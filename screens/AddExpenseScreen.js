@@ -16,6 +16,7 @@ import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { createExpense, updateExpense } from '../services/expenseService';
 import FriendSelector from '../components/FriendSelector';
+import InviteFriendSheet from '../components/InviteFriendSheet';
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
@@ -25,6 +26,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [title, setTitle] = useState(expense?.title || '');
   const [participants, setParticipants] = useState(expense?.participants || [{ name: 'Me' }]);
   const [selectedFriends, setSelectedFriends] = useState([]);
+  const [placeholders, setPlaceholders] = useState([]);
+  const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
   const [items, setItems] = useState(expense?.items || []);
   const [loading, setLoading] = useState(false);
 
@@ -103,10 +106,38 @@ const AddExpenseScreen = ({ route, navigation }) => {
   useEffect(() => {
     const allParticipants = [
       { name: 'Me' },
-      ...selectedFriends.map(friend => ({ name: friend.name }))
+      ...selectedFriends.map(friend => ({ name: friend.name, userId: friend.id })),
+      ...placeholders.map(p => ({ name: p.name, placeholder: true, phoneNumber: p.phoneNumber }))
     ];
     setParticipants(allParticipants);
-  }, [selectedFriends]);
+  }, [selectedFriends, placeholders]);
+
+  const handleAddPlaceholder = (ghost) => {
+    setPlaceholders(prev => [...prev, ghost]);
+  };
+
+  const handleInvitePlaceholder = (ghost) => {
+    setInviteTarget({ name: ghost.name, phone: ghost.phoneNumber || '' });
+  };
+
+  const removePlaceholder = (ghostId) => {
+    const indexInPlaceholders = placeholders.findIndex(p => p.id === ghostId);
+    if (indexInPlaceholders < 0) return;
+    // Compute participant index in the combined participants array
+    const removedParticipantIndex = 1 + selectedFriends.length + indexInPlaceholders; // 0 is Me
+
+    // Adjust item splits similar to previous removeParticipant logic
+    setItems(prevItems => prevItems.map(item => ({
+      ...item,
+      splits: item.splits?.filter(split => split.participantIndex !== removedParticipantIndex)
+        .map(split => ({
+          ...split,
+          participantIndex: split.participantIndex > removedParticipantIndex ? split.participantIndex - 1 : split.participantIndex
+        })) || []
+    })));
+
+    setPlaceholders(prev => prev.filter(p => p.id !== ghostId));
+  };
 
   const addItem = () => {
     const newItem = {
@@ -412,10 +443,33 @@ const AddExpenseScreen = ({ route, navigation }) => {
               onFriendsChange={setSelectedFriends}
               maxFriends={9}
               placeholder="Add friends to split with..."
+              allowPlaceholders={true}
+              onAddPlaceholder={handleAddPlaceholder}
             />
-            <Text style={styles.participantsNote}>
-              You'll automatically be included as a participant
-            </Text>
+            {/* Render placeholder chips with Invite buttons */}
+            {placeholders.length > 0 && (
+              <View style={{ marginTop: Spacing.sm }}>
+                {placeholders.map((p, idx) => (
+                  <View key={p.id} style={styles.placeholderRow}>
+                    <View style={styles.placeholderAvatar}>
+                      <Text style={styles.placeholderInitials}>{p.name?.[0] || '?'}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.placeholderName}>{p.name}</Text>
+                      <Text style={styles.placeholderMeta}>{p.phoneNumber ? `Phone: ${p.phoneNumber}` : 'No phone added'}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.inviteButton} onPress={() => handleInvitePlaceholder(p)}>
+                      <Ionicons name="qr-code" size={16} color={Colors.surface} />
+                      <Text style={styles.inviteButtonText}>Invite</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.removeButton} onPress={() => removePlaceholder(p.id)}>
+                      <Ionicons name="trash" size={18} color={Colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+            <Text style={styles.participantsNote}>You'll automatically be included as a participant</Text>
           </View>
 
           <View style={[styles.section, styles.lastSection]}>
@@ -450,6 +504,14 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <InviteFriendSheet
+        visible={!!inviteTarget}
+        onClose={() => setInviteTarget(null)}
+        expenseId={expense?.id}
+        placeholderName={inviteTarget?.name || ''}
+        phoneNumber={inviteTarget?.phone || ''}
+      />
     </View>
   );
 };
@@ -720,6 +782,40 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     fontStyle: 'italic',
   },
+  placeholderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    ...Shadows.card,
+  },
+  placeholderAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  placeholderInitials: { ...Typography.title, color: Colors.textSecondary, fontWeight: '600' },
+  placeholderName: { ...Typography.title, color: Colors.textPrimary },
+  placeholderMeta: { ...Typography.body, color: Colors.textSecondary },
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+  },
+  inviteButtonText: { ...Typography.label, color: Colors.surface, fontWeight: '600' },
+  removeButton: { marginLeft: Spacing.sm },
   footer: {
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.lg,

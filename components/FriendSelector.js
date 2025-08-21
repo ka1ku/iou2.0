@@ -20,12 +20,16 @@ const FriendSelector = ({
   onFriendsChange, 
   maxFriends = 10,
   showAddButton = true,
-  placeholder = "Select friends to split with..."
+  placeholder = "Select friends to split with...",
+  allowPlaceholders = true,
+  onAddPlaceholder
 }) => {
   const [friends, setFriends] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [newPlaceholder, setNewPlaceholder] = useState({ name: '', phone: '' });
+  const [showPhoneQuick, setShowPhoneQuick] = useState(false);
 
   useEffect(() => {
     loadFriends();
@@ -195,6 +199,52 @@ const FriendSelector = ({
               />
             </View>
 
+            {/* Quick Add Placeholder (integrated with search) */}
+            {allowPlaceholders && searchQuery.trim().length > 0 && (
+              <View style={styles.quickAddCard}>
+                <View style={styles.quickAddRow}>
+                  <Ionicons name="person-add" size={20} color={Colors.accent} />
+                  <Text style={styles.quickAddText}>
+                    Add "{searchQuery.trim()}" as placeholder
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.quickAddButton}
+                    onPress={() => {
+                      const name = searchQuery.trim();
+                      if (!name) return;
+                      const ghost = {
+                        id: `ghost-${Date.now()}`,
+                        name,
+                        phoneNumber: newPlaceholder.phone.trim() || undefined,
+                        isPlaceholder: true,
+                      };
+                      onAddPlaceholder?.(ghost);
+                      setSearchQuery('');
+                      setNewPlaceholder({ name: '', phone: '' });
+                      setShowPhoneQuick(false);
+                    }}
+                  >
+                    <Text style={styles.quickAddButtonText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={() => setShowPhoneQuick(v => !v)}>
+                  <Text style={styles.quickAddPhoneToggle}>
+                    {showPhoneQuick ? 'Hide phone' : 'Add phone number'}
+                  </Text>
+                </TouchableOpacity>
+                {showPhoneQuick && (
+                  <TextInput
+                    style={[styles.input, { marginTop: Spacing.sm }]}
+                    placeholder="Phone (optional)"
+                    keyboardType="phone-pad"
+                    placeholderTextColor={Colors.textSecondary}
+                    value={newPlaceholder.phone}
+                    onChangeText={(t) => setNewPlaceholder({ ...newPlaceholder, phone: t })}
+                  />
+                )}
+              </View>
+            )}
+
             {/* Friends List */}
             <FlatList
               data={filteredFriends}
@@ -232,6 +282,7 @@ const FriendSelector = ({
           </View>
         </View>
       </Modal>
+
     </View>
   );
 };
@@ -414,6 +465,24 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
   },
+  quickAddCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    ...Shadows.card,
+  },
+  quickAddRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  quickAddText: { ...Typography.body, color: Colors.textPrimary, flex: 1, marginLeft: Spacing.sm },
+  quickAddButton: { backgroundColor: Colors.accent, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.pill },
+  quickAddButtonText: { ...Typography.label, color: Colors.surface, fontWeight: '600' },
+  quickAddPhoneToggle: { ...Typography.label, color: Colors.accent, marginTop: Spacing.sm },
   selectionSummary: {
     ...Typography.body,
     color: Colors.textSecondary,
@@ -428,6 +497,17 @@ const styles = StyleSheet.create({
     ...Typography.title,
     color: Colors.surface,
     fontWeight: '600',
+  },
+  inputRow: { marginBottom: Spacing.md },
+  inputLabel: { ...Typography.label, color: Colors.textSecondary, marginBottom: Spacing.xs },
+  input: {
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    ...Typography.body,
+    color: Colors.textPrimary,
   },
 });
 

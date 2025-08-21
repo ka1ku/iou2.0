@@ -32,6 +32,7 @@ import VerifyOTPScreen from './screens/VerifyOTPScreen';
 import TwoFactorAuthScreen from './screens/TwoFactorAuthScreen';
 import FriendsScreen from './screens/FriendsScreen';
 import FriendInvitationHandler from './components/FriendInvitationHandler';
+import ExpenseJoinHandler from './components/ExpenseJoinHandler';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -406,6 +407,7 @@ export default function App() {
         <ReceiptScanningProvider>
           {user ? <MainTabs /> : <AuthStack />}
           <FriendInvitationHandler />
+          <ExpenseJoinHandler />
         </ReceiptScanningProvider>
       </NavigationContainer>
     </SafeAreaProvider>

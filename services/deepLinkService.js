@@ -1,5 +1,6 @@
 import { Linking } from 'react-native';
 import { parseFriendInviteLink } from './friendService';
+import { parseExpenseJoinLink } from './expenseService';
 import { getCurrentUser } from './authService';
 
 class DeepLinkService {
@@ -40,6 +41,13 @@ class DeepLinkService {
       return;
     }
 
+    // Parse expense join
+    const expenseJoin = parseExpenseJoinLink(url);
+    if (expenseJoin) {
+      this.handleExpenseJoin(expenseJoin);
+      return;
+    }
+
     // Add more deep link handlers here as needed
     console.log('Unknown deep link format:', url);
   }
@@ -66,6 +74,16 @@ class DeepLinkService {
       
     } catch (error) {
       console.error('Error handling friend invite:', error);
+    }
+  }
+
+  // Handle expense join deep links
+  async handleExpenseJoin(joinData) {
+    try {
+      // Do not require auth here; join screen will handle auth
+      this.notifyListeners('expenseJoin', joinData);
+    } catch (error) {
+      console.error('Error handling expense join:', error);
     }
   }
 
