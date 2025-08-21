@@ -1,0 +1,75 @@
+// Centralized design tokens for consistent styling across the app
+
+export const Colors = {
+  background: '#F5F1E8', // Warm cream background
+  surface: '#FFFFFF',
+  card: '#FFF8F0', // Slightly warmer card background
+  textPrimary: '#2C2C2C',
+  textSecondary: '#8A8A8A',
+  accent: '#D4A574', // Warm gold/amber accent
+  accentDark: '#B8935F',
+  success: '#7FB069',
+  danger: '#E56B6F',
+  blue: '#4A90E2', // Blue for receipt scanning button
+  divider: '#E8E0D5',
+  tabActive: '#2C2C2C',
+  tabInactive: '#B8935F',
+};
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
+};
+
+export const Radius = {
+  sm: 12,
+  md: 20,
+  lg: 24,
+  xl: 32,
+  pill: 999,
+};
+
+export const Shadows = {
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+};
+
+export const Typography = {
+  // Poppins font family keys we will load in App.js
+  familyRegular: 'Poppins_400Regular',
+  familyMedium: 'Poppins_500Medium',
+  familySemiBold: 'Poppins_600SemiBold',
+  familyBold: 'Poppins_700Bold',
+
+  h1: {
+    fontSize: 32,
+    fontFamily: 'Poppins_700Bold',
+  },
+  h2: {
+    fontSize: 24,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  title: {
+    fontSize: 18,
+    fontFamily: 'Poppins_600SemiBold',
+  },
+  body: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+  },
+  label: {
+    fontSize: 12,
+    fontFamily: 'Poppins_500Medium',
+  },
+};
+
+

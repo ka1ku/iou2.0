@@ -1,0 +1,72 @@
+{
+  "expo": {
+    "name": "IOU App",
+    "slug": "iou-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "com.kailee.iou20",
+    "universalLinks": {
+      "ios": {
+        "applinks": "com.kailee.iou20"
+      },
+      "android": {
+        "intentFilters": [
+          {
+            "action": "VIEW",
+            "autoVerify": true,
+            "data": [
+              {
+                "scheme": "https",
+                "host": "kailee.iou20.com"
+              }
+            ],
+            "category": ["BROWSABLE", "DEFAULT"]
+          }
+        ]
+      }
+    },
+    "icon": "./assets/appstore.png",
+    "splash": {
+      "image": "./assets/appstore.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.kailee.iou20",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "venmo"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.kailee.iou20",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to scan receipts and extract expense information.",
+          "cameraPermission": "The app accesses your camera to take photos of receipts for expense scanning."
+        }
+      ],
+      "expo-file-system"
+    ]
+  }
+}
