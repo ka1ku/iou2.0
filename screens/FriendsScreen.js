@@ -15,7 +15,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import VenmoProfilePicture from '../components/VenmoProfilePicture';
+import ProfilePicture from '../components/VenmoProfilePicture';
+import DeleteButton from '../components/DeleteButton';
 import { getCurrentUser } from '../services/authService';
 import { 
   getUserFriends, 
@@ -234,16 +235,18 @@ const FriendsScreen = ({ navigation }) => {
     <View style={styles.requestCard}>
       <View style={styles.requestInfo}>
         <View style={styles.requestAvatar}>
-          <VenmoProfilePicture
-            source={item.fromUserProfile?.venmoProfilePic}
+          <ProfilePicture
+            source={item.fromUserProfile?.profilePhoto}
             size={36}
             username={item.fromUserProfile?.venmoUsername || `${item.fromUserProfile?.firstName || ''} ${item.fromUserProfile?.lastName || ''}`}
           />
         </View>
         <Text style={styles.requestName}>
-          {item.fromUserProfile?.venmoUsername ? `@${item.fromUserProfile.venmoUsername}` : `${item.fromUserProfile?.firstName || ''} ${item.fromUserProfile?.lastName || ''}`}
+          {`${item.fromUserProfile?.firstName || ''} ${item.fromUserProfile?.lastName || ''}`.trim() || 'Unknown Name'}
         </Text>
-        <Text style={styles.requestPhone}>{formatPhone(item.fromUserProfile?.phoneNumber || '')}</Text>
+        {item.fromUserProfile?.venmoUsername && (
+          <Text style={styles.requestUsername}>@{item.fromUserProfile.venmoUsername}</Text>
+        )}
       </View>
       <View style={styles.requestActions}>
         <TouchableOpacity
@@ -253,60 +256,73 @@ const FriendsScreen = ({ navigation }) => {
         >
           <Ionicons name="checkmark-circle" size={28} color={Colors.accent} />
         </TouchableOpacity>
-        <TouchableOpacity
-          accessibilityLabel="Decline friend request"
-          style={styles.iconAction}
+        <DeleteButton
           onPress={() => handleDeclineRequest(item.id)}
-        >
-          <Ionicons name="close-circle" size={28} color={Colors.danger} />
-        </TouchableOpacity>
+          size="large"
+          variant="subtle"
+          testID="decline-friend-request"
+        />
       </View>
     </View>
   );
 
   const renderFriend = ({ item }) => (
-    <View style={styles.friendCard}>
+    <TouchableOpacity 
+      style={styles.friendCard}
+      onPress={() => navigation.navigate('FriendProfile', { 
+        friend: {
+          friendId: item.friendId,
+          name: item.friendData.venmoUsername
+            ? `@${item.friendData.venmoUsername}`
+            : `${item.friendData.firstName} ${item.friendData.lastName}`,
+          venmoUsername: item.friendData.venmoUsername,
+          profilePhoto: item.friendData.profilePhoto,
+          firstName: item.friendData.firstName,
+          lastName: item.friendData.lastName,
+        }
+      })}
+      activeOpacity={0.7}
+    >
       <View style={styles.friendInfo}>
         <View style={styles.friendAvatar}>
-          <VenmoProfilePicture
-            source={item.friendData.venmoProfilePic}
+          <ProfilePicture
+            source={item.friendData.profilePhoto}
             size={40}
             username={item.friendData.venmoUsername || `${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`}
           />
         </View>
         <View style={styles.friendDetails}>
           <Text style={styles.friendName}>
-            {item.friendData.venmoUsername
-              ? `@${item.friendData.venmoUsername}`
-              : `${item.friendData.firstName} ${item.friendData.lastName}`}
+            {`${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`.trim() || 'Unknown Name'}
           </Text>
-          <Text style={styles.friendPhone}>{formatPhone(item.friendData.phoneNumber)}</Text>
+          {item.friendData.venmoUsername && (
+            <Text style={styles.friendUsername}>@{item.friendData.venmoUsername}</Text>
+          )}
         </View>
       </View>
-      <TouchableOpacity
-        style={styles.removeFriendButton}
-        onPress={() => handleRemoveFriend(item.friendId, `${item.friendData.firstName} ${item.friendData.lastName}`)}
-      >
-        <Ionicons name="close-circle" size={22} color={Colors.danger} />
-      </TouchableOpacity>
-    </View>
+      <View style={styles.friendActions}>
+        <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+      </View>
+    </TouchableOpacity>
   );
 
   const renderSearchResult = ({ item }) => (
     <View style={styles.searchResultCard}>
       <View style={styles.searchResultInfo}>
         <View style={styles.searchResultAvatar}>
-          <VenmoProfilePicture
-            source={item.venmoProfilePic}
+          <ProfilePicture
+            source={item.profilePhoto}
             size={40}
             username={item.venmoUsername || `${item.firstName || ''} ${item.lastName || ''}`}
           />
         </View>
         <View style={styles.searchResultDetails}>
           <Text style={styles.searchResultName}>
-            {item.venmoUsername ? `@${item.venmoUsername}` : `${item.firstName} ${item.lastName}`}
+            {`${item.firstName || ''} ${item.lastName || ''}`.trim() || 'Unknown Name'}
           </Text>
-          <Text style={styles.searchResultPhone}>{formatPhone(item.phoneNumber)}</Text>
+          {item.venmoUsername && (
+            <Text style={styles.searchResultUsername}>@{item.venmoUsername}</Text>
+          )}
         </View>
       </View>
       <TouchableOpacity
@@ -329,13 +345,7 @@ const FriendsScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
         <Text style={styles.headerTitle}>Friends</Text>
         <TouchableOpacity style={styles.shareButton} onPress={handleShareInvite}>
           <Ionicons name="share-outline" size={24} color={Colors.accent} />
@@ -431,24 +441,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.md,
     backgroundColor: Colors.surface,
-    ...Shadows.card,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
     ...Shadows.card,
   },
   headerTitle: {
     ...Typography.h2,
     color: Colors.textPrimary,
     flex: 1,
-    textAlign: 'center',
   },
   shareButton: {
     width: 40,
@@ -462,11 +462,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.md,
   },
   section: {
     backgroundColor: Colors.card,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
     padding: Spacing.lg,
     borderRadius: Radius.lg,
     ...Shadows.card,
@@ -480,12 +480,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...Typography.title,
     color: Colors.textPrimary,
+    marginBottom: Spacing.md,
   },
   toggleButton: {
     padding: Spacing.sm,
   },
   addFriendForm: {
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
   },
   phoneInput: {
     borderWidth: 1,
@@ -519,16 +520,19 @@ const styles = StyleSheet.create({
   },
   requestInfo: {
     flex: 1,
+    paddingRight: Spacing.sm,
+  },
+  requestAvatar: {
+    marginBottom: Spacing.xs,
   },
   requestName: {
     ...Typography.title,
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
-  requestPhone: {
+  requestUsername: {
     ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+    color: Colors.accent,
   },
   requestVenmo: {
     ...Typography.label,
@@ -537,6 +541,11 @@ const styles = StyleSheet.create({
   requestActions: {
     flexDirection: 'row',
     gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  iconAction: {
+    padding: Spacing.xs,
+    borderRadius: Radius.sm,
   },
   requestButton: {
     paddingHorizontal: Spacing.md,
@@ -573,6 +582,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingRight: Spacing.sm,
   },
   friendAvatar: {
     width: 40,
@@ -596,18 +606,20 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
-  friendPhone: {
+  friendUsername: {
     ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+    color: Colors.accent,
+  },
+  friendActions: {
+    padding: Spacing.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   friendVenmo: {
     ...Typography.label,
     color: Colors.accent,
   },
-  removeFriendButton: {
-    padding: Spacing.sm,
-  },
+
   searchResultCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -620,6 +632,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    paddingRight: Spacing.sm,
   },
   searchResultAvatar: {
     width: 40,
@@ -643,10 +656,9 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
-  searchResultPhone: {
+  searchResultUsername: {
     ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+    color: Colors.accent,
   },
   searchResultVenmo: {
     ...Typography.label,
@@ -665,23 +677,26 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.md,
   },
   emptyStateText: {
     ...Typography.title,
     color: Colors.textPrimary,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.md,
   },
   emptyStateSubtext: {
     ...Typography.body,
     color: Colors.textSecondary,
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
     textAlign: 'center',
+    paddingHorizontal: Spacing.md,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
   },
   loadingText: {
     ...Typography.body,
@@ -691,3 +706,4 @@ const styles = StyleSheet.create({
 });
 
 export default FriendsScreen;
+

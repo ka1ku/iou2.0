@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Image, StyleSheet, Text } from 'react-native';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 
-const VenmoProfilePicture = ({ 
+const ProfilePicture = ({ 
   source, 
   size = 60, 
   username = '', 
@@ -78,6 +78,7 @@ const VenmoProfilePicture = ({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
+    marginRight: Spacing.lg,
   },
   image: {
     backgroundColor: Colors.surface,
@@ -96,4 +97,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default VenmoProfilePicture;
+export default ProfilePicture;

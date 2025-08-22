@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   StatusBar,
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
+import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
+import Button from '../../components/Button';
 
 const WelcomeScreen = ({ navigation }) => {
   return (
@@ -20,7 +20,7 @@ const WelcomeScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('../assets/appstore.png')} 
+            source={require('../../assets/appstore.png')} 
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -31,39 +31,53 @@ const WelcomeScreen = ({ navigation }) => {
         </Text>
       </View>
 
+      {/* Background Accent */}
+      <View style={styles.backgroundAccent} />
+
       {/* Features Section */}
       <View style={styles.featuresContainer}>
         <View style={styles.feature}>
-          <Ionicons name="people-outline" size={32} color={Colors.accent} />
+          <View style={styles.iconContainer}>
+            <Ionicons name="people-outline" size={28} color={Colors.accent} />
+          </View>
           <Text style={styles.featureText}>Split with Groups</Text>
         </View>
         <View style={styles.feature}>
-          <Ionicons name="calculator-outline" size={32} color={Colors.accent} />
+          <View style={styles.iconContainer}>
+            <Ionicons name="calculator-outline" size={28} color={Colors.accent} />
+          </View>
           <Text style={styles.featureText}>Auto Calculate</Text>
         </View>
         <View style={styles.feature}>
-          <Ionicons name="sync-outline" size={32} color={Colors.accent} />
+          <View style={styles.iconContainer}>
+            <Ionicons name="sync-outline" size={28} color={Colors.accent} />
+          </View>
           <Text style={styles.featureText}>Real-time Sync</Text>
         </View>
       </View>
 
+      {/* Visual Separator */}
+      <View style={styles.separator} />
+
       {/* Action Buttons */}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.primaryButton]}
+        <Button
+          title="Create Account"
           onPress={() => navigation.navigate('SignUp')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.primaryButtonText}>Create Account</Text>
-        </TouchableOpacity>
+          variant="primary"
+          size="large"
+          fullWidth
+          style={styles.createAccountButton}
+        />
         
-        <TouchableOpacity
-          style={[styles.button, styles.secondaryButton]}
+        <Button
+          title="Sign In"
           onPress={() => navigation.navigate('SignIn')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.secondaryButtonText}>Sign In</Text>
-        </TouchableOpacity>
+          variant="outline"
+          size="large"
+          fullWidth
+          style={styles.button}
+        />
       </View>
     </SafeAreaView>
   );
@@ -84,17 +98,16 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: Radius.xl,
-    backgroundColor: Colors.background, // Subtle background that matches the app theme
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.xl,
-    ...Shadows.card,
-    overflow: 'hidden', // Ensures the image respects the rounded corners
+    overflow: 'hidden',
   },
   logoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: Radius.xl, // Match the container's border radius
+    borderRadius: Radius.xl,
   },
   title: {
     ...Typography.h1,
@@ -107,6 +120,8 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.xxl,
+    lineHeight: 22,
+    paddingHorizontal: Spacing.lg,
   },
   featuresContainer: {
     flexDirection: 'row',
@@ -117,41 +132,57 @@ const styles = StyleSheet.create({
   feature: {
     alignItems: 'center',
     flex: 1,
+    paddingHorizontal: Spacing.xs,
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.lg,
+    backgroundColor: Colors.accent + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.accent + '25',
   },
   featureText: {
     ...Typography.label,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     textAlign: 'center',
-    marginTop: Spacing.sm,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
   },
   buttonContainer: {
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.xl,
+    paddingTop: Spacing.lg,
+  },
+  createAccountButton: {
+    marginBottom: Spacing.md,
+    shadowOpacity: 0,
+    elevation: 0,
+    color: Colors.white,
   },
   button: {
-    height: 56,
-    borderRadius: Radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: Spacing.md,
   },
-  primaryButton: {
-    backgroundColor: Colors.accent,
-    ...Shadows.card,
+  backgroundAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 150,
+    backgroundColor: Colors.accent + '05', // A very subtle accent background
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
   },
-  primaryButtonText: {
-    ...Typography.title,
-    color: 'white',
+  separator: {
+    height: Spacing.md,
+    backgroundColor: Colors.background,
+    marginVertical: Spacing.md,
   },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: Colors.accent,
-  },
-  secondaryButtonText: {
-    ...Typography.title,
-    color: Colors.accent,
-  },
+
 });
 
 export default WelcomeScreen;

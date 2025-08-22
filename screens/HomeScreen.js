@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { useFocusEffect } from '@react-navigation/native';
 import { getCurrentUser, onAuthStateChange } from '../services/authService';
-import { getUserExpenses, deleteExpense } from '../services/expenseService';
+import { getUserExpenses } from '../services/expenseService';
 import * as ImagePicker from 'expo-image-picker';
 import { getApp } from '@react-native-firebase/app';
 import { getAI, getGenerativeModel } from '@react-native-firebase/ai';
@@ -29,11 +29,10 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scanningReceipt, setScanningReceipt] = useState(false);
+
   
   // Get the global receipt scanning context
   const { setIsReceiptScanning, setShowScanningOverlay, startScanningAnimation, stopScanningAnimation } = useReceiptScanning();
-
-
 
   useEffect(() => {
     // Listen for auth state changes and load expenses when user is available
@@ -61,6 +60,8 @@ const HomeScreen = ({ navigation }) => {
       if (currentUser) {
         const userExpenses = await getUserExpenses(currentUser.uid);
         setExpenses(userExpenses);
+        
+
       }
     } catch (error) {
       console.error('Error loading expenses:', error);
@@ -76,31 +77,49 @@ const HomeScreen = ({ navigation }) => {
     loadExpenses();
   };
 
-
-
-
-
-  const handleDeleteExpense = (expenseId, expenseTitle) => {
-    Alert.alert(
-      'Delete Expense',
-      `Are you sure you want to delete "${expenseTitle}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteExpense(expenseId);
-              setExpenses(expenses.filter(exp => exp.id !== expenseId));
-            } catch (error) {
-              Alert.alert('Error', 'Failed to delete expense');
-            }
-          }
+  // Calculate how much you owe for a specific expense
+  const calculateExpenseBalance = (expense) => {
+    const currentUserIndex = 0; // Assuming current user is always first participant
+    let youOwe = 0;
+    let youPaid = 0;
+    
+    expense.items?.forEach(item => {
+      const paidByIndex = item.paidBy || 0;
+      const itemAmount = parseFloat(item.amount) || 0;
+      
+      if (item.splitType === 'even') {
+        const splitAmount = itemAmount / expense.participants.length;
+        
+        if (paidByIndex === currentUserIndex) {
+          // You paid for this item
+          youPaid += itemAmount;
+          // Others owe you their share
+          youOwe -= (expense.participants.length - 1) * splitAmount;
+        } else {
+          // Someone else paid, you owe your share
+          youOwe += splitAmount;
         }
-      ]
-    );
+      } else if (item.splitType === 'custom') {
+        const yourSplit = item.splits?.find(split => split.participantIndex === currentUserIndex);
+        const yourAmount = yourSplit ? parseFloat(yourSplit.amount) || 0 : 0;
+        
+        if (paidByIndex === currentUserIndex) {
+          // You paid for this item
+          youPaid += itemAmount;
+          // You owe the difference between what you paid and your share
+          youOwe -= (itemAmount - yourAmount);
+        } else {
+          // Someone else paid, you owe your share
+          youOwe += yourAmount;
+        }
+      }
+    });
+    
+    return { youOwe, youPaid };
   };
+
+
+
 
 
 
@@ -274,13 +293,22 @@ const HomeScreen = ({ navigation }) => {
 
 {
   "title": "Receipt title or business name",
-  "total": "Total amount as a number",
-  "date": "Date of purchase (YYYY-MM-DD format)",
+  "date": "Date of purchase (YYYY-MM-DD)",
+  "subtotal": "Items subtotal BEFORE tax/tip/fees as a number",
+  "total": "Grand total as a number",
   "items": [
     {
       "name": "Item name",
       "amount": "Item price as a number",
       "quantity": "Quantity as a number"
+    }
+  ],
+  "fees": [
+    {
+      "name": "Tax | Tip | Gratuity | Service Fee | Delivery Fee | Convenience Fee | Surcharge",
+      "type": "percentage | fixed",
+      "percentage": "If percentage-based, the percent number; else null",
+      "amount": "Numeric amount of this fee"
     }
   ],
   "participants": [
@@ -293,14 +321,14 @@ const HomeScreen = ({ navigation }) => {
 }
 
 Important guidelines:
-- Extract only the information that is clearly visible on the receipt
+- Identify and include common charges under fees: Tax (Sales Tax), Tip/Gratuity, Service Fee, Delivery Fee, Convenience Fee, Surcharge
 - Convert all monetary amounts to numbers (remove $ signs and commas)
+- Provide BOTH amount and percentage when possible; if one is missing but can be derived from subtotal, compute it
+- If subtotal is not printed, compute it by summing item amounts
+- Ensure total ≈ subtotal + sum(fees)
 - If a date is not clearly visible, use today's date
-- If item details are not clear, estimate based on what you can see
 - Ensure the JSON is valid and properly formatted
-- Focus on accuracy - if something is unclear, don't guess
-
-Please respond with ONLY the JSON data, no additional text.`;
+- Respond with ONLY the JSON data, no extra text.`;
 
       // Create the content parts array as per Firebase AI documentation
       const contentParts = [
@@ -322,13 +350,58 @@ Please respond with ONLY the JSON data, no additional text.`;
       if (jsonMatch) {
         try {
           const receiptData = JSON.parse(jsonMatch[0]);
-          
-          // Validate the receipt data structure
-          if (!receiptData.title || !receiptData.total) {
+
+          // Basic validation
+          if (!receiptData.title || receiptData.total === undefined || receiptData.total === null) {
             throw new Error('AI response missing required fields (title or total)');
           }
-          
-          return receiptData;
+
+          // Normalize numeric fields
+          const items = Array.isArray(receiptData.items) ? receiptData.items.map(it => ({
+            name: it.name || '',
+            amount: Number(it.amount) || 0,
+            quantity: Number(it.quantity) || 1,
+          })) : [];
+
+          // Compute subtotal if missing
+          const computedSubtotal = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+          const subtotal = Number(receiptData.subtotal);
+          const normalizedSubtotal = Number.isFinite(subtotal) ? subtotal : computedSubtotal;
+
+          // Normalize fees
+          const rawFees = Array.isArray(receiptData.fees) ? receiptData.fees : [];
+          const normalizedFees = rawFees.map(f => {
+            const name = (f.name || '').trim() || 'Fee';
+            const pct = f.percentage !== undefined && f.percentage !== null ? Number(f.percentage) : NaN;
+            const amt = f.amount !== undefined && f.amount !== null ? Number(f.amount) : NaN;
+            let type = f.type === 'percentage' || f.type === 'fixed' ? f.type : (Number.isFinite(pct) ? 'percentage' : 'fixed');
+
+            let percentage = Number.isFinite(pct) ? pct : null;
+            let amount = Number.isFinite(amt) ? amt : null;
+
+            if (type === 'percentage') {
+              if (percentage === null && Number.isFinite(amount) && normalizedSubtotal > 0) {
+                percentage = (amount / normalizedSubtotal) * 100;
+              }
+              if (amount === null && Number.isFinite(percentage)) {
+                amount = (normalizedSubtotal * percentage) / 100;
+              }
+            }
+
+            // Fallbacks
+            if (!Number.isFinite(amount)) amount = 0;
+            if (!Number.isFinite(percentage)) percentage = null;
+
+            return { name, type, percentage, amount };
+          });
+
+          return {
+            ...receiptData,
+            items,
+            subtotal: normalizedSubtotal,
+            fees: normalizedFees,
+            total: Number(receiptData.total) || 0,
+          };
         } catch (parseError) {
           console.error('JSON parsing error:', parseError);
           throw new Error('AI response contained invalid JSON format: ' + parseError.message);
@@ -351,6 +424,7 @@ Please respond with ONLY the JSON data, no additional text.`;
   const renderExpenseItem = ({ item }) => {
     const totalItems = item.items?.length || 0;
     const totalParticipants = item.participants?.length || 0;
+    const expenseBalance = calculateExpenseBalance(item);
     
     // Calculate payment summary
     const paymentSummary = {};
@@ -365,15 +439,28 @@ Please respond with ONLY the JSON data, no additional text.`;
       <TouchableOpacity
         style={styles.expenseCard}
         onPress={() => navigation.navigate('AddExpense', { expense: item })}
+        activeOpacity={0.8}
       >
         <View style={styles.expenseHeader}>
           <Text style={styles.expenseTitle}>{item.title}</Text>
-          <TouchableOpacity
-            onPress={() => handleDeleteExpense(item.id, item.title)}
-            style={styles.deleteButton}
-          >
-            <Ionicons name="trash-outline" size={20} color="#ff4444" />
-          </TouchableOpacity>
+          <View style={styles.expenseBalance}>
+            {expenseBalance.youOwe > 0 ? (
+              <View style={styles.oweContainer}>
+                <Ionicons name="arrow-up-circle" size={16} color={Colors.danger} />
+                <Text style={styles.oweText}>You owe ${expenseBalance.youOwe.toFixed(2)}</Text>
+              </View>
+            ) : expenseBalance.youOwe < 0 ? (
+              <View style={styles.owedContainer}>
+                <Ionicons name="arrow-down-circle" size={16} color={Colors.success} />
+                <Text style={styles.owedText}>You're owed ${Math.abs(expenseBalance.youOwe).toFixed(2)}</Text>
+              </View>
+            ) : (
+              <View style={styles.evenContainer}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                <Text style={styles.evenText}>Settled up</Text>
+              </View>
+            )}
+          </View>
         </View>
         
         <View style={styles.expenseDetails}>
@@ -454,6 +541,8 @@ Please respond with ONLY the JSON data, no additional text.`;
         </View>
       </View>
 
+
+
       <FlatList
         data={expenses}
         renderItem={renderExpenseItem}
@@ -493,6 +582,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+
   receiptButton: {
     backgroundColor: Colors.blue,
     width: 44,
@@ -540,53 +630,108 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
     ...Shadows.card,
   },
   expenseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   expenseTitle: {
     ...Typography.title,
     color: Colors.textPrimary,
     flex: 1,
+    marginRight: Spacing.sm,
   },
-  deleteButton: {
-    padding: 4,
+  expenseBalance: {
+    alignItems: 'flex-end',
   },
+  oweContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.danger + '15',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.danger + '30',
+  },
+  oweText: {
+    ...Typography.label,
+    color: Colors.danger,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  owedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.success + '15',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.success + '30',
+  },
+  owedText: {
+    ...Typography.label,
+    color: Colors.success,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  evenContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.success + '15',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.success + '30',
+  },
+  evenText: {
+    ...Typography.label,
+    color: Colors.success,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+
   expenseDetails: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   expenseTotal: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: Typography.familySemiBold,
-    color: Colors.blue,
+    color: Colors.accent,
+    fontWeight: '700',
   },
   expenseInfo: {
     ...Typography.body,
     color: Colors.textSecondary,
-    marginTop: 4,
+    marginTop: 6,
   },
   participantsContainer: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
   },
   participantsLabel: {
     ...Typography.label,
     color: Colors.textSecondary,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   participantsList: {
     ...Typography.body,
     color: Colors.textPrimary,
-    marginTop: 2,
+    lineHeight: 20,
   },
   paymentSummaryContainer: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
   },
@@ -594,28 +739,33 @@ const styles = StyleSheet.create({
     ...Typography.label,
     color: Colors.textSecondary,
     marginBottom: Spacing.sm,
+    fontWeight: '600',
   },
   paymentSummaryList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: Spacing.sm,
   },
   paymentSummaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.background,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   paymentSummaryName: {
     ...Typography.label,
     color: Colors.textPrimary,
-    marginRight: 4,
+    marginRight: 6,
+    fontWeight: '500',
   },
   paymentSummaryAmount: {
     ...Typography.label,
     color: Colors.accent,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

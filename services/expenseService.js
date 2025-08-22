@@ -44,7 +44,13 @@ export const createExpense = async (expenseData, userId) => {
       createdBy: userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      items: expenseData.items || []
+      items: expenseData.items || [],
+      join: {
+        enabled: true,
+        code: generateJoinCode(),
+        token: generateInviteToken(),
+        createdAt: serverTimestamp(),
+      }
     };
     
     // Add to Firestore using modular API with getApp()
@@ -124,54 +130,64 @@ export const deleteExpense = async (expenseId, userId) => {
 
 // Generate a random token and a 6-digit code
 const generateInviteToken = () => Math.random().toString(36).slice(2, 12);
-const generateJoinCode = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generateJoinCode = () => {
+  const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+};
 
-// Create an invite for a placeholder participant
-export const createExpenseInvite = async (expenseId, options) => {
+// Get or (optionally) initialize expense join info (room code)
+export const getExpenseJoinInfo = async (expenseId, { initializeIfMissing = false } = {}) => {
   try {
-    const {
-      placeholderId,
-      placeholderName,
-      phoneNumber,
-      ttlMinutes = 15,
-    } = options || {};
-
     if (!expenseId) throw new Error('Missing expenseId');
 
     const firestoreInstance = getFirestore(getApp());
 
-    // Validate expense exists
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     const expenseSnap = await getDoc(expenseRef);
     if (!expenseSnap.exists()) throw new Error('Expense not found');
-
-    const token = generateInviteToken();
-    const code = generateJoinCode();
-    const nowMs = Date.now();
-    const expiresAtMs = nowMs + ttlMinutes * 60 * 1000;
-
-    const inviteData = {
-      expenseId,
-      token,
-      code,
-      placeholderId: placeholderId || null,
-      placeholderName: placeholderName || null,
-      phoneNumber: phoneNumber || null,
-      used: false,
+    const expense = expenseSnap.data();
+    if (expense.join && expense.join.code && expense.join.token) {
+      return expense.join;
+    }
+    if (!initializeIfMissing) return null;
+    const join = {
+      enabled: true,
+      code: generateJoinCode(),
+      token: generateInviteToken(),
       createdAt: serverTimestamp(),
-      expiresAtMs,
     };
-
-    // Store under subcollection for better locality
-    const invitesCol = collection(firestoreInstance, 'expenses', expenseId, 'invites');
-    const inviteRef = await addDoc(invitesCol, inviteData);
-
-    return {
-      id: inviteRef.id,
-      ...inviteData,
-    };
+    await updateDoc(expenseRef, { join, updatedAt: serverTimestamp() });
+    return join;
   } catch (error) {
-    console.error('Error creating expense invite:', error);
+    console.error('Error getting expense join info:', error);
+    throw error;
+  }
+};
+
+export const setExpenseJoinEnabled = async (expenseId, enabled) => {
+  try {
+    const firestoreInstance = getFirestore(getApp());
+    const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
+    await updateDoc(expenseRef, { 'join.enabled': !!enabled, updatedAt: serverTimestamp() });
+    return true;
+  } catch (error) {
+    console.error('Error updating expense join enabled:', error);
+    throw error;
+  }
+};
+
+export const rotateExpenseJoinCode = async (expenseId) => {
+  try {
+    const firestoreInstance = getFirestore(getApp());
+    const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
+    await updateDoc(expenseRef, { 'join.code': generateJoinCode(), 'join.token': generateInviteToken(), updatedAt: serverTimestamp() });
+    return true;
+  } catch (error) {
+    console.error('Error rotating expense join code:', error);
     throw error;
   }
 };
@@ -210,55 +226,40 @@ export const joinExpense = async ({ expenseId, token, code, user }) => {
 
     const firestoreInstance = getFirestore(getApp());
 
-    // Load invite by token or code
-    const invitesCol = collection(firestoreInstance, 'expenses', expenseId, 'invites');
-
-    let inviteSnap = null;
-    if (token) {
-      // Firestore does not support direct where on subcollection by field without query
-      const q = query(invitesCol, where('token', '==', token));
-      const res = await getDocs(q);
-      inviteSnap = res.empty ? null : res.docs[0];
-    } else if (code) {
-      const q = query(invitesCol, where('code', '==', code));
-      const res = await getDocs(q);
-      inviteSnap = res.empty ? null : res.docs[0];
-    }
-
-    if (!inviteSnap || !inviteSnap.exists()) throw new Error('Invite not found');
-    const invite = inviteSnap.data();
-    if (invite.used) throw new Error('Invite already used');
-    if (invite.expiresAtMs && Date.now() > invite.expiresAtMs) throw new Error('Invite expired');
-
     // Fetch expense
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     const expenseDoc = await getDoc(expenseRef);
     if (!expenseDoc.exists()) throw new Error('Expense not found');
     const expense = expenseDoc.data();
 
+    if (!expense.join || !expense.join.enabled) {
+      throw new Error('Join by room code is disabled for this expense');
+    }
+
+    // Validate token or code if provided
+    if (token && token !== expense.join.token) {
+      throw new Error('Invalid join link');
+    }
+    if (code && code !== expense.join.code) {
+      throw new Error('Invalid room code');
+    }
+
     // Prepare participant record (non-destructive: append if not present)
     const participants = Array.isArray(expense.participants) ? [...expense.participants] : [];
 
-    // If placeholder name exists, try to replace the first matching placeholder entry
+    // Try replacing first placeholder, otherwise append
     let replaced = false;
-    if (invite.placeholderName) {
-      const index = participants.findIndex(p => p && p.name === invite.placeholderName && p.placeholder === true);
-      if (index >= 0) {
-        participants[index] = {
-          name: `${user.firstName || 'Friend'} ${user.lastName || ''}`.trim() || (user.venmoUsername ? `@${user.venmoUsername}` : 'Friend'),
-          userId: user.uid,
-          placeholder: false,
-        };
-        replaced = true;
-      }
-    }
-
-    if (!replaced) {
-      participants.push({
+    const placeholderIndex = participants.findIndex(p => p && p.placeholder === true);
+    if (placeholderIndex >= 0) {
+      participants[placeholderIndex] = {
         name: `${user.firstName || 'Friend'} ${user.lastName || ''}`.trim() || (user.venmoUsername ? `@${user.venmoUsername}` : 'Friend'),
         userId: user.uid,
         placeholder: false,
-      });
+      };
+      replaced = true;
+    }
+    if (!replaced) {
+      participants.push({ name: `${user.firstName || 'Friend'} ${user.lastName || ''}`.trim() || (user.venmoUsername ? `@${user.venmoUsername}` : 'Friend'), userId: user.uid, placeholder: false });
     }
 
     // Update expense participants only; splits are not recalculated here
@@ -266,9 +267,6 @@ export const joinExpense = async ({ expenseId, token, code, user }) => {
       participants,
       updatedAt: serverTimestamp(),
     });
-
-    // Mark invite used
-    await updateDoc(inviteSnap.ref, { used: true, updatedAt: serverTimestamp() });
 
     return true;
   } catch (error) {

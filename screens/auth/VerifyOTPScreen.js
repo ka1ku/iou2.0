@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { verifyOTP, sendOTP, resolve2FAChallenge, createUserProfile, getTemporarySignupData, clearTemporarySignupData } from '../services/authService';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import { verifyOTP, sendOTP, resolve2FAChallenge, createUserProfile, getTemporarySignupData, clearTemporarySignupData } from '../../services/authService';
 
 const VerifyOTPScreen = ({ navigation, route }) => {
   const { phoneNumber, verificationId, isInitialAuth = true, is2FA = false, resolver = null, isSignUp = false } = route.params;
@@ -171,7 +171,7 @@ const VerifyOTPScreen = ({ navigation, route }) => {
 
     setResendLoading(true);
     try {
-      const result = await sendOTP(phoneNumber);
+      const result = await sendOTP(phoneNumber, true); // Skip existence check for resend
       setCurrentVerificationId(result.verificationId);
       setTimer(60);
       setCanResend(false);

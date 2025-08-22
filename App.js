@@ -24,12 +24,15 @@ import deepLinkService from './services/deepLinkService';
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AddExpenseScreen from './screens/AddExpenseScreen';
-import WelcomeScreen from './screens/WelcomeScreen';
-import SignInScreen from './screens/SignInScreen';
-import SignUpScreen from './screens/SignUpScreen';
+import WelcomeScreen from './screens/auth/WelcomeScreen';
+import SignInScreen from './screens/auth/SignInScreen';
+import SignUpScreen from './screens/auth/SignUpScreen';
 import VenmoLinkScreen from './screens/VenmoLinkScreen';
-import VerifyOTPScreen from './screens/VerifyOTPScreen';
-import TwoFactorAuthScreen from './screens/TwoFactorAuthScreen';
+import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
+// TwoFactorAuthScreen removed
+import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
+import ComponentDemoScreen from './screens/ComponentDemoScreen';
+import FriendProfileScreen from './screens/FriendProfileScreen';
 import FriendsScreen from './screens/FriendsScreen';
 import FriendInvitationHandler from './components/FriendInvitationHandler';
 import ExpenseJoinHandler from './components/ExpenseJoinHandler';
@@ -57,7 +60,7 @@ const HomeStack = () => {
   );
 };
 
-// Stack navigator for Profile tab (includes TwoFactorAuth screen)
+// Stack navigator for Profile tab (includes NotificationSettings)
 const ProfileStack = () => {
   return (
     <Stack.Navigator>
@@ -67,11 +70,37 @@ const ProfileStack = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
-        name="TwoFactorAuth"
-        component={TwoFactorAuthScreen}
-        options={{
-          headerShown: false,
-        }}
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ComponentDemo"
+        component={ComponentDemoScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="FriendProfile"
+        component={FriendProfileScreen}
+        options={{ headerShown: false }}
+      />
+    </Stack.Navigator>
+  );
+};
+
+// Stack navigator for Friends tab (includes FriendProfile)
+const FriendsStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen
+        name="FriendsMain"
+        component={FriendsScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="FriendProfile"
+        component={FriendProfileScreen}
+        options={{ headerShown: false }}
       />
     </Stack.Navigator>
   );
@@ -207,7 +236,7 @@ const MainTabs = () => {
         />
         <Tab.Screen
           name="Friends"
-          component={FriendsScreen}
+          component={FriendsStack}
         />
         <Tab.Screen
           name="Profile"

@@ -6,9 +6,13 @@ import {
   addDoc, 
   serverTimestamp,
   doc,
-  setDoc
+  setDoc,
+  query,
+  where,
+  getDocs
 } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
+import { generateFallbackAvatar } from '../utils/venmoUtils';
 
 // Store verification session globally for access in verify function
 let globalPhoneAuthState = null;
@@ -52,13 +56,121 @@ export const validateAndOptimizeProfilePicture = async (imageUrl, fallbackName =
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&size=200&background=3d95ce&color=fff&bold=true`;
 };
 
-// Send OTP using React Native Firebase phone authentication
-export const sendOTP = async (phoneNumber) => {
+// Format phone number consistently across the app
+export const formatPhoneNumber = (phoneNumber) => {
+  // Remove all non-digits
+  const cleaned = phoneNumber.replace(/\D/g, '');
+  
+  // If it's already in international format, return as is
+  if (phoneNumber.startsWith('+')) {
+    return phoneNumber;
+  }
+  
+  // Add +1 prefix for US numbers
+  if (cleaned.length === 10) {
+    return `+1${cleaned}`;
+  }
+  
+  // If it already has country code, return as is
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return `+${cleaned}`;
+  }
+  
+  // Return the original if we can't determine format
+  return phoneNumber;
+};
+
+// Check if username already exists in users collection
+export const checkUsernameExists = async (username) => {
   try {
-    // Format phone number to include country code if not present
-    const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+1${phoneNumber}`;
+    const firestoreInstance = getFirestore(getApp());
+    
+    // Query users collection for the username
+    const usersRef = collection(firestoreInstance, 'users');
+    const q = query(usersRef, where('username', '==', username.toLowerCase()));
+    const querySnapshot = await getDocs(q);
+    
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking username existence:', error);
+    // If there's an error checking, we'll allow the flow to continue
+    // This prevents blocking legitimate users due to Firestore issues
+    // However, we should log this for monitoring purposes
+    console.warn('Username existence check failed, allowing signup to proceed');
+    return false;
+  }
+};
+
+// Check if phone number already exists in users collection
+export const checkPhoneNumberExists = async (phoneNumber) => {
+  try {
+    const firestoreInstance = getFirestore(getApp());
+    
+    // Query users collection for the phone number
+    const usersRef = collection(firestoreInstance, 'users');
+    const q = query(usersRef, where('phoneNumber', '==', phoneNumber));
+    const querySnapshot = await getDocs(q);
+    
+    return !querySnapshot.empty;
+  } catch (error) {
+    console.error('Error checking phone number existence:', error);
+    // If there's an error checking, we'll allow the flow to continue
+    // This prevents blocking legitimate users due to Firestore issues
+    // However, we should log this for monitoring purposes
+    console.warn('Phone number existence check failed, allowing signup to proceed');
+    return false;
+  }
+};
+
+// Check if phone number exists in Firebase Auth (more comprehensive check)
+export const checkPhoneNumberExistsInAuth = async (phoneNumber) => {
+  try {
+    // First check Firestore users collection
+    const existsInFirestore = await checkPhoneNumberExists(phoneNumber);
+    if (existsInFirestore) {
+      console.log('Phone number found in Firestore:', phoneNumber);
+      return true;
+    }
+    
+    // Note: Firebase Auth doesn't provide a direct way to check if a phone number exists
+    // without actually sending an OTP. The Firestore check is our primary method.
+    // This function is here for future extensibility if we find better methods.
+    
+    console.log('Phone number not found in Firestore:', phoneNumber);
+    return false;
+  } catch (error) {
+    console.error('Error in comprehensive phone number check:', error);
+    // Log additional context for debugging
+    console.warn('Phone number check failed for:', phoneNumber, 'Error:', error.message);
+    return false;
+  }
+};
+
+// Send OTP using React Native Firebase phone authentication
+export const sendOTP = async (phoneNumber, skipExistenceCheck = false) => {
+  try {
+    // Validate phone number input
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      throw new Error('Invalid phone number provided');
+    }
+    
+    // Format phone number consistently
+    const formattedPhone = formatPhoneNumber(phoneNumber);
+    
+    // Validate formatted phone number
+    if (!formattedPhone.startsWith('+') || formattedPhone.length < 10) {
+      throw new Error('Invalid phone number format. Please enter a valid phone number.');
+    }
     
     console.log('Sending OTP to:', formattedPhone);
+    
+    // Check if phone number already exists in users collection (only for signup)
+    if (!skipExistenceCheck) {
+      const phoneExists = await checkPhoneNumberExistsInAuth(formattedPhone);
+      if (phoneExists) {
+        throw new Error('An account with this phone number already exists. Please sign in instead or use a different phone number.');
+      }
+    }
     
     // Use React Native Firebase phone auth - new modular API
     const authInstance = getAuth();
@@ -212,27 +324,7 @@ export const getCurrentUser = () => {
   return authInstance.currentUser;
 };
 
-// Test Firestore connection
-export const testFirestoreConnection = async () => {
-  try {
-    // Get Firestore instance using getApp() as per migration guide
-    const firestoreInstance = getFirestore(getApp());
-    
-    // Test creating a simple document using the modular API
-    const testDoc = {
-      test: true,
-      timestamp: new Date().toISOString(),
-      message: 'Firestore connection test'
-    };
-    
-    const testDocRef = await addDoc(collection(firestoreInstance, 'test'), testDoc);
-    
-    return true;
-  } catch (error) {
-    console.error('Firestore connection test failed:', error);
-    return false;
-  }
-};
+
 
 // Create user profile in Firestore after successful 2FA verification
 export const createUserProfile = async (userData, phoneNumber) => {
@@ -244,15 +336,15 @@ export const createUserProfile = async (userData, phoneNumber) => {
       throw new Error('No user signed in');
     }
 
-    // Test Firestore connection first
-    const connectionTest = await testFirestoreConnection();
-    if (!connectionTest) {
-      throw new Error('Firestore connection test failed');
-    }
+
 
     // Validate required fields
     if (!userData.firstName || !userData.lastName) {
       throw new Error('Missing required user data: firstName and lastName are required');
+    }
+    
+    if (!userData.username) {
+      throw new Error('Missing required user data: username is required');
     }
 
     if (!phoneNumber && !user.phoneNumber) {
@@ -263,35 +355,62 @@ export const createUserProfile = async (userData, phoneNumber) => {
     const cleanUserData = {
       firstName: (userData.firstName || '').trim(),
       lastName: (userData.lastName || '').trim(),
+      username: (userData.username || '').trim().toLowerCase(),
       phoneNumber: (phoneNumber || user.phoneNumber || '').trim(),
       venmoUsername: userData.venmoUsername ? userData.venmoUsername.trim() : null,
-      venmoProfilePic: null
+      profilePhoto: null
     };
 
-    // Handle Venmo profile picture safely
+    // Determine profile photo: Venmo profile pic if available, otherwise generated avatar
     if (userData.venmoProfilePic) {
       try {
-        // Basic URL validation
-        const url = new URL(userData.venmoProfilePic);
-        if (url.protocol === 'http:' || url.protocol === 'https:') {
-          cleanUserData.venmoProfilePic = userData.venmoProfilePic.trim();
+        // Check if this is a real Venmo profile picture (not a fallback avatar)
+        const isRealVenmoProfile = !userData.venmoProfilePic.includes('ui-avatars.com');
+        
+        if (isRealVenmoProfile) {
+          // This is a real Venmo profile picture - use it
+          cleanUserData.profilePhoto = userData.venmoProfilePic.trim();
+          console.log('Using real Venmo profile picture');
+        } else {
+          // This is a fallback avatar - generate a new one based on user's name
+          cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
+          console.log('Using fallback avatar (Venmo user exists but no pfp)');
         }
       } catch (urlError) {
-        // Skip invalid URLs
+        // Fallback to generated avatar if Venmo URL parsing fails
+        cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
+        console.log('URL parsing failed, using fallback avatar');
       }
+    } else {
+      // No Venmo profile picture, use generated avatar
+      cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
+      console.log('No Venmo data, using fallback avatar');
     }
 
     // Create user document with auth UID as document ID
     const userDoc = {
       firstName: cleanUserData.firstName,
       lastName: cleanUserData.lastName,
+      username: cleanUserData.username,
       phoneNumber: cleanUserData.phoneNumber,
       venmoUsername: cleanUserData.venmoUsername,
-      venmoProfilePic: cleanUserData.venmoProfilePic,
+      profilePhoto: cleanUserData.profilePhoto,
       phoneVerified: true,
       accountStatus: 'active',
       createdAt: serverTimestamp()
     };
+
+    // Log what's being saved
+    console.log('Creating user profile with data:', {
+      firstName: cleanUserData.firstName,
+      lastName: cleanUserData.lastName,
+      username: cleanUserData.username,
+      phoneNumber: cleanUserData.phoneNumber,
+      venmoUsername: cleanUserData.venmoUsername,
+      hasVenmoUsername: !!cleanUserData.venmoUsername,
+      profilePhoto: cleanUserData.profilePhoto,
+      isRealVenmoProfile: cleanUserData.profilePhoto && !cleanUserData.profilePhoto.includes('ui-avatars.com')
+    });
 
     // Store in Firestore using the auth UID as document ID
     const firestoreInstance = getFirestore(getApp());

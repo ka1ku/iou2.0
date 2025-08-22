@@ -11,13 +11,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import DeleteButton from '../../components/DeleteButton';
 import {
   getEnrolledFactors,
   enrollPhoneNumberFor2FA,
   complete2FAEnrollment,
   unenroll2FA,
-} from '../services/authService';
+} from '../../services/authService';
 
 const TwoFactorAuthScreen = ({ navigation }) => {
   const [enrolledFactors, setEnrolledFactors] = useState([]);
@@ -312,12 +313,12 @@ const TwoFactorAuthScreen = ({ navigation }) => {
                       </Text>
                     </View>
                   </View>
-                  <TouchableOpacity
-                    style={styles.removeButton}
+                  <DeleteButton
                     onPress={() => handleUnenroll(factor.uid, factor.displayName || 'Phone')}
-                  >
-                    <Ionicons name="trash-outline" size={20} color={Colors.danger} />
-                  </TouchableOpacity>
+                    size="medium"
+                    variant="subtle"
+                    testID="remove-2fa-factor"
+                  />
                 </View>
               ))}
             </View>
@@ -460,9 +461,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
-  removeButton: {
-    padding: Spacing.sm,
-  },
+
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',

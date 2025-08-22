@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, Share, Linking,
 import { Ionicons } from '@expo/vector-icons';
 import QRCodeStyled from 'react-native-qrcode-styled';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import { createExpenseInvite, generateExpenseJoinLink } from '../services/expenseService';
+import { getExpenseJoinInfo, generateExpenseJoinLink } from '../services/expenseService';
 
 const InviteFriendSheet = ({
   visible,
@@ -13,7 +13,7 @@ const InviteFriendSheet = ({
   phoneNumber,
 }) => {
   const [loading, setLoading] = useState(false);
-  const [invite, setInvite] = useState(null);
+  const [joinInfo, setJoinInfo] = useState(null);
 
   useEffect(() => {
     const ensureInvite = async () => {
@@ -25,12 +25,8 @@ const InviteFriendSheet = ({
       }
       try {
         setLoading(true);
-        const created = await createExpenseInvite(expenseId, {
-          placeholderName,
-          phoneNumber: phoneNumber || null,
-          ttlMinutes: 15,
-        });
-        setInvite(created);
+        const info = await getExpenseJoinInfo(expenseId, { initializeIfMissing: true });
+        setJoinInfo(info);
       } catch (e) {
         Alert.alert('Error', e.message || 'Failed to create invite');
         onClose?.();
@@ -43,9 +39,9 @@ const InviteFriendSheet = ({
   }, [visible, expenseId, placeholderName, phoneNumber]);
 
   const deepLink = useMemo(() => {
-    if (!invite) return '';
-    return generateExpenseJoinLink({ expenseId, token: invite.token });
-  }, [invite, expenseId]);
+    if (!joinInfo) return '';
+    return generateExpenseJoinLink({ expenseId, token: joinInfo.token, code: joinInfo.code });
+  }, [joinInfo, expenseId]);
 
   const handleShare = async () => {
     if (!deepLink) return;
@@ -86,7 +82,7 @@ const InviteFriendSheet = ({
 
         <View style={styles.content}>
           <View style={styles.qrCard}>
-            {invite && deepLink ? (
+            {joinInfo && deepLink ? (
               <QRCodeStyled
                 data={deepLink}
                 padding={20}
@@ -107,8 +103,8 @@ const InviteFriendSheet = ({
               <View style={styles.qrPlaceholder} />
             )}
             <Text style={styles.placeholderName}>{placeholderName}</Text>
-            {invite?.code ? (
-              <Text style={styles.codeText}>Or enter code: {invite.code} (15 min)</Text>
+            {joinInfo?.code ? (
+              <Text style={styles.codeText}>Room code: {joinInfo.code}</Text>
             ) : null}
           </View>
 

@@ -1281,6 +1281,12 @@ PODS:
   - Firebase/Firestore (12.1.0):
     - Firebase/CoreOnly
     - FirebaseFirestore (~> 12.1.0)
+  - Firebase/Functions (12.1.0):
+    - Firebase/CoreOnly
+    - FirebaseFunctions (~> 12.1.0)
+  - Firebase/Messaging (12.1.0):
+    - Firebase/CoreOnly
+    - FirebaseMessaging (~> 12.1.0)
   - FirebaseAppCheckInterop (12.1.0)
   - FirebaseAuth (12.1.0):
     - FirebaseAppCheckInterop (~> 12.1.0)
@@ -1320,9 +1326,35 @@ PODS:
     - gRPC-Core (~> 1.69.0)
     - leveldb-library (~> 1.22)
     - nanopb (~> 3.30910.0)
+  - FirebaseFunctions (12.1.0):
+    - FirebaseAppCheckInterop (~> 12.1.0)
+    - FirebaseAuthInterop (~> 12.1.0)
+    - FirebaseCore (~> 12.1.0)
+    - FirebaseCoreExtension (~> 12.1.0)
+    - FirebaseMessagingInterop (~> 12.1.0)
+    - FirebaseSharedSwift (~> 12.1.0)
+    - GTMSessionFetcher/Core (< 6.0, >= 3.4)
+  - FirebaseInstallations (12.1.0):
+    - FirebaseCore (~> 12.1.0)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/UserDefaults (~> 8.1)
+    - PromisesObjC (~> 2.4)
+  - FirebaseMessaging (12.1.0):
+    - FirebaseCore (~> 12.1.0)
+    - FirebaseInstallations (~> 12.1.0)
+    - GoogleDataTransport (~> 10.1)
+    - GoogleUtilities/AppDelegateSwizzler (~> 8.1)
+    - GoogleUtilities/Environment (~> 8.1)
+    - GoogleUtilities/Reachability (~> 8.1)
+    - GoogleUtilities/UserDefaults (~> 8.1)
+    - nanopb (~> 3.30910.0)
+  - FirebaseMessagingInterop (12.1.0)
   - FirebaseSharedSwift (12.1.0)
   - fmt (11.0.2)
   - glog (0.3.5)
+  - GoogleDataTransport (10.1.0):
+    - nanopb (~> 3.30910.0)
+    - PromisesObjC (~> 2.4)
   - GoogleUtilities/AppDelegateSwizzler (8.1.0):
     - GoogleUtilities/Environment
     - GoogleUtilities/Logger
@@ -1342,6 +1374,9 @@ PODS:
     - GoogleUtilities/Privacy
   - GoogleUtilities/Privacy (8.1.0)
   - GoogleUtilities/Reachability (8.1.0):
+    - GoogleUtilities/Logger
+    - GoogleUtilities/Privacy
+  - GoogleUtilities/UserDefaults (8.1.0):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
   - "gRPC-C++ (1.69.0)":
@@ -1446,6 +1481,7 @@ PODS:
     - nanopb/encode (= 3.30910.0)
   - nanopb/decode (3.30910.0)
   - nanopb/encode (3.30910.0)
+  - PromisesObjC (2.4.0)
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -3227,7 +3263,16 @@ PODS:
     - Firebase/Firestore (= 12.1.0)
     - React-Core
     - RNFBApp
-  - RNGestureHandler (2.16.2):
+  - RNFBFunctions (23.1.0):
+    - Firebase/Functions (= 12.1.0)
+    - React-Core
+    - RNFBApp
+  - RNFBMessaging (23.1.0):
+    - Firebase/Messaging (= 12.1.0)
+    - FirebaseCoreExtension
+    - React-Core
+    - RNFBApp
+  - RNGestureHandler (2.24.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -3237,6 +3282,7 @@ PODS:
     - React-Core
     - React-debug
     - React-Fabric
+    - React-FabricComponents
     - React-featureflags
     - React-graphics
     - React-hermes
@@ -3426,7 +3472,7 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
-  - RNSVG (15.12.1):
+  - RNSVG (15.11.2):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -3449,9 +3495,9 @@ PODS:
     - ReactCodegen
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
-    - RNSVG/common (= 15.12.1)
+    - RNSVG/common (= 15.11.2)
     - Yoga
-  - RNSVG/common (15.12.1):
+  - RNSVG/common (15.11.2):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -3573,6 +3619,8 @@ DEPENDENCIES:
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBAuth (from `../node_modules/@react-native-firebase/auth`)"
   - "RNFBFirestore (from `../node_modules/@react-native-firebase/firestore`)"
+  - "RNFBFunctions (from `../node_modules/@react-native-firebase/functions`)"
+  - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
@@ -3592,13 +3640,19 @@ SPEC REPOS:
     - FirebaseCoreInternal
     - FirebaseFirestore
     - FirebaseFirestoreInternal
+    - FirebaseFunctions
+    - FirebaseInstallations
+    - FirebaseMessaging
+    - FirebaseMessagingInterop
     - FirebaseSharedSwift
+    - GoogleDataTransport
     - GoogleUtilities
     - "gRPC-C++"
     - gRPC-Core
     - GTMSessionFetcher
     - leveldb-library
     - nanopb
+    - PromisesObjC
     - RecaptchaInterop
     - SocketRocket
     - ZXingObjC
@@ -3779,6 +3833,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-firebase/auth"
   RNFBFirestore:
     :path: "../node_modules/@react-native-firebase/firestore"
+  RNFBFunctions:
+    :path: "../node_modules/@react-native-firebase/functions"
+  RNFBMessaging:
+    :path: "../node_modules/@react-native-firebase/messaging"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
   RNReanimated:
@@ -3818,9 +3876,14 @@ SPEC CHECKSUMS:
   FirebaseCoreInternal: ff526c22671bb564d1b34a47615e29ba99389dee
   FirebaseFirestore: 7f06732c905092d12a6e060aace72a28ad528190
   FirebaseFirestoreInternal: 1e6d681414d7fe2b8b99315784e242e7f301cf44
+  FirebaseFunctions: a3da4b0c69f1240ef51bbe39a78a1393b6c12323
+  FirebaseInstallations: 6836550c466a6c3f753a777bec6f4e58ea228779
+  FirebaseMessaging: 6538be0d8e8d0a3405407bc3813e2223287c0d17
+  FirebaseMessagingInterop: 1e9db269130b57cf791776b6c32dad1645fabca3
   FirebaseSharedSwift: ee4344de8a4d5b5290de3600667307a44f85fd40
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
+  GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   "gRPC-C++": cc207623316fb041a7a3e774c252cf68a058b9e8
   gRPC-Core: 860978b7db482de8b4f5e10677216309b5ff6330
@@ -3828,6 +3891,7 @@ SPEC CHECKSUMS:
   hermes-engine: f03b0e06d3882d71e67e45b073bb827da1a21aae
   leveldb-library: cc8b8f8e013647a295ad3f8cd2ddf49a6f19be19
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
+  PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   RCT-Folly: e78785aa9ba2ed998ea4151e314036f6c49e6d82
   RCTDeprecation: 5f638f65935e273753b1f31a365db6a8d6dc53b5
   RCTRequired: 8b46a520ea9071e2bc47d474aa9ca31b4a935bd8
@@ -3897,10 +3961,12 @@ SPEC CHECKSUMS:
   RNFBApp: fcac8339a5ffd5a735c62d5f0101f79e4d9a7670
   RNFBAuth: d1b30e032a9afb220a664921473edcf9f30bed38
   RNFBFirestore: fb562751396142d315d11bf2f5ae292a6eb79442
-  RNGestureHandler: ade690d50a98e9e15379261af1f4afa1d5b22f59
+  RNFBFunctions: cc64dc8a80332cfcc288c3f0c9f74830792fc1c4
+  RNFBMessaging: 8c72e2f7d5eb2cc24d87e60c8be21eb2c94da272
+  RNGestureHandler: 8ff2b1434b0ff8bab28c8242a656fb842990bbc8
   RNReanimated: a3f55346df73f35c38bf0b446294d3d0b1ac8cf9
   RNScreens: 90b905d545a5ebbe976985702b8a39e3475727b2
-  RNSVG: 680e961f640e381aab730a04b2371969686ed9f7
+  RNSVG: 4470464e129f6bc58b78b961850b054dbbea8ef7
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: bfcce202dba74007f8974ee9c5f903a9a286c445
   ZXingObjC: 8898711ab495761b2dbbdec76d90164a6d7e14c5

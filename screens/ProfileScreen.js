@@ -16,7 +16,7 @@ import { getCurrentUser, onAuthStateChange, signOutUser } from '../services/auth
 import { getUserExpenses, calculateUserBalances } from '../services/expenseService';
 import { getFirestore, doc, getDoc } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
-import VenmoProfilePicture from '../components/VenmoProfilePicture';
+import ProfilePicture from '../components/VenmoProfilePicture';
 
 const ProfileScreen = ({ navigation }) => {
   const [user, setUser] = useState(null);
@@ -187,8 +187,8 @@ const ProfileScreen = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            <VenmoProfilePicture
-              source={userProfile?.venmoProfilePic}
+            <ProfilePicture
+              source={userProfile?.profilePhoto}
               size={80}
               username={userProfile?.venmoUsername || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`}
               showFallback
@@ -326,13 +326,8 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.settingsList}>
           <TouchableOpacity 
             style={styles.settingItem}
-            onPress={() => navigation.navigate('TwoFactorAuth')}
+            onPress={() => navigation.navigate('NotificationSettings')}
           >
-            <Ionicons name="shield-checkmark-outline" size={24} color={Colors.textSecondary} />
-            <Text style={styles.settingText}>Two-Factor Authentication</Text>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
             <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
             <Text style={styles.settingText}>Notifications</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
@@ -342,13 +337,16 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.settingText}>Language</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
-            <Ionicons name="help-circle-outline" size={24} color={Colors.textSecondary} />
-            <Text style={styles.settingText}>FAQ</Text>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('ComponentDemo')}
+          >
+            <Ionicons name="cube-outline" size={24} color={Colors.textSecondary} />
+            <Text style={styles.settingText}>Component Demo</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
         </View>
-              </View>
+      </View>
         </ScrollView>
      </View>
     );
@@ -378,11 +376,13 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xl,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   profileSection: {
     alignItems: 'center',
     flex: 1,
+    justifyContent: 'center',
+    width: '100%',
   },
   avatarContainer: {
     width: 80,
@@ -392,6 +392,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.md,
+    alignSelf: 'center',
     ...Shadows.card,
   },
   userName: {
@@ -407,6 +408,9 @@ const styles = StyleSheet.create({
   },
   signOutButton: {
     padding: 8,
+    position: 'absolute',
+    top: 60,
+    right: Spacing.xl,
   },
   balancesSection: {
     margin: Spacing.lg,

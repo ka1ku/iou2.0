@@ -3,17 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { sendOTP, handleMultiFactorError } from '../services/authService';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import { sendOTP, handleMultiFactorError } from '../../services/authService';
 
 const SignInScreen = ({ navigation }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -54,7 +54,7 @@ const SignInScreen = ({ navigation }) => {
     setLoading(true);
     try {
       console.log('Attempting to send OTP to:', `+1${digits}`);
-      const result = await sendOTP(`+1${digits}`);
+      const result = await sendOTP(`+1${digits}`, true); // Skip existence check for sign-in
       
       console.log('OTP sent successfully, navigating to verify screen');
       // Navigate to OTP verification screen with verificationId
@@ -106,12 +106,19 @@ const SignInScreen = ({ navigation }) => {
             >
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to your existing account</Text>
+            <Text style={styles.title}>Sign In</Text>
+            <View style={styles.headerSpacer} />
           </View>
 
           {/* Phone Number Input */}
           <View style={styles.formContainer}>
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepTitle}>Phone Number</Text>
+              <Text style={styles.stepSubtitle}>
+                We'll send you a verification code to confirm your number
+              </Text>
+            </View>
+
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Phone Number</Text>
               <View style={styles.phoneInputContainer}>
@@ -125,7 +132,7 @@ const SignInScreen = ({ navigation }) => {
                   placeholder="(555) 123-4567"
                   placeholderTextColor={Colors.textSecondary}
                   keyboardType="phone-pad"
-                  maxLength={14} // (XXX) XXX-XXXX format
+                  maxLength={14}
                   autoFocus
                 />
               </View>
@@ -140,6 +147,12 @@ const SignInScreen = ({ navigation }) => {
               <Text style={styles.sendButtonText}>
                 {loading ? 'Sending...' : 'Send Verification Code'}
               </Text>
+              <Ionicons 
+                name="arrow-forward" 
+                size={20} 
+                color="white" 
+                style={styles.buttonIcon} 
+              />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -167,9 +180,6 @@ const SignInScreen = ({ navigation }) => {
               </Text>
             </View>
           </View>
-
-
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -190,7 +200,10 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: Spacing.xl,
-    paddingBottom: Spacing.xxl,
+    paddingBottom: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backButton: {
     width: 40,
@@ -199,20 +212,35 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginRight: Spacing.lg,
     ...Shadows.card,
   },
-  title: {
-    ...Typography.h1,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
+  headerSpacer: {
+    width: 40,
   },
-  subtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
+  title: {
+    ...Typography.h2,
+    color: Colors.textPrimary,
   },
   formContainer: {
+    flex: 1,
     marginBottom: Spacing.xxl,
+  },
+  stepHeader: {
+    marginBottom: Spacing.xxl,
+    alignItems: 'center',
+  },
+  stepTitle: {
+    ...Typography.h1,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  stepSubtitle: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   inputContainer: {
     marginBottom: Spacing.xl,
@@ -260,8 +288,10 @@ const styles = StyleSheet.create({
     height: 56,
     backgroundColor: Colors.accent,
     borderRadius: Radius.md,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: Spacing.lg,
     ...Shadows.card,
   },
   sendButtonDisabled: {
@@ -272,38 +302,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
   },
-  infoContainer: {
-    marginTop: Spacing.xl,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-    paddingHorizontal: Spacing.sm,
-  },
-  infoText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginLeft: Spacing.md,
-    flex: 1,
-    lineHeight: 20,
-  },
-  recaptchaContainer: {
-    position: 'absolute',
-    top: -1000, // Hide off-screen
-    left: -1000,
-    width: 1,
-    height: 1,
-    opacity: 0,
-  },
-  recaptchaWebView: {
-    width: 1,
-    height: 1,
+  buttonIcon: {
+    marginLeft: Spacing.sm,
   },
   signUpLink: {
     alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    marginTop: Spacing.md,
+    paddingVertical: Spacing.md,
   },
   signUpLinkText: {
     ...Typography.body,
@@ -313,7 +317,20 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: '600',
   },
-
+  infoContainer: {
+    paddingTop: Spacing.lg,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  infoText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginLeft: Spacing.sm,
+    flex: 1,
+  },
 });
 
 export default SignInScreen;

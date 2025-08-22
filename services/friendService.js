@@ -61,7 +61,7 @@ const getMinimalProfile = async (userId) => {
     lastName: (data.lastName || '').trim(),
     phoneNumber: (data.phoneNumber || '').trim(),
     venmoUsername: data.venmoUsername || null,
-    venmoProfilePic: data.venmoProfilePic || null,
+    profilePhoto: data.profilePhoto || data.venmoProfilePic || null, // Use profilePhoto, fallback to venmoProfilePic for backward compatibility
   };
 };
 
@@ -182,7 +182,7 @@ export const acceptFriendRequest = async (requestId) => {
         lastName: '',
         phoneNumber: currentUser.phoneNumber || '',
         venmoUsername: null,
-        venmoProfilePic: null,
+        profilePhoto: null,
       },
       status: 'accepted',
       createdAt: serverTimestamp(),

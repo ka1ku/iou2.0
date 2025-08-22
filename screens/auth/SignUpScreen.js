@@ -9,84 +9,36 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Animated,
-  ActivityIndicator,
   Image,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { sendOTP, validateAndOptimizeProfilePicture, storeTemporarySignupData, clearTemporarySignupData, getTemporarySignupData } from '../services/authService';
-import VenmoProfilePicture from '../components/VenmoProfilePicture';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import { sendOTP, storeTemporarySignupData, clearTemporarySignupData, getTemporarySignupData, checkUsernameExists } from '../../services/authService';
+import { useVenmoProfile } from '../../hooks/useVenmoProfile';
+import VenmoProfileDisplay from '../../components/VenmoProfileDisplay';
+import VenmoInputForm from '../../components/VenmoInputForm';
 
-/**
- * Decodes HTML entities in text (e.g., &amp; -> &)
- */
-const decodeHtmlEntities = (text) => {
-  if (!text) return text;
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-};
 
-/**
- * Extracts profile image URL from HTML using multiple fallback methods
- * Priority: Open Graph > Twitter Card > Class-based > Data-src
- */
-const extractProfileImage = (html) => {
-  // Method 1: Open Graph image (most reliable)
-  const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
-  if (ogMatch?.[1]) {
-    return decodeHtmlEntities(ogMatch[1]);
-  }
-
-  // Method 2: Twitter card image
-  const twitterMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
-  if (twitterMatch?.[1]) {
-    return decodeHtmlEntities(twitterMatch[1]);
-  }
-
-  // Method 3: Profile image with specific classes
-  const profileMatch = html.match(/<img[^>]+src=["']([^"']+)["'][^>]*class=["'][^"']*(?:profile|avatar|user)[^"']*["']/i);
-  if (profileMatch?.[1]) {
-    return decodeHtmlEntities(profileMatch[1]);
-  }
-
-  // Method 4: Data-src (lazy loaded images)
-  const dataSrcMatch = html.match(/<img[^>]+data-src=["']([^"']+)["']/i);
-  if (dataSrcMatch?.[1]) {
-    return decodeHtmlEntities(dataSrcMatch[1]);
-  }
-
-  return null;
-};
-
-/**
- * Extracts display name from HTML page title
- */
-const extractDisplayName = (html) => {
-  const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  if (titleMatch?.[1]) {
-    return titleMatch[1].replace(/[^\w\s]/g, '').trim();
-  }
-  return null;
-};
 
 const SignUpScreen = ({ navigation }) => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [venmoUsername, setVenmoUsername] = useState('');
-  const [venmoProfilePic, setVenmoProfilePic] = useState(null);
-  const [venmoVerified, setVenmoVerified] = useState(false);
-  const [verifyingVenmo, setVerifyingVenmo] = useState(false);
+  const {
+    venmoUsername,
+    venmoProfilePic,
+    venmoVerified,
+    verifyingVenmo,
+    verificationError,
+    handleUsernameChange,
+    resetVenmoProfile,
+    getVenmoData,
+    setVenmoUsername
+  } = useVenmoProfile(firstName, lastName);
   const [userData, setUserData] = useState(null);
   const isProceedingToVerification = useRef(false);
   // const [fadeAnim] = useState(() => new Animated.Value(1)); // Temporarily disabled
@@ -108,6 +60,10 @@ const SignUpScreen = ({ navigation }) => {
         const tempData = await getTemporarySignupData();
         if (tempData) {
           setUserData(tempData);
+          // Restore form data if available
+          if (tempData.firstName) setFirstName(tempData.firstName);
+          if (tempData.lastName) setLastName(tempData.lastName);
+          if (tempData.username) setUsername(tempData.username);
         }
       } catch (error) {
         console.error('Error loading temporary signup data:', error);
@@ -137,110 +93,9 @@ const SignUpScreen = ({ navigation }) => {
     setPhoneNumber(formatted);
   };
 
-  /**
-   * Fetches and validates Venmo profile information
-   * Attempts to extract profile picture and display name from public profile page
-   */
-  const fetchVenmoProfile = async (username) => {
-    if (!username.trim()) return;
-    
-    setVerifyingVenmo(true);
-    try {
-      const normalized = username.replace(/^@+/, '');
-      const profileUrl = `https://account.venmo.com/u/${encodeURIComponent(normalized)}`;
-      
-      console.log('Fetching Venmo profile for:', normalized);
-      
-      const response = await fetch(profileUrl, {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-        timeout: 10000
-      });
+  // Venmo verification is now automatic after typing stops
 
-      if (!response.ok) {
-        throw new Error(`Profile not found (${response.status})`);
-      }
 
-      const html = await response.text();
-      console.log('HTML received, length:', html.length);
-
-      // Extract profile image and display name
-      const imageUrl = extractProfileImage(html);
-      const displayName = extractDisplayName(html);
-
-      // Fallback to generated avatar if no image found
-      if (!imageUrl) {
-        const nameForAvatar = displayName || normalized;
-        imageUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(nameForAvatar)}&size=200&background=3d95ce&color=fff&bold=true&font-size=0.4`;
-        console.log('Using generated avatar for:', nameForAvatar);
-      }
-
-      // Ensure the image URL is absolute
-      if (imageUrl && imageUrl.startsWith('/')) {
-        imageUrl = `https://account.venmo.com${imageUrl}`;
-      }
-
-      // Validate and optimize the profile picture
-      const validatedImageUrl = await validateAndOptimizeProfilePicture(imageUrl, displayName || normalized);
-
-      setVenmoProfilePic(validatedImageUrl);
-      setVenmoVerified(true);
-      setVenmoUsername(normalized);
-      
-      console.log('Successfully set Venmo profile:', {
-        username: normalized,
-        imageUrl: validatedImageUrl,
-        displayName: displayName
-      });
-
-    } catch (error) {
-      console.error('Error fetching Venmo profile:', error);
-      Alert.alert(
-        'Could not verify automatically',
-        'We could not confirm this Venmo username. You can still continue without Venmo or try again.',
-        [
-          { text: 'Continue Without Venmo', onPress: () => setVenmoUsername('') },
-          { text: 'Try Again', style: 'cancel' },
-        ]
-      );
-    } finally {
-      setVerifyingVenmo(false);
-    }
-  };
-
-  const handleVenmoUsernameSubmit = () => {
-    if (!venmoUsername.trim()) {
-      Alert.alert('Required Field', 'Please enter your Venmo username');
-      return;
-    }
-    fetchVenmoProfile(venmoUsername);
-  };
-
-  const openVenmoApp = async () => {
-    try {
-      const normalized = (venmoUsername || '').replace(/^@+/, '');
-      const venmoAppUrl = normalized
-        ? `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(normalized)}&amount=0&note=Verification`
-        : 'venmo://';
-      const canOpen = await Linking.canOpenURL(venmoAppUrl);
-      
-      if (canOpen) {
-        await Linking.openURL(venmoAppUrl);
-      } else {
-        const storeUrl = Platform.OS === 'ios' 
-          ? 'https://apps.apple.com/us/app/venmo/id351727428'
-          : 'https://play.google.com/store/apps/details?id=com.venmo';
-        await Linking.openURL(storeUrl);
-      }
-    } catch (error) {
-      console.error('Error opening Venmo app:', error);
-      Alert.alert('Error', 'Unable to open Venmo app. Please install Venmo from the app store.');
-    }
-  };
 
   const validateStep1 = () => {
     if (!firstName.trim()) {
@@ -254,12 +109,41 @@ const SignUpScreen = ({ navigation }) => {
     return true;
   };
 
-  const validateStep2 = () => {
-    // Venmo step - optional, always valid
+  const validateStep2 = async () => {
+    if (!username.trim()) {
+      Alert.alert('Required Field', 'Please enter a username');
+      return false;
+    }
+    
+    // Check username format (alphanumeric, 3-20 characters)
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+    if (!usernameRegex.test(username.trim())) {
+      Alert.alert('Invalid Username', 'Username must be 3-20 characters long and contain only letters, numbers, and underscores');
+      return false;
+    }
+    
+    // Check if username is already taken
+    try {
+      const usernameExists = await checkUsernameExists(username.trim());
+      if (usernameExists) {
+        Alert.alert('Username Taken', 'This username is already taken. Please choose a different one.');
+        return false;
+      }
+    } catch (error) {
+      console.error('Error checking username:', error);
+      Alert.alert('Error', 'Unable to check username availability. Please try again.');
+      return false;
+    }
+    
     return true;
   };
 
   const validateStep3 = () => {
+    // Venmo step - optional, always valid
+    return true;
+  };
+
+  const validateStep4 = () => {
     if (!phoneNumber.trim()) {
       Alert.alert('Required Field', 'Please enter your phone number');
       return false;
@@ -279,28 +163,34 @@ const SignUpScreen = ({ navigation }) => {
         animateStepTransition(() => setCurrentStep(2));
       }
     } else if (currentStep === 2) {
-      if (validateStep2()) {
+      if (await validateStep2()) {
+        animateStepTransition(() => setCurrentStep(3));
+      }
+    } else if (currentStep === 3) {
+      if (validateStep3()) {
         // Store temporary data before proceeding to phone verification
+        const venmoData = getVenmoData();
         const tempData = {
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          venmoUsername: venmoVerified ? venmoUsername : null,
-          venmoProfilePic: venmoVerified ? venmoProfilePic : null,
+          username: username.trim().toLowerCase(),
+          venmoUsername: venmoData.verified ? venmoData.username : null,
+          venmoProfilePic: venmoData.verified ? venmoData.profilePic : null,
         };
-        
+       
         await storeTemporarySignupData(tempData);
         
         // Verify the data was stored before proceeding
         const storedData = await getTemporarySignupData();
         if (storedData) {
           isProceedingToVerification.current = true;
-          animateStepTransition(() => setCurrentStep(3));
+          animateStepTransition(() => setCurrentStep(4));
         } else {
           Alert.alert('Error', 'Failed to save your information. Please try again.');
         }
       }
-    } else if (currentStep === 3) {
-      if (validateStep3()) {
+    } else if (currentStep === 4) {
+      if (validateStep4()) {
         // Ensure flag is set before proceeding to OTP
         if (!isProceedingToVerification.current) {
           isProceedingToVerification.current = true;
@@ -333,7 +223,20 @@ const SignUpScreen = ({ navigation }) => {
     } catch (error) {
       // Reset flag if OTP sending fails
       isProceedingToVerification.current = false;
-      Alert.alert('Error', error.message || 'Failed to send verification code. Please try again.');
+      
+      // Handle phone number already exists error specifically
+      if (error.message.includes('already exists')) {
+        Alert.alert(
+          'Account Already Exists',
+          'This phone number is already registered. You can either sign in with this number or use a different phone number to create a new account.',
+          [
+            { text: 'Sign In Instead', onPress: () => navigation.navigate('SignIn') },
+            { text: 'Use Different Number', style: 'cancel' }
+          ]
+        );
+      } else {
+        Alert.alert('Error', error.message || 'Failed to send verification code. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -341,16 +244,16 @@ const SignUpScreen = ({ navigation }) => {
 
   const handlePrevStep = () => {
     if (currentStep === 2) {
-      // Clear Venmo data when going back from Venmo step
-      setVenmoUsername('');
-      setVenmoProfilePic(null);
-      setVenmoVerified(false);
       animateStepTransition(() => setCurrentStep(1));
     } else if (currentStep === 3) {
+      // Clear Venmo data when going back from Venmo step
+      resetVenmoProfile();
+      animateStepTransition(() => setCurrentStep(2));
+    } else if (currentStep === 4) {
       // Don't clear temporary data when going back from phone verification
       // This data is needed for the verification process
       isProceedingToVerification.current = false;
-      animateStepTransition(() => setCurrentStep(2));
+      animateStepTransition(() => setCurrentStep(3));
     }
   };
 
@@ -365,11 +268,11 @@ const SignUpScreen = ({ navigation }) => {
         <View 
           style={[
             styles.progressFill, 
-            { width: `${(currentStep / 3) * 100}%` }
+            { width: `${(currentStep / 4) * 100}%` }
           ]} 
         />
       </View>
-      <Text style={styles.progressText}>Step {currentStep} of 3</Text>
+      <Text style={styles.progressText}>Step {currentStep} of 4</Text>
     </View>
   );
 
@@ -411,13 +314,45 @@ const SignUpScreen = ({ navigation }) => {
     </View>
   );
 
-    const renderStep2 = () => (
+  const renderStep2 = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <Text style={styles.stepTitle}>Choose a username</Text>
+        <Text style={styles.stepSubtitle}>
+          This will be your unique identifier in the app
+        </Text>
+      </View>
+
+      <View style={styles.formContainer}>
+        <View style={styles.inputContainer}>
+          <Text style={styles.inputLabel}>Username</Text>
+          <TextInput
+            style={styles.textInput}
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Enter a username"
+            placeholderTextColor={Colors.textSecondary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+          />
+          <Text style={styles.inputHint}>
+            3-20 characters, letters, numbers, and underscores only
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderStep3 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
         <View style={styles.venmoIconContainer}>
-          <View style={styles.venmoIcon}>
-            <Text style={styles.venmoIconText}>V</Text>
-          </View>
+          <Image 
+            source={require('../../assets/venmo.png')} 
+            style={styles.venmoLogo}
+            resizeMode="contain"
+          />
         </View>
         <Text style={styles.stepTitle}>Link Your Venmo</Text>
         <Text style={styles.stepSubtitle}>
@@ -427,73 +362,35 @@ const SignUpScreen = ({ navigation }) => {
 
       <View style={styles.formContainer}>
         {venmoVerified ? (
-          <View style={styles.verifiedContainer}>
-            <View style={styles.profileContainer}>
-              <VenmoProfilePicture
-                source={venmoProfilePic}
-                size={50}
-                username={venmoUsername}
-                style={styles.profilePic}
-              />
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>@{venmoUsername}</Text>
-                <Text style={styles.profileStatus}>✓ Verified Venmo Account</Text>
-              </View>
-            </View>
-            
-            <TouchableOpacity
-              style={styles.changeButton}
-              onPress={() => {
-                setVenmoVerified(false);
-                setVenmoProfilePic(null);
-                setVenmoUsername('');
-              }}
-            >
-              <Text style={styles.changeButtonText}>Change Account</Text>
-            </TouchableOpacity>
-          </View>
+          <VenmoProfileDisplay
+            username={venmoUsername}
+            profilePic={venmoProfilePic}
+            onChangeAccount={resetVenmoProfile}
+            profileSize={50}
+          />
         ) : (
-          <View style={styles.setupContainer}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Venmo Username</Text>
-              <View style={styles.venmoInputContainer}>
-                <Text style={styles.atSymbol}>@</Text>
-                <TextInput
-                  style={styles.venmoInput}
-                  value={venmoUsername}
-                  onChangeText={setVenmoUsername}
-                  placeholder="your-venmo-username"
-                  placeholderTextColor={Colors.textSecondary}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onSubmitEditing={handleVenmoUsernameSubmit}
-                />
+          <>
+            <VenmoInputForm
+              username={venmoUsername}
+              onUsernameChange={handleUsernameChange}
+              verifying={verifyingVenmo}
+              verified={venmoVerified}
+            />
+            
+            {/* Show verification error if any */}
+            {verificationError && (
+              <View style={styles.errorContainer}>
+                <Ionicons name="alert-circle" size={20} color={Colors.error} />
+                <Text style={styles.errorText}>{verificationError}</Text>
               </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.verifyButton, verifyingVenmo && styles.verifyButtonDisabled]}
-              onPress={handleVenmoUsernameSubmit}
-              disabled={verifyingVenmo}
-            >
-              {verifyingVenmo ? (
-                <ActivityIndicator color="white" size="small" />
-              ) : (
-                <Text style={styles.verifyButtonText}>Verify Venmo Account</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.openVenmoButton} onPress={openVenmoApp}>
-              <Ionicons name="open-outline" size={20} color={Colors.accent} />
-              <Text style={styles.openVenmoText}>Open Venmo App</Text>
-            </TouchableOpacity>
-          </View>
+            )}
+          </>
         )}
       </View>
     </View>
   );
 
-  const renderStep3 = () => {
+  const renderStep4 = () => {
     return (
       <View style={styles.stepContainer}>
         <View style={styles.stepHeader}>
@@ -583,6 +480,7 @@ const SignUpScreen = ({ navigation }) => {
           {currentStep === 1 && renderStep1()}
           {currentStep === 2 && renderStep2()}
           {currentStep === 3 && renderStep3()}
+          {currentStep === 4 && renderStep4()}
 
           {/* Bottom Section */}
           <View style={styles.bottomSection}>
@@ -596,6 +494,7 @@ const SignUpScreen = ({ navigation }) => {
                 {loading ? 'Sending...' : 
                  currentStep === 1 ? 'Continue' : 
                  currentStep === 2 ? 'Continue' : 
+                 currentStep === 3 ? (venmoVerified ? 'Continue' : 'Skip') : 
                  'Send Verification Code'}
               </Text>
               <Ionicons 
@@ -730,6 +629,31 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 16,
   },
+  inputHint: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+    fontStyle: 'italic',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.error + '08',
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    marginTop: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.error + '20',
+    ...Shadows.card,
+  },
+  errorText: {
+    ...Typography.body,
+    color: Colors.error,
+    marginLeft: Spacing.sm,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+  },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -799,125 +723,14 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: '600',
   },
-  // Venmo styles
+  // Venmo logo styles
   venmoIconContainer: {
     marginBottom: Spacing.lg,
   },
-  venmoIcon: {
+  venmoLogo: {
     width: 60,
     height: 60,
-    borderRadius: 30,
-    backgroundColor: '#3d95ce',
-    justifyContent: 'center',
-    alignItems: 'center',
     ...Shadows.card,
-  },
-  venmoIconText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  setupContainer: {
-    width: '100%',
-  },
-  verifiedContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  profileContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    width: '100%',
-    ...Shadows.card,
-  },
-  profilePic: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: Spacing.md,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-    fontSize: 16,
-  },
-  profileStatus: {
-    ...Typography.body,
-    color: Colors.success,
-    fontSize: 12,
-  },
-  changeButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-  },
-  changeButtonText: {
-    ...Typography.body,
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  venmoInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    overflow: 'hidden',
-  },
-  atSymbol: {
-    paddingLeft: Spacing.lg,
-    ...Typography.body,
-    color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  venmoInput: {
-    flex: 1,
-    height: 56,
-    paddingHorizontal: Spacing.md,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontSize: 16,
-  },
-  verifyButton: {
-    height: 44,
-    backgroundColor: '#3d95ce',
-    borderRadius: Radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
-    marginTop: Spacing.md,
-    ...Shadows.card,
-  },
-  verifyButtonDisabled: {
-    opacity: 0.6,
-  },
-  verifyButtonText: {
-    ...Typography.title,
-    color: 'white',
-    fontSize: 14,
-  },
-  openVenmoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-  },
-  openVenmoText: {
-    ...Typography.body,
-    color: Colors.accent,
-    marginLeft: Spacing.sm,
-    fontWeight: '600',
-    fontSize: 14,
   },
 });
 

@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import VenmoProfilePicture from '../components/VenmoProfilePicture';
+import ProfilePicture from '../components/VenmoProfilePicture';
+import DeleteButton from '../components/DeleteButton';
 import { getCurrentUser } from '../services/authService';
 import { getUserFriends } from '../services/friendService';
 
@@ -79,7 +80,7 @@ const FriendSelector = ({
           : `${friend.friendData.firstName} ${friend.friendData.lastName}`,
         phoneNumber: friend.friendData.phoneNumber,
         venmoUsername: friend.friendData.venmoUsername,
-        venmoProfilePic: friend.friendData.venmoProfilePic
+        profilePhoto: friend.friendData.profilePhoto
       };
       
       onFriendsChange([...selectedFriends, newFriend]);
@@ -101,8 +102,8 @@ const FriendSelector = ({
       >
         <View style={styles.friendInfo}>
           <View style={styles.friendAvatar}>
-            <VenmoProfilePicture
-              source={item.friendData.venmoProfilePic}
+            <ProfilePicture
+              source={item.friendData.profilePhoto}
               size={40}
               username={item.friendData.venmoUsername || `${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`}
             />
@@ -128,12 +129,11 @@ const FriendSelector = ({
   const renderSelectedFriend = ({ item }) => (
     <View style={styles.selectedFriendChip}>
       <Text style={styles.selectedFriendName}>{item.name}</Text>
-      <TouchableOpacity
-        style={styles.removeFriendButton}
+      <DeleteButton
         onPress={() => removeSelectedFriend(item.id)}
-      >
-        <Ionicons name="close-circle" size={16} color={Colors.danger} />
-      </TouchableOpacity>
+        size="small"
+        variant="subtle"
+      />
     </View>
   );
 
@@ -222,6 +222,7 @@ const FriendSelector = ({
                       setSearchQuery('');
                       setNewPlaceholder({ name: '', phone: '' });
                       setShowPhoneQuick(false);
+                      setShowModal(false); // Close modal after adding placeholder
                     }}
                   >
                     <Text style={styles.quickAddButtonText}>Add</Text>
@@ -268,18 +269,7 @@ const FriendSelector = ({
             />
           </View>
 
-          {/* Modal Footer */}
-          <View style={styles.modalFooter}>
-            <Text style={styles.selectionSummary}>
-              {selectedFriends.length} friend{selectedFriends.length !== 1 ? 's' : ''} selected
-            </Text>
-            <TouchableOpacity
-              style={styles.doneButton}
-              onPress={() => setShowModal(false)}
-            >
-              <Text style={styles.doneButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
+
         </View>
       </Modal>
 
@@ -316,9 +306,7 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     marginRight: Spacing.xs,
   },
-  removeFriendButton: {
-    padding: 2,
-  },
+
   selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -455,16 +443,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     textAlign: 'center',
   },
-  modalFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-  },
   quickAddCard: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
@@ -483,21 +461,6 @@ const styles = StyleSheet.create({
   quickAddButton: { backgroundColor: Colors.accent, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.pill },
   quickAddButtonText: { ...Typography.label, color: Colors.surface, fontWeight: '600' },
   quickAddPhoneToggle: { ...Typography.label, color: Colors.accent, marginTop: Spacing.sm },
-  selectionSummary: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  doneButton: {
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.md,
-  },
-  doneButtonText: {
-    ...Typography.title,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
   inputRow: { marginBottom: Spacing.md },
   inputLabel: { ...Typography.label, color: Colors.textSecondary, marginBottom: Spacing.xs },
   input: {

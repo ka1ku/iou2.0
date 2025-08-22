@@ -9,6 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,9 @@ import { getCurrentUser } from '../services/authService';
 import { createExpense, updateExpense } from '../services/expenseService';
 import FriendSelector from '../components/FriendSelector';
 import InviteFriendSheet from '../components/InviteFriendSheet';
+import PriceInput from '../components/PriceInput';
+import SmartSplitInput from '../components/SmartSplitInput';
+import DeleteButton from '../components/DeleteButton';
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
@@ -28,12 +32,17 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [placeholders, setPlaceholders] = useState([]);
   const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
+  const [showSettings, setShowSettings] = useState(false);
+  const [joinEnabled, setJoinEnabled] = useState(true);
   const [items, setItems] = useState(expense?.items || []);
+  const [fees, setFees] = useState(expense?.fees || []);
   const [loading, setLoading] = useState(false);
 
-  // Calculate total from items
+  // Calculate total from items and fees
   const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const feesTotal = fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
+    return itemsTotal + feesTotal;
   };
 
   useEffect(() => {
@@ -64,6 +73,46 @@ const AddExpenseScreen = ({ route, navigation }) => {
           splits: []
         }));
         setItems(formattedItems);
+      }
+      
+      // Set fees if available (e.g., tax, tip)
+      if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
+        const subtotalFromReceipt = Number(scannedReceipt.subtotal);
+        const fallbackItemsTotal = (scannedReceipt.items || []).reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
+        const baseline = Number.isFinite(subtotalFromReceipt) ? subtotalFromReceipt : fallbackItemsTotal;
+
+        const formattedFees = scannedReceipt.fees.map((fee, index) => {
+          const rawType = fee.type === 'percentage' || fee.type === 'fixed' ? fee.type : undefined;
+          let percentage = fee.percentage !== undefined && fee.percentage !== null ? Number(fee.percentage) : null;
+          let amount = fee.amount !== undefined && fee.amount !== null ? Number(fee.amount) : null;
+          let type = rawType || (Number.isFinite(percentage) ? 'percentage' : 'fixed');
+
+          if (type === 'percentage') {
+            if (!Number.isFinite(percentage)) {
+              // Try deriving percentage from amount
+              if (Number.isFinite(amount) && baseline > 0) {
+                percentage = (amount / baseline) * 100;
+              }
+            }
+            if (!Number.isFinite(amount) && Number.isFinite(percentage)) {
+              amount = (baseline * percentage) / 100;
+            }
+          }
+
+          if (!Number.isFinite(amount)) amount = 0;
+          if (!Number.isFinite(percentage)) percentage = null;
+
+          return {
+            id: Date.now().toString() + 'fee' + index,
+            name: fee.name || 'Fee',
+            amount,
+            type,
+            percentage,
+            splitType: 'proportional',
+            splits: []
+          };
+        });
+        setFees(formattedFees);
       }
       
       // Show success message
@@ -167,6 +216,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
     }
     
     setItems(updated);
+    
+    // Recalculate percentage-based fees when items change
+    if (field === 'amount') {
+      const updatedFees = fees.map(fee => {
+        if (fee.type === 'percentage') {
+          const itemsTotal = updated.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+          return { ...fee, amount: (itemsTotal * fee.percentage) / 100 };
+        }
+        return fee;
+      });
+      setFees(updatedFees);
+    }
   };
 
   const updateItemSplitType = (index, splitType) => {
@@ -179,10 +240,17 @@ const AddExpenseScreen = ({ route, navigation }) => {
       updated[index].splits = participants.map((_, i) => ({
         participantIndex: i,
         amount: splitAmount,
-        percentage: 100 / participants.length
+      }));
+    } else if (splitType === 'custom') {
+      // Initialize custom splits evenly for smart split
+      const amount = parseFloat(updated[index].amount) || 0;
+      const splitAmount = amount / participants.length;
+      updated[index].splits = participants.map((_, i) => ({
+        participantIndex: i,
+        amount: splitAmount,
       }));
     } else {
-      // Clear splits for custom mode
+      // Clear splits for other modes
       updated[index].splits = [];
     }
     
@@ -199,11 +267,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
     
     const existingSplitIndex = item.splits.findIndex(s => s.participantIndex === participantIndex);
     if (existingSplitIndex >= 0) {
-      item.splits[existingSplitIndex].amount = parseFloat(amount) || 0;
+      item.splits[existingSplitIndex].amount = amount || 0;
     } else {
       item.splits.push({
         participantIndex,
-        amount: parseFloat(amount) || 0
+        amount: amount || 0
       });
     }
     
@@ -211,7 +279,56 @@ const AddExpenseScreen = ({ route, navigation }) => {
   };
 
   const removeItem = (index) => {
-    setItems(items.filter((_, i) => i !== index));
+    const updatedItems = items.filter((_, i) => i !== index);
+    setItems(updatedItems);
+    
+    // Recalculate percentage-based fees when items are removed
+    const updatedFees = fees.map(fee => {
+      if (fee.type === 'percentage') {
+        const itemsTotal = updatedItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+        return { ...fee, amount: (itemsTotal * fee.percentage) / 100 };
+      }
+      return fee;
+    });
+    setFees(updatedFees);
+  };
+
+  const addFee = () => {
+    const newFee = {
+      id: Date.now().toString(),
+      name: '',
+      amount: 0,
+      type: 'percentage', // 'percentage' or 'fixed'
+      percentage: 15, // default 15% tip
+      splitType: 'proportional', // 'equal' or 'proportional'
+      splits: []
+    };
+    setFees([...fees, newFee]);
+  };
+
+  const updateFee = (index, field, value) => {
+    const updated = [...fees];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    // Recalculate amount if percentage changed
+    if (field === 'percentage' && updated[index].type === 'percentage') {
+      const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+      updated[index].amount = (itemsTotal * value) / 100;
+    }
+    
+    // Recalculate amount if type changed from fixed to percentage
+    if (field === 'type' && value === 'percentage') {
+      const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+      updated[index].amount = (itemsTotal * (updated[index].percentage || 15)) / 100;
+    }
+    
+
+    
+    setFees(updated);
+  };
+
+  const removeFee = (index) => {
+    setFees(fees.filter((_, i) => i !== index));
   };
 
   const saveExpense = async () => {
@@ -235,6 +352,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
       return;
     }
 
+    if (fees.some(fee => !fee.name.trim())) {
+      Alert.alert('Error', 'Please fill in all fee names');
+      return;
+    }
+
     setLoading(true);
     try {
       const currentUser = getCurrentUser();
@@ -250,7 +372,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
           ...item,
           name: item.name.trim(),
           amount: parseFloat(item.amount)
-        }))
+        })),
+        fees: fees.map(fee => ({
+          ...fee,
+          name: fee.name.trim(),
+          amount: parseFloat(fee.amount)
+        })),
+        join: {
+          enabled: joinEnabled,
+        }
       };
 
       if (isEditing) {
@@ -280,33 +410,19 @@ const AddExpenseScreen = ({ route, navigation }) => {
             value={item.name}
             onChangeText={(text) => updateItem(index, 'name', text)}
           />
-          <TouchableOpacity onPress={() => removeItem(index)} style={styles.removeItemButton}>
-            <Ionicons name="close-circle" size={24} color={Colors.danger} />
-          </TouchableOpacity>
+          <DeleteButton
+            onPress={() => removeItem(index)}
+            size="medium"
+            variant="subtle"
+          />
         </View>
 
-        <TextInput
+        <PriceInput
+          value={item.amount}
+          onChangeText={(amount) => updateItem(index, 'amount', amount)}
+          placeholder="0.00"
           style={styles.amountInput}
-          placeholder="Amount"
-          value={item.amount?.toString() || ''}
-          onChangeText={(text) => {
-            // Remove any non-numeric characters except decimal point
-            const cleanText = text.replace(/[^0-9.]/g, '');
-            // Ensure only one decimal point
-            const parts = cleanText.split('.');
-            if (parts.length <= 2) {
-              updateItem(index, 'amount', cleanText);
-            }
-          }}
-          keyboardType="numeric"
         />
-        
-        {/* Display formatted amount below input */}
-        {item.amount && parseFloat(item.amount) > 0 && (
-          <Text style={styles.formattedAmount}>
-            ${parseFloat(item.amount).toFixed(2)}
-          </Text>
-        )}
 
         <View style={styles.paidByContainer}>
           <Text style={styles.paidByLabel}>Paid by:</Text>
@@ -364,29 +480,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
         {item.splitType === 'custom' && (
           <View style={styles.customSplitsContainer}>
-            {participants.map((participant, pIndex) => {
-              const split = item.splits?.find(s => s.participantIndex === pIndex);
-              return (
-                <View key={pIndex} style={styles.customSplitRow}>
-                  <Text style={styles.participantName}>{participant.name}:</Text>
-                  <TextInput
-                    style={styles.customSplitInput}
-                    placeholder="0.00"
-                    value={split?.amount?.toString() || ''}
-                    onChangeText={(text) => {
-                      // Remove any non-numeric characters except decimal point
-                      const cleanText = text.replace(/[^0-9.]/g, '');
-                      // Ensure only one decimal point
-                      const parts = cleanText.split('.');
-                      if (parts.length <= 2) {
-                        updateItemSplit(index, pIndex, cleanText);
-                      }
-                    }}
-                    keyboardType="numeric"
-                  />
-                </View>
-              );
-            })}
+            <SmartSplitInput
+              participants={participants}
+              total={parseFloat(item.amount) || 0}
+              initialSplits={item.splits || []}
+              onSplitsChange={(newSplits) => {
+                // Update the item's splits
+                const updated = [...items];
+                updated[index].splits = newSplits;
+                setItems(updated);
+              }}
+              style={styles.smartSplitContainer}
+            />
           </View>
         )}
 
@@ -395,6 +500,162 @@ const AddExpenseScreen = ({ route, navigation }) => {
             ${((parseFloat(item.amount) || 0) / participants.length).toFixed(2)} per person
           </Text>
         )}
+      </View>
+    );
+  };
+
+  const renderFee = (fee, index) => {
+    const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    
+    return (
+      <View key={fee.id} style={styles.feeCard}>
+        <View style={styles.feeHeader}>
+          <TextInput
+            style={styles.feeNameInput}
+            placeholder="Fee name (e.g., Tip, Tax, Service)"
+            value={fee.name}
+            onChangeText={(text) => updateFee(index, 'name', text)}
+          />
+          <DeleteButton
+            onPress={() => removeFee(index)}
+            size="medium"
+            variant="subtle"
+          />
+        </View>
+
+        <View style={styles.feeTypeContainer}>
+          <TouchableOpacity
+            style={[
+              styles.feeTypeButton,
+              fee.type === 'percentage' && styles.feeTypeButtonActive
+            ]}
+            onPress={() => updateFee(index, 'type', 'percentage')}
+          >
+            <Text style={[
+              styles.feeTypeText,
+              fee.type === 'percentage' && styles.feeTypeTextActive
+            ]}>
+              Percentage
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.feeTypeButton,
+              fee.type === 'fixed' && styles.feeTypeButtonActive
+            ]}
+            onPress={() => updateFee(index, 'type', 'fixed')}
+          >
+            <Text style={[
+              styles.feeTypeText,
+              fee.type === 'fixed' && styles.feeTypeTextActive
+            ]}>
+              Fixed Amount
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {fee.type === 'percentage' ? (
+          <View style={styles.percentageContainer}>
+            <View style={styles.percentageButtons}>
+              {[10, 15, 18, 20, 25].map((percent) => (
+                <TouchableOpacity
+                  key={percent}
+                  style={[
+                    styles.percentageButton,
+                    fee.percentage === percent && styles.percentageButtonActive
+                  ]}
+                  onPress={() => updateFee(index, 'percentage', percent)}
+                >
+                  <Text style={[
+                    styles.percentageButtonText,
+                    fee.percentage === percent && styles.percentageButtonTextActive
+                  ]}>
+                    {percent}%
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.customPercentageContainer}>
+              <Text style={styles.customPercentageLabel}>Custom:</Text>
+              <TextInput
+                style={styles.customPercentageInput}
+                placeholder="0"
+                value={fee.percentage?.toString() || ''}
+                onChangeText={(text) => {
+                  const num = parseFloat(text);
+                  if (!isNaN(num) && num >= 0 && num <= 100) {
+                    updateFee(index, 'percentage', num);
+                  }
+                }}
+                keyboardType="numeric"
+              />
+              <Text style={styles.percentageSymbol}>%</Text>
+            </View>
+            <Text style={styles.calculatedAmount}>
+              Amount: ${((itemsTotal * fee.percentage) / 100).toFixed(2)}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.fixedAmountContainer}>
+            <PriceInput
+              value={fee.amount}
+              onChangeText={(amount) => updateFee(index, 'amount', amount)}
+              placeholder="0.00"
+              style={styles.feeAmountInput}
+            />
+          </View>
+        )}
+
+        <View style={styles.feeSplitContainer}>
+          <Text style={styles.feeSplitLabel}>Split:</Text>
+          <TouchableOpacity
+            style={[
+              styles.feeSplitButton,
+              fee.splitType === 'equal' && styles.feeSplitButtonActive
+            ]}
+            onPress={() => updateFee(index, 'splitType', 'equal')}
+          >
+            <Text style={[
+              styles.feeSplitText,
+              fee.splitType === 'equal' && styles.feeSplitTextActive
+            ]}>
+              Split Even
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.feeSplitButton,
+              fee.splitType === 'proportional' && styles.feeSplitButtonActive
+            ]}
+            onPress={() => updateFee(index, 'splitType', 'proportional')}
+          >
+            <Text style={[
+              styles.feeSplitText,
+              fee.splitType === 'proportional' && styles.feeSplitTextActive
+            ]}>
+              Proportional
+            </Text>
+          </TouchableOpacity>
+
+        </View>
+
+        {fee.splitType === 'equal' && (
+          <Text style={styles.feeSplitInfo}>
+            ${((fee.amount || 0) / participants.length).toFixed(2)} per person
+          </Text>
+        )}
+        {fee.splitType === 'proportional' && (
+          <Text style={styles.feeSplitInfo}>
+            Split proportionally based on who paid what
+          </Text>
+        )}
+
+        
+        {/* Show total fee amount */}
+        <View style={styles.feeTotalContainer}>
+          <Text style={styles.feeTotalLabel}>Total Fee:</Text>
+          <Text style={styles.feeTotalAmount}>${(fee.amount || 0).toFixed(2)}</Text>
+        </View>
       </View>
     );
   };
@@ -411,7 +672,12 @@ const AddExpenseScreen = ({ route, navigation }) => {
         <Text style={styles.headerTitle}>
           {isEditing ? 'Edit Expense' : 'Add Expense'}
         </Text>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => setShowSettings(true)}
+        >
+          <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
       </View>
       
       <KeyboardAvoidingView 
@@ -462,9 +728,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
                       <Ionicons name="qr-code" size={16} color={Colors.surface} />
                       <Text style={styles.inviteButtonText}>Invite</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.removeButton} onPress={() => removePlaceholder(p.id)}>
-                      <Ionicons name="trash" size={18} color={Colors.danger} />
-                    </TouchableOpacity>
+                    <DeleteButton
+                      onPress={() => removePlaceholder(p.id)}
+                      size="small"
+                      variant="subtle"
+                    />
                   </View>
                 ))}
               </View>
@@ -472,7 +740,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
             <Text style={styles.participantsNote}>You'll automatically be included as a participant</Text>
           </View>
 
-          <View style={[styles.section, styles.lastSection]}>
+          <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Items</Text>
               <TouchableOpacity onPress={addItem} style={styles.addButton}>
@@ -487,6 +755,24 @@ const AddExpenseScreen = ({ route, navigation }) => {
               </View>
             ) : (
               items.map(renderItem)
+            )}
+          </View>
+
+          <View style={[styles.section, styles.lastSection]}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Fees & Tips</Text>
+              <TouchableOpacity onPress={addFee} style={styles.addButton}>
+                <Ionicons name="add-circle" size={24} color={Colors.accent} />
+              </TouchableOpacity>
+            </View>
+            {fees.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="card-outline" size={48} color={Colors.textSecondary} />
+                <Text style={styles.emptyStateText}>No fees added yet</Text>
+                <Text style={styles.emptyStateSubtext}>Add tips, taxes, or service fees</Text>
+              </View>
+            ) : (
+              fees.map(renderFee)
             )}
           </View>
         </ScrollView>
@@ -512,6 +798,50 @@ const AddExpenseScreen = ({ route, navigation }) => {
         placeholderName={inviteTarget?.name || ''}
         phoneNumber={inviteTarget?.phone || ''}
       />
+
+      {/* Settings Modal */}
+      <Modal
+        visible={showSettings}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowSettings(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowSettings(false)}
+            >
+              <Ionicons name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Expense Settings</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          <View style={styles.modalContent}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingTitle}>Allow join by room code</Text>
+                <Text style={styles.settingDescription}>
+                  Let others join this expense using the room code
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  joinEnabled && styles.toggleButtonActive
+                ]}
+                onPress={() => setJoinEnabled(!joinEnabled)}
+              >
+                <View style={[
+                  styles.toggleThumb,
+                  joinEnabled && styles.toggleThumbActive
+                ]} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -548,6 +878,15 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 40,
     height: 40,
+  },
+  settingsButton: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.card,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -648,18 +987,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     color: Colors.textPrimary,
   },
-  removeItemButton: {
-    padding: Spacing.sm,
-  },
+
   amountInput: {
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
-    ...Typography.body,
     marginBottom: Spacing.sm,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
   },
   formattedAmount: {
     ...Typography.body,
@@ -709,15 +1039,11 @@ const styles = StyleSheet.create({
   },
   customSplitInput: {
     width: 80,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.sm,
-    padding: Spacing.sm,
-    ...Typography.body,
-    textAlign: 'center',
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
   },
+  smartSplitContainer: {
+    marginTop: Spacing.sm,
+  },
+
   evenSplitText: {
     ...Typography.label,
     color: Colors.textSecondary,
@@ -815,7 +1141,83 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   inviteButtonText: { ...Typography.label, color: Colors.surface, fontWeight: '600' },
-  removeButton: { marginLeft: Spacing.sm },
+
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: 60,
+    paddingBottom: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  closeButton: {
+    padding: Spacing.sm,
+  },
+  modalTitle: {
+    ...Typography.h2,
+    color: Colors.textPrimary,
+    flex: 1,
+    textAlign: 'center',
+  },
+  modalContent: {
+    flex: 1,
+    padding: Spacing.lg,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.md,
+    ...Shadows.card,
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  settingTitle: {
+    ...Typography.title,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  settingDescription: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+  },
+  toggleButton: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.divider,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleButtonActive: {
+    backgroundColor: Colors.accent,
+  },
+  toggleThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: Colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  toggleThumbActive: {
+    transform: [{ translateX: 20 }],
+  },
   footer: {
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.lg,
@@ -841,6 +1243,187 @@ const styles = StyleSheet.create({
   },
   lastSection: {
     marginBottom: 0,
+  },
+  // Fee styles
+  feeCard: {
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+    ...Shadows.card,
+  },
+  feeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  feeNameInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
+    ...Typography.body,
+    marginRight: Spacing.sm,
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
+  },
+
+  feeTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  feeTypeButton: {
+    flex: 1,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    alignItems: 'center',
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surface,
+  },
+  feeTypeButtonActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  feeTypeText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  feeTypeTextActive: {
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  percentageContainer: {
+    marginBottom: Spacing.md,
+  },
+  percentageButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  percentageButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  percentageButtonActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  percentageButtonText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  percentageButtonTextActive: {
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  customPercentageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  customPercentageLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    marginRight: Spacing.sm,
+  },
+  customPercentageInput: {
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    ...Typography.body,
+    textAlign: 'center',
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
+    width: 60,
+    marginRight: Spacing.xs,
+  },
+  percentageSymbol: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+  },
+  calculatedAmount: {
+    ...Typography.label,
+    color: Colors.accent,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  fixedAmountContainer: {
+    marginBottom: Spacing.md,
+  },
+  feeAmountInput: {
+    marginBottom: 0,
+  },
+  feeSplitContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  feeSplitLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  feeSplitButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+  },
+  feeSplitButtonActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  feeSplitText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  feeSplitTextActive: {
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  feeSplitInfo: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  feeTotalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  feeTotalLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  feeTotalAmount: {
+    ...Typography.title,
+    color: Colors.accent,
+    fontWeight: '700',
   },
 });
 

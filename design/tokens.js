@@ -3,6 +3,7 @@
 export const Colors = {
   background: '#F5F1E8', // Warm cream background
   surface: '#FFFFFF',
+  white: '#FFFFFF', // Pure white for text and icons
   card: '#FFF8F0', // Slightly warmer card background
   textPrimary: '#2C2C2C',
   textSecondary: '#8A8A8A',
@@ -10,8 +11,10 @@ export const Colors = {
   accentDark: '#B8935F',
   success: '#7FB069',
   danger: '#E56B6F',
+  warning: '#F39C12', // Warning color for unallocated amounts
   blue: '#4A90E2', // Blue for receipt scanning button
   divider: '#E8E0D5',
+  border: '#E8E0D5', // Border color for inputs
   tabActive: '#2C2C2C',
   tabInactive: '#B8935F',
 };
@@ -41,6 +44,13 @@ export const Shadows = {
     shadowRadius: 12,
     elevation: 6,
   },
+  button: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
 };
 
 export const Typography = {
@@ -58,6 +68,10 @@ export const Typography = {
     fontSize: 24,
     fontFamily: 'Poppins_600SemiBold',
   },
+  h3: {
+    fontSize: 20,
+    fontFamily: 'Poppins_600SemiBold',
+  },
   title: {
     fontSize: 18,
     fontFamily: 'Poppins_600SemiBold',
@@ -66,9 +80,21 @@ export const Typography = {
     fontSize: 14,
     fontFamily: 'Poppins_400Regular',
   },
+  body1: {
+    fontSize: 14,
+    fontFamily: 'Poppins_400Regular',
+  },
+  body2: {
+    fontSize: 12,
+    fontFamily: 'Poppins_400Regular',
+  },
   label: {
     fontSize: 12,
     fontFamily: 'Poppins_500Medium',
+  },
+  caption: {
+    fontSize: 10,
+    fontFamily: 'Poppins_400Regular',
   },
 };
 
