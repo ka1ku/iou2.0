@@ -353,8 +353,8 @@ export const createUserProfile = async (userData, phoneNumber) => {
 
     // Clean and prepare user data
     const cleanUserData = {
-      firstName: (userData.firstName || '').trim(),
-      lastName: (userData.lastName || '').trim(),
+      firstName: (userData.firstName || '').trim().toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+      lastName: (userData.lastName || '').trim().toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
       username: (userData.username || '').trim().toLowerCase(),
       phoneNumber: (phoneNumber || user.phoneNumber || '').trim(),
       venmoUsername: userData.venmoUsername ? userData.venmoUsername.trim() : null,

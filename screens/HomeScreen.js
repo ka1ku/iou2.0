@@ -125,7 +125,7 @@ const HomeScreen = ({ navigation }) => {
 
   const handleReceiptScan = async () => {
     try {
-      // Check permissions first
+      // Check permissions
       const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
       const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
@@ -184,8 +184,7 @@ const HomeScreen = ({ navigation }) => {
       
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+
         quality: 0.8,
       });
 
@@ -214,6 +213,8 @@ const HomeScreen = ({ navigation }) => {
       // Use Firebase AI to scan the receipt
       const receiptData = await scanReceiptWithAI(base64Image);
       
+      // Record the receipt scan in Firestore
+      
       // Stop animation before navigation
       stopScanningAnimation();
       
@@ -236,6 +237,10 @@ const HomeScreen = ({ navigation }) => {
         errorMessage += 'There was an issue with the AI service. Please try again.';
       } else if (error.message.includes('AI response')) {
         errorMessage += 'The AI could not properly read the receipt. Please ensure the image is clear and try again.';
+      } else if (error.message.includes('Not a receipt')) {
+        errorMessage = 'This image does not appear to be a receipt. Please try with a clear receipt image.';
+      } else if (error.message.includes('Could not extract')) {
+        errorMessage = 'Could not extract any usable information from this image. Please ensure it\'s a clear receipt and try again.';
       } else {
         errorMessage += 'Please try again or enter manually.';
       }
@@ -292,15 +297,15 @@ const HomeScreen = ({ navigation }) => {
       const prompt = `You are a receipt scanning assistant. Analyze this receipt image and extract the following information in JSON format:
 
 {
-  "title": "Receipt title or business name",
-  "date": "Date of purchase (YYYY-MM-DD)",
-  "subtotal": "Items subtotal BEFORE tax/tip/fees as a number",
-  "total": "Grand total as a number",
+  "title": "Receipt title or business name (if not clear, use 'Receipt' or business name)",
+  "date": "Date of purchase (YYYY-MM-DD) or today's date if not visible",
+  "subtotal": "Items subtotal BEFORE tax/tip/fees as a number, or null if not visible",
+  "total": "Grand total as a number, or null if not visible",
   "items": [
     {
-      "name": "Item name",
+      "name": "Item name (use 'Item' if unclear)",
       "amount": "Item price as a number",
-      "quantity": "Quantity as a number"
+      "quantity": "Quantity as a number (default to 1 if not visible)"
     }
   ],
   "fees": [
@@ -321,14 +326,19 @@ const HomeScreen = ({ navigation }) => {
 }
 
 Important guidelines:
-- Identify and include common charges under fees: Tax (Sales Tax), Tip/Gratuity, Service Fee, Delivery Fee, Convenience Fee, Surcharge
-- Convert all monetary amounts to numbers (remove $ signs and commas)
-- Provide BOTH amount and percentage when possible; if one is missing but can be derived from subtotal, compute it
-- If subtotal is not printed, compute it by summing item amounts
-- Ensure total ≈ subtotal + sum(fees)
-- If a date is not clearly visible, use today's date
+- Extract as much information as possible, even if some fields are unclear
+- If a field is not visible or unclear, use null or a reasonable default
+- For monetary amounts, remove $ signs and commas, convert to numbers
+- If subtotal is not visible, it will be computed from items
+- If total is not visible, it will be computed from subtotal + fees
+- Use today's date if no date is visible
+- If item names are unclear, use descriptive names like "Food Item", "Beverage", etc.
 - Ensure the JSON is valid and properly formatted
-- Respond with ONLY the JSON data, no extra text.`;
+- Respond with ONLY the JSON data, no extra text
+- If this is clearly not a receipt (e.g., random photo, document, text message, etc.), respond with {"error": "Not a receipt"}
+- If the image is too blurry or unreadable, try your best to extract what you can see
+- A receipt should typically contain: business name, items purchased, prices, and/or a total amount
+- If you see any of these elements, extract them even if incomplete`;
 
       // Create the content parts array as per Firebase AI documentation
       const contentParts = [
@@ -344,6 +354,7 @@ Important guidelines:
       const response = await model.generateContent(contentParts);
 
       const responseText = response.response.text();
+      console.log('AI Response:', responseText);
       
       // Try to extract JSON from the response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -351,22 +362,28 @@ Important guidelines:
         try {
           const receiptData = JSON.parse(jsonMatch[0]);
 
-          // Basic validation
-          if (!receiptData.title || receiptData.total === undefined || receiptData.total === null) {
-            throw new Error('AI response missing required fields (title or total)');
+          // Check if AI detected this is not a receipt
+          if (receiptData.error === 'Not a receipt') {
+            throw new Error('This image does not appear to be a receipt. Please try with a clear receipt image.');
           }
 
-          // Normalize numeric fields
+          // Basic validation - be more flexible
+          // Only require that we have some basic structure that looks like a receipt
+          if (!receiptData || typeof receiptData !== 'object') {
+            throw new Error('AI response is not in the expected format');
+          }
+
+          // Normalize numeric fields with better fallbacks
           const items = Array.isArray(receiptData.items) ? receiptData.items.map(it => ({
-            name: it.name || '',
+            name: it.name || 'Item',
             amount: Number(it.amount) || 0,
             quantity: Number(it.quantity) || 1,
-          })) : [];
+          })).filter(item => item.amount > 0) : []; // Only include items with valid amounts
 
-          // Compute subtotal if missing
+          // Compute subtotal if missing or invalid
           const computedSubtotal = items.reduce((s, it) => s + (Number(it.amount) || 0), 0);
           const subtotal = Number(receiptData.subtotal);
-          const normalizedSubtotal = Number.isFinite(subtotal) ? subtotal : computedSubtotal;
+          const normalizedSubtotal = Number.isFinite(subtotal) && subtotal > 0 ? subtotal : computedSubtotal;
 
           // Normalize fees
           const rawFees = Array.isArray(receiptData.fees) ? receiptData.fees : [];
@@ -395,27 +412,87 @@ Important guidelines:
             return { name, type, percentage, amount };
           });
 
-          return {
+          // Calculate total if missing or invalid
+          const rawTotal = Number(receiptData.total);
+          const calculatedTotal = normalizedSubtotal + normalizedFees.reduce((sum, fee) => sum + (fee.amount || 0), 0);
+          const normalizedTotal = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : calculatedTotal;
+
+          // Ensure we have at least some basic data
+          if (items.length === 0 && normalizedSubtotal === 0 && normalizedTotal === 0) {
+            // If we have no items but have a title, create a minimal receipt
+            if (receiptData.title && receiptData.title !== 'Receipt') {
+              console.log('Creating minimal receipt from available data');
+              const minimalReceipt = {
+                title: receiptData.title,
+                date: receiptData.date || new Date().toISOString().split('T')[0],
+                subtotal: 0,
+                total: 0,
+                items: [],
+                fees: [],
+                participants: [{ name: 'You', paidBy: true }],
+                notes: 'Minimal receipt data extracted'
+              };
+              return minimalReceipt;
+            }
+            throw new Error('Could not extract any usable information from this image. Please ensure it\'s a clear receipt.');
+          }
+
+          const finalReceiptData = {
             ...receiptData,
+            title: receiptData.title || 'Receipt',
+            date: receiptData.date || new Date().toISOString().split('T')[0],
             items,
             subtotal: normalizedSubtotal,
             fees: normalizedFees,
-            total: Number(receiptData.total) || 0,
+            total: normalizedTotal,
           };
+
+          console.log('Processed receipt data:', finalReceiptData);
+          return finalReceiptData;
         } catch (parseError) {
           console.error('JSON parsing error:', parseError);
           throw new Error('AI response contained invalid JSON format: ' + parseError.message);
         }
       } else {
         console.error('No JSON found in response:', responseText);
-        throw new Error('AI response did not contain valid JSON structure');
+        
+        // Check if the response contains any useful information that we can parse
+        if (responseText.toLowerCase().includes('receipt') || 
+            responseText.toLowerCase().includes('total') || 
+            responseText.toLowerCase().includes('amount') ||
+            responseText.toLowerCase().includes('$')) {
+          // Try to create a minimal receipt from the text response
+          const fallbackData = {
+            title: 'Receipt (AI Response)',
+            date: new Date().toISOString().split('T')[0],
+            subtotal: 0,
+            total: 0,
+            items: [],
+            fees: [],
+            participants: [{ name: 'You', paidBy: true }],
+            notes: 'AI response: ' + responseText.substring(0, 200) + '...'
+          };
+          
+          console.log('Using fallback receipt data:', fallbackData);
+          return fallbackData;
+        }
+        
+        throw new Error('AI response did not contain valid JSON structure and no useful receipt information was found');
       }
       
     } catch (error) {
       console.error('AI scanning error:', error);
+      
+      // Handle specific error cases
       if (error.message.includes('AI response')) {
         throw error; // Re-throw our custom errors
+      } else if (error.message.includes('Not a receipt')) {
+        throw error; // Re-throw receipt validation errors
+      } else if (error.message.includes('Could not extract')) {
+        throw error; // Re-throw extraction errors
       } else {
+        // For other errors, try to provide a helpful message
+        console.error('Unexpected AI error:', error);
         throw new Error('Failed to scan receipt with Firebase AI: ' + error.message);
       }
     }
@@ -518,7 +595,9 @@ Important guidelines:
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Expenses</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>My Expenses</Text>
+        </View>
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={styles.receiptButton}
@@ -529,7 +608,7 @@ Important guidelines:
             {scanningReceipt ? (
               <ActivityIndicator size="small" color="white" />
             ) : (
-              <Ionicons name="receipt-outline" size={26} color="white" />
+              <Ionicons name="scan-outline" size={26} color="white" />
             )}
           </TouchableOpacity>
           <TouchableOpacity
@@ -574,9 +653,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerTitle: {
     ...Typography.h2,
     color: Colors.textPrimary,
+    marginRight: Spacing.sm,
   },
   headerButtons: {
     flexDirection: 'row',

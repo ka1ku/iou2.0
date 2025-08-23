@@ -351,7 +351,7 @@ export const findUserByPhoneNumber = async (phoneNumber) => {
   }
 };
 
-// Find user by Venmo username (case-insensitive, without leading @)
+// Find user by username (case-insensitive, without leading @)
 export const findUserByUsername = async (username) => {
   try {
     if (!username) return null;
@@ -361,7 +361,7 @@ export const findUserByUsername = async (username) => {
 
     const userQuery = query(
       collection(firestoreInstance, 'users'),
-      where('venmoUsername', '==', normalized)
+      where('username', '==', normalized)
     );
 
     const snapshot = await getDocs(userQuery);

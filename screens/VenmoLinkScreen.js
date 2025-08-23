@@ -20,27 +20,26 @@ import VenmoInputForm from '../components/VenmoInputForm';
 const VenmoLinkScreen = ({ navigation, route }) => {
   const { firstName, lastName, phoneNumber, isSignUp } = route.params;
   const [loading, setLoading] = useState(false);
+  
+  // Use the hook with correct variable names
   const {
-    venmoUsername,
+    username,
     venmoProfilePic,
     venmoVerified,
-    verifyingVenmo,
-    verifyVenmoProfile,
+    isVerifying,
+    verificationError,
+    handleUsernameChange,
     resetVenmoProfile,
-    getVenmoData,
-    setVenmoUsername
+    getVenmoData
   } = useVenmoProfile(firstName, lastName);
-
-
 
   /**
    * Handles Venmo username submission
    */
   const handleVenmoUsernameSubmit = () => {
-    verifyVenmoProfile(venmoUsername);
+    // This is now handled automatically by the hook
+    // No need to manually call verification
   };
-
-
 
   const handleSkipVenmo = () => {
     Alert.alert(
@@ -94,7 +93,7 @@ const VenmoLinkScreen = ({ navigation, route }) => {
     if (venmoVerified) {
       return (
         <VenmoProfileDisplay
-          username={venmoUsername}
+          username={username}
           profilePic={venmoProfilePic}
           onChangeAccount={resetVenmoProfile}
           profileSize={60}
@@ -104,10 +103,10 @@ const VenmoLinkScreen = ({ navigation, route }) => {
 
     return (
       <VenmoInputForm
-        username={venmoUsername}
-        onUsernameChange={setVenmoUsername}
-        onVerify={handleVenmoUsernameSubmit}
-        verifying={verifyingVenmo}
+        username={username}
+        onUsernameChange={handleUsernameChange}
+        verifying={isVerifying}
+        verified={venmoVerified}
       />
     );
   };
@@ -144,6 +143,13 @@ const VenmoLinkScreen = ({ navigation, route }) => {
             </Text>
 
             {renderVenmoSetup()}
+
+            {/* Show verification error if any */}
+            {verificationError && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{verificationError}</Text>
+              </View>
+            )}
 
             {/* Benefits */}
             <View style={styles.benefitsContainer}>
@@ -256,7 +262,18 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: Spacing.xxl,
   },
-
+  errorContainer: {
+    backgroundColor: Colors.error + '20',
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    marginBottom: Spacing.lg,
+    width: '100%',
+  },
+  errorText: {
+    ...Typography.body,
+    color: Colors.error,
+    textAlign: 'center',
+  },
   benefitsContainer: {
     width: '100%',
   },
@@ -298,7 +315,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
   },
-
   skipButton: {
     alignItems: 'center',
     paddingVertical: Spacing.md,

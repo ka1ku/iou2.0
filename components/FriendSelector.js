@@ -19,7 +19,7 @@ import { getUserFriends } from '../services/friendService';
 const FriendSelector = ({ 
   selectedFriends, 
   onFriendsChange, 
-  maxFriends = 10,
+  maxFriends = null, // Remove limit - can have unlimited friends
   showAddButton = true,
   placeholder = "Select friends to split with...",
   allowPlaceholders = true,
@@ -30,7 +30,6 @@ const FriendSelector = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [newPlaceholder, setNewPlaceholder] = useState({ name: '', phone: '' });
-  const [showPhoneQuick, setShowPhoneQuick] = useState(false);
 
   useEffect(() => {
     loadFriends();
@@ -55,7 +54,6 @@ const FriendSelector = ({
     const fullName = `${friend.friendData.firstName} ${friend.friendData.lastName}`.toLowerCase();
     const search = searchQuery.toLowerCase();
     return fullName.includes(search) || 
-           friend.friendData.phoneNumber.includes(search) ||
            (friend.friendData.venmoUsername && friend.friendData.venmoUsername.toLowerCase().includes(search));
   });
 
@@ -67,19 +65,11 @@ const FriendSelector = ({
       const updated = selectedFriends.filter(selected => selected.id !== friend.friendId);
       onFriendsChange(updated);
     } else {
-      // Add friend (check max limit)
-      if (selectedFriends.length >= maxFriends) {
-        Alert.alert('Maximum Friends Reached', `You can only select up to ${maxFriends} friends for an expense.`);
-        return;
-      }
-      
+      // Add friend (no limit)
       const newFriend = {
         id: friend.friendId,
-        name: friend.friendData.venmoUsername
-          ? `@${friend.friendData.venmoUsername}`
-          : `${friend.friendData.firstName} ${friend.friendData.lastName}`,
-        phoneNumber: friend.friendData.phoneNumber,
-        venmoUsername: friend.friendData.venmoUsername,
+        name: `${friend.friendData.firstName || ''} ${friend.friendData.lastName || ''}`.trim() || 'Unknown Name',
+        username: friend.friendData.venmoUsername,
         profilePhoto: friend.friendData.profilePhoto
       };
       
@@ -110,11 +100,11 @@ const FriendSelector = ({
           </View>
           <View style={styles.friendDetails}>
             <Text style={styles.friendName}>
-              {item.friendData.venmoUsername
-                ? `@${item.friendData.venmoUsername}`
-                : `${item.friendData.firstName} ${item.friendData.lastName}`}
+              {`${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`.trim() || 'Unknown Name'}
             </Text>
-            <Text style={styles.friendPhone}>{item.friendData.phoneNumber}</Text>
+            {item.friendData.venmoUsername && (
+              <Text style={styles.friendVenmo}>@{item.friendData.venmoUsername}</Text>
+            )}
           </View>
         </View>
         <View style={styles.selectionIndicator}>
@@ -126,34 +116,10 @@ const FriendSelector = ({
     );
   };
 
-  const renderSelectedFriend = ({ item }) => (
-    <View style={styles.selectedFriendChip}>
-      <Text style={styles.selectedFriendName}>{item.name}</Text>
-      <DeleteButton
-        onPress={() => removeSelectedFriend(item.id)}
-        size="small"
-        variant="subtle"
-      />
-    </View>
-  );
+
 
   return (
     <View style={styles.container}>
-      {/* Selected Friends Display */}
-      {selectedFriends.length > 0 && (
-        <View style={styles.selectedFriendsContainer}>
-          <Text style={styles.selectedFriendsLabel}>Selected Friends:</Text>
-          <FlatList
-            data={selectedFriends}
-            renderItem={renderSelectedFriend}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.selectedFriendsList}
-          />
-        </View>
-      )}
-
       {/* Friend Selection Button */}
       {showAddButton && (
         <TouchableOpacity
@@ -162,10 +128,39 @@ const FriendSelector = ({
         >
           <Ionicons name="people-outline" size={20} color={Colors.accent} />
           <Text style={styles.selectButtonText}>
-            {selectedFriends.length === 0 ? placeholder : `Add/Remove Friends (${selectedFriends.length}/${maxFriends})`}
+            {selectedFriends.length === 0 ? placeholder : `Add/Remove Friends (${selectedFriends.length})`}
           </Text>
           <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
+      )}
+
+      {/* Selected Friends Display */}
+      {selectedFriends.length > 0 && (
+        <View style={styles.selectedFriendsContainer}>
+          <Text style={styles.selectedFriendsLabel}>Selected Friends:</Text>
+          {selectedFriends.map((friend) => (
+            <View key={friend.id} style={styles.selectedFriendChip}>
+              <View style={styles.friendAvatar}>
+                <ProfilePicture
+                  source={friend.profilePhoto || null}
+                  size={40}
+                  username={friend.name}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.selectedFriendName}>{friend.name}</Text>
+                {friend.username && (
+                  <Text style={styles.selectedFriendUsername}>@{friend.username}</Text>
+                )}
+              </View>
+              <DeleteButton
+                onPress={() => removeSelectedFriend(friend.id)}
+                size="small"
+                variant="subtle"
+              />
+            </View>
+          ))}
+        </View>
       )}
 
       {/* Friend Selection Modal */}
@@ -183,7 +178,12 @@ const FriendSelector = ({
               <Ionicons name="close" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Select Friends</Text>
-            <View style={styles.headerSpacer} />
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={() => setShowModal(false)}
+            >
+              <Ionicons name="checkmark" size={24} color={Colors.accent} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.modalContent}>
@@ -192,7 +192,7 @@ const FriendSelector = ({
               <Ionicons name="search" size={20} color={Colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search friends..."
+                placeholder="Search friends or add placeholder"
                 placeholderTextColor={Colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -215,34 +215,17 @@ const FriendSelector = ({
                       const ghost = {
                         id: `ghost-${Date.now()}`,
                         name,
-                        phoneNumber: newPlaceholder.phone.trim() || undefined,
                         isPlaceholder: true,
                       };
                       onAddPlaceholder?.(ghost);
                       setSearchQuery('');
                       setNewPlaceholder({ name: '', phone: '' });
-                      setShowPhoneQuick(false);
                       setShowModal(false); // Close modal after adding placeholder
                     }}
                   >
                     <Text style={styles.quickAddButtonText}>Add</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => setShowPhoneQuick(v => !v)}>
-                  <Text style={styles.quickAddPhoneToggle}>
-                    {showPhoneQuick ? 'Hide phone' : 'Add phone number'}
-                  </Text>
-                </TouchableOpacity>
-                {showPhoneQuick && (
-                  <TextInput
-                    style={[styles.input, { marginTop: Spacing.sm }]}
-                    placeholder="Phone (optional)"
-                    keyboardType="phone-pad"
-                    placeholderTextColor={Colors.textSecondary}
-                    value={newPlaceholder.phone}
-                    onChangeText={(t) => setNewPlaceholder({ ...newPlaceholder, phone: t })}
-                  />
-                )}
               </View>
             )}
 
@@ -279,32 +262,51 @@ const FriendSelector = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: Spacing.md,
   },
   selectedFriendsContainer: {
-    marginBottom: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    paddingTop: Spacing.md,
+    marginTop: Spacing.md,
   },
   selectedFriendsLabel: {
     ...Typography.label,
     color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.md,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 12,
   },
-  selectedFriendsList: {
-    paddingRight: Spacing.md,
-  },
+
   selectedFriendChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.pill,
-    marginRight: Spacing.sm,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    ...Shadows.card,
   },
   selectedFriendName: {
-    ...Typography.label,
-    color: Colors.surface,
-    marginRight: Spacing.xs,
+    ...Typography.title,
+    color: Colors.textPrimary,
+  },
+  selectedFriendUsername: {
+    ...Typography.body,
+    color: Colors.accent,
+    marginBottom: Spacing.xs,
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
   },
 
   selectButton: {
@@ -313,8 +315,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    borderRadius: Radius.lg, // Slightly more rounded
+    padding: Spacing.lg, // More padding for better touch target
+    marginTop: Spacing.md, // Add top margin for better spacing
     ...Shadows.card,
   },
   selectButtonText: {
@@ -339,6 +342,9 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.divider,
   },
   closeButton: {
+    padding: Spacing.sm,
+  },
+  doneButton: {
     padding: Spacing.sm,
   },
   modalTitle: {
@@ -415,11 +421,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
   },
-  friendPhone: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-  },
   friendVenmo: {
     ...Typography.label,
     color: Colors.accent,
@@ -460,18 +461,7 @@ const styles = StyleSheet.create({
   quickAddText: { ...Typography.body, color: Colors.textPrimary, flex: 1, marginLeft: Spacing.sm },
   quickAddButton: { backgroundColor: Colors.accent, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.pill },
   quickAddButtonText: { ...Typography.label, color: Colors.surface, fontWeight: '600' },
-  quickAddPhoneToggle: { ...Typography.label, color: Colors.accent, marginTop: Spacing.sm },
-  inputRow: { marginBottom: Spacing.md },
-  inputLabel: { ...Typography.label, color: Colors.textSecondary, marginBottom: Spacing.xs },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
+
 });
 
 export default FriendSelector;

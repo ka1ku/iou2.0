@@ -1201,7 +1201,7 @@ PODS:
   - EXImageLoader (5.1.0):
     - ExpoModulesCore
     - React-Core
-  - Expo (53.0.20):
+  - Expo (53.0.22):
     - DoubleConversion
     - ExpoModulesCore
     - glog
@@ -1244,6 +1244,8 @@ PODS:
     - ExpoModulesCore
   - ExpoKeepAwake (14.1.4):
     - ExpoModulesCore
+  - ExpoLinearGradient (14.1.5):
+    - ExpoModulesCore
   - ExpoModulesCore (2.5.0):
     - DoubleConversion
     - glog
@@ -1281,12 +1283,6 @@ PODS:
   - Firebase/Firestore (12.1.0):
     - Firebase/CoreOnly
     - FirebaseFirestore (~> 12.1.0)
-  - Firebase/Functions (12.1.0):
-    - Firebase/CoreOnly
-    - FirebaseFunctions (~> 12.1.0)
-  - Firebase/Messaging (12.1.0):
-    - Firebase/CoreOnly
-    - FirebaseMessaging (~> 12.1.0)
   - FirebaseAppCheckInterop (12.1.0)
   - FirebaseAuth (12.1.0):
     - FirebaseAppCheckInterop (~> 12.1.0)
@@ -1326,35 +1322,9 @@ PODS:
     - gRPC-Core (~> 1.69.0)
     - leveldb-library (~> 1.22)
     - nanopb (~> 3.30910.0)
-  - FirebaseFunctions (12.1.0):
-    - FirebaseAppCheckInterop (~> 12.1.0)
-    - FirebaseAuthInterop (~> 12.1.0)
-    - FirebaseCore (~> 12.1.0)
-    - FirebaseCoreExtension (~> 12.1.0)
-    - FirebaseMessagingInterop (~> 12.1.0)
-    - FirebaseSharedSwift (~> 12.1.0)
-    - GTMSessionFetcher/Core (< 6.0, >= 3.4)
-  - FirebaseInstallations (12.1.0):
-    - FirebaseCore (~> 12.1.0)
-    - GoogleUtilities/Environment (~> 8.1)
-    - GoogleUtilities/UserDefaults (~> 8.1)
-    - PromisesObjC (~> 2.4)
-  - FirebaseMessaging (12.1.0):
-    - FirebaseCore (~> 12.1.0)
-    - FirebaseInstallations (~> 12.1.0)
-    - GoogleDataTransport (~> 10.1)
-    - GoogleUtilities/AppDelegateSwizzler (~> 8.1)
-    - GoogleUtilities/Environment (~> 8.1)
-    - GoogleUtilities/Reachability (~> 8.1)
-    - GoogleUtilities/UserDefaults (~> 8.1)
-    - nanopb (~> 3.30910.0)
-  - FirebaseMessagingInterop (12.1.0)
   - FirebaseSharedSwift (12.1.0)
   - fmt (11.0.2)
   - glog (0.3.5)
-  - GoogleDataTransport (10.1.0):
-    - nanopb (~> 3.30910.0)
-    - PromisesObjC (~> 2.4)
   - GoogleUtilities/AppDelegateSwizzler (8.1.0):
     - GoogleUtilities/Environment
     - GoogleUtilities/Logger
@@ -1374,9 +1344,6 @@ PODS:
     - GoogleUtilities/Privacy
   - GoogleUtilities/Privacy (8.1.0)
   - GoogleUtilities/Reachability (8.1.0):
-    - GoogleUtilities/Logger
-    - GoogleUtilities/Privacy
-  - GoogleUtilities/UserDefaults (8.1.0):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
   - "gRPC-C++ (1.69.0)":
@@ -1476,12 +1443,42 @@ PODS:
     - hermes-engine/Pre-built (= 0.79.5)
   - hermes-engine/Pre-built (0.79.5)
   - leveldb-library (1.22.6)
+  - lottie-ios (4.5.0)
+  - lottie-react-native (7.2.2):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - lottie-ios (= 4.5.0)
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
   - nanopb/decode (3.30910.0)
   - nanopb/encode (3.30910.0)
-  - PromisesObjC (2.4.0)
+  - PurchasesHybridCommon (16.2.2):
+    - RevenueCat (= 5.34.0)
+  - PurchasesHybridCommonUI (16.2.2):
+    - PurchasesHybridCommon (= 16.2.2)
+    - RevenueCatUI (= 5.34.0)
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -3228,6 +3225,9 @@ PODS:
     - React-perflogger (= 0.79.5)
     - React-utils (= 0.79.5)
   - RecaptchaInterop (101.0.0)
+  - RevenueCat (5.34.0)
+  - RevenueCatUI (5.34.0):
+    - RevenueCat (= 5.34.0)
   - RNCAsyncStorage (2.1.2):
     - DoubleConversion
     - glog
@@ -3263,15 +3263,6 @@ PODS:
     - Firebase/Firestore (= 12.1.0)
     - React-Core
     - RNFBApp
-  - RNFBFunctions (23.1.0):
-    - Firebase/Functions (= 12.1.0)
-    - React-Core
-    - RNFBApp
-  - RNFBMessaging (23.1.0):
-    - Firebase/Messaging (= 12.1.0)
-    - FirebaseCoreExtension
-    - React-Core
-    - RNFBApp
   - RNGestureHandler (2.24.0):
     - DoubleConversion
     - glog
@@ -3297,6 +3288,12 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - RNPaywalls (9.2.2):
+    - PurchasesHybridCommonUI (= 16.2.2)
+    - React-Core
+  - RNPurchases (9.2.2):
+    - PurchasesHybridCommon (= 16.2.2)
+    - React-Core
   - RNReanimated (3.17.5):
     - DoubleConversion
     - glog
@@ -3542,6 +3539,7 @@ DEPENDENCIES:
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoImagePicker (from `../node_modules/expo-image-picker/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
+  - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
@@ -3549,6 +3547,7 @@ DEPENDENCIES:
   - fmt (from `../node_modules/react-native/third-party-podspecs/fmt.podspec`)
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - lottie-react-native (from `../node_modules/lottie-react-native`)
   - RCT-Folly (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCT-Folly/Fabric (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -3619,9 +3618,9 @@ DEPENDENCIES:
   - "RNFBApp (from `../node_modules/@react-native-firebase/app`)"
   - "RNFBAuth (from `../node_modules/@react-native-firebase/auth`)"
   - "RNFBFirestore (from `../node_modules/@react-native-firebase/firestore`)"
-  - "RNFBFunctions (from `../node_modules/@react-native-firebase/functions`)"
-  - "RNFBMessaging (from `../node_modules/@react-native-firebase/messaging`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
+  - RNPaywalls (from `../node_modules/react-native-purchases-ui`)
+  - RNPurchases (from `../node_modules/react-native-purchases`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
@@ -3640,20 +3639,19 @@ SPEC REPOS:
     - FirebaseCoreInternal
     - FirebaseFirestore
     - FirebaseFirestoreInternal
-    - FirebaseFunctions
-    - FirebaseInstallations
-    - FirebaseMessaging
-    - FirebaseMessagingInterop
     - FirebaseSharedSwift
-    - GoogleDataTransport
     - GoogleUtilities
     - "gRPC-C++"
     - gRPC-Core
     - GTMSessionFetcher
     - leveldb-library
+    - lottie-ios
     - nanopb
-    - PromisesObjC
+    - PurchasesHybridCommon
+    - PurchasesHybridCommonUI
     - RecaptchaInterop
+    - RevenueCat
+    - RevenueCatUI
     - SocketRocket
     - ZXingObjC
 
@@ -3682,6 +3680,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../node_modules/expo-keep-awake/ios"
+  ExpoLinearGradient:
+    :path: "../node_modules/expo-linear-gradient/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
   ExpoSplashScreen:
@@ -3697,6 +3697,8 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2025-06-04-RNv0.79.3-7f9a871eefeb2c3852365ee80f0b6733ec12ac3b
+  lottie-react-native:
+    :path: "../node_modules/lottie-react-native"
   RCT-Folly:
     :podspec: "../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
   RCTDeprecation:
@@ -3833,12 +3835,12 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-firebase/auth"
   RNFBFirestore:
     :path: "../node_modules/@react-native-firebase/firestore"
-  RNFBFunctions:
-    :path: "../node_modules/@react-native-firebase/functions"
-  RNFBMessaging:
-    :path: "../node_modules/@react-native-firebase/messaging"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
+  RNPaywalls:
+    :path: "../node_modules/react-native-purchases-ui"
+  RNPurchases:
+    :path: "../node_modules/react-native-purchases"
   RNReanimated:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
@@ -3855,7 +3857,7 @@ SPEC CHECKSUMS:
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   EXConstants: 98bcf0f22b820f9b28f9fee55ff2daededadd2f8
   EXImageLoader: 4d3d3284141f1a45006cc4d0844061c182daf7ee
-  Expo: 43d9e0c3108cc3a1c2739743e9b51086144ee4b0
+  Expo: 05e259dbef0cb888e4b775813875ac1075288c97
   ExpoAsset: ef06e880126c375f580d4923fdd1cdf4ee6ee7d6
   ExpoBlur: 3c8885b9bf9eef4309041ec87adec48b5f1986a9
   ExpoCamera: e1879906d41184e84b57d7643119f8509414e318
@@ -3863,6 +3865,7 @@ SPEC CHECKSUMS:
   ExpoFont: cf508bc2e6b70871e05386d71cab927c8524cc8e
   ExpoImagePicker: 0963da31800c906e01c03e25d7c849f16ebf02a2
   ExpoKeepAwake: bf0811570c8da182bfb879169437d4de298376e7
+  ExpoLinearGradient: 7734c8059972fcf691fb4330bcdf3390960a152d
   ExpoModulesCore: 471ae18809dc8a5c9a623193a317eef6048a4f8a
   ExpoSplashScreen: 0ad5acac1b5d2953c6e00d4319f16d616f70d4dd
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
@@ -3876,22 +3879,20 @@ SPEC CHECKSUMS:
   FirebaseCoreInternal: ff526c22671bb564d1b34a47615e29ba99389dee
   FirebaseFirestore: 7f06732c905092d12a6e060aace72a28ad528190
   FirebaseFirestoreInternal: 1e6d681414d7fe2b8b99315784e242e7f301cf44
-  FirebaseFunctions: a3da4b0c69f1240ef51bbe39a78a1393b6c12323
-  FirebaseInstallations: 6836550c466a6c3f753a777bec6f4e58ea228779
-  FirebaseMessaging: 6538be0d8e8d0a3405407bc3813e2223287c0d17
-  FirebaseMessagingInterop: 1e9db269130b57cf791776b6c32dad1645fabca3
   FirebaseSharedSwift: ee4344de8a4d5b5290de3600667307a44f85fd40
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
-  GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   "gRPC-C++": cc207623316fb041a7a3e774c252cf68a058b9e8
   gRPC-Core: 860978b7db482de8b4f5e10677216309b5ff6330
   GTMSessionFetcher: 02d6e866e90bc236f48a703a041dfe43e6221a29
   hermes-engine: f03b0e06d3882d71e67e45b073bb827da1a21aae
   leveldb-library: cc8b8f8e013647a295ad3f8cd2ddf49a6f19be19
+  lottie-ios: a881093fab623c467d3bce374367755c272bdd59
+  lottie-react-native: 825856a41d05a933539ea4fdf384d67c10590547
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
-  PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
+  PurchasesHybridCommon: 62f852419aae7041792217593998f7ac3f8b567d
+  PurchasesHybridCommonUI: 365fd90992bd91e6d330f5a91dcc8459a5a6ba14
   RCT-Folly: e78785aa9ba2ed998ea4151e314036f6c49e6d82
   RCTDeprecation: 5f638f65935e273753b1f31a365db6a8d6dc53b5
   RCTRequired: 8b46a520ea9071e2bc47d474aa9ca31b4a935bd8
@@ -3957,13 +3958,15 @@ SPEC CHECKSUMS:
   ReactCodegen: 542dbcd3d677ed7c4fe69e28b7c492998f48c9db
   ReactCommon: 1aa48867a0fc71a2b4f9e8a1529f5673648354f3
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
+  RevenueCat: eb2aa042789d9c99ad5172bd96e28b96286d6ada
+  RevenueCatUI: 03025a80b64ce8ff8e43f47a7eb9dbbb6b4f486e
   RNCAsyncStorage: 646c1bf2ebfc78d6632a3b0399f471fba8101e73
   RNFBApp: fcac8339a5ffd5a735c62d5f0101f79e4d9a7670
   RNFBAuth: d1b30e032a9afb220a664921473edcf9f30bed38
   RNFBFirestore: fb562751396142d315d11bf2f5ae292a6eb79442
-  RNFBFunctions: cc64dc8a80332cfcc288c3f0c9f74830792fc1c4
-  RNFBMessaging: 8c72e2f7d5eb2cc24d87e60c8be21eb2c94da272
   RNGestureHandler: 8ff2b1434b0ff8bab28c8242a656fb842990bbc8
+  RNPaywalls: c11528c07f8250a7fc818c61fbf267317560336e
+  RNPurchases: 7993b33416e67d5863140b5c62c682b34719f475
   RNReanimated: a3f55346df73f35c38bf0b446294d3d0b1ac8cf9
   RNScreens: 90b905d545a5ebbe976985702b8a39e3475727b2
   RNSVG: 4470464e129f6bc58b78b961850b054dbbea8ef7

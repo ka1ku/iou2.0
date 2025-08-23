@@ -10,6 +10,7 @@ export const Colors = {
   accent: '#D4A574', // Warm gold/amber accent
   accentDark: '#B8935F',
   success: '#7FB069',
+  error: '#E56B6F', // Error color for validation messages
   danger: '#E56B6F',
   warning: '#F39C12', // Warning color for unallocated amounts
   blue: '#4A90E2', // Blue for receipt scanning button

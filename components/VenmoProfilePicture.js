@@ -30,21 +30,23 @@ const ProfilePicture = ({
       width: size,
       height: size,
       borderRadius: size / 2,
+      overflow: 'hidden',
     },
     style
   ];
 
-  if (imageError || !source) {
-    if (!showFallback) return null;
-    
+  // If we have a source and no error, show the source image
+  if (source && !imageError) {
     return (
       <View style={[styles.container, { width: size, height: size }]}>
         <Image
-          source={{ uri: fallbackImage }}
+          source={{ uri: source }}
           style={imageStyle}
           onLoad={handleImageLoad}
           onError={handleImageError}
+          resizeMode="cover"
         />
+        {/* Show placeholder only while the source image is loading */}
         {!imageLoaded && (
           <View style={[styles.placeholder, imageStyle]}>
             <Text style={[styles.placeholderText, { fontSize: size * 0.3 }]}>
@@ -56,14 +58,19 @@ const ProfilePicture = ({
     );
   }
 
+  // If no source or there was an error, show fallback
+  if (!showFallback) return null;
+  
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       <Image
-        source={{ uri: source }}
+        source={{ uri: fallbackImage }}
         style={imageStyle}
         onLoad={handleImageLoad}
         onError={handleImageError}
+        resizeMode="cover"
       />
+      {/* Show placeholder only while the fallback image is loading */}
       {!imageLoaded && (
         <View style={[styles.placeholder, imageStyle]}>
           <Text style={[styles.placeholderText, { fontSize: size * 0.3 }]}>
@@ -78,7 +85,6 @@ const ProfilePicture = ({
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    marginRight: Spacing.lg,
   },
   image: {
     backgroundColor: Colors.surface,
@@ -90,6 +96,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3d95ce',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 2, // Higher z-index to ensure it's above the image
   },
   placeholderText: {
     color: 'white',

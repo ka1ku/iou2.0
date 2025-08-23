@@ -20,7 +20,10 @@
                 "host": "kailee.iou20.com"
               }
             ],
-            "category": ["BROWSABLE", "DEFAULT"]
+            "category": [
+              "BROWSABLE",
+              "DEFAULT"
+            ]
           }
         ]
       }
@@ -45,7 +48,13 @@
     },
     "android": {
       "package": "com.kailee.iou20",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET"
+      ]
     },
     "plugins": [
       "@react-native-firebase/app",
@@ -67,6 +76,11 @@
         }
       ],
       "expo-file-system"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ccec82eb-e35c-4a30-8f92-d9bb9049b111"
+      }
+    }
   }
 }

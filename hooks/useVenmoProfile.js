@@ -3,39 +3,46 @@ import { fetchVenmoProfile, generateFallbackAvatar } from '../utils/venmoUtils';
 
 /**
  * Hook for managing Venmo profile verification during signup
+ * Consolidated and improved to handle all Venmo functionality in one place
  */
 export const useVenmoProfile = (firstName, lastName) => {
-  const [venmoUsername, setVenmoUsername] = useState('');
-  const [venmoProfilePic, setVenmoProfilePic] = useState(null);
+  const [username, setUsername] = useState('');
+  const [venmoProfilePic, setVenmoProfilePic] = useState('');
   const [venmoVerified, setVenmoVerified] = useState(false);
-  const [verifyingVenmo, setVerifyingVenmo] = useState(false);
-  const [verificationError, setVerificationError] = useState(null);
-  const debounceTimeoutRef = useRef(null);
+  const [verificationError, setVerificationError] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [debounceTimeout, setDebounceTimeout] = useState(null);
+  const [lastVerifiedUsername, setLastVerifiedUsername] = useState('');
 
   /**
    * Automatically verify Venmo profile after typing stops
    */
-  const verifyVenmoProfile = useCallback(async (username) => {
-    if (!username.trim()) {
+  const verifyVenmoProfile = useCallback(async (usernameToVerify) => {
+    if (!usernameToVerify.trim()) {
       setVenmoVerified(false);
       setVenmoProfilePic(null);
       setVerificationError(null);
       return;
     }
+
+    // Don't re-verify if we already verified this exact username
+    if (lastVerifiedUsername === usernameToVerify.trim()) {
+      return;
+    }
     
-    setVerifyingVenmo(true);
+    setIsVerifying(true);
     setVerificationError(null);
     
     try {
-      console.log('Verifying Venmo profile for:', username);
+      console.log('Verifying Venmo profile for:', usernameToVerify);
       
       // Use the real Venmo profile fetching logic
-      const profileData = await fetchVenmoProfile(username, firstName, lastName);
+      const profileData = await fetchVenmoProfile(usernameToVerify, firstName, lastName);
       
       console.log('Venmo profile data received:', profileData);
       
       // Always set the username and profile picture
-      setVenmoUsername(profileData.username);
+      setUsername(profileData.username);
       setVenmoProfilePic(profileData.imageUrl);
       
       // Use the userExists field to determine verification status
@@ -43,6 +50,7 @@ export const useVenmoProfile = (firstName, lastName) => {
         // User definitely exists
         setVenmoVerified(true);
         setVerificationError(null);
+        setLastVerifiedUsername(profileData.username);
         
         // Check if they have a real profile picture
         const hasRealProfilePic = !profileData.imageUrl.includes('ui-avatars.com');
@@ -73,46 +81,63 @@ export const useVenmoProfile = (firstName, lastName) => {
       
       // This should rarely happen now since fetchVenmoProfile handles most errors
       setVenmoVerified(false);
-      setVenmoProfilePic(generateFallbackAvatar(firstName, lastName, username.trim()));
+      setVenmoProfilePic(generateFallbackAvatar(firstName, lastName, usernameToVerify.trim()));
       setVerificationError('Unable to verify Venmo account. Please check your connection and try again.');
       
       console.log('Unexpected error in verification, using fallback avatar');
     } finally {
-      setVerifyingVenmo(false);
+      setIsVerifying(false);
     }
-  }, [firstName, lastName]);
+  }, [firstName, lastName, lastVerifiedUsername]);
 
   /**
    * Handle username input with debounced verification
    */
-  const handleUsernameChange = useCallback((username) => {
-    setVenmoUsername(username);
+  const handleUsernameChange = useCallback((newUsername) => {
+    // Clear any existing verification state when username changes
     setVerificationError(null);
     
     // Clear existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
+    }
+    
+    // Update username immediately for responsive UI
+    setUsername(newUsername);
+    
+    // Show loading immediately if there's a username
+    if (newUsername.trim()) {
+      setIsVerifying(true);
+      setVenmoVerified(false); // Reset verification until we confirm
+    } else {
+      setIsVerifying(false);
+      setVenmoVerified(false);
+      setVenmoProfilePic(null);
+      setLastVerifiedUsername('');
     }
     
     // Set new timeout for verification
-    debounceTimeoutRef.current = setTimeout(() => {
-      verifyVenmoProfile(username);
-    }, 1000); // Wait 1 second after typing stops
+    setDebounceTimeout(setTimeout(() => {
+      if (newUsername.trim()) {
+        verifyVenmoProfile(newUsername);
+      }
+    }, 1000)); // Wait 1 second after typing stops
   }, [verifyVenmoProfile]);
 
   /**
    * Reset Venmo profile data
    */
   const resetVenmoProfile = useCallback(() => {
-    setVenmoUsername('');
+    setUsername('');
     setVenmoProfilePic(null);
     setVenmoVerified(false);
-    setVerifyingVenmo(false);
+    setIsVerifying(false);
     setVerificationError(null);
+    setLastVerifiedUsername('');
     
     // Clear any pending verification
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
     }
   }, []);
 
@@ -120,29 +145,40 @@ export const useVenmoProfile = (firstName, lastName) => {
    * Get current Venmo data
    */
   const getVenmoData = useCallback(() => ({
-    username: venmoUsername,
+    username: username,
     profilePic: venmoProfilePic,
     verified: venmoVerified
-  }), [venmoUsername, venmoProfilePic, venmoVerified]);
+  }), [username, venmoProfilePic, venmoVerified]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
+      if (debounceTimeout) {
+        clearTimeout(debounceTimeout);
       }
     };
-  }, []);
+  }, [debounceTimeout]);
 
   return {
-    venmoUsername,
+    // State variables
+    username,
     venmoProfilePic,
     venmoVerified,
-    verifyingVenmo,
+    isVerifying,
     verificationError,
+    
+    // Actions
     handleUsernameChange,
     resetVenmoProfile,
     getVenmoData,
-    setVenmoUsername
+    setUsername,
+    
+    // Aliases for backward compatibility
+    venmoUsername: username,
+    venmoProfilePic: venmoProfilePic,
+    venmoVerified: venmoVerified,
+    verifyingVenmo: isVerifying,
+    verifyVenmoProfile: () => verifyVenmoProfile(username),
+    setVenmoUsername: setUsername
   };
 };

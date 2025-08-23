@@ -81,7 +81,17 @@ const ProfileScreen = ({ navigation }) => {
       const userDoc = await getDoc(doc(firestoreInstance, 'users', userId));
       
       if (userDoc.exists()) {
-        setUserProfile(userDoc.data());
+        const profileData = userDoc.data();
+        console.log('Loaded user profile data:', {
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          username: profileData.username,
+          venmoUsername: profileData.venmoUsername,
+          profilePhoto: profileData.profilePhoto,
+          hasProfilePhoto: !!profileData.profilePhoto,
+          profilePhotoType: profileData.profilePhoto ? (profileData.profilePhoto.includes('ui-avatars.com') ? 'fallback' : 'real') : 'none'
+        });
+        setUserProfile(profileData);
       } else {
         console.log('No user profile found for:', userId);
         setUserProfile(null);
@@ -190,15 +200,16 @@ const ProfileScreen = ({ navigation }) => {
             <ProfilePicture
               source={userProfile?.profilePhoto}
               size={80}
-              username={userProfile?.venmoUsername || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`}
+              username={userProfile?.username || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`}
               showFallback
             />
           </View>
+
           <Text style={styles.userName}>
             {userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : 'User'}
           </Text>
           <Text style={styles.userEmail}>
-            {userProfile?.venmoUsername ? `@${userProfile.venmoUsername}` : 'No Venmo username'}
+            {userProfile?.username ? `@${userProfile.username}` : 'No username'}
           </Text>
         </View>
         <TouchableOpacity onPress={handleSignOut} style={styles.signOutButton}>
@@ -345,6 +356,7 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.settingText}>Component Demo</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
+
         </View>
       </View>
         </ScrollView>

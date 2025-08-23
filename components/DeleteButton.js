@@ -40,9 +40,9 @@ const DeleteButton = ({
     switch (variant) {
       case 'subtle':
         return {
-          backgroundColor: Colors.background,
-          borderColor: Colors.divider,
-          borderWidth: 1,
+          backgroundColor: 'transparent',
+          borderColor: 'transparent',
+          borderWidth: 0,
         };
       case 'filled':
         return {
@@ -80,9 +80,9 @@ const DeleteButton = ({
       testID={testID}
     >
       <Ionicons
-        name="close-circle"
+        name="close"
         size={sizeStyles.iconSize}
-        color={disabled ? Colors.textSecondary : Colors.danger}
+        color={disabled ? Colors.textSecondary : Colors.textSecondary}
       />
     </TouchableOpacity>
   );

@@ -29,15 +29,15 @@ const SignUpScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const {
-    venmoUsername,
+    username: venmoUsername,
     venmoProfilePic,
     venmoVerified,
-    verifyingVenmo,
+    isVerifying,
     verificationError,
     handleUsernameChange,
     resetVenmoProfile,
     getVenmoData,
-    setVenmoUsername
+    setUsername: setVenmoUsername
   } = useVenmoProfile(firstName, lastName);
   const [userData, setUserData] = useState(null);
   const isProceedingToVerification = useRef(false);
@@ -93,6 +93,19 @@ const SignUpScreen = ({ navigation }) => {
     setPhoneNumber(formatted);
   };
 
+  // Validate and format name input (only allow letters, spaces, hyphens, apostrophes)
+  const handleFirstNameChange = (text) => {
+    // Only allow letters, spaces, hyphens, and apostrophes
+    const filtered = text.replace(/[^a-zA-Z\s\-']/g, '');
+    setFirstName(filtered);
+  };
+
+  const handleLastNameChange = (text) => {
+    // Only allow letters, spaces, hyphens, and apostrophes
+    const filtered = text.replace(/[^a-zA-Z\s\-']/g, '');
+    setLastName(filtered);
+  };
+
   // Venmo verification is now automatic after typing stops
 
 
@@ -106,6 +119,31 @@ const SignUpScreen = ({ navigation }) => {
       Alert.alert('Required Field', 'Please enter your last name');
       return false;
     }
+    
+    // Validate first name format (letters, spaces, hyphens, apostrophes only)
+    const nameRegex = /^[a-zA-Z\s\-']+$/;
+    if (!nameRegex.test(firstName.trim())) {
+      Alert.alert('Invalid First Name', 'First name can only contain letters, spaces, hyphens, and apostrophes');
+      return false;
+    }
+    
+    // Validate last name format (letters, spaces, hyphens, apostrophes only)
+    if (!nameRegex.test(lastName.trim())) {
+      Alert.alert('Invalid Last Name', 'Last name can only contain letters, spaces, hyphens, and apostrophes');
+      return false;
+    }
+    
+    // Check minimum length (at least 2 characters)
+    if (firstName.trim().length < 2) {
+      Alert.alert('Invalid First Name', 'First name must be at least 2 characters long');
+      return false;
+    }
+    
+    if (lastName.trim().length < 2) {
+      Alert.alert('Invalid Last Name', 'Last name must be at least 2 characters long');
+      return false;
+    }
+    
     return true;
   };
 
@@ -171,8 +209,8 @@ const SignUpScreen = ({ navigation }) => {
         // Store temporary data before proceeding to phone verification
         const venmoData = getVenmoData();
         const tempData = {
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
+          firstName: firstName.trim().toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+          lastName: lastName.trim().toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
           username: username.trim().toLowerCase(),
           venmoUsername: venmoData.verified ? venmoData.username : null,
           venmoProfilePic: venmoData.verified ? venmoData.profilePic : null,
@@ -291,7 +329,7 @@ const SignUpScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             value={firstName}
-            onChangeText={setFirstName}
+            onChangeText={handleFirstNameChange}
             placeholder="Enter your first name"
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="words"
@@ -304,7 +342,7 @@ const SignUpScreen = ({ navigation }) => {
           <TextInput
             style={styles.textInput}
             value={lastName}
-            onChangeText={setLastName}
+            onChangeText={handleLastNameChange}
             placeholder="Enter your last name"
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="words"
@@ -373,7 +411,7 @@ const SignUpScreen = ({ navigation }) => {
             <VenmoInputForm
               username={venmoUsername}
               onUsernameChange={handleUsernameChange}
-              verifying={verifyingVenmo}
+              verifying={isVerifying}
               verified={venmoVerified}
             />
             
@@ -446,31 +484,6 @@ const SignUpScreen = ({ navigation }) => {
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.title}>Create Account</Text>
-            {currentStep > 1 && (
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  Alert.alert(
-                    'Cancel Sign Up?',
-                    'Are you sure you want to cancel? All entered information will be lost.',
-                    [
-                      { text: 'Keep Going', style: 'cancel' },
-                      { 
-                        text: 'Cancel', 
-                        style: 'destructive',
-                        onPress: () => {
-                          isProceedingToVerification.current = false; // Reset flag when canceling
-                          clearTemporarySignupData();
-                          navigation.navigate('Welcome');
-                        }
-                      },
-                    ]
-                  );
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            )}
           </View>
 
           {/* Progress Bar */}
@@ -549,17 +562,7 @@ const styles = StyleSheet.create({
     marginRight: Spacing.lg,
     ...Shadows.card,
   },
-  cancelButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.error,
-  },
-  cancelButtonText: {
-    ...Typography.body,
-    color: 'white',
-    fontWeight: '600',
-  },
+
   title: {
     ...Typography.h2,
     color: Colors.textPrimary,

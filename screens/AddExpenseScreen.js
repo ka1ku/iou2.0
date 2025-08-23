@@ -27,15 +27,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
 
-  const [title, setTitle] = useState(expense?.title || '');
-  const [participants, setParticipants] = useState(expense?.participants || [{ name: 'Me' }]);
+  const [title, setTitle] = useState('');
+  const [participants, setParticipants] = useState([{ name: 'Me' }]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [placeholders, setPlaceholders] = useState([]);
   const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
   const [showSettings, setShowSettings] = useState(false);
   const [joinEnabled, setJoinEnabled] = useState(true);
-  const [items, setItems] = useState(expense?.items || []);
-  const [fees, setFees] = useState(expense?.fees || []);
+  const [items, setItems] = useState([]);
+  const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Calculate total from items and fees
@@ -124,6 +124,69 @@ const AddExpenseScreen = ({ route, navigation }) => {
     }
   }, [scannedReceipt, fromReceiptScan]);
 
+  // Initialize selectedFriends and placeholders when editing an existing expense
+  useEffect(() => {
+    if (expense && isEditing) {
+      // Extract friends from existing participants
+      const existingFriends = expense.participants
+        .filter(p => p.name !== 'Me' && !p.placeholder && p.userId)
+        .map(p => ({
+          id: p.userId,
+          name: p.name,
+          phoneNumber: p.phoneNumber,
+          username: p.username,
+          profilePhoto: p.profilePhoto
+        }));
+      
+      // Extract placeholders from existing participants
+      const existingPlaceholders = expense.participants
+        .filter(p => p.placeholder)
+        .map(p => ({
+          id: p.id || `ghost-${Date.now()}-${Math.random()}`,
+          name: p.name,
+          phoneNumber: p.phoneNumber,
+          isPlaceholder: true
+        }));
+      
+      setSelectedFriends(existingFriends);
+      setPlaceholders(existingPlaceholders);
+      
+      // Set initial participants (this will be updated by the other useEffect)
+      const initialParticipants = [
+        { name: 'Me' },
+        ...existingFriends.map(friend => ({ 
+          name: friend.name, 
+          userId: friend.id,
+          phoneNumber: friend.phoneNumber,
+          username: friend.username,
+          profilePhoto: friend.profilePhoto
+        })),
+        ...existingPlaceholders.map(p => ({ 
+          name: p.name, 
+          placeholder: true, 
+          id: p.id
+        }))
+      ];
+      setParticipants(initialParticipants);
+      
+      // Set title and other fields from existing expense
+      if (expense.title) {
+        setTitle(expense.title);
+      }
+      if (expense.join) {
+        setJoinEnabled(expense.join.enabled);
+      }
+      
+      // Set items and fees from existing expense
+      if (expense.items) {
+        setItems(expense.items);
+      }
+      if (expense.fees) {
+        setFees(expense.fees);
+      }
+    }
+  }, [expense, isEditing]);
+
   const addParticipant = () => {
     setParticipants([...participants, { name: '' }]);
   };
@@ -155,8 +218,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
   useEffect(() => {
     const allParticipants = [
       { name: 'Me' },
-      ...selectedFriends.map(friend => ({ name: friend.name, userId: friend.id })),
-      ...placeholders.map(p => ({ name: p.name, placeholder: true, phoneNumber: p.phoneNumber }))
+      ...selectedFriends.map(friend => ({ 
+        name: friend.name, 
+        userId: friend.id,
+        phoneNumber: friend.phoneNumber,
+        username: friend.username,
+        profilePhoto: friend.profilePhoto
+      })),
+      ...placeholders.map(p => ({ 
+        name: p.name, 
+        placeholder: true, 
+        id: p.id
+      }))
     ];
     setParticipants(allParticipants);
   }, [selectedFriends, placeholders]);
@@ -194,7 +267,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
       name: '',
       amount: 0,
       paidBy: 0, // Default to first participant (usually "Me")
-      splitType: 'even',
       splits: []
     };
     setItems([...items, newItem]);
@@ -204,8 +276,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
     const updated = [...items];
     updated[index] = { ...updated[index], [field]: value };
     
-    // If amount changed and split type is even, recalculate splits
-    if (field === 'amount' && updated[index].splitType === 'even') {
+    // If amount changed, recalculate splits
+    if (field === 'amount') {
       const amount = parseFloat(value) || 0;
       const splitAmount = amount / participants.length;
       updated[index].splits = participants.map((_, i) => ({
@@ -230,32 +302,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
     }
   };
 
-  const updateItemSplitType = (index, splitType) => {
-    const updated = [...items];
-    updated[index].splitType = splitType;
-    
-    if (splitType === 'even') {
-      const amount = parseFloat(updated[index].amount) || 0;
-      const splitAmount = amount / participants.length;
-      updated[index].splits = participants.map((_, i) => ({
-        participantIndex: i,
-        amount: splitAmount,
-      }));
-    } else if (splitType === 'custom') {
-      // Initialize custom splits evenly for smart split
-      const amount = parseFloat(updated[index].amount) || 0;
-      const splitAmount = amount / participants.length;
-      updated[index].splits = participants.map((_, i) => ({
-        participantIndex: i,
-        amount: splitAmount,
-      }));
-    } else {
-      // Clear splits for other modes
-      updated[index].splits = [];
-    }
-    
-    setItems(updated);
-  };
+
 
   const updateItemSplit = (itemIndex, participantIndex, amount) => {
     const updated = [...items];
@@ -367,7 +414,14 @@ const AddExpenseScreen = ({ route, navigation }) => {
       const expenseData = {
         title: title.trim(),
         total: calculateTotal(),
-        participants: participants.map(p => ({ name: p.name.trim() })),
+        participants: participants.map(p => ({ 
+          name: p.name.trim(),
+          userId: p.userId,
+          placeholder: p.placeholder,
+          phoneNumber: p.phoneNumber,
+          username: p.username,
+          profilePhoto: p.profilePhoto
+        })),
         items: items.map(item => ({
           ...item,
           name: item.name.trim(),
@@ -403,13 +457,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const renderItem = (item, index) => {
     return (
       <View key={item.id} style={styles.itemCard}>
+        {/* Item Header with Name Input and Delete Button */}
         <View style={styles.itemHeader}>
-          <TextInput
-            style={styles.itemNameInput}
-            placeholder="Item name"
-            value={item.name}
-            onChangeText={(text) => updateItem(index, 'name', text)}
-          />
+          <View style={styles.itemNameContainer}>
+            <Text style={styles.itemNameLabel}>Item Name</Text>
+            <TextInput
+              style={styles.itemNameInput}
+              placeholder="Enter item name"
+              placeholderTextColor={Colors.textSecondary}
+              value={item.name}
+              onChangeText={(text) => updateItem(index, 'name', text)}
+            />
+          </View>
           <DeleteButton
             onPress={() => removeItem(index)}
             size="medium"
@@ -417,13 +476,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <PriceInput
-          value={item.amount}
-          onChangeText={(amount) => updateItem(index, 'amount', amount)}
-          placeholder="0.00"
-          style={styles.amountInput}
-        />
+        {/* Price Input Section */}
+        <View style={styles.priceSection}>
+          <Text style={styles.priceLabel}>Price</Text>
+          <PriceInput
+            value={item.amount}
+            onChangeText={(amount) => updateItem(index, 'amount', amount)}
+            placeholder="0.00"
+            style={styles.amountInput}
+          />
+        </View>
 
+        {/* Paid By Section */}
         <View style={styles.paidByContainer}>
           <Text style={styles.paidByLabel}>Paid by:</Text>
           <View style={styles.paidByButtons}>
@@ -447,59 +511,22 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        <View style={styles.splitTypeContainer}>
-          <TouchableOpacity
-            style={[
-              styles.splitTypeButton,
-              item.splitType === 'even' && styles.splitTypeButtonActive
-            ]}
-            onPress={() => updateItemSplitType(index, 'even')}
-          >
-            <Text style={[
-              styles.splitTypeText,
-              item.splitType === 'even' && styles.splitTypeTextActive
-            ]}>
-              Split Even
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.splitTypeButton,
-              item.splitType === 'custom' && styles.splitTypeButtonActive
-            ]}
-            onPress={() => updateItemSplitType(index, 'custom')}
-          >
-            <Text style={[
-              styles.splitTypeText,
-              item.splitType === 'custom' && styles.splitTypeTextActive
-            ]}>
-              Custom Split
-            </Text>
-          </TouchableOpacity>
+        {/* Smart Split Section */}
+        <View style={styles.smartSplitSection}>
+          <Text style={styles.smartSplitLabel}>Split Amount</Text>
+          <SmartSplitInput
+            participants={participants}
+            total={parseFloat(item.amount) || 0}
+            initialSplits={item.splits || []}
+            onSplitsChange={(newSplits) => {
+              // Update the item's splits
+              const updated = [...items];
+              updated[index].splits = newSplits;
+              setItems(updated);
+            }}
+            style={styles.smartSplitContainer}
+          />
         </View>
-
-        {item.splitType === 'custom' && (
-          <View style={styles.customSplitsContainer}>
-            <SmartSplitInput
-              participants={participants}
-              total={parseFloat(item.amount) || 0}
-              initialSplits={item.splits || []}
-              onSplitsChange={(newSplits) => {
-                // Update the item's splits
-                const updated = [...items];
-                updated[index].splits = newSplits;
-                setItems(updated);
-              }}
-              style={styles.smartSplitContainer}
-            />
-          </View>
-        )}
-
-        {item.splitType === 'even' && (
-          <Text style={styles.evenSplitText}>
-            ${((parseFloat(item.amount) || 0) / participants.length).toFixed(2)} per person
-          </Text>
-        )}
       </View>
     );
   };
@@ -509,13 +536,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
     
     return (
       <View key={fee.id} style={styles.feeCard}>
+        {/* Fee Header with Name Input and Delete Button */}
         <View style={styles.feeHeader}>
-          <TextInput
-            style={styles.feeNameInput}
-            placeholder="Fee name (e.g., Tip, Tax, Service)"
-            value={fee.name}
-            onChangeText={(text) => updateFee(index, 'name', text)}
-          />
+          <View style={styles.feeNameContainer}>
+            <Text style={styles.feeNameLabel}>Fee Name</Text>
+            <TextInput
+              style={styles.feeNameInput}
+              placeholder="e.g., Tip, Tax, Service"
+              placeholderTextColor={Colors.textSecondary}
+              value={fee.name}
+              onChangeText={(text) => updateFee(index, 'name', text)}
+            />
+          </View>
           <DeleteButton
             onPress={() => removeFee(index)}
             size="medium"
@@ -523,39 +555,45 @@ const AddExpenseScreen = ({ route, navigation }) => {
           />
         </View>
 
-        <View style={styles.feeTypeContainer}>
-          <TouchableOpacity
-            style={[
-              styles.feeTypeButton,
-              fee.type === 'percentage' && styles.feeTypeButtonActive
-            ]}
-            onPress={() => updateFee(index, 'type', 'percentage')}
-          >
-            <Text style={[
-              styles.feeTypeText,
-              fee.type === 'percentage' && styles.feeTypeTextActive
-            ]}>
-              Percentage
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.feeTypeButton,
-              fee.type === 'fixed' && styles.feeTypeButtonActive
-            ]}
-            onPress={() => updateFee(index, 'type', 'fixed')}
-          >
-            <Text style={[
-              styles.feeTypeText,
-              fee.type === 'fixed' && styles.feeTypeTextActive
-            ]}>
-              Fixed Amount
-            </Text>
-          </TouchableOpacity>
+        {/* Fee Type Section */}
+        <View style={styles.feeTypeSection}>
+          <Text style={styles.feeTypeLabel}>Fee Type</Text>
+          <View style={styles.feeTypeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.feeTypeButton,
+                fee.type === 'percentage' && styles.feeTypeButtonActive
+              ]}
+              onPress={() => updateFee(index, 'type', 'percentage')}
+            >
+              <Text style={[
+                styles.feeTypeText,
+                fee.type === 'percentage' && styles.feeTypeTextActive
+              ]}>
+                Percentage
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.feeTypeButton,
+                fee.type === 'fixed' && styles.feeTypeButtonActive
+              ]}
+              onPress={() => updateFee(index, 'type', 'fixed')}
+            >
+              <Text style={[
+                styles.feeTypeText,
+                fee.type === 'fixed' && styles.feeTypeTextActive
+              ]}>
+                Fixed Amount
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
+        {/* Percentage Section */}
         {fee.type === 'percentage' ? (
-          <View style={styles.percentageContainer}>
+          <View style={styles.percentageSection}>
+            <Text style={styles.percentageLabel}>Percentage</Text>
             <View style={styles.percentageButtons}>
               {[10, 15, 18, 20, 25].map((percent) => (
                 <TouchableOpacity
@@ -596,7 +634,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
             </Text>
           </View>
         ) : (
-          <View style={styles.fixedAmountContainer}>
+          /* Fixed Amount Section */
+          <View style={styles.fixedAmountSection}>
+            <Text style={styles.fixedAmountLabel}>Amount</Text>
             <PriceInput
               value={fee.amount}
               onChangeText={(amount) => updateFee(index, 'amount', amount)}
@@ -606,54 +646,55 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        <View style={styles.feeSplitContainer}>
-          <Text style={styles.feeSplitLabel}>Split:</Text>
-          <TouchableOpacity
-            style={[
-              styles.feeSplitButton,
-              fee.splitType === 'equal' && styles.feeSplitButtonActive
-            ]}
-            onPress={() => updateFee(index, 'splitType', 'equal')}
-          >
-            <Text style={[
-              styles.feeSplitText,
-              fee.splitType === 'equal' && styles.feeSplitTextActive
-            ]}>
-              Split Even
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.feeSplitButton,
-              fee.splitType === 'proportional' && styles.feeSplitButtonActive
-            ]}
-            onPress={() => updateFee(index, 'splitType', 'proportional')}
-          >
-            <Text style={[
-              styles.feeSplitText,
-              fee.splitType === 'proportional' && styles.feeSplitTextActive
-            ]}>
-              Proportional
-            </Text>
-          </TouchableOpacity>
+        {/* Split Type Section */}
+        <View style={styles.feeSplitSection}>
+          <Text style={styles.feeSplitLabel}>Split Type</Text>
+          <View style={styles.feeSplitContainer}>
+            <TouchableOpacity
+              style={[
+                styles.feeSplitButton,
+                fee.splitType === 'equal' && styles.feeSplitButtonActive
+              ]}
+              onPress={() => updateFee(index, 'splitType', 'equal')}
+            >
+              <Text style={[
+                styles.feeSplitText,
+                fee.splitType === 'equal' && styles.feeSplitTextActive
+              ]}>
+                Split Even
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.feeSplitButton,
+                fee.splitType === 'proportional' && styles.feeSplitButtonActive
+              ]}
+              onPress={() => updateFee(index, 'splitType', 'proportional')}
+            >
+              <Text style={[
+                styles.feeSplitText,
+                fee.splitType === 'proportional' && styles.feeSplitTextActive
+              ]}>
+                Proportional
+              </Text>
+            </TouchableOpacity>
+          </View>
 
+          {fee.splitType === 'equal' && (
+            <Text style={styles.feeSplitInfo}>
+              ${((fee.amount || 0) / participants.length).toFixed(2)} per person
+            </Text>
+          )}
+          {fee.splitType === 'proportional' && (
+            <Text style={styles.feeSplitInfo}>
+              Split proportionally based on who paid what
+            </Text>
+          )}
         </View>
 
-        {fee.splitType === 'equal' && (
-          <Text style={styles.feeSplitInfo}>
-            ${((fee.amount || 0) / participants.length).toFixed(2)} per person
-          </Text>
-        )}
-        {fee.splitType === 'proportional' && (
-          <Text style={styles.feeSplitInfo}>
-            Split proportionally based on who paid what
-          </Text>
-        )}
-
-        
-        {/* Show total fee amount */}
-        <View style={styles.feeTotalContainer}>
-          <Text style={styles.feeTotalLabel}>Total Fee:</Text>
+        {/* Total Fee Section */}
+        <View style={styles.feeTotalSection}>
+          <Text style={styles.feeTotalLabel}>Total Fee</Text>
           <Text style={styles.feeTotalAmount}>${(fee.amount || 0).toFixed(2)}</Text>
         </View>
       </View>
@@ -703,41 +744,61 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Participants</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Participants</Text>
+              <View style={styles.participantsCount}>
+                <Text style={styles.participantsCountText}>
+                  {participants.length} {participants.length === 1 ? 'person' : 'people'}
+                </Text>
+              </View>
+            </View>
             <FriendSelector
               selectedFriends={selectedFriends}
               onFriendsChange={setSelectedFriends}
-              maxFriends={9}
               placeholder="Add friends to split with..."
               allowPlaceholders={true}
               onAddPlaceholder={handleAddPlaceholder}
             />
             {/* Render placeholder chips with Invite buttons */}
             {placeholders.length > 0 && (
-              <View style={{ marginTop: Spacing.sm }}>
+              <View style={styles.placeholdersContainer}>
+                <Text style={styles.placeholdersLabel}>Pending Invites</Text>
                 {placeholders.map((p, idx) => (
-                  <View key={p.id} style={styles.placeholderRow}>
-                    <View style={styles.placeholderAvatar}>
-                      <Text style={styles.placeholderInitials}>{p.name?.[0] || '?'}</Text>
+                  <View key={p.id} style={styles.placeholderCard}>
+                    <View style={styles.placeholderContent}>
+                      <View style={styles.placeholderAvatar}>
+                        <Text style={styles.placeholderInitials}>{p.name?.[0]?.toUpperCase() || '?'}</Text>
+                      </View>
+                      <View style={styles.placeholderInfo}>
+                        <Text style={styles.placeholderName}>{p.name}</Text>
+                        {p.phoneNumber && (
+                          <Text style={styles.placeholderPhone}>{p.phoneNumber}</Text>
+                        )}
+                        <Text style={styles.placeholderTag}>Placeholder</Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.placeholderName}>{p.name}</Text>
-                      <Text style={styles.placeholderMeta}>{p.phoneNumber ? `Phone: ${p.phoneNumber}` : 'No phone added'}</Text>
+                    <View style={styles.placeholderActions}>
+                      <TouchableOpacity 
+                        style={styles.inviteButton} 
+                        onPress={() => handleInvitePlaceholder(p)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="qr-code-outline" size={16} color={Colors.surface} />
+                        <Text style={styles.inviteButtonText}>Invite</Text>
+                      </TouchableOpacity>
+                      <DeleteButton
+                        onPress={() => removePlaceholder(p.id)}
+                        size="small"
+                        variant="subtle"
+                      />
                     </View>
-                    <TouchableOpacity style={styles.inviteButton} onPress={() => handleInvitePlaceholder(p)}>
-                      <Ionicons name="qr-code" size={16} color={Colors.surface} />
-                      <Text style={styles.inviteButtonText}>Invite</Text>
-                    </TouchableOpacity>
-                    <DeleteButton
-                      onPress={() => removePlaceholder(p.id)}
-                      size="small"
-                      variant="subtle"
-                    />
                   </View>
                 ))}
               </View>
             )}
-            <Text style={styles.participantsNote}>You'll automatically be included as a participant</Text>
+            <View style={styles.participantsNoteContainer}>
+              <Text style={styles.participantsNote}>You'll automatically be included as a participant</Text>
+            </View>
           </View>
 
           <View style={styles.section}>
@@ -929,8 +990,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
+
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
   },
@@ -965,31 +1025,60 @@ const styles = StyleSheet.create({
   itemCard: {
     borderWidth: 1,
     borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
     marginBottom: Spacing.md,
     backgroundColor: Colors.surface,
     ...Shadows.card,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
   },
   itemHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.sm,
   },
-  itemNameInput: {
+  itemNameContainer: {
     flex: 1,
+    marginRight: Spacing.sm,
+  },
+  itemNameLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  itemNameInput: {
     borderWidth: 1,
     borderColor: Colors.divider,
     borderRadius: Radius.sm,
     padding: Spacing.md,
     ...Typography.body,
-    marginRight: Spacing.sm,
     backgroundColor: Colors.surface,
     color: Colors.textPrimary,
+    fontSize: 16,
+    minHeight: 48,
   },
 
+  priceSection: {
+    marginBottom: Spacing.md,
+  },
+  priceLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   amountInput: {
     marginBottom: Spacing.sm,
+    minHeight: 48,
   },
   formattedAmount: {
     ...Typography.body,
@@ -997,36 +1086,8 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
     textAlign: 'right',
   },
-  splitTypeContainer: {
-    flexDirection: 'row',
-    marginBottom: Spacing.sm,
-    gap: Spacing.sm,
-  },
-  splitTypeButton: {
-    flex: 1,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    alignItems: 'center',
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.surface,
-  },
-  splitTypeButtonActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
-  splitTypeText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  splitTypeTextActive: {
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  customSplitsContainer: {
-    marginTop: Spacing.sm,
-  },
+
+
   customSplitRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1043,21 +1104,29 @@ const styles = StyleSheet.create({
   smartSplitContainer: {
     marginTop: Spacing.sm,
   },
-
-  evenSplitText: {
+  smartSplitSection: {
+    marginTop: Spacing.md,
+  },
+  smartSplitLabel: {
     ...Typography.label,
     color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
+
+
   paidByContainer: {
     marginBottom: Spacing.md,
   },
   paidByLabel: {
-    ...Typography.body,
+    ...Typography.label,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: Colors.textSecondary,
     marginBottom: Spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   paidByButtons: {
     flexDirection: 'row',
@@ -1071,10 +1140,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.divider,
     backgroundColor: Colors.surface,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 2,
   },
   paidByButtonActive: {
     backgroundColor: Colors.accent,
     borderColor: Colors.accent,
+    ...Shadows.button,
+    elevation: 3,
   },
   paidByText: {
     ...Typography.label,
@@ -1105,8 +1181,17 @@ const styles = StyleSheet.create({
     ...Typography.label,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: Spacing.sm,
     fontStyle: 'italic',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  participantsNoteContainer: {
+    backgroundColor: Colors.surfaceLight,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   placeholderRow: {
     flexDirection: 'row',
@@ -1120,17 +1205,24 @@ const styles = StyleSheet.create({
     ...Shadows.card,
   },
   placeholderAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: Spacing.md,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+    position: 'relative',
   },
-  placeholderInitials: { ...Typography.title, color: Colors.textSecondary, fontWeight: '600' },
+  placeholderInitials: { 
+    ...Typography.title, 
+    color: Colors.textSecondary, 
+    fontWeight: '600',
+    fontSize: 18,
+  },
   placeholderName: { ...Typography.title, color: Colors.textPrimary },
-  placeholderMeta: { ...Typography.body, color: Colors.textSecondary },
   inviteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1248,32 +1340,59 @@ const styles = StyleSheet.create({
   feeCard: {
     borderWidth: 1,
     borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
     marginBottom: Spacing.md,
     backgroundColor: Colors.surface,
     ...Shadows.card,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
   },
   feeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: Spacing.sm,
   },
-  feeNameInput: {
+  feeNameContainer: {
     flex: 1,
+    marginRight: Spacing.sm,
+  },
+  feeNameLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  feeNameInput: {
     borderWidth: 1,
     borderColor: Colors.divider,
     borderRadius: Radius.sm,
     padding: Spacing.md,
     ...Typography.body,
-    marginRight: Spacing.sm,
     backgroundColor: Colors.surface,
     color: Colors.textPrimary,
+    fontSize: 16,
+    minHeight: 48,
   },
 
+  feeTypeSection: {
+    marginBottom: Spacing.md,
+  },
+  feeTypeLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   feeTypeContainer: {
     flexDirection: 'row',
-    marginBottom: Spacing.md,
     gap: Spacing.sm,
   },
   feeTypeButton: {
@@ -1284,10 +1403,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: Radius.sm,
     backgroundColor: Colors.surface,
+    minHeight: 48,
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 2,
   },
   feeTypeButtonActive: {
     backgroundColor: Colors.accent,
     borderColor: Colors.accent,
+    ...Shadows.button,
+    elevation: 3,
   },
   feeTypeText: {
     ...Typography.body,
@@ -1298,8 +1423,16 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     fontWeight: '600',
   },
-  percentageContainer: {
+  percentageSection: {
     marginBottom: Spacing.md,
+  },
+  percentageLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   percentageButtons: {
     flexDirection: 'row',
@@ -1316,10 +1449,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     minWidth: 60,
     alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 2,
   },
   percentageButtonActive: {
     backgroundColor: Colors.accent,
     borderColor: Colors.accent,
+    ...Shadows.button,
+    elevation: 3,
   },
   percentageButtonText: {
     ...Typography.label,
@@ -1362,34 +1500,53 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
-  fixedAmountContainer: {
+  fixedAmountSection: {
     marginBottom: Spacing.md,
+  },
+  fixedAmountLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   feeAmountInput: {
     marginBottom: 0,
   },
-  feeSplitContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    gap: Spacing.sm,
+  feeSplitSection: {
+    marginBottom: Spacing.md,
   },
   feeSplitLabel: {
-    ...Typography.body,
-    color: Colors.textPrimary,
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  feeSplitContainer: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
   },
   feeSplitButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
+    flex: 1,
+    padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.divider,
+    alignItems: 'center',
+    borderRadius: Radius.sm,
     backgroundColor: Colors.surface,
+    minHeight: 48,
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 2,
   },
   feeSplitButtonActive: {
     backgroundColor: Colors.accent,
     borderColor: Colors.accent,
+    ...Shadows.button,
+    elevation: 3,
   },
   feeSplitText: {
     ...Typography.label,
@@ -1406,14 +1563,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
-  feeTotalContainer: {
+  feeTotalSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
   },
   feeTotalLabel: {
     ...Typography.body,
@@ -1424,6 +1578,110 @@ const styles = StyleSheet.create({
     ...Typography.title,
     color: Colors.accent,
     fontWeight: '700',
+  },
+  placeholdersContainer: {
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  placeholdersLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 12,
+  },
+  placeholderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    ...Shadows.card,
+    elevation: 2,
+    minHeight: 72,
+  },
+  placeholderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  placeholderAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+    position: 'relative',
+  },
+  placeholderInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  placeholderName: {
+    ...Typography.title,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+  },
+  placeholderPhone: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: 14,
+  },
+  placeholderTag: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontSize: 11,
+    marginTop: Spacing.xs,
+    fontStyle: 'italic',
+    opacity: 0.8,
+  },
+  placeholderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  inviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    ...Shadows.button,
+    elevation: 2,
+  },
+  inviteButtonText: { 
+    ...Typography.label, 
+    color: Colors.surface, 
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  participantsCount: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    ...Shadows.button,
+    elevation: 2,
+  },
+  participantsCountText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
   },
 });
 

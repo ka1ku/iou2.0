@@ -259,7 +259,16 @@ export const joinExpense = async ({ expenseId, token, code, user }) => {
       replaced = true;
     }
     if (!replaced) {
-      participants.push({ name: `${user.firstName || 'Friend'} ${user.lastName || ''}`.trim() || (user.venmoUsername ? `@${user.venmoUsername}` : 'Friend'), userId: user.uid, placeholder: false });
+      // Create participant entry for the user
+      const participantName = user.firstName && user.lastName 
+        ? `${user.firstName} ${user.lastName}`.trim() 
+        : (user.username ? `@${user.username}` : 'Friend');
+      
+      participants.push({ 
+        name: participantName, 
+        userId: user.uid, 
+        placeholder: false 
+      });
     }
 
     // Update expense participants only; splits are not recalculated here

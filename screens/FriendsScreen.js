@@ -238,14 +238,14 @@ const FriendsScreen = ({ navigation }) => {
           <ProfilePicture
             source={item.fromUserProfile?.profilePhoto}
             size={36}
-            username={item.fromUserProfile?.venmoUsername || `${item.fromUserProfile?.firstName || ''} ${item.fromUserProfile?.lastName || ''}`}
+            username={item.fromUserProfile?.username || `${item.fromUserProfile?.firstName || ''} ${item.fromUserProfile?.lastName || ''}`}
           />
         </View>
         <Text style={styles.requestName}>
           {`${item.fromUserProfile?.firstName || ''} ${item.fromUserProfile?.lastName || ''}`.trim() || 'Unknown Name'}
         </Text>
-        {item.fromUserProfile?.venmoUsername && (
-          <Text style={styles.requestUsername}>@{item.fromUserProfile.venmoUsername}</Text>
+        {item.fromUserProfile?.username && (
+          <Text style={styles.requestUsername}>@{item.fromUserProfile.username}</Text>
         )}
       </View>
       <View style={styles.requestActions}>
@@ -272,10 +272,8 @@ const FriendsScreen = ({ navigation }) => {
       onPress={() => navigation.navigate('FriendProfile', { 
         friend: {
           friendId: item.friendId,
-          name: item.friendData.venmoUsername
-            ? `@${item.friendData.venmoUsername}`
-            : `${item.friendData.firstName} ${item.friendData.lastName}`,
-          venmoUsername: item.friendData.venmoUsername,
+          name: `${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`.trim() || 'Unknown Name',
+          username: item.friendData.username,
           profilePhoto: item.friendData.profilePhoto,
           firstName: item.friendData.firstName,
           lastName: item.friendData.lastName,
@@ -288,15 +286,15 @@ const FriendsScreen = ({ navigation }) => {
           <ProfilePicture
             source={item.friendData.profilePhoto}
             size={40}
-            username={item.friendData.venmoUsername || `${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`}
+            username={item.friendData.username || `${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`}
           />
         </View>
         <View style={styles.friendDetails}>
           <Text style={styles.friendName}>
             {`${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`.trim() || 'Unknown Name'}
           </Text>
-          {item.friendData.venmoUsername && (
-            <Text style={styles.friendUsername}>@{item.friendData.venmoUsername}</Text>
+          {item.friendData.username && (
+            <Text style={styles.friendUsername}>@{item.friendData.username}</Text>
           )}
         </View>
       </View>
@@ -313,15 +311,15 @@ const FriendsScreen = ({ navigation }) => {
           <ProfilePicture
             source={item.profilePhoto}
             size={40}
-            username={item.venmoUsername || `${item.firstName || ''} ${item.lastName || ''}`}
+            username={item.username || `${item.firstName || ''} ${item.lastName || ''}`}
           />
         </View>
         <View style={styles.searchResultDetails}>
           <Text style={styles.searchResultName}>
             {`${item.firstName || ''} ${item.lastName || ''}`.trim() || 'Unknown Name'}
           </Text>
-          {item.venmoUsername && (
-            <Text style={styles.searchResultUsername}>@{item.venmoUsername}</Text>
+          {item.username && (
+            <Text style={styles.searchResultUsername}>@{item.username}</Text>
           )}
         </View>
       </View>

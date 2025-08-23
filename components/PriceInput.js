@@ -15,9 +15,8 @@ const PriceInput = ({
   const [displayValue, setDisplayValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
-  // Sync external value only when not focused (prevents cursor jumps/lock)
+  // Sync external value with internal display value
   useEffect(() => {
-    if (isFocused) return;
     if (value === null || value === undefined || value === '') {
       setDisplayValue('');
       return;
@@ -28,7 +27,7 @@ const PriceInput = ({
     } else {
       setDisplayValue('');
     }
-  }, [value, isFocused]);
+  }, [value]);
 
   const clampDecimals = useCallback(
     (text) => {

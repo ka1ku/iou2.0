@@ -150,13 +150,11 @@ const FriendProfileScreen = ({ route, navigation }) => {
   };
 
   const handleVenmoPayment = () => {
-    if (friend.venmoUsername) {
-      const venmoUrl = `https://venmo.com/${friend.venmoUsername}`;
-      Linking.openURL(venmoUrl).catch(() => {
-        Alert.alert('Error', 'Could not open Venmo');
-      });
+    if (friend.username) {
+      const venmoUrl = `https://venmo.com/${friend.username}`;
+      Linking.openURL(venmoUrl);
     } else {
-      Alert.alert('No Venmo', 'This friend doesn\'t have a Venmo username');
+      Alert.alert('No Username', 'This friend doesn\'t have a username');
     }
   };
 
@@ -228,7 +226,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
             <ProfilePicture
               source={friend.profilePhoto}
               size={80}
-              username={friend.venmoUsername || friend.name}
+              username={friend.username || friend.name}
             />
             <View style={styles.friendDetails}>
               <Text style={styles.friendName}>
@@ -237,8 +235,8 @@ const FriendProfileScreen = ({ route, navigation }) => {
                   : friend.name
                 }
               </Text>
-              {friend.venmoUsername && (
-                <Text style={styles.venmoUsername}>@{friend.venmoUsername}</Text>
+              {friend.username && (
+                <Text style={styles.venmoUsername}>@{friend.username}</Text>
               )}
             </View>
           </View>
@@ -285,23 +283,24 @@ const FriendProfileScreen = ({ route, navigation }) => {
           <Text style={styles.sectionTitle}>Payment Methods</Text>
           
           <View style={styles.paymentMethods}>
-            {friend.venmoUsername && (
+            {friend.username && (
               <TouchableOpacity style={styles.paymentMethod} onPress={handleVenmoPayment}>
                 <View style={styles.paymentMethodIcon}>
                   <Ionicons name="card-outline" size={24} color={Colors.accent} />
                 </View>
                 <View style={styles.paymentMethodInfo}>
                   <Text style={styles.paymentMethodTitle}>Venmo</Text>
-                  <Text style={styles.paymentMethodDetail}>@{friend.venmoUsername}</Text>
+                  <Text style={styles.paymentMethodDetail}>@{friend.username}</Text>
                 </View>
                 <Ionicons name="open-outline" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
             )}
             
-            {!friend.venmoUsername && (
-              <Text style={styles.noPaymentMethods}>
-                No payment methods available
-              </Text>
+            {!friend.username && (
+              <View style={styles.noPaymentMethod}>
+                <Ionicons name="information-circle-outline" size={24} color={Colors.textSecondary} />
+                <Text style={styles.noPaymentMethodText}>No payment method available</Text>
+              </View>
             )}
           </View>
         </View>
@@ -556,6 +555,15 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.surface,
     fontWeight: '600',
+  },
+  noPaymentMethod: {
+    alignItems: 'center',
+    padding: Spacing.md,
+  },
+  noPaymentMethodText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
   },
 });
 

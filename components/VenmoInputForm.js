@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, StyleSheet, Linking, Platform } from 'react-native';
+import { View, Text, TextInput, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
+import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 
 /**
  * Reusable component for Venmo username input with automatic verification
@@ -10,34 +10,8 @@ const VenmoInputForm = ({
   username, 
   onUsernameChange, 
   verifying, 
-  verified,
-  onOpenVenmoApp 
+  verified
 }) => {
-  const handleOpenVenmoApp = async () => {
-    if (onOpenVenmoApp) {
-      onOpenVenmoApp();
-    } else {
-      // Default Venmo app opening logic
-      try {
-        const normalized = (username || '').replace(/^@+/, '');
-        const venmoAppUrl = normalized
-          ? `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(normalized)}&amount=0&note=Verification`
-          : 'venmo://';
-        const canOpen = await Linking.canOpenURL(venmoAppUrl);
-        
-        if (canOpen) {
-          await Linking.openURL(venmoAppUrl);
-        } else {
-          const storeUrl = Platform.OS === 'ios' 
-            ? 'https://apps.apple.com/us/app/venmo/id351727428'
-            : 'https://play.google.com/store/apps/details?id=com.venmo';
-          await Linking.openURL(storeUrl);
-        }
-      } catch (error) {
-        console.error('Error opening Venmo app:', error);
-      }
-    }
-  };
 
   return (
     <View style={styles.setupContainer}>
@@ -53,6 +27,8 @@ const VenmoInputForm = ({
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="off"
+            spellCheck={false}
           />
           
           {/* Loading indicator or checkmark on the right */}
@@ -65,11 +41,6 @@ const VenmoInputForm = ({
           </View>
         </View>
       </View>
-
-      <TouchableOpacity style={styles.openVenmoButton} onPress={handleOpenVenmoApp}>
-        <Ionicons name="open-outline" size={20} color={Colors.accent} />
-        <Text style={styles.openVenmoText}>Open Venmo App</Text>
-      </TouchableOpacity>
     </View>
   );
 };
@@ -118,18 +89,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  openVenmoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-  },
-  openVenmoText: {
-    ...Typography.body,
-    color: Colors.accent,
-    marginLeft: Spacing.sm,
-    fontWeight: '600',
-  },
+
+
 });
 
 export default VenmoInputForm;

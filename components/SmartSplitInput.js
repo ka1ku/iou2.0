@@ -16,164 +16,193 @@ const SmartSplitInput = ({
   onSplitsChange,
   style,
 }) => {
-  // Internal state for smart split logic
-  const [splits, setSplits] = useState([]);
-  const [lockedRows, setLockedRows] = useState(new Set());
+  // State for each participant: amount and locked status
+  const [participantStates, setParticipantStates] = useState([]);
   const [error, setError] = useState(null);
 
-  // Initialize splits when component mounts or participants/total change
+  // Initialize when component mounts or participants/total change
   useEffect(() => {
     if (participants.length > 0 && total > 0) {
-      initializeSplits();
+      initializeParticipants();
     }
   }, [participants.length, total]);
 
-  // Initialize splits evenly across all participants
-  const initializeSplits = useCallback(() => {
+  // Initialize all participants with even split and unlocked
+  const initializeParticipants = useCallback(() => {
     if (participants.length === 0 || total <= 0) return;
 
     const evenAmount = total / participants.length;
-    const newSplits = participants.map((_, index) => ({
-      participantIndex: index,
+    const newStates = participants.map((_, index) => ({
       amount: evenAmount,
+      locked: false,
     }));
 
-    setSplits(newSplits);
-    setLockedRows(new Set());
+    setParticipantStates(newStates);
     setError(null);
     
     if (onSplitsChange) {
-      onSplitsChange(newSplits);
+      onSplitsChange(newStates.map(state => ({ amount: state.amount })));
     }
   }, [participants, total, onSplitsChange]);
 
-  // Calculate remaining pool (total - sum of locked amounts)
-  const calculateRemainingPool = useCallback(() => {
-    const lockedTotal = splits.reduce((sum, split, index) => {
-      return lockedRows.has(index) ? sum + (split.amount || 0) : sum;
+  // Calculate remaining balance to distribute among unlocked users
+  const calculateRemainingBalance = useCallback((states) => {
+    const lockedTotal = states.reduce((sum, state, index) => {
+      return state.locked ? sum + (state.amount || 0) : sum;
     }, 0);
     
     return Math.max(0, total - lockedTotal);
-  }, [splits, lockedRows, total]);
+  }, [total]);
 
-  // Distribute remaining pool among auto rows
-  const distributeRemainingPool = useCallback((remainingPool) => {
-    const autoRows = splits.map((_, index) => index).filter(index => !lockedRows.has(index));
+  // Distribute remaining balance evenly among unlocked users
+  const distributeRemainingBalance = useCallback((states) => {
+    const unlockedIndices = states.map((state, index) => state.locked ? null : index).filter(i => i !== null);
     
-    if (autoRows.length === 0) return;
+    if (unlockedIndices.length === 0) return states;
     
-    if (autoRows.length === 1) {
-      // Single auto row gets all remaining
-      const newSplits = [...splits];
-      newSplits[autoRows[0]].amount = remainingPool;
-      setSplits(newSplits);
-      return;
+    const remainingBalance = calculateRemainingBalance(states);
+    
+    if (unlockedIndices.length === 1) {
+      // Single unlocked user gets all remaining balance
+      const newStates = [...states];
+      newStates[unlockedIndices[0]].amount = Math.round(remainingBalance * 100) / 100;
+      return newStates;
     }
 
-    // Distribute evenly among auto rows
-    const baseAmount = Math.floor(remainingPool * 100 / autoRows.length) / 100; // Round down to cents
-    const remainder = Math.round((remainingPool - (baseAmount * autoRows.length)) * 100) / 100;
+    // Distribute evenly among unlocked users
+    const baseAmount = Math.floor(remainingBalance * 100 / unlockedIndices.length) / 100;
+    const remainder = Math.round((remainingBalance - (baseAmount * unlockedIndices.length)) * 100) / 100;
     
-    const newSplits = [...splits];
-    autoRows.forEach((rowIndex, arrayIndex) => {
+    const newStates = [...states];
+    unlockedIndices.forEach((rowIndex, arrayIndex) => {
       let amount = baseAmount;
       // Distribute remainder cents to first few rows
       if (arrayIndex < Math.floor(remainder * 100)) {
         amount += 0.01;
       }
-      newSplits[rowIndex].amount = amount;
+      newStates[rowIndex].amount = Math.round(amount * 100) / 100;
     });
     
-    setSplits(newSplits);
-  }, [splits, lockedRows, total]);
+    return newStates;
+  }, [calculateRemainingBalance]);
 
-  // Handle input change for a specific row
-  const handleAmountChange = useCallback((rowIndex, value) => {
+  // Handle amount change for a specific participant
+  const handleAmountChange = useCallback((index, value) => {
     const numValue = value !== null ? value : 0;
     
-    // Mark row as locked
-    const newLockedRows = new Set(lockedRows);
-    newLockedRows.add(rowIndex);
-    setLockedRows(newLockedRows);
+    // Mark as locked when user types a value
+    const newStates = [...participantStates];
+    newStates[index] = {
+      ...newStates[index],
+      amount: numValue,
+      locked: true,
+    };
     
-    // Update the specific row
-    const newSplits = [...splits];
-    newSplits[rowIndex].amount = numValue;
-    
-    // Check for over-allocation
-    const lockedTotal = newSplits.reduce((sum, split, index) => {
-      return newLockedRows.has(index) ? sum + (split.amount || 0) : sum;
+    // Check if total exceeds bill amount
+    const lockedTotal = newStates.reduce((sum, state) => {
+      return state.locked ? sum + (state.amount || 0) : sum;
     }, 0);
     
     if (lockedTotal > total) {
       setError(`Total exceeds bill amount by $${(lockedTotal - total).toFixed(2)}`);
-      // Set all auto rows to 0
-      newSplits.forEach((split, index) => {
-        if (!newLockedRows.has(index)) {
-          split.amount = 0;
+      // Set all unlocked amounts to 0
+      newStates.forEach((state, i) => {
+        if (!state.locked) {
+          state.amount = 0;
         }
       });
     } else {
       setError(null);
-      // Distribute remaining pool among auto rows
-      const remainingPool = total - lockedTotal;
-      distributeRemainingPool(remainingPool);
+      // Redistribute remaining balance among unlocked users
+      const updatedStates = distributeRemainingBalance(newStates);
+      setParticipantStates(updatedStates);
+      
+      if (onSplitsChange) {
+        onSplitsChange(updatedStates.map(state => ({ amount: state.amount })));
+      }
+      return;
     }
     
-    setSplits(newSplits);
+    setParticipantStates(newStates);
     
     if (onSplitsChange) {
-      onSplitsChange(newSplits);
+      onSplitsChange(newStates.map(state => ({ amount: state.amount })));
     }
-  }, [splits, lockedRows, total, distributeRemainingPool, onSplitsChange]);
+  }, [participantStates, total, distributeRemainingBalance, onSplitsChange]);
 
-  // Handle blur (formatting and validation)
-  const handleBlur = useCallback((rowIndex) => {
-    const split = splits[rowIndex];
+  // Toggle lock status for a participant
+  const toggleLock = useCallback((index) => {
+    const newStates = [...participantStates];
+    const currentState = newStates[index];
     
-    // If field is empty or 0, unlock it and return to auto-fill
-    if (split.amount === null || split.amount === undefined || split.amount === 0) {
-      unlockRow(rowIndex);
+    if (currentState.locked) {
+      // Unlock: mark as unlocked and let distribution handle the amount
+      newStates[index] = {
+        ...currentState,
+        locked: false,
+      };
+      
+      // Redistribute remaining balance among unlocked users
+      const updatedStates = distributeRemainingBalance(newStates);
+      
+      setParticipantStates(updatedStates);
+      setError(null);
+      
+      if (onSplitsChange) {
+        onSplitsChange(updatedStates.map(state => ({ amount: state.amount })));
+      }
+    } else {
+      // Lock: keep current amount and mark as locked
+      newStates[index] = {
+        ...currentState,
+        locked: true,
+      };
+      
+      // Redistribute remaining balance among other unlocked users
+      const updatedStates = distributeRemainingBalance(newStates);
+      setParticipantStates(updatedStates);
+      setError(null);
+      
+      if (onSplitsChange) {
+        onSplitsChange(updatedStates.map(state => ({ amount: state.amount })));
+      }
+    }
+  }, [participantStates, distributeRemainingBalance, onSplitsChange]);
+
+  // Handle blur to format amounts
+  const handleBlur = useCallback((index) => {
+    const state = participantStates[index];
+    
+    // If field is empty or 0 and unlocked, unlock it
+    if ((state.amount === null || state.amount === undefined || state.amount === 0) && !state.locked) {
+      const newStates = [...participantStates];
+      newStates[index] = { amount: 0, locked: false };
+      
+      const updatedStates = distributeRemainingBalance(newStates);
+      setParticipantStates(updatedStates);
+      
+      if (onSplitsChange) {
+        onSplitsChange(updatedStates.map(state => ({ amount: state.amount })));
+      }
       return;
     }
     
     // Format to 2 decimal places
-    const formattedAmount = Math.round(split.amount * 100) / 100;
-    if (formattedAmount !== split.amount) {
-      const newSplits = [...splits];
-      newSplits[rowIndex].amount = formattedAmount;
-      setSplits(newSplits);
+    const formattedAmount = Math.round(state.amount * 100) / 100;
+    if (formattedAmount !== state.amount) {
+      const newStates = [...participantStates];
+      newStates[index].amount = formattedAmount;
+      setParticipantStates(newStates);
       
       if (onSplitsChange) {
-        onSplitsChange(newSplits);
+        onSplitsChange(newStates.map(state => ({ amount: state.amount })));
       }
     }
-  }, [splits, onSplitsChange]);
+  }, [participantStates, distributeRemainingBalance, onSplitsChange]);
 
-  // Unlock a row (return to auto-fill)
-  const unlockRow = useCallback((rowIndex) => {
-    const newLockedRows = new Set(lockedRows);
-    newLockedRows.delete(rowIndex);
-    setLockedRows(newLockedRows);
-    
-    // Clear the row amount (PriceInput expects null for empty)
-    const newSplits = [...splits];
-    newSplits[rowIndex].amount = null;
-    
-    // Redistribute remaining pool
-    const remainingPool = calculateRemainingPool();
-    distributeRemainingPool(remainingPool);
-    
-    setSplits(newSplits);
-    setError(null);
-    
-    if (onSplitsChange) {
-      onSplitsChange(newSplits);
-    }
-  }, [splits, lockedRows, calculateRemainingPool, distributeRemainingPool, onSplitsChange]);
-
-  // Calculate unallocated amount
-  const unallocatedAmount = Math.max(0, total - splits.reduce((sum, split) => sum + (split.amount || 0), 0));
+  // Calculate allocated and unallocated amounts
+  const allocatedAmount = participantStates.reduce((sum, state) => sum + (state.amount || 0), 0);
+  const unallocatedAmount = Math.max(0, total - allocatedAmount);
 
   if (participants.length === 0 || total <= 0) {
     return null;
@@ -181,17 +210,16 @@ const SmartSplitInput = ({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Header with total and unallocated info */}
-      <View style={styles.header}>
-        <Text style={styles.totalText}>Total: ${total.toFixed(2)}</Text>
-        {unallocatedAmount > 0 && (
+      {/* Header with unallocated info */}
+      {unallocatedAmount > 0 && (
+        <View style={styles.header}>
           <View style={styles.unallocatedContainer}>
             <Text style={styles.unallocatedText}>
               Unallocated: ${unallocatedAmount.toFixed(2)}
             </Text>
           </View>
-        )}
-      </View>
+        </View>
+      )}
 
       {/* Error message */}
       {error && (
@@ -202,60 +230,59 @@ const SmartSplitInput = ({
 
       {/* Split rows */}
       {participants.map((participant, index) => {
-        const split = splits[index] || { amount: 0 };
-        const isLocked = lockedRows.has(index);
-        const isAuto = !isLocked;
+        const state = participantStates[index] || { amount: 0, locked: false };
         
         return (
           <View key={index} style={styles.splitRow}>
             {/* Participant name */}
             <View style={styles.participantInfo}>
-              <Text style={styles.participantName}>
-                {participant.name || `Person ${index + 1}`}
-              </Text>
-              {isAuto && (
-                <View style={styles.autoBadge}>
-                  <Text style={styles.autoBadgeText}>Auto</Text>
-                </View>
-              )}
+              <View style={styles.participantTextContainer}>
+                <Text style={styles.participantName}>
+                  {participant.name || `Person ${index + 1}`}
+                </Text>
+                {participant.username && (
+                  <Text style={styles.participantUsername}>
+                    @{participant.username}
+                  </Text>
+                )}
+              </View>
             </View>
 
             {/* Amount input */}
             <View style={styles.inputContainer}>
               <Text style={styles.currencySymbol}>$</Text>
               <PriceInput
-                value={split.amount}
+                value={state.amount}
                 onChangeText={(value) => handleAmountChange(index, value)}
                 onBlur={() => handleBlur(index)}
                 placeholder="0.00"
                 style={[
                   styles.amountInput,
-                  isLocked && styles.lockedInput,
-                  isAuto && styles.autoInput
+                  !state.locked && styles.autoAmountInput
                 ]}
                 editable={true}
               />
             </View>
 
-            {/* Unlock button for locked rows */}
-            {isLocked && (
-              <TouchableOpacity
-                onPress={() => unlockRow(index)}
-                style={styles.unlockButton}
-              >
-                <Ionicons name="lock-open" size={16} color={Colors.accent} />
-              </TouchableOpacity>
-            )}
+            {/* Lock/Unlock button */}
+            <TouchableOpacity
+              onPress={() => toggleLock(index)}
+              style={[
+                styles.lockButton,
+                state.locked && styles.lockedButton
+              ]}
+            >
+              <Ionicons 
+                name={state.locked ? "lock-closed" : "lock-open"} 
+                size={16} 
+                color={state.locked ? Colors.accent : Colors.textSecondary} 
+              />
+            </TouchableOpacity>
           </View>
         );
       })}
 
-      {/* Summary */}
-      <View style={styles.summary}>
-        <Text style={styles.summaryText}>
-          Split {participants.length} ways • Smart distribution enabled
-        </Text>
-      </View>
+   
     </View>
   );
 };
@@ -269,14 +296,9 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.md,
-  },
-  totalText: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    fontWeight: '600',
   },
   unallocatedContainer: {
     alignItems: 'center',
@@ -300,8 +322,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
   participantInfo: {
     flex: 1,
@@ -309,21 +331,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.xs,
   },
+  participantTextContainer: {
+    flexDirection: 'column',
+  },
   participantName: {
     ...Typography.body1,
     color: Colors.textPrimary,
     fontWeight: '500',
   },
-  autoBadge: {
-    backgroundColor: Colors.accent + '20',
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Radius.xs,
-  },
-  autoBadgeText: {
+  participantUsername: {
     ...Typography.caption,
-    color: Colors.accent,
-    fontSize: 10,
+    color: Colors.textSecondary,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -342,28 +360,29 @@ const styles = StyleSheet.create({
     ...Typography.body1,
     color: Colors.textPrimary,
   },
-  lockedInput: {
+  autoAmountInput: {
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  lockButton: {
+    padding: Spacing.xs,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: Radius.sm,
     backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.accent,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.xs,
-  },
-  autoInput: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.xs,
   },
-  unlockButton: {
-    padding: Spacing.xs,
+  lockedButton: {
+    backgroundColor: Colors.accent + '20',
+    borderColor: Colors.accent,
   },
   summary: {
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+
   },
   summaryText: {
     ...Typography.caption,
