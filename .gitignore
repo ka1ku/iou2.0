@@ -27,3 +27,7 @@ firestore-debug.log
 dist/
 build/
 web-build/
+
+# Mobile platform builds
+ios/
+android/
