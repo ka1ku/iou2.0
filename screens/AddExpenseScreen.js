@@ -14,13 +14,47 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import { getCurrentUser } from '../services/authService';
-import { createExpense, updateExpense } from '../services/expenseService';
+
 import FriendSelector from '../components/FriendSelector';
 import InviteFriendSheet from '../components/InviteFriendSheet';
 import PriceInput from '../components/PriceInput';
 import DeleteButton from '../components/DeleteButton';
-import { ItemHeader, PriceInputSection, PaidBySection, SmartSplitSection, SplitTypeSection, WhoConsumedSection } from './AddExpenseScreenItems';
+import { 
+  ItemHeader, 
+  PriceInputSection, 
+  PaidBySection, 
+  SmartSplitSection, 
+  SplitTypeSection, 
+  WhoConsumedSection, 
+  FeeHeader, 
+  FeeTypeSection, 
+  PercentageSection, 
+  FixedAmountSection, 
+  TotalFeeSection,
+  Header,
+  ExpenseDetailsSection,
+  ParticipantsSection,
+  ItemsSection,
+  FeesSection,
+  Footer,
+  SettingsModal,
+  WhoPaidSection
+} from './AddExpenseScreenItems';
+import {
+  addItem,
+  updateItem,
+  updateItemSplit,
+  removeItem,
+  addFee,
+  updateFee,
+  removeFee,
+  saveExpense,
+  renderItem,
+  addParticipant,
+  updateParticipant,
+  removeParticipant,
+  removePlaceholder
+} from './AddExpenseScreenFunctions';
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
@@ -232,36 +266,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
     }
   }, [expense, isEditing]);
 
-  const addParticipant = () => {
-    setParticipants([...participants, { name: '' }]);
-  };
-
-  const updateParticipant = (index, name) => {
-    const updated = [...participants];
-    updated[index] = { name };
-    setParticipants(updated);
-  };
-
-  const removeParticipant = (index) => {
-    if (participants.length > 1) {
-      setParticipants(participants.filter((_, i) => i !== index));
-      // Update item splits and selectedConsumers to remove this participant
-      setItems(items.map(item => ({
-        ...item,
-        selectedConsumers: item.selectedConsumers?.filter(consumerIndex => consumerIndex !== index)
-          .map(consumerIndex => consumerIndex > index ? consumerIndex - 1 : consumerIndex) || [],
-        splits: item.splits?.filter(split => split.participantIndex !== index)
-          .map(split => ({
-            ...split,
-            participantIndex: split.participantIndex > index ? split.participantIndex - 1 : split.participantIndex
-          }))
-      })));
-    } else {
-      Alert.alert('Error', 'No participants');
-    }
-  };
-
-  // Update participants when friends are selected
+    // Update participants when friends are selected
   useEffect(() => {
     const allParticipants = [
       { name: 'Me' },
@@ -286,6 +291,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
       selectedConsumers: item.selectedConsumers?.filter(index => index < allParticipants.length) || [0]
     })));
   }, [selectedFriends, placeholders]);
+  
+  const handleAddParticipant = () => {
+    addParticipant(participants, setParticipants);
+  };
+
+  const handleUpdateParticipant = (index, name) => {
+    updateParticipant(index, name, participants, setParticipants);
+  };
+
+  const handleRemoveParticipant = (index) => {
+    removeParticipant(index, participants, setParticipants, items, setItems);
+  };
 
   const handleAddPlaceholder = (ghost) => {
     setPlaceholders(prev => [...prev, ghost]);
@@ -295,291 +312,66 @@ const AddExpenseScreen = ({ route, navigation }) => {
     setInviteTarget({ name: ghost.name, phone: ghost.phoneNumber || '' });
   };
 
-  const removePlaceholder = (ghostId) => {
-    const indexInPlaceholders = placeholders.findIndex(p => p.id === ghostId);
-    if (indexInPlaceholders < 0) return;
-    // Compute participant index in the combined participants array
-    const removedParticipantIndex = 1 + selectedFriends.length + indexInPlaceholders; // 0 is Me
-
-    // Adjust item splits and selectedConsumers similar to previous removeParticipant logic
-    setItems(prevItems => prevItems.map(item => ({
-      ...item,
-      selectedConsumers: item.selectedConsumers?.filter(consumerIndex => consumerIndex !== removedParticipantIndex)
-        .map(consumerIndex => consumerIndex > removedParticipantIndex ? consumerIndex - 1 : consumerIndex) || [],
-      splits: item.splits?.filter(split => split.participantIndex !== removedParticipantIndex)
-        .map(split => ({
-          ...split,
-          participantIndex: split.participantIndex > removedParticipantIndex ? split.participantIndex - 1 : split.participantIndex
-        })) || []
-    })));
-
-    setPlaceholders(prev => prev.filter(p => p.id !== ghostId));
+  const handleRemovePlaceholder = (ghostId) => {
+    removePlaceholder(ghostId, placeholders, setPlaceholders, items, setItems, selectedFriends);
   };
 
-  const addItem = () => {
-    const newItem = {
-      id: Date.now().toString(),
-      name: '',
-      amount: 0,
-      selectedConsumers: participants.length > 0 ? [0] : [], // Default to first participant (usually "Me")
-      splits: []
-    };
-    setItems([...items, newItem]);
+  const handleAddItem = () => {
+    addItem(items, setItems, participants);
   };
 
-  const updateItem = (index, field, value) => {
-    const updated = [...items];
-    updated[index] = { ...updated[index], [field]: value };
-    
-    // If amount changed, recalculate splits
-    if (field === 'amount') {
-      const amount = parseFloat(value) || 0;
-      const selectedConsumers = updated[index].selectedConsumers || [0];
-      if (selectedConsumers.length > 0) {
-        if (selectedConsumers.length === 1) {
-          // Single consumer gets 100% of the amount
-          updated[index].splits = [{
-            participantIndex: selectedConsumers[0],
-            amount: amount,
-            percentage: 100
-          }];
-        } else {
-          // Multiple consumers split evenly
-          const splitAmount = amount / selectedConsumers.length;
-          updated[index].splits = selectedConsumers.map((consumerIndex, i) => ({
-            participantIndex: consumerIndex,
-            amount: splitAmount,
-            percentage: 100 / selectedConsumers.length
-          }));
-        }
-      }
-    }
-    
-    setItems(updated);
-    
-    // Recalculate percentage-based fees when items change
-    if (field === 'amount') {
-      const updatedFees = fees.map(fee => {
-        if (fee.type === 'percentage') {
-          const itemsTotal = updated.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-          return { ...fee, amount: (itemsTotal * fee.percentage) / 100 };
-        }
-        return fee;
-      });
-      setFees(updatedFees);
-    }
+  const handleUpdateItem = (index, field, value) => {
+    updateItem(index, field, value, items, setItems, fees, setFees);
   };
 
-  const updateItemSplit = (itemIndex, participantIndex, amount) => {
-    const updated = [...items];
-    const item = updated[itemIndex];
-    
-    if (!item.splits) {
-      item.splits = [];
-    }
-    
-    const existingSplitIndex = item.splits.findIndex(s => s.participantIndex === participantIndex);
-    if (existingSplitIndex >= 0) {
-      item.splits[existingSplitIndex].amount = amount || 0;
-    } else {
-      item.splits.push({
-        participantIndex,
-        amount: amount || 0
-      });
-    }
-    
-    setItems(updated);
+  const handleUpdateItemSplit = (itemIndex, participantIndex, amount) => {
+    updateItemSplit(itemIndex, participantIndex, amount, items, setItems);
   };
 
-  const removeItem = (index) => {
-    const updatedItems = items.filter((_, i) => i !== index);
-    setItems(updatedItems);
-    
-    // Recalculate percentage-based fees when items are removed
-    const updatedFees = fees.map(fee => {
-      if (fee.type === 'percentage') {
-        const itemsTotal = updatedItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-        return { ...fee, amount: (itemsTotal * fee.percentage) / 100 };
-      }
-      return fee;
-    });
-    setFees(updatedFees);
+  const handleRemoveItem = (index) => {
+    removeItem(index, items, setItems, fees, setFees);
   };
 
-  const addFee = () => {
-    const newFee = {
-      id: Date.now().toString(),
-      name: '',
-      amount: 0,
-      type: 'percentage', // 'percentage' or 'fixed'
-      percentage: 15, // default 15% tip
-      splitType: 'proportional', // 'equal' or 'proportional'
-      splits: []
-    };
-    setFees([...fees, newFee]);
+  const handleAddFee = () => {
+    addFee(fees, setFees);
   };
 
-  const updateFee = (index, field, value) => {
-    const updated = [...fees];
-    updated[index] = { ...updated[index], [field]: value };
-    
-    // Recalculate amount if percentage changed
-    if (field === 'percentage' && updated[index].type === 'percentage') {
-      const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-      updated[index].amount = (itemsTotal * value) / 100;
-    }
-    
-    // Recalculate amount if type changed from fixed to percentage
-    if (field === 'type' && value === 'percentage') {
-      const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-      updated[index].amount = (itemsTotal * (updated[index].percentage || 15)) / 100;
-    }
-    
-
-    
-    setFees(updated);
+  const handleUpdateFee = (index, field, value) => {
+    updateFee(index, field, value, fees, setFees, items);
   };
 
-  const removeFee = (index) => {
-    setFees(fees.filter((_, i) => i !== index));
+  const handleRemoveFee = (index) => {
+    removeFee(index, fees, setFees);
   };
 
-  const saveExpense = async () => {
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter an expense title');
-      return;
-    }
-
-    if (participants.some(p => !p.name.trim())) {
-      Alert.alert('Error', 'Please enter names for all participants');
-      return;
-    }
-
-    if (items.length === 0) {
-      Alert.alert('Error', 'Please add at least one item');
-      return;
-    }
-
-    if (items.some(item => !item.name.trim() || !item.amount || parseFloat(item.amount) <= 0)) {
-      Alert.alert('Error', 'Please fill in all item details with valid amounts');
-      return;
-    }
-
-    if (fees.some(fee => !fee.name.trim())) {
-      Alert.alert('Error', 'Please fill in all fee names');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const currentUser = getCurrentUser();
-      if (!currentUser) {
-        throw new Error('No user signed in');
-      }
-
-      const expenseData = {
-        title: title.trim(),
-        total: calculateTotal(),
-        participants: participants.map(p => ({ 
-          name: p.name.trim(),
-          userId: p.userId,
-          placeholder: p.placeholder,
-          phoneNumber: p.phoneNumber,
-          username: p.username,
-          profilePhoto: p.profilePhoto
-        })),
-        items: items.map(item => ({
-          ...item,
-          name: item.name.trim(),
-          amount: parseFloat(item.amount)
-        })),
-        fees: fees.map(fee => ({
-          ...fee,
-          name: fee.name.trim(),
-          amount: parseFloat(fee.amount)
-        })),
-        selectedPayers: selectedPayers,
-        join: {
-          enabled: joinEnabled,
-        }
-      };
-
-      if (isEditing) {
-        await updateExpense(expense.id, expenseData, currentUser.uid);
-        Alert.alert('Success', 'Expense updated successfully');
-      } else {
-        await createExpense(expenseData, currentUser.uid);
-        Alert.alert('Success', 'Expense created successfully');
-      }
-
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error saving expense:', error);
-      Alert.alert('Error', 'Failed to save expense: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleSaveExpense = async () => {
+    saveExpense(
+      title,
+      participants,
+      items,
+      fees,
+      selectedPayers,
+      joinEnabled,
+      isEditing,
+      expense,
+      navigation,
+      setLoading,
+      calculateTotal
+    );
   };
 
-  const renderItem = (item, index) => {
-    return (
-      <View key={item.id} style={styles.itemCard}>
-        <ItemHeader
-          itemName={item.name}
-          onNameChange={(text) => updateItem(index, 'name', text)}
-          onDelete={() => removeItem(index)}
-        />
-
-        <PriceInputSection
-          amount={item.amount}
-          onAmountChange={(amount) => updateItem(index, 'amount', amount)}
-        />
-
-        <WhoConsumedSection
-          participants={participants}
-          selectedConsumers={item.selectedConsumers || [0]}
-          onConsumersChange={(consumers) => {
-            const updated = [...items];
-            updated[index].selectedConsumers = consumers;
-            // Recalculate splits for new consumers
-            const amount = parseFloat(updated[index].amount) || 0;
-            if (amount > 0 && consumers.length > 0) {
-              if (consumers.length === 1) {
-                // Single consumer gets 100% of the amount
-                updated[index].splits = [{
-                  participantIndex: consumers[0],
-                  amount: amount,
-                  percentage: 100
-                }];
-              } else {
-                // Multiple consumers split evenly
-                const splitAmount = amount / consumers.length;
-                updated[index].splits = consumers.map((consumerIndex, i) => ({
-                  participantIndex: consumerIndex,
-                  amount: splitAmount,
-                  percentage: 100 / consumers.length
-                }));
-              }
-            } else {
-              updated[index].splits = [];
-            }
-            setItems(updated);
-          }}
-        />
-
-        <SmartSplitSection
-          participants={participants}
-          selectedConsumers={item.selectedConsumers || [0]}
-          total={parseFloat(item.amount) || 0}
-          initialSplits={item.splits || []}
-          onSplitsChange={(newSplits) => {
-            // Update the item's splits
-            const updated = [...items];
-            updated[index].splits = newSplits;
-            setItems(updated);
-          }}
-        />
-      </View>
+  const handleRenderItem = (item, index) => {
+    return renderItem(
+      item,
+      index,
+      participants,
+      items,
+      setItems,
+      handleUpdateItem,
+      handleRemoveItem,
+      fees,
+      setFees,
+      styles
     );
   };
 
@@ -588,299 +380,97 @@ const AddExpenseScreen = ({ route, navigation }) => {
     
     return (
       <View key={fee.id} style={styles.feeCard}>
-        {/* Fee Header with Name Input and Delete Button */}
-        <View style={styles.feeHeader}>
-          <View style={styles.feeNameContainer}>
-            <Text style={styles.feeNameLabel}>Fee Name</Text>
-            <TextInput
-              style={styles.feeNameInput}
-              placeholder="e.g., Tip, Tax, Service"
-              placeholderTextColor={Colors.textSecondary}
-              value={fee.name}
-              onChangeText={(text) => updateFee(index, 'name', text)}
-            />
-          </View>
-          <DeleteButton
-            onPress={() => removeFee(index)}
-            size="medium"
-            variant="subtle"
-          />
-        </View>
+        <FeeHeader
+          feeName={fee.name}
+          onNameChange={(text) => handleUpdateFee(index, 'name', text)}
+          onDelete={() => handleRemoveFee(index)}
+        />
 
-        {/* Fee Type Section */}
-        <View style={styles.feeTypeSection}>
-          <Text style={styles.feeTypeLabel}>Fee Type</Text>
-          <View style={styles.feeTypeContainer}>
-            <TouchableOpacity
-              style={[
-                styles.feeTypeButton,
-                fee.type === 'percentage' && styles.feeTypeButtonActive
-              ]}
-              onPress={() => updateFee(index, 'type', 'percentage')}
-            >
-              <Text style={[
-                styles.feeTypeText,
-                fee.type === 'percentage' && styles.feeTypeTextActive
-              ]}>
-                Percentage
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.feeTypeButton,
-                fee.type === 'fixed' && styles.feeTypeButtonActive
-              ]}
-              onPress={() => updateFee(index, 'type', 'fixed')}
-            >
-              <Text style={[
-                styles.feeTypeText,
-                fee.type === 'fixed' && styles.feeTypeTextActive
-              ]}>
-                Fixed Amount
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <FeeTypeSection
+          feeType={fee.type}
+          onTypeChange={(type) => handleUpdateFee(index, 'type', type)}
+        />
 
-        {/* Percentage Section */}
         {fee.type === 'percentage' ? (
-          <View style={styles.percentageSection}>
-            <Text style={styles.percentageLabel}>Percentage</Text>
-            <View style={styles.percentageButtons}>
-              {[10, 15, 18, 20, 25].map((percent) => (
-                <TouchableOpacity
-                  key={percent}
-                  style={[
-                    styles.percentageButton,
-                    fee.percentage === percent && styles.percentageButtonActive
-                  ]}
-                  onPress={() => updateFee(index, 'percentage', percent)}
-                >
-                  <Text style={[
-                    styles.percentageButtonText,
-                    fee.percentage === percent && styles.percentageButtonTextActive
-                  ]}>
-                    {percent}%
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.customPercentageContainer}>
-              <Text style={styles.customPercentageLabel}>Custom:</Text>
-              <TextInput
-                style={styles.customPercentageInput}
-                placeholder="0"
-                value={fee.percentage?.toString() || ''}
-                onChangeText={(text) => {
-                  const num = parseFloat(text);
-                  if (!isNaN(num) && num >= 0 && num <= 100) {
-                    updateFee(index, 'percentage', num);
-                  }
-                }}
-                keyboardType="numeric"
-              />
-              <Text style={styles.percentageSymbol}>%</Text>
-            </View>
-            <Text style={styles.calculatedAmount}>
-              Amount: ${((itemsTotal * fee.percentage) / 100).toFixed(2)}
-            </Text>
-          </View>
+          <PercentageSection
+            percentage={fee.percentage}
+            onPercentageChange={(percentage) => handleUpdateFee(index, 'percentage', percentage)}
+            itemsTotal={itemsTotal}
+          />
         ) : (
-          /* Fixed Amount Section */
-          <View style={styles.fixedAmountSection}>
-            <Text style={styles.fixedAmountLabel}>Amount</Text>
-            <PriceInput
-              value={fee.amount}
-              onChangeText={(amount) => updateFee(index, 'amount', amount)}
-              placeholder="0.00"
-              style={styles.feeAmountInput}
-            />
-          </View>
+          <FixedAmountSection
+            amount={fee.amount}
+            onAmountChange={(amount) => handleUpdateFee(index, 'amount', amount)}
+          />
         )}
 
         <SplitTypeSection
           splitType={fee.splitType}
-          onSplitTypeChange={(splitType) => updateFee(index, 'splitType', splitType)}
+                      onSplitTypeChange={(splitType) => handleUpdateFee(index, 'splitType', splitType)}
           feeAmount={fee.amount}
           participantCount={participants.length}
         />
 
-        {/* Total Fee Section */}
-        <View style={styles.feeTotalSection}>
-          <Text style={styles.feeTotalLabel}>Total Fee</Text>
-          <Text style={styles.feeTotalAmount}>${(fee.amount || 0).toFixed(2)}</Text>
-        </View>
+        <TotalFeeSection feeAmount={fee.amount} />
       </View>
     );
   };
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEditing ? 'Edit Expense' : 'Add Expense'}
-        </Text>
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => setShowSettings(true)}
-        >
-          <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        isEditing={isEditing}
+        onBack={() => navigation.goBack()}
+        onSettings={() => setShowSettings(true)}
+        topInset={insets.top}
+      />
       
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Expense Details</Text>
-            <TextInput
-              style={styles.titleInput}
-              placeholder="What's this expense for?"
-              placeholderTextColor={Colors.textSecondary}
-              value={title}
-              onChangeText={setTitle}
-            />
-            <View style={styles.totalContainer}>
-              <Text style={styles.totalLabel}>Total Amount</Text>
-              <Text style={styles.totalText}>
-                ${calculateTotal().toFixed(2)}
-              </Text>
-            </View>
-          </View>
+          <ExpenseDetailsSection
+            title={title}
+            onTitleChange={setTitle}
+            total={calculateTotal()}
+          />
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Participants</Text>
-              <View style={styles.participantsCount}>
-                <Text style={styles.participantsCountText}>
-                  {participants.length} {participants.length === 1 ? 'person' : 'people'}
-                </Text>
-              </View>
-            </View>
-            <FriendSelector
-              selectedFriends={selectedFriends}
-              onFriendsChange={setSelectedFriends}
-              placeholder="Add friends to split with..."
-              allowPlaceholders={true}
-              onAddPlaceholder={handleAddPlaceholder}
-            />
-            {/* Render placeholder chips with Invite buttons */}
-            {placeholders.length > 0 && (
-              <View style={styles.placeholdersContainer}>
-                <Text style={styles.placeholdersLabel}>Pending Invites</Text>
-                {placeholders.map((p, idx) => (
-                  <View key={p.id} style={styles.placeholderCard}>
-                    <View style={styles.placeholderContent}>
-                      <View style={styles.placeholderAvatar}>
-                        <Text style={styles.placeholderInitials}>{p.name?.[0]?.toUpperCase() || '?'}</Text>
-                      </View>
-                      <View style={styles.placeholderInfo}>
-                        <Text style={styles.placeholderName}>{p.name}</Text>
-                        {p.phoneNumber && (
-                          <Text style={styles.placeholderPhone}>{p.phoneNumber}</Text>
-                        )}
-                        <Text style={styles.placeholderTag}>Placeholder</Text>
-                      </View>
-                    </View>
-                    <View style={styles.placeholderActions}>
-                      <TouchableOpacity 
-                        style={styles.inviteButton} 
-                        onPress={() => handleInvitePlaceholder(p)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="qr-code-outline" size={16} color={Colors.surface} />
-                        <Text style={styles.inviteButtonText}>Invite</Text>
-                      </TouchableOpacity>
-                      <DeleteButton
-                        onPress={() => removePlaceholder(p.id)}
-                        size="small"
-                        variant="subtle"
-                      />
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-            <View style={styles.participantsNoteContainer}>
-              <Text style={styles.participantsNote}>You'll automatically be included as a participant</Text>
-            </View>
-          </View>
+          <ParticipantsSection
+            selectedFriends={selectedFriends}
+            onFriendsChange={setSelectedFriends}
+            placeholders={placeholders}
+            onAddPlaceholder={handleAddPlaceholder}
+            onInvitePlaceholder={handleInvitePlaceholder}
+            onRemovePlaceholder={handleRemovePlaceholder}
+            participantCount={participants.length}
+          />
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Who Paid for This Expense?</Text>
-            <PaidBySection
-              participants={participants}
-              selectedPayers={selectedPayers}
-              onPayersChange={setSelectedPayers}
-            />
-          </View>
+          <WhoPaidSection
+            participants={participants}
+            selectedPayers={selectedPayers}
+            onPayersChange={setSelectedPayers}
+          />
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Items</Text>
-              <TouchableOpacity onPress={addItem} style={styles.addButton}>
-                <Ionicons name="add-circle" size={24} color={Colors.accent} />
-              </TouchableOpacity>
-            </View>
-            {items.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
-                <Text style={styles.emptyStateText}>No items added yet</Text>
-                <Text style={styles.emptyStateSubtext}>Tap the + button to add your first item</Text>
-              </View>
-            ) : (
-              <>
-                {items.map(renderItem)}
-                <TouchableOpacity
-                  style={styles.addMoreItemsButton}
-                  onPress={addItem}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.addMoreItemsButtonText}>Add More Items</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
+          <ItemsSection
+            items={items}
+            onAddItem={handleAddItem}
+            renderItem={handleRenderItem}
+          />
 
-          <View style={[styles.section, styles.lastSection]}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Fees & Tips</Text>
-              <TouchableOpacity onPress={addFee} style={styles.addButton}>
-                <Ionicons name="add-circle" size={24} color={Colors.accent} />
-              </TouchableOpacity>
-            </View>
-            {fees.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="card-outline" size={48} color={Colors.textSecondary} />
-                <Text style={styles.emptyStateText}>No fees added yet</Text>
-                <Text style={styles.emptyStateSubtext}>Add tips, taxes, or service fees</Text>
-              </View>
-            ) : (
-              fees.map(renderFee)
-            )}
-          </View>
+          <FeesSection
+            fees={fees}
+            onAddFee={handleAddFee}
+            renderFee={renderFee}
+            isLastSection={true}
+          />
         </ScrollView>
 
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-            onPress={saveExpense}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>
-              {loading ? 'Saving...' : (isEditing ? 'Update Expense' : 'Save Expense')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Footer
+          loading={loading}
+          isEditing={isEditing}
+          onSave={handleSaveExpense}
+        />
       </KeyboardAvoidingView>
 
       <InviteFriendSheet
@@ -891,49 +481,12 @@ const AddExpenseScreen = ({ route, navigation }) => {
         phoneNumber={inviteTarget?.phone || ''}
       />
 
-      {/* Settings Modal */}
-      <Modal
+      <SettingsModal
         visible={showSettings}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowSettings(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowSettings(false)}
-            >
-              <Ionicons name="close" size={24} color={Colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Expense Settings</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-
-          <View style={styles.modalContent}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Allow join by room code</Text>
-                <Text style={styles.settingDescription}>
-                  Let others join this expense using the room code
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  joinEnabled && styles.toggleButtonActive
-                ]}
-                onPress={() => setJoinEnabled(!joinEnabled)}
-              >
-                <View style={[
-                  styles.toggleThumb,
-                  joinEnabled && styles.toggleThumbActive
-                ]} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowSettings(false)}
+        joinEnabled={joinEnabled}
+        onToggleJoin={() => setJoinEnabled(!joinEnabled)}
+      />
     </View>
   );
 };
