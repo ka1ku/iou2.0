@@ -82,7 +82,7 @@ export const Typography = {
     fontFamily: 'Poppins_400Regular',
   },
   body1: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Poppins_400Regular',
   },
   body2: {

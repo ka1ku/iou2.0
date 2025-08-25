@@ -1,3 +1,28 @@
+/**
+ * Button Component
+ * 
+ * A highly customizable, reusable button component that supports multiple variants,
+ * sizes, states, and icon configurations. Built on top of React Native's TouchableOpacity
+ * with consistent styling and behavior patterns.
+ * 
+ * Features:
+ * - Multiple visual variants (primary, secondary, outline, danger, ghost)
+ * - Three size options (small, medium, large)
+ * - Loading and disabled states
+ * - Icon support with configurable positioning
+ * - Full-width option
+ * - Custom styling override support
+ * - Consistent design token usage
+ * 
+ * @component
+ * @example
+ * <Button 
+ *   title="Save Expense" 
+ *   onPress={handleSave} 
+ *   variant="primary" 
+ *   size="large" 
+ * />
+ */
 import React from 'react';
 import {
   TouchableOpacity,
@@ -9,6 +34,25 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
 
+/**
+ * Button component with comprehensive customization options
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.title - Button text to display
+ * @param {Function} props.onPress - Function called when button is pressed
+ * @param {string} [props.variant='primary'] - Visual style variant: 'primary', 'secondary', 'outline', 'danger', 'ghost'
+ * @param {string} [props.size='medium'] - Button size: 'small', 'medium', 'large'
+ * @param {boolean} [props.loading=false] - Shows loading spinner when true
+ * @param {boolean} [props.disabled=false] - Disables button interaction when true
+ * @param {string} [props.icon] - Ionicons icon name to display
+ * @param {string} [props.iconPosition='left'] - Icon position: 'left' or 'right'
+ * @param {Object} [props.style] - Additional styles for the button container
+ * @param {Object} [props.textStyle] - Additional styles for the button text
+ * @param {boolean} [props.fullWidth=false] - Makes button span full width when true
+ * @param {React.ReactNode} [props.children] - Custom content to render instead of title
+ * @param {...Object} props - Additional props passed to TouchableOpacity
+ * @returns {React.ReactElement} A customizable button component
+ */
 const Button = ({
   title,
   onPress,
@@ -24,6 +68,11 @@ const Button = ({
   children,
   ...props
 }) => {
+  /**
+   * Generates the button container styles based on variant, size, and state
+   * 
+   * @returns {Array} Array of style objects to apply to the button
+   */
   const getButtonStyle = () => {
     const baseStyle = [styles.button, styles[size]];
     
@@ -50,6 +99,11 @@ const Button = ({
     return baseStyle;
   };
 
+  /**
+   * Generates the button text styles based on variant, size, and state
+   * 
+   * @returns {Array} Array of style objects to apply to the button text
+   */
   const getTextStyle = () => {
     const baseTextStyle = [styles.text, styles[`${size}Text`]];
     
@@ -66,6 +120,11 @@ const Button = ({
     return baseTextStyle;
   };
 
+  /**
+   * Renders the icon on the button with appropriate styling and positioning
+   * 
+   * @returns {React.ReactElement|null} Icon component or null if no icon
+   */
   const renderIcon = () => {
     if (!icon) return null;
     
@@ -78,6 +137,11 @@ const Button = ({
     return <Ionicons name={icon} size={getIconSize()} color={getIconColor()} style={iconStyle} />;
   };
 
+  /**
+   * Returns the appropriate icon size based on button size
+   * 
+   * @returns {number} Icon size in pixels
+   */
   const getIconSize = () => {
     switch (size) {
       case 'small': return 16;
@@ -86,12 +150,22 @@ const Button = ({
     }
   };
 
+  /**
+   * Returns the appropriate icon color based on variant and state
+   * 
+   * @returns {string} Icon color value
+   */
   const getIconColor = () => {
     if (disabled || loading) return Colors.textSecondary;
     if (variant === 'outline' || variant === 'ghost') return Colors.accent;
     return Colors.white;
   };
 
+  /**
+   * Renders the button content (icon, text, or custom children)
+   * 
+   * @returns {React.ReactElement} Button content with proper layout
+   */
   const renderContent = () => {
     if (children) return children;
     

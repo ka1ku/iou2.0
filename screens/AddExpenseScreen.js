@@ -19,8 +19,8 @@ import { createExpense, updateExpense } from '../services/expenseService';
 import FriendSelector from '../components/FriendSelector';
 import InviteFriendSheet from '../components/InviteFriendSheet';
 import PriceInput from '../components/PriceInput';
-import SmartSplitInput from '../components/SmartSplitInput';
 import DeleteButton from '../components/DeleteButton';
+import { ItemHeader, PriceInputSection, PaidBySection, SmartSplitSection, SplitTypeSection, WhoConsumedSection } from './AddExpenseScreenItems';
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
@@ -37,6 +37,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [items, setItems] = useState([]);
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
 
   // Calculate total from items and fees
   const calculateTotal = () => {
@@ -68,12 +69,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
           id: Date.now().toString() + index,
           name: item.name || '',
           amount: parseFloat(item.amount) || 0,
-          paidBy: 0, // Default to first participant
-          splitType: 'even',
-          splits: []
+          selectedConsumers: [0], // Default to first participant
+          splits: [{
+            participantIndex: 0,
+            amount: parseFloat(item.amount) || 0,
+            percentage: 100
+          }]
         }));
         setItems(formattedItems);
       }
+      
+      // Set default payers to first participant
+      setSelectedPayers([0]);
       
       // Set fees if available (e.g., tax, tip)
       if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
@@ -179,10 +186,48 @@ const AddExpenseScreen = ({ route, navigation }) => {
       
       // Set items and fees from existing expense
       if (expense.items) {
-        setItems(expense.items);
+        // Transform old items to new structure if needed
+        const transformedItems = expense.items.map(item => {
+          const consumers = item.selectedConsumers || [item.paidBy || 0];
+          const amount = parseFloat(item.amount) || 0;
+          
+          let splits = item.splits || [];
+          if (splits.length === 0 && consumers.length > 0 && amount > 0) {
+            if (consumers.length === 1) {
+              // Single consumer gets 100% of the amount
+              splits = [{
+                participantIndex: consumers[0],
+                amount: amount,
+                percentage: 100
+              }];
+            } else {
+              // Multiple consumers split evenly
+              const splitAmount = amount / consumers.length;
+              splits = consumers.map((consumerIndex, i) => ({
+                participantIndex: consumerIndex,
+                amount: splitAmount,
+                percentage: 100 / consumers.length
+              }));
+            }
+          }
+          
+          return {
+            ...item,
+            selectedConsumers: consumers,
+            splits: splits,
+            // Remove old paidBy field
+            paidBy: undefined
+          };
+        });
+        setItems(transformedItems);
       }
       if (expense.fees) {
         setFees(expense.fees);
+      }
+      
+      // Set selected payers if available
+      if (expense.selectedPayers) {
+        setSelectedPayers(expense.selectedPayers);
       }
     }
   }, [expense, isEditing]);
@@ -200,9 +245,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const removeParticipant = (index) => {
     if (participants.length > 1) {
       setParticipants(participants.filter((_, i) => i !== index));
-      // Update item splits to remove this participant
+      // Update item splits and selectedConsumers to remove this participant
       setItems(items.map(item => ({
         ...item,
+        selectedConsumers: item.selectedConsumers?.filter(consumerIndex => consumerIndex !== index)
+          .map(consumerIndex => consumerIndex > index ? consumerIndex - 1 : consumerIndex) || [],
         splits: item.splits?.filter(split => split.participantIndex !== index)
           .map(split => ({
             ...split,
@@ -232,6 +279,12 @@ const AddExpenseScreen = ({ route, navigation }) => {
       }))
     ];
     setParticipants(allParticipants);
+    
+    // Clean up any invalid selectedConsumers references
+    setItems(prevItems => prevItems.map(item => ({
+      ...item,
+      selectedConsumers: item.selectedConsumers?.filter(index => index < allParticipants.length) || [0]
+    })));
   }, [selectedFriends, placeholders]);
 
   const handleAddPlaceholder = (ghost) => {
@@ -248,9 +301,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
     // Compute participant index in the combined participants array
     const removedParticipantIndex = 1 + selectedFriends.length + indexInPlaceholders; // 0 is Me
 
-    // Adjust item splits similar to previous removeParticipant logic
+    // Adjust item splits and selectedConsumers similar to previous removeParticipant logic
     setItems(prevItems => prevItems.map(item => ({
       ...item,
+      selectedConsumers: item.selectedConsumers?.filter(consumerIndex => consumerIndex !== removedParticipantIndex)
+        .map(consumerIndex => consumerIndex > removedParticipantIndex ? consumerIndex - 1 : consumerIndex) || [],
       splits: item.splits?.filter(split => split.participantIndex !== removedParticipantIndex)
         .map(split => ({
           ...split,
@@ -266,7 +321,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
       id: Date.now().toString(),
       name: '',
       amount: 0,
-      paidBy: 0, // Default to first participant (usually "Me")
+      selectedConsumers: participants.length > 0 ? [0] : [], // Default to first participant (usually "Me")
       splits: []
     };
     setItems([...items, newItem]);
@@ -279,12 +334,25 @@ const AddExpenseScreen = ({ route, navigation }) => {
     // If amount changed, recalculate splits
     if (field === 'amount') {
       const amount = parseFloat(value) || 0;
-      const splitAmount = amount / participants.length;
-      updated[index].splits = participants.map((_, i) => ({
-        participantIndex: i,
-        amount: splitAmount,
-        percentage: 100 / participants.length
-      }));
+      const selectedConsumers = updated[index].selectedConsumers || [0];
+      if (selectedConsumers.length > 0) {
+        if (selectedConsumers.length === 1) {
+          // Single consumer gets 100% of the amount
+          updated[index].splits = [{
+            participantIndex: selectedConsumers[0],
+            amount: amount,
+            percentage: 100
+          }];
+        } else {
+          // Multiple consumers split evenly
+          const splitAmount = amount / selectedConsumers.length;
+          updated[index].splits = selectedConsumers.map((consumerIndex, i) => ({
+            participantIndex: consumerIndex,
+            amount: splitAmount,
+            percentage: 100 / selectedConsumers.length
+          }));
+        }
+      }
     }
     
     setItems(updated);
@@ -301,8 +369,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
       setFees(updatedFees);
     }
   };
-
-
 
   const updateItemSplit = (itemIndex, participantIndex, amount) => {
     const updated = [...items];
@@ -432,6 +498,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
           name: fee.name.trim(),
           amount: parseFloat(fee.amount)
         })),
+        selectedPayers: selectedPayers,
         join: {
           enabled: joinEnabled,
         }
@@ -457,76 +524,61 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const renderItem = (item, index) => {
     return (
       <View key={item.id} style={styles.itemCard}>
-        {/* Item Header with Name Input and Delete Button */}
-        <View style={styles.itemHeader}>
-          <View style={styles.itemNameContainer}>
-            <Text style={styles.itemNameLabel}>Item Name</Text>
-            <TextInput
-              style={styles.itemNameInput}
-              placeholder="Enter item name"
-              placeholderTextColor={Colors.textSecondary}
-              value={item.name}
-              onChangeText={(text) => updateItem(index, 'name', text)}
-            />
-          </View>
-          <DeleteButton
-            onPress={() => removeItem(index)}
-            size="medium"
-            variant="subtle"
-          />
-        </View>
+        <ItemHeader
+          itemName={item.name}
+          onNameChange={(text) => updateItem(index, 'name', text)}
+          onDelete={() => removeItem(index)}
+        />
 
-        {/* Price Input Section */}
-        <View style={styles.priceSection}>
-          <Text style={styles.priceLabel}>Price</Text>
-          <PriceInput
-            value={item.amount}
-            onChangeText={(amount) => updateItem(index, 'amount', amount)}
-            placeholder="0.00"
-            style={styles.amountInput}
-          />
-        </View>
+        <PriceInputSection
+          amount={item.amount}
+          onAmountChange={(amount) => updateItem(index, 'amount', amount)}
+        />
 
-        {/* Paid By Section */}
-        <View style={styles.paidByContainer}>
-          <Text style={styles.paidByLabel}>Paid by:</Text>
-          <View style={styles.paidByButtons}>
-            {participants.map((participant, pIndex) => (
-              <TouchableOpacity
-                key={pIndex}
-                style={[
-                  styles.paidByButton,
-                  (item.paidBy || 0) === pIndex && styles.paidByButtonActive
-                ]}
-                onPress={() => updateItem(index, 'paidBy', pIndex)}
-              >
-                <Text style={[
-                  styles.paidByText,
-                  (item.paidBy || 0) === pIndex && styles.paidByTextActive
-                ]}>
-                  {participant.name || `Person ${pIndex + 1}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <WhoConsumedSection
+          participants={participants}
+          selectedConsumers={item.selectedConsumers || [0]}
+          onConsumersChange={(consumers) => {
+            const updated = [...items];
+            updated[index].selectedConsumers = consumers;
+            // Recalculate splits for new consumers
+            const amount = parseFloat(updated[index].amount) || 0;
+            if (amount > 0 && consumers.length > 0) {
+              if (consumers.length === 1) {
+                // Single consumer gets 100% of the amount
+                updated[index].splits = [{
+                  participantIndex: consumers[0],
+                  amount: amount,
+                  percentage: 100
+                }];
+              } else {
+                // Multiple consumers split evenly
+                const splitAmount = amount / consumers.length;
+                updated[index].splits = consumers.map((consumerIndex, i) => ({
+                  participantIndex: consumerIndex,
+                  amount: splitAmount,
+                  percentage: 100 / consumers.length
+                }));
+              }
+            } else {
+              updated[index].splits = [];
+            }
+            setItems(updated);
+          }}
+        />
 
-        {/* Smart Split Section */}
-        <View style={styles.smartSplitSection}>
-          <Text style={styles.smartSplitLabel}>Split Amount</Text>
-          <SmartSplitInput
-            participants={participants}
-            total={parseFloat(item.amount) || 0}
-            initialSplits={item.splits || []}
-            onSplitsChange={(newSplits) => {
-              // Update the item's splits
-              const updated = [...items];
-              updated[index].splits = newSplits;
-              setItems(updated);
-            }}
-            style={styles.smartSplitContainer}
-          />
-        </View>
+        <SmartSplitSection
+          participants={participants}
+          selectedConsumers={item.selectedConsumers || [0]}
+          total={parseFloat(item.amount) || 0}
+          initialSplits={item.splits || []}
+          onSplitsChange={(newSplits) => {
+            // Update the item's splits
+            const updated = [...items];
+            updated[index].splits = newSplits;
+            setItems(updated);
+          }}
+        />
       </View>
     );
   };
@@ -646,51 +698,12 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Split Type Section */}
-        <View style={styles.feeSplitSection}>
-          <Text style={styles.feeSplitLabel}>Split Type</Text>
-          <View style={styles.feeSplitContainer}>
-            <TouchableOpacity
-              style={[
-                styles.feeSplitButton,
-                fee.splitType === 'equal' && styles.feeSplitButtonActive
-              ]}
-              onPress={() => updateFee(index, 'splitType', 'equal')}
-            >
-              <Text style={[
-                styles.feeSplitText,
-                fee.splitType === 'equal' && styles.feeSplitTextActive
-              ]}>
-                Split Even
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.feeSplitButton,
-                fee.splitType === 'proportional' && styles.feeSplitButtonActive
-              ]}
-              onPress={() => updateFee(index, 'splitType', 'proportional')}
-            >
-              <Text style={[
-                styles.feeSplitText,
-                fee.splitType === 'proportional' && styles.feeSplitTextActive
-              ]}>
-                Proportional
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {fee.splitType === 'equal' && (
-            <Text style={styles.feeSplitInfo}>
-              ${((fee.amount || 0) / participants.length).toFixed(2)} per person
-            </Text>
-          )}
-          {fee.splitType === 'proportional' && (
-            <Text style={styles.feeSplitInfo}>
-              Split proportionally based on who paid what
-            </Text>
-          )}
-        </View>
+        <SplitTypeSection
+          splitType={fee.splitType}
+          onSplitTypeChange={(splitType) => updateFee(index, 'splitType', splitType)}
+          feeAmount={fee.amount}
+          participantCount={participants.length}
+        />
 
         {/* Total Fee Section */}
         <View style={styles.feeTotalSection}>
@@ -802,6 +815,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Who Paid for This Expense?</Text>
+            <PaidBySection
+              participants={participants}
+              selectedPayers={selectedPayers}
+              onPayersChange={setSelectedPayers}
+            />
+          </View>
+
+          <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Items</Text>
               <TouchableOpacity onPress={addItem} style={styles.addButton}>
@@ -815,7 +837,16 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 <Text style={styles.emptyStateSubtext}>Tap the + button to add your first item</Text>
               </View>
             ) : (
-              items.map(renderItem)
+              <>
+                {items.map(renderItem)}
+                <TouchableOpacity
+                  style={styles.addMoreItemsButton}
+                  onPress={addItem}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.addMoreItemsButtonText}>Add More Items</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
 
@@ -1036,128 +1067,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 16,
   },
-  itemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  itemNameContainer: {
-    flex: 1,
-    marginRight: Spacing.sm,
-  },
-  itemNameLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  itemNameInput: {
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
-    ...Typography.body,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-    fontSize: 16,
-    minHeight: 48,
-  },
-
-  priceSection: {
-    marginBottom: Spacing.md,
-  },
-  priceLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  amountInput: {
-    marginBottom: Spacing.sm,
-    minHeight: 48,
-  },
-  formattedAmount: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-    textAlign: 'right',
-  },
-
-
-  customSplitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  participantName: {
-    flex: 1,
-    ...Typography.body,
-    color: Colors.textPrimary,
-  },
-  customSplitInput: {
-    width: 80,
-  },
-  smartSplitContainer: {
-    marginTop: Spacing.sm,
-  },
-  smartSplitSection: {
-    marginTop: Spacing.md,
-  },
-  smartSplitLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-
-  paidByContainer: {
-    marginBottom: Spacing.md,
-  },
-  paidByLabel: {
-    ...Typography.label,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  paidByButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  paidByButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    backgroundColor: Colors.surface,
-    minWidth: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.button,
-    elevation: 2,
-  },
-  paidByButtonActive: {
+  addMoreItemsButton: {
     backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-    ...Shadows.button,
-    elevation: 3,
+    padding: Spacing.lg,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    ...Shadows.card,
   },
-  paidByText: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  paidByTextActive: {
+  addMoreItemsButtonText: {
+    ...Typography.title,
     color: Colors.surface,
     fontWeight: '600',
   },
@@ -1514,55 +1433,7 @@ const styles = StyleSheet.create({
   feeAmountInput: {
     marginBottom: 0,
   },
-  feeSplitSection: {
-    marginBottom: Spacing.md,
-  },
-  feeSplitLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  feeSplitContainer: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  feeSplitButton: {
-    flex: 1,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    alignItems: 'center',
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.surface,
-    minHeight: 48,
-    justifyContent: 'center',
-    ...Shadows.button,
-    elevation: 2,
-  },
-  feeSplitButtonActive: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-    ...Shadows.button,
-    elevation: 3,
-  },
-  feeSplitText: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  feeSplitTextActive: {
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  feeSplitInfo: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
+
   feeTotalSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1683,6 +1554,7 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     fontWeight: '600',
   },
+
 });
 
 export default AddExpenseScreen;

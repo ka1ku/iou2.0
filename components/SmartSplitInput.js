@@ -261,6 +261,7 @@ const SmartSplitInput = ({
                   !state.locked && styles.autoAmountInput
                 ]}
                 editable={true}
+                showCurrency={false}
               />
             </View>
 
