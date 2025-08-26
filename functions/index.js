@@ -1,7 +1,51 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const algoliasearch = require('algoliasearch');
 
 admin.initializeApp();
+
+// Initialize Algolia
+const algoliaClient = algoliasearch('I0T07P5NB6', 'fb4e3327d2030d4c281cdc6fa64f7984');
+const usersIndex = algoliaClient.initIndex('users');
+
+// Firestore trigger to sync users to Algolia
+exports.syncUserToAlgolia = functions.firestore
+  .document('users/{userId}')
+  .onWrite(async (change, context) => {
+    const userId = context.params.userId;
+    const userData = change.after.exists ? change.after.data() : null;
+    
+    try {
+      if (change.after.exists && userData) {
+        // User created or updated - add/update in Algolia (without phone numbers)
+        const searchableUser = {
+          objectID: userId,
+          profilePhoto: userData.profilePhoto || '',
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          username: userData.username || '',
+          venmoUsername: userData.venmoUsername || '',
+          fullName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+          // Remove phone numbers from index and searchable text
+          searchableText: [
+            userData.username || '',
+            userData.venmoUsername || '',
+            `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
+          ].filter(Boolean).join(' ').toLowerCase()
+        };
+        
+        await usersIndex.saveObject(searchableUser);
+        console.log(`User ${userId} synced to Algolia (without phone numbers)`);
+      } else {
+        // User deleted - remove from Algolia
+        await usersIndex.deleteObject(userId);
+        console.log(`User ${userId} removed from Algolia`);
+      }
+    } catch (error) {
+      console.error(`Error syncing user ${userId} to Algolia:`, error);
+      throw error;
+    }
+  });
 
 // Cloud Function to send test push notification
 exports.sendTestNotification = functions.https.onCall(async (data, context) => {

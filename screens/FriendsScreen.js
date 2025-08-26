@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
-  TextInput,
   ActivityIndicator,
   Share,
-  Linking
+  Linking,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,8 +24,6 @@ import {
   acceptFriendRequest, 
   declineFriendRequest,
   removeFriend,
-  findUserByPhoneNumber,
-  findUserByUsername,
   createFriendRequest,
   generateFriendInviteLink,
   listenToFriends,
@@ -39,13 +37,13 @@ const FriendsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
-  const [showAddFriend, setShowAddFriend] = useState(true); // always show search
-  const [searchInput, setSearchInput] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const currentUser = getCurrentUser();
 
   useEffect(() => {
-    const currentUser = getCurrentUser();
     if (currentUser) {
       loadFriendsData();
       setupListeners(currentUser.uid);
@@ -72,7 +70,6 @@ const FriendsScreen = ({ navigation }) => {
 
   const loadFriendsData = async () => {
     try {
-      const currentUser = getCurrentUser();
       if (currentUser) {
         const [userFriends, userRequests] = await Promise.all([
           getUserFriends(currentUser.uid),
@@ -139,51 +136,40 @@ const FriendsScreen = ({ navigation }) => {
     );
   };
 
-  const handleSearchUser = async () => {
-    const raw = (searchInput || '').trim();
-    if (!raw) {
-      Alert.alert('Error', 'Please enter a phone number or @username');
-      return;
-    }
-
-    setSearching(true);
+  const handleUserSelect = useCallback(async (user) => {
     try {
-      let user = null;
-      const looksLikeUsername = /[a-zA-Z@]/.test(raw);
-      user = looksLikeUsername ? await findUserByUsername(raw) : await findUserByPhoneNumber(raw);
-
-      if (user) {
-        setSearchResults([user]);
-      } else {
-        setSearchResults([]);
-        Alert.alert('Not Found', 'No user found with that phone or username');
-      }
-    } catch (error) {
-      console.error('Error searching for user:', error);
-      Alert.alert('Error', 'Failed to search for user');
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handleSendFriendRequest = async (userData) => {
-    try {
-      const currentUser = getCurrentUser();
       if (!currentUser) {
         throw new Error('No user signed in');
       }
 
-      if (userData.id === currentUser.uid) {
+      if (user.id === currentUser.uid) {
         Alert.alert('Not Allowed', 'You cannot add yourself as a friend');
         return;
       }
 
-      await createFriendRequest(currentUser.uid, userData.id);
+      // Check if already friends
+      const isAlreadyFriend = friends.some(friend => friend.friendId === user.id);
+      if (isAlreadyFriend) {
+        Alert.alert('Already Friends', 'You are already friends with this user');
+        return;
+      }
 
+      // Check if friend request already sent
+      const hasRequest = friendRequests.some(request => 
+        request.fromUserId === user.id || request.toUserId === user.id
+      );
+      if (hasRequest) {
+        Alert.alert('Already Sent', 'You have already sent a friend request to this user');
+        return;
+      }
+
+      await createFriendRequest(currentUser.uid, user.id);
       Alert.alert('Success', 'Friend request sent!');
+      
+      // Clear search results
       setSearchResults([]);
-      setSearchInput('');
-      setShowAddFriend(false);
+      setHasSearched(false);
+      
     } catch (error) {
       console.error('Error sending friend request:', error);
       if (error.message.includes('already exists')) {
@@ -194,11 +180,10 @@ const FriendsScreen = ({ navigation }) => {
         Alert.alert('Error', 'Failed to send friend request');
       }
     }
-  };
+  }, [currentUser, friends, friendRequests]);
 
   const handleShareInvite = async () => {
     try {
-      const currentUser = getCurrentUser();
       if (!currentUser) {
         throw new Error('No user signed in');
       }
@@ -217,18 +202,6 @@ const FriendsScreen = ({ navigation }) => {
       console.error('Error sharing invite:', error);
       Alert.alert('Error', 'Failed to share invite');
     }
-  };
-
-  const formatPhone = (value) => {
-    if (!value) return '';
-    const digits = value.replace(/\D/g, '');
-    let rest = digits;
-    if (digits.startsWith('1')) rest = digits.slice(1);
-    const area = rest.slice(0,3);
-    const mid = rest.slice(3,6);
-    const last = rest.slice(6,10);
-    if (area && mid && last) return `+1 (${area}) ${mid}-${last}`;
-    return value;
   };
 
   const renderFriendRequest = ({ item }) => (
@@ -304,34 +277,6 @@ const FriendsScreen = ({ navigation }) => {
     </TouchableOpacity>
   );
 
-  const renderSearchResult = ({ item }) => (
-    <View style={styles.searchResultCard}>
-      <View style={styles.searchResultInfo}>
-        <View style={styles.searchResultAvatar}>
-          <ProfilePicture
-            source={item.profilePhoto}
-            size={40}
-            username={item.username || `${item.firstName || ''} ${item.lastName || ''}`}
-          />
-        </View>
-        <View style={styles.searchResultDetails}>
-          <Text style={styles.searchResultName}>
-            {`${item.firstName || ''} ${item.lastName || ''}`.trim() || 'Unknown Name'}
-          </Text>
-          {item.username && (
-            <Text style={styles.searchResultUsername}>@{item.username}</Text>
-          )}
-        </View>
-      </View>
-      <TouchableOpacity
-        style={styles.addFriendButton}
-        onPress={() => handleSendFriendRequest(item)}
-      >
-        <Text style={styles.addFriendButtonText}>Add Friend</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -350,56 +295,34 @@ const FriendsScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Friend Requests Section */}
         {friendRequests.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Friend Requests ({friendRequests.length})</Text>
-            <FlatList
-              data={friendRequests}
-              renderItem={renderFriendRequest}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
+            {friendRequests.map((item) => (
+              <View key={item.id}>
+                {renderFriendRequest({ item })}
+              </View>
+            ))}
           </View>
         )}
 
-        {/* Add Friend Section */}
+        {/* Add Friend Section with Algolia Search */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Add Friend</Text>
-          <View style={styles.addFriendForm}>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="Enter phone number or @username"
-              placeholderTextColor={Colors.textSecondary}
-              value={searchInput}
-              onChangeText={setSearchInput}
-              keyboardType="default"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={styles.searchButton}
-              onPress={handleSearchUser}
-              disabled={searching}
-            >
-              {searching ? (
-                <ActivityIndicator size="small" color={Colors.surface} />
-              ) : (
-                <Text style={styles.searchButtonText}>Search</Text>
-              )}
-            </TouchableOpacity>
-            
-            {searchResults.length > 0 && (
-              <FlatList
-                data={searchResults}
-                renderItem={renderSearchResult}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
+          <Text style={styles.sectionDescription}>
+            Search for users by name, username, or phone number
+          </Text>
+          <View style={styles.searchContainer}>
+          
           </View>
         </View>
 
@@ -415,16 +338,14 @@ const FriendsScreen = ({ navigation }) => {
               </Text>
             </View>
           ) : (
-            <FlatList
-              data={friends}
-              renderItem={renderFriend}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
+            friends.map((item) => (
+              <View key={item.id}>
+                {renderFriend({ item })}
+              </View>
+            ))
           )}
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 };
@@ -462,52 +383,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.md,
   },
+  scrollContent: {
+    paddingBottom: Spacing.xl, // Add padding at the bottom to prevent content from being cut off
+  },
   section: {
     backgroundColor: Colors.card,
     marginBottom: Spacing.md,
     padding: Spacing.lg,
     borderRadius: Radius.lg,
     ...Shadows.card,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.md,
+    minHeight: 120, // Ensure minimum height for sections
   },
   sectionTitle: {
     ...Typography.title,
     color: Colors.textPrimary,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
+    fontSize: 18, // Ensure readable font size
   },
-  toggleButton: {
-    padding: Spacing.sm,
-  },
-  addFriendForm: {
-    marginTop: Spacing.sm,
-  },
-  phoneInput: {
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
+  sectionDescription: {
     ...Typography.body,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.lg, // Increased margin
+    fontStyle: 'italic',
+    fontSize: 14, // Ensure readable font size
+    lineHeight: 20, // Better line spacing
   },
-  searchButton: {
-    backgroundColor: Colors.accent,
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    marginBottom: Spacing.md,
+  searchContainer: {
+    marginTop: Spacing.md, // Increased margin
+    minHeight: 80, // Ensure minimum height for search container
   },
-  searchButtonText: {
-    ...Typography.title,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
+
   requestCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -532,10 +437,6 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.accent,
   },
-  requestVenmo: {
-    ...Typography.label,
-    color: Colors.accent,
-  },
   requestActions: {
     flexDirection: 'row',
     gap: Spacing.sm,
@@ -544,29 +445,6 @@ const styles = StyleSheet.create({
   iconAction: {
     padding: Spacing.xs,
     borderRadius: Radius.sm,
-  },
-  requestButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.sm,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  acceptButton: {
-    backgroundColor: Colors.accent,
-  },
-  acceptButtonText: {
-    ...Typography.label,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  declineButton: {
-    backgroundColor: Colors.danger,
-  },
-  declineButtonText: {
-    ...Typography.label,
-    color: Colors.surface,
-    fontWeight: '600',
   },
   friendCard: {
     flexDirection: 'row',
@@ -591,11 +469,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: Spacing.md,
   },
-  friendInitials: {
-    ...Typography.title,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
   friendDetails: {
     flex: 1,
   },
@@ -612,66 +485,6 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  friendVenmo: {
-    ...Typography.label,
-    color: Colors.accent,
-  },
-
-  searchResultCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    marginBottom: Spacing.sm,
-  },
-  searchResultInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: Spacing.sm,
-  },
-  searchResultAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.blue,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  searchResultInitials: {
-    ...Typography.title,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  searchResultDetails: {
-    flex: 1,
-  },
-  searchResultName: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  searchResultUsername: {
-    ...Typography.body,
-    color: Colors.accent,
-  },
-  searchResultVenmo: {
-    ...Typography.label,
-    color: Colors.accent,
-  },
-  addFriendButton: {
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.sm,
-  },
-  addFriendButtonText: {
-    ...Typography.label,
-    color: Colors.surface,
-    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',

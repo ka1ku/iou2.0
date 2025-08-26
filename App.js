@@ -38,6 +38,7 @@ import FriendProfileScreen from './screens/FriendProfileScreen';
 import FriendsScreen from './screens/FriendsScreen';
 import FriendInvitationHandler from './components/FriendInvitationHandler';
 import ExpenseJoinHandler from './components/ExpenseJoinHandler';
+import AlgoliaSearchDemo from './components/AlgoliaSearchDemo';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
