@@ -6,27 +6,26 @@ import PriceInput from '../../components/PriceInput';
 /**
  * PriceInputSection Component
  * 
- * Displays the price input section for an expense item with an external dollar sign.
- * The dollar sign is positioned outside the input field for consistent styling.
+ * Displays the price input section for an expense item with an internal dollar sign.
+ * The dollar sign is positioned inside the input field for consistent styling.
  * 
  * @component
  * @param {Object} props - Component props
  * @param {number} props.amount - Current price amount
  * @param {Function} props.onAmountChange - Callback when amount changes
- * @returns {React.ReactElement} Price input section with external dollar sign
+ * @returns {React.ReactElement} Price input section with internal dollar sign
  */
 const PriceInputSection = ({ amount, onAmountChange }) => {
   return (
     <View style={styles.priceSection}>
       <Text style={styles.priceLabel}>Price</Text>
       <View style={styles.priceInputContainer}>
-        <Text style={styles.currencySymbol}>$</Text>
         <PriceInput
           value={amount}
           onChangeText={onAmountChange}
           placeholder="0.00"
           style={styles.amountInput}
-          showCurrency={false}
+          showCurrency={true}
         />
       </View>
     </View>
@@ -46,14 +45,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   priceInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
-  },
-  currencySymbol: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    marginRight: 4,
+    marginRight: Spacing.sm
   },
   amountInput: {
     marginBottom: Spacing.sm,

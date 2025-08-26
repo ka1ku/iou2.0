@@ -250,7 +250,6 @@ const SmartSplitInput = ({
 
             {/* Amount input */}
             <View style={styles.inputContainer}>
-              <Text style={styles.currencySymbol}>$</Text>
               <PriceInput
                 value={state.amount}
                 onChangeText={(value) => handleAmountChange(index, value)}
@@ -261,7 +260,7 @@ const SmartSplitInput = ({
                   !state.locked && styles.autoAmountInput
                 ]}
                 editable={true}
-                showCurrency={false}
+                showCurrency={true}
               />
             </View>
 
@@ -345,15 +344,8 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     width: 120,
     marginRight: Spacing.sm,
-  },
-  currencySymbol: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    marginRight: 4,
   },
   amountInput: {
     flex: 1,

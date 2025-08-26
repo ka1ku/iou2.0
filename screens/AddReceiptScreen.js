@@ -317,7 +317,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
       items,
       setItems,
       handleUpdateItem,
-      handleRemoveItem,
       fees,
       setFees,
       styles
