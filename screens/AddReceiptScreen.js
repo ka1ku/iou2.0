@@ -35,12 +35,12 @@ import {
   removeParticipant,
   removePlaceholder
 } from './AddExpenseScreenFunctions';
+import { getCurrentUser } from '../services/authService';
 
 const AddReceiptScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
-
   const [title, setTitle] = useState('');
   const [participants, setParticipants] = useState([{ name: 'Me' }]);
   const [selectedFriends, setSelectedFriends] = useState([]);
@@ -148,9 +148,18 @@ const AddReceiptScreen = ({ route, navigation }) => {
   // Initialize selectedFriends and placeholders when editing an existing expense
   useEffect(() => {
     if (expense && isEditing) {
-      // Extract friends from existing participants
+        console.log('expense', expense.items[2].splits)
+      const currentUser = getCurrentUser();
+      // Extract friends from existing participants (exclude current user and placeholders)
       const existingFriends = expense.participants
-        .filter(p => p.name !== 'Me' && !p.placeholder && p.userId)
+        .filter(p => {
+          // Exclude placeholders
+          if (p.placeholder) return false;
+          // Exclude the current user (either by name 'Me' or by userId matching createdBy)
+          if (p.name === 'Me' || (p.userId && expense.createdBy && p.userId === expense.createdBy)) return false;
+          // Must have a userId to be considered a friend
+          return p.userId;
+        })
         .map(p => ({
           id: p.userId,
           name: p.name,
@@ -171,7 +180,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
       
       setSelectedFriends(existingFriends);
       setPlaceholders(existingPlaceholders);
-      
       // Set initial participants (this will be updated by the other useEffect)
       const initialParticipants = [
         { name: 'Me' },
@@ -198,43 +206,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
         setJoinEnabled(expense.join.enabled);
       }
       
-      // Set items and fees from existing expense
-      if (expense.items) {
-        // Transform old items to new structure if needed
-        const transformedItems = expense.items.map(item => {
-          const consumers = item.selectedConsumers || [item.paidBy || 0];
-          const amount = parseFloat(item.amount) || 0;
-          
-          let splits = item.splits || [];
-          if (splits.length === 0 && consumers.length > 0 && amount > 0) {
-            if (consumers.length === 1) {
-              // Single consumer gets 100% of the amount
-              splits = [{
-                participantIndex: consumers[0],
-                amount: amount,
-                percentage: 100
-              }];
-            } else {
-              // Multiple consumers split evenly
-              const splitAmount = amount / consumers.length;
-              splits = consumers.map((consumerIndex, i) => ({
-                participantIndex: consumerIndex,
-                amount: splitAmount,
-                percentage: 100 / consumers.length
-              }));
-            }
-          }
-          
-          return {
-            ...item,
-            selectedConsumers: consumers,
-            splits: splits,
-            // Remove old paidBy field
-            paidBy: undefined
-          };
-        });
-        setItems(transformedItems);
-      }
       if (expense.fees) {
         setFees(expense.fees);
       }
@@ -243,9 +214,11 @@ const AddReceiptScreen = ({ route, navigation }) => {
       if (expense.selectedPayers) {
         setSelectedPayers(expense.selectedPayers);
       }
+      if (expense.items) {
+        setItems(expense.items);
+      }
     }
   }, [expense, isEditing]);
-
   // Update participants when friends are selected
   useEffect(() => {
     const allParticipants = [
@@ -265,11 +238,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
     ];
     setParticipants(allParticipants);
     
-    // Clean up any invalid selectedConsumers references
-    setItems(prevItems => prevItems.map(item => ({
-      ...item,
-      selectedConsumers: item.selectedConsumers?.filter(index => index < allParticipants.length) || [0]
-    })));
   }, [selectedFriends, placeholders]);
   
   const handleAddParticipant = () => {

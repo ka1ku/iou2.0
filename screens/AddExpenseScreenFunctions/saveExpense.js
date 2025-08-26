@@ -111,7 +111,7 @@ const saveExpense = async (
         enabled: joinEnabled || false,
       }
     };
-
+    console.log(expenseData)
     if (isEditing) {
       await updateExpense(expense.id, expenseData, currentUser.uid);
       Alert.alert('Success', 'Expense updated successfully');

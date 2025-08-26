@@ -219,7 +219,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
       
       setSelectedFriends(existingFriends);
       setPlaceholders(existingPlaceholders);
-      
+
       // Set initial participants (this will be updated by the other useEffect)
       const initialParticipants = [
         { 
@@ -250,56 +250,19 @@ const AddExpenseScreen = ({ route, navigation }) => {
           profilePhoto: null
         }))
       ];
-      setParticipants(initialParticipants);
-      
-      // Set title and other fields from existing expense
+      setParticipants(initialParticipants);      // Set title and other fields from existing expense
       if (expense.title) {
         setTitle(expense.title);
       }
       if (expense.join) {
         setJoinEnabled(expense.join.enabled);
       }
-      
-      // Set items and fees from existing expense (only take the first item for single-item expenses)
-      if (expense.items && expense.items.length > 0) {
-        // Transform the first item to new structure
-        const firstItem = expense.items[0];
-        const consumers = firstItem.selectedConsumers || [firstItem.paidBy || 0];
-        const amount = parseFloat(firstItem.amount) || 0;
-        
-        let splits = firstItem.splits || [];
-        if (splits.length === 0 && consumers.length > 0 && amount > 0) {
-          if (consumers.length === 1) {
-            // Single consumer gets 100% of the amount
-            splits = [{
-              participantIndex: consumers[0],
-              amount: amount,
-              percentage: 100
-            }];
-          } else {
-            // Multiple consumers split evenly
-            const splitAmount = amount / consumers.length;
-            splits = consumers.map((consumerIndex, i) => ({
-              participantIndex: consumerIndex,
-              amount: splitAmount,
-              percentage: 100 / consumers.length
-            }));
-          }
-        }
-        
-        const transformedItem = {
-          ...firstItem,
-          selectedConsumers: consumers,
-          splits: splits,
-          // Remove old paidBy field
-          paidBy: undefined
-        };
-        setItems([transformedItem]);
-      }
       if (expense.fees) {
         setFees(expense.fees);
       }
-      
+      if (expense.items) {
+        setItems(expense.items);
+      }
       // Set selected payers if available
       if (expense.selectedPayers) {
         setSelectedPayers(expense.selectedPayers);
@@ -340,12 +303,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
           profilePhoto: null
         }))
       ];
-      
-      // Clean up any invalid selectedConsumers references
-      setItems(prevItems => prevItems.map(item => ({
-        ...item,
-        selectedConsumers: item.selectedConsumers?.filter(index => index < allParticipants.length) || [0]
-      })));
+    
       
       return allParticipants;
     });

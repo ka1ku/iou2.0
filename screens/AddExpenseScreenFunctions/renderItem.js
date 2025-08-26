@@ -73,7 +73,4 @@ const renderItem = (
   );
 };
 
-// Note: styles should be imported from the main component or defined here
-// The styles.itemCard will be passed from the parent component
-
 export default renderItem;

@@ -61,9 +61,10 @@ const ProfileScreen = ({ navigation }) => {
         // Load expenses
         const userExpenses = await getUserExpenses(currentUser.uid);
         setExpenses(userExpenses);
-        
+        console.log('userExpenses', userExpenses);
         // Calculate balances
         const calculatedBalances = calculateUserBalances(userExpenses, currentUser.uid);
+        // console.log('calculatedBalances', calculatedBalances)
         setBalances(calculatedBalances);
       }
     } catch (error) {
@@ -153,22 +154,37 @@ const ProfileScreen = ({ navigation }) => {
       }
     });
 
+    // Determine if this is a receipt or individual expense
+    const isReceipt = expense.expenseType === 'receipt';
+    const screenName = isReceipt ? 'AddReceipt' : 'AddExpense';
+    const iconName = isReceipt ? 'receipt-outline' : 'card-outline';
+    const typeLabel = isReceipt ? 'Receipt' : 'Expense';
+
     return (
       <TouchableOpacity
         key={expense.id}
         style={styles.expenseSummaryCard}
-        onPress={() => navigation.navigate('AddExpense', { expense })}
+        onPress={() => navigation.navigate('Home', {
+            screen: screenName,
+            params: { expense }
+          })}
       >
         <View style={styles.expenseSummaryHeader}>
-          <Text style={styles.expenseSummaryTitle}>{expense.title}</Text>
+          <View style={styles.expenseSummaryLeft}>
+            <Ionicons name={iconName} size={20} color={Colors.accent} style={styles.expenseTypeIcon} />
+            <Text style={styles.expenseSummaryTitle}>{expense.title}</Text>
+          </View>
           <Text style={styles.expenseSummaryTotal}>
             ${expense.total?.toFixed(2) || '0.00'}
           </Text>
         </View>
         <View style={styles.expenseSummaryDetails}>
-          <Text style={styles.expenseSummaryInfo}>
-            Your share: ${userTotal.toFixed(2)}
-          </Text>
+          <View style={styles.expenseSummaryLeft}>
+            <Text style={styles.expenseTypeLabel}>{typeLabel}</Text>
+            <Text style={styles.expenseSummaryInfo}>
+              Your share: ${userTotal.toFixed(2)}
+            </Text>
+          </View>
           <Text style={styles.expenseSummaryInfo}>
             {expense.participants?.length || 0} participants
           </Text>
@@ -285,19 +301,36 @@ const ProfileScreen = ({ navigation }) => {
 
       <View style={styles.expensesSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recent Expenses</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+          <View style={styles.sectionHeaderLeft}>
+            <Text style={styles.sectionTitle}>Recent Expenses</Text>
+            <View style={styles.expenseTypeCounts}>
+              <View style={styles.typeCount}>
+                <Ionicons name="card-outline" size={16} color={Colors.accent} />
+                <Text style={styles.typeCountText}>
+                  {expenses.filter(exp => exp.expenseType !== 'receipt').length}
+                </Text>
+              </View>
+              <View style={styles.typeCount}>
+                <Ionicons name="receipt-outline" size={16} color={Colors.accent} />
+                <Text style={styles.typeCountText}>
+                  {expenses.filter(exp => exp.expenseType === 'receipt').length}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.viewAllButton}>
             <Text style={styles.viewAllLink}>View All</Text>
           </TouchableOpacity>
         </View>
-        
         {expenses.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color="#ccc" />
             <Text style={styles.emptyStateText}>No expenses yet</Text>
             <TouchableOpacity
               style={styles.createExpenseButton}
-              onPress={() => navigation.navigate('AddExpense')}
+              onPress={() => navigation.navigate('Home', {
+                screen: 'AddExpense'
+              })}
             >
               <Text style={styles.createExpenseButtonText}>Create Your First Expense</Text>
             </TouchableOpacity>
@@ -337,7 +370,9 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.settingsList}>
           <TouchableOpacity 
             style={styles.settingItem}
-            onPress={() => navigation.navigate('NotificationSettings')}
+            onPress={() => navigation.navigate('Profile', {
+              screen: 'NotificationSettings'
+            })}
           >
             <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
             <Text style={styles.settingText}>Notifications</Text>
@@ -521,6 +556,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },
+  sectionHeaderLeft: {
+    flex: 1,
+  },
+  expenseTypeCounts: {
+    flexDirection: 'row',
+    marginTop: Spacing.xs,
+  },
+  typeCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: Spacing.lg,
+  },
+  typeCountText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginLeft: Spacing.xs,
+    fontSize: 12,
+  },
+  viewAllButton: {
+    alignSelf: 'flex-end',
+  },
   viewAllLink: {
     fontSize: 16,
     color: Colors.accent,
@@ -565,6 +621,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  expenseSummaryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  expenseTypeIcon: {
+    marginRight: Spacing.sm,
+  },
   expenseSummaryTitle: {
     ...Typography.title,
     color: Colors.textPrimary,
@@ -578,6 +642,14 @@ const styles = StyleSheet.create({
   expenseSummaryDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  expenseTypeLabel: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontSize: 12,
+    fontFamily: Typography.familyMedium,
+    marginRight: Spacing.sm,
   },
   expenseSummaryInfo: {
     ...Typography.body,

@@ -288,16 +288,14 @@ export const joinExpense = async ({ expenseId, token, code, user }) => {
 export const calculateUserBalances = (expenses, userId) => {
   let totalOwed = 0;
   let totalOwes = 0;
-  const debtBreakdown = {}; // { participantName: amount } - positive means they owe you, negative means you owe them
-  
+  const debtBreakdown = {}; // { participantName: amount } - positive means they owe you, negative means you owe them  
   expenses.forEach(expense => {
-    const currentUserIndex = 0; // Assuming current user is always the first participant
-    
-    expense.items?.forEach(item => {
-      const paidByIndex = item.paidBy || 0;
-      const paidByParticipant = expense.participants?.[paidByIndex];
-      
-      if (!paidByParticipant || !item.amount || !expense.participants?.length) {
+    const currentUserIndex = 0;
+    const paidByIndices = expense.selectedPayers
+    const paidByParticipants = expense.participants?.[paidByIndices];
+
+    expense.items?.forEach(item => { console.log(item)
+      if (!paidByParticipants || !item.amount || !expense.participants?.length) {
         return; // Skip invalid items
       }
       
@@ -305,19 +303,19 @@ export const calculateUserBalances = (expenses, userId) => {
         const splitAmount = parseFloat(item.amount) / expense.participants.length;
         
         // If current user paid, others owe them
-        if (paidByIndex === currentUserIndex) {
+        if (paidByIndices.includes(currentUserIndex)) { {
           expense.participants.forEach((participant, index) => {
             if (index !== currentUserIndex) {
               totalOwed += splitAmount;
               debtBreakdown[participant.name] = (debtBreakdown[participant.name] || 0) + splitAmount;
             }
-          });
+          })};
         } else {
           // Someone else paid, current user owes them
           totalOwes += splitAmount;
-          debtBreakdown[paidByParticipant.name] = (debtBreakdown[paidByParticipant.name] || 0) - splitAmount;
+          debtBreakdown[paidByParticipants.name] = (debtBreakdown[paidByParticipants.name] || 0) - splitAmount;
         }
-      } else if (item.splitType === 'custom') {
+      } else {
         item.splits?.forEach(split => {
           const splitParticipant = expense.participants?.[split.participantIndex];
           const splitAmount = parseFloat(split.amount) || 0;
@@ -325,16 +323,16 @@ export const calculateUserBalances = (expenses, userId) => {
           if (!splitParticipant || splitAmount === 0) {
             return; // Skip invalid splits
           }
-          
-          if (paidByIndex === currentUserIndex && split.participantIndex !== currentUserIndex) {
+          if (paidByIndices.includes(currentUserIndex) && split.participantIndex !== currentUserIndex) {
             // Current user paid, someone else owes them
             totalOwed += splitAmount;
             debtBreakdown[splitParticipant.name] = (debtBreakdown[splitParticipant.name] || 0) + splitAmount;
-          } else if (paidByIndex !== currentUserIndex && split.participantIndex === currentUserIndex) {
+          } else if (!paidByIndices.includes(currentUserIndex) && split.participantIndex === currentUserIndex) {
             // Someone else paid, current user owes them
             totalOwes += splitAmount;
-            debtBreakdown[paidByParticipant.name] = (debtBreakdown[paidByParticipant.name] || 0) - splitAmount;
+            debtBreakdown[paidByParticipants.name] = (debtBreakdown[paidByParticipants.name] || 0) - splitAmount;
           }
+          
         });
       }
     });

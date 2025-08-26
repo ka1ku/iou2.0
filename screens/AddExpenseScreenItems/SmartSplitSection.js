@@ -39,10 +39,7 @@ const SmartSplitSection = ({ participants, selectedConsumers, total, initialSpli
     );
   }
 
-  // Create a mapping from consumer array index back to original participant index
-  const consumerToParticipantMap = selectedConsumers.filter(index => participants[index]);
 
-  // Transform initialSplits to work with filtered consumers
   const transformedInitialSplits = initialSplits
     .filter(split => selectedConsumers.includes(split.participantIndex))
     .map(split => ({
@@ -51,11 +48,16 @@ const SmartSplitSection = ({ participants, selectedConsumers, total, initialSpli
     }));
 
   const handleSplitsChange = (newSplits) => {
-    // Transform splits back to original participant indices
-    const transformedSplits = newSplits.map(split => ({
-      ...split,
-      participantIndex: consumerToParticipantMap[split.participantIndex]
-    }));
+    // Map each split back to the correct participant index from selectedConsumers,
+    // preserving the order of selectedConsumers in the transformedSplits array.
+    const transformedSplits = selectedConsumers.map((participantIndex, i) => {
+      // Find the corresponding split for this consumer (by order)
+      const split = newSplits[i];
+      return {
+        ...split,
+        participantIndex,
+      };
+    });
     onSplitsChange(transformedSplits);
   };
 
