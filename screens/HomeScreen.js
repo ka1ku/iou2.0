@@ -219,7 +219,7 @@ const HomeScreen = ({ navigation }) => {
       stopScanningAnimation();
       
       // Navigate to AddExpense with the scanned data
-      navigation.navigate('AddExpense', { 
+      navigation.navigate('AddReceipt', { 
         scannedReceipt: receiptData,
         fromReceiptScan: true 
       });
@@ -250,6 +250,8 @@ const HomeScreen = ({ navigation }) => {
       setScanningReceipt(false);
     }
   };
+
+
 
   const imageToBase64 = async (uri) => {
     try {
@@ -503,6 +505,13 @@ Important guidelines:
     const totalParticipants = item.participants?.length || 0;
     const expenseBalance = calculateExpenseBalance(item);
     
+    // Determine if this is a receipt or expense
+    const isReceipt = item.expenseType === 'receipt' || 
+                     item.fromReceiptScan || 
+                     (item.title && item.title.toLowerCase().includes('receipt')) ||
+                     (item.items && item.items.length > 1); // Multiple items often indicate a receipt
+    const isExpense = item.expenseType === 'expense' || !isReceipt;
+    
     // Calculate payment summary
     const paymentSummary = {};
     item.items?.forEach(expenseItem => {
@@ -512,31 +521,50 @@ Important guidelines:
       paymentSummary[paidByName] = (paymentSummary[paidByName] || 0) + itemAmount;
     });
 
+    const handleItemPress = () => {
+      if (isReceipt) {
+        navigation.navigate('AddReceipt', { expense: item });
+      } else {
+        navigation.navigate('AddExpense', { expense: item });
+      }
+    };
+
     return (
       <TouchableOpacity
-        style={styles.expenseCard}
-        onPress={() => navigation.navigate('AddExpense', { expense: item })}
+        style={[styles.expenseCard, isReceipt && styles.receiptCard]}
+        onPress={handleItemPress}
         activeOpacity={0.8}
       >
+        
         <View style={styles.expenseHeader}>
-          <Text style={styles.expenseTitle}>{item.title}</Text>
-          <View style={styles.expenseBalance}>
-            {expenseBalance.youOwe > 0 ? (
-              <View style={styles.oweContainer}>
-                <Ionicons name="arrow-up-circle" size={16} color={Colors.danger} />
-                <Text style={styles.oweText}>You owe ${expenseBalance.youOwe.toFixed(2)}</Text>
-              </View>
-            ) : expenseBalance.youOwe < 0 ? (
-              <View style={styles.owedContainer}>
-                <Ionicons name="arrow-down-circle" size={16} color={Colors.success} />
-                <Text style={styles.owedText}>You're owed ${Math.abs(expenseBalance.youOwe).toFixed(2)}</Text>
-              </View>
-            ) : (
-              <View style={styles.evenContainer}>
-                <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-                <Text style={styles.evenText}>Settled up</Text>
-              </View>
-            )}
+          <View style={styles.titleContainer}>
+            <Text style={styles.expenseTitle}>{item.title}</Text>
+          </View>
+          <View style={styles.rightHeaderSection}>
+            {/* Type indicator */}
+            <View style={[styles.typeBadge, isReceipt ? styles.receiptBadge : styles.expenseBadge]}>
+              <Text style={[styles.typeText, isReceipt ? styles.receiptTypeText : styles.expenseTypeText]}>
+                {isReceipt ? 'Receipt' : 'Expense'}
+              </Text>
+            </View>
+            <View style={styles.expenseBalance}>
+              {expenseBalance.youOwe > 0 ? (
+                <View style={styles.oweContainer}>
+                  <Ionicons name="arrow-up-circle" size={16} color={Colors.danger} />
+                  <Text style={styles.oweText}>You owe ${expenseBalance.youOwe.toFixed(2)}</Text>
+                </View>
+              ) : expenseBalance.youOwe < 0 ? (
+                <View style={styles.owedContainer}>
+                  <Ionicons name="arrow-down-circle" size={16} color={Colors.success} />
+                  <Text style={styles.owedText}>You're owed ${Math.abs(expenseBalance.youOwe).toFixed(2)}</Text>
+                </View>
+              ) : (
+                <View style={styles.evenContainer}>
+                  <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                  <Text style={styles.evenText}>Settled up</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
         
@@ -718,20 +746,63 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     ...Shadows.card,
   },
+  receiptCard: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.blue + '20',
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    ...Shadows.card,
+  },
   expenseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   expenseTitle: {
     ...Typography.title,
     color: Colors.textPrimary,
-    flex: 1,
     marginRight: Spacing.sm,
+  },
+  typeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderWidth: 1,
+    minWidth: 70,
+    justifyContent: 'center',
+  },
+  typeText: {
+    ...Typography.label,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  receiptBadge: {
+    backgroundColor: Colors.blue + '10',
+    borderColor: Colors.blue + '30',
+  },
+  receiptTypeText: {
+    color: Colors.blue,
+  },
+  expenseBadge: {
+    backgroundColor: Colors.accent + '10',
+    borderColor: Colors.accent + '30',
+  },
+  expenseTypeText: {
+    color: Colors.accent,
   },
   expenseBalance: {
     alignItems: 'flex-end',
+    minWidth: 80,
   },
   oweContainer: {
     flexDirection: 'row',
@@ -780,6 +851,10 @@ const styles = StyleSheet.create({
     color: Colors.success,
     fontWeight: '600',
     marginLeft: 4,
+  },
+  rightHeaderSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   expenseDetails: {
@@ -855,6 +930,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  receiptIndicator: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    backgroundColor: Colors.blue + '10',
+    borderRadius: Radius.pill,
+    padding: Spacing.xxs,
+    borderWidth: 1,
+    borderColor: Colors.blue + '30',
   },
 
 });

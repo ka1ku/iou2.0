@@ -1,5 +1,6 @@
 import { Alert } from 'react-native';
 import { getCurrentUser } from '../../services/authService';
+import { getUserProfile } from '../../services/friendService';
 import { createExpense, updateExpense } from '../../services/expenseService';
 
 const saveExpense = async (
@@ -13,11 +14,15 @@ const saveExpense = async (
   expense,
   navigation,
   setLoading,
-  calculateTotal
+  calculateTotal,
+  expenseType = 'expense' // Default to expense, can be 'receipt' or 'expense'
 ) => {
-  if (!title.trim()) {
-    Alert.alert('Error', 'Please enter an expense title');
-    return;
+  // Generate a default title from the item name if no title is provided
+  let finalTitle = title.trim();
+  if (!finalTitle && items.length > 0 && items[0].name.trim()) {
+    finalTitle = items[0].name.trim();
+  } else if (!finalTitle) {
+    finalTitle = 'Expense'; // Fallback default
   }
 
   if (participants.some(p => !p.name.trim())) {
@@ -47,30 +52,63 @@ const saveExpense = async (
       throw new Error('No user signed in');
     }
 
+    // Get the current user's profile from Firestore
+    const userProfile = await getUserProfile(currentUser.uid);
+    if (!userProfile) {
+      throw new Error('Failed to get user profile');
+    }
+
+    // Map participants with proper user data
+    const mappedParticipants = participants.map((p, index) => {
+      if (p.name === 'Me') {
+        // Use the current user's actual profile data but preserve the existing structure
+        return {
+          ...p, // Preserve existing fields like id, userId, etc.
+          name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+          userId: p.userId || currentUser.uid, // Use existing userId if available, otherwise use current user's uid
+          placeholder: false,
+          phoneNumber: userProfile.phoneNumber,
+          username: userProfile.username,
+          profilePhoto: userProfile.profilePhoto
+        };
+      } else {
+        // For other participants, preserve their existing data
+        return {
+          ...p, // Preserve all existing fields
+          name: p.name.trim(),
+          userId: p.userId || null,
+          placeholder: p.placeholder || false,
+          phoneNumber: p.phoneNumber || null,
+          username: p.username || null,
+          profilePhoto: p.profilePhoto || null
+        };
+      }
+    });
+
     const expenseData = {
-      title: title.trim(),
+      title: finalTitle,
       total: calculateTotal(),
-      participants: participants.map(p => ({ 
-        name: p.name.trim(),
-        userId: p.userId,
-        placeholder: p.placeholder,
-        phoneNumber: p.phoneNumber,
-        username: p.username,
-        profilePhoto: p.profilePhoto
-      })),
+      expenseType: expenseType, // Mark as manual expense
+      participants: mappedParticipants,
       items: items.map(item => ({
-        ...item,
+        id: item.id,
         name: item.name.trim(),
-        amount: parseFloat(item.amount)
+        amount: parseFloat(item.amount) || 0,
+        selectedConsumers: item.selectedConsumers || [0],
+        splits: item.splits || []
       })),
       fees: fees.map(fee => ({
-        ...fee,
+        id: fee.id,
         name: fee.name.trim(),
-        amount: parseFloat(fee.amount)
+        amount: parseFloat(fee.amount) || 0,
+        type: fee.type || 'fixed',
+        percentage: fee.percentage || null,
+        splitType: fee.splitType || 'proportional',
+        splits: fee.splits || []
       })),
-      selectedPayers: selectedPayers,
+      selectedPayers: selectedPayers || [0],
       join: {
-        enabled: joinEnabled,
+        enabled: joinEnabled || false,
       }
     };
 

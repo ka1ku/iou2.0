@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.divider,
-    borderRadius: Radius.lg, // Slightly more rounded
+    borderRadius: Radius.sm, // Slightly more rounded
     padding: Spacing.lg, // More padding for better touch target
     marginTop: Spacing.md, // Add top margin for better spacing
     ...Shadows.card,

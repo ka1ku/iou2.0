@@ -29,7 +29,6 @@ const PaidBySection = ({ participants, selectedPayers, onPayersChange }) => {
 
   return (
     <View style={styles.paidByContainer}>
-      <Text style={styles.paidByLabel}>Who paid for this expense?</Text>
       <View style={styles.paidByButtons}>
         {participants.map((participant, pIndex) => (
           <TouchableOpacity
@@ -61,6 +60,7 @@ const PaidBySection = ({ participants, selectedPayers, onPayersChange }) => {
 const styles = StyleSheet.create({
   paidByContainer: {
     marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
   },
   paidByLabel: {
     ...Typography.label,

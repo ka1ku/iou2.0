@@ -9,7 +9,6 @@ const renderItem = (
   items,
   setItems,
   updateItem,
-  removeItem,
   fees,
   setFees,
   styles
@@ -19,7 +18,6 @@ const renderItem = (
       <ItemHeader
         itemName={item.name}
         onNameChange={(text) => updateItem(index, 'name', text, items, setItems, fees, setFees)}
-        onDelete={() => removeItem(index, items, setItems, fees, setFees)}
       />
 
       <PriceInputSection

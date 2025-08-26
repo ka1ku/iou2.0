@@ -1,22 +1,20 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
-import DeleteButton from '../../components/DeleteButton';
 
 /**
  * ItemHeader Component
  * 
- * Displays the header section for an expense item with name input and delete button.
+ * Displays the header section for an expense item with name input.
  * Used in the AddExpenseScreen for managing individual expense items.
  * 
  * @component
  * @param {Object} props - Component props
  * @param {string} props.itemName - Current name of the item
  * @param {Function} props.onNameChange - Callback when item name changes
- * @param {Function} props.onDelete - Callback when delete button is pressed
- * @returns {React.ReactElement} Item header with name input and delete button
+ * @returns {React.ReactElement} Item header with name input
  */
-const ItemHeader = ({ itemName, onNameChange, onDelete }) => {
+const ItemHeader = ({ itemName, onNameChange }) => {
   return (
     <View style={styles.itemHeader}>
       <View style={styles.itemNameContainer}>
@@ -29,11 +27,6 @@ const ItemHeader = ({ itemName, onNameChange, onDelete }) => {
           onChangeText={onNameChange}
         />
       </View>
-      <DeleteButton
-        onPress={onDelete}
-        size="medium"
-        variant="subtle"
-      />
     </View>
   );
 };

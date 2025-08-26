@@ -14,8 +14,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import { getCurrentUser } from '../services/authService';
-import { getUserProfile } from '../services/friendService';
 
 import FriendSelector from '../components/FriendSelector';
 import InviteFriendSheet from '../components/InviteFriendSheet';
@@ -23,8 +21,10 @@ import PriceInput from '../components/PriceInput';
 import DeleteButton from '../components/DeleteButton';
 import { ItemHeader, PriceInputSection, PaidBySection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection } from './AddExpenseScreenItems';
 import {
+  addItem,
   updateItem,
   updateItemSplit,
+  removeItem,
   addFee,
   updateFee,
   removeFee,
@@ -36,33 +36,19 @@ import {
   removePlaceholder
 } from './AddExpenseScreenFunctions';
 
-const AddExpenseScreen = ({ route, navigation }) => {
+const AddReceiptScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
 
   const [title, setTitle] = useState('');
-  const [participants, setParticipants] = useState([{ 
-    name: 'Me',
-    id: 'me-participant', // Use a unique ID for "Me"
-    userId: getCurrentUser()?.uid || null, // Use current user's UID
-    placeholder: false,
-    phoneNumber: null,
-    username: null,
-    profilePhoto: null
-  }]);
+  const [participants, setParticipants] = useState([{ name: 'Me' }]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [placeholders, setPlaceholders] = useState([]);
   const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
   const [showSettings, setShowSettings] = useState(false);
   const [joinEnabled, setJoinEnabled] = useState(true);
-  const [items, setItems] = useState([{
-    id: Date.now().toString(),
-    name: '',
-    amount: 0,
-    selectedConsumers: [0], // Default to first participant (usually "Me")
-    splits: []
-  }]);
+  const [items, setItems] = useState([]);
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
@@ -76,42 +62,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     navigation.setOptions({
-      title: isEditing ? 'Edit Expense' : 'Add Expense',
+      title: isEditing ? 'Edit Receipt' : 'Add Receipt',
     });
   }, [isEditing, navigation]);
-
-  // Initialize "Me" participant with current user's profile data
-  useEffect(() => {
-    const initializeMeParticipant = async () => {
-      try {
-        const currentUser = getCurrentUser();
-        if (currentUser) {
-          const userProfile = await getUserProfile(currentUser.uid);
-          if (userProfile) {
-            setParticipants(prev => {
-              const updated = [...prev];
-              if (updated.length > 0 && updated[0].name === 'Me') {
-                updated[0] = {
-                  ...updated[0], // Preserve existing ID and structure
-                  name: 'Me',
-                  userId: currentUser.uid,
-                  placeholder: false,
-                  phoneNumber: userProfile.phoneNumber,
-                  username: userProfile.username,
-                  profilePhoto: userProfile.profilePhoto
-                };
-              }
-              return updated;
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing user participant:', error);
-      }
-    };
-
-    initializeMeParticipant();
-  }, []);
 
   // Handle scanned receipt data
   useEffect(() => {
@@ -124,21 +77,20 @@ const AddExpenseScreen = ({ route, navigation }) => {
         setParticipants(scannedReceipt.participants);
       }
       
-      // Set items if available (only take the first item for single-item expenses)
+      // Set items if available
       if (scannedReceipt.items && scannedReceipt.items.length > 0) {
-        const firstItem = scannedReceipt.items[0];
-        const formattedItem = {
-          id: Date.now().toString(),
-          name: firstItem.name || '',
-          amount: parseFloat(firstItem.amount) || 0,
+        const formattedItems = scannedReceipt.items.map((item, index) => ({
+          id: Date.now().toString() + index,
+          name: item.name || '',
+          amount: parseFloat(item.amount) || 0,
           selectedConsumers: [0], // Default to first participant
           splits: [{
             participantIndex: 0,
-            amount: parseFloat(firstItem.amount) || 0,
+            amount: parseFloat(item.amount) || 0,
             percentage: 100
           }]
-        };
-        setItems([formattedItem]);
+        }));
+        setItems(formattedItems);
       }
       
       // Set default payers to first participant
@@ -196,9 +148,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
   // Initialize selectedFriends and placeholders when editing an existing expense
   useEffect(() => {
     if (expense && isEditing) {
-      // Extract friends from existing participants (exclude current user)
+      // Extract friends from existing participants
       const existingFriends = expense.participants
-        .filter(p => p.name !== 'Me' && !p.placeholder && p.userId && p.userId !== getCurrentUser()?.uid)
+        .filter(p => p.name !== 'Me' && !p.placeholder && p.userId)
         .map(p => ({
           id: p.userId,
           name: p.name,
@@ -222,32 +174,18 @@ const AddExpenseScreen = ({ route, navigation }) => {
       
       // Set initial participants (this will be updated by the other useEffect)
       const initialParticipants = [
-        { 
-          name: 'Me',
-          id: 'me-participant', // Use a unique ID for "Me"
-          userId: getCurrentUser()?.uid || null, // Use current user's UID
-          placeholder: false,
-          phoneNumber: null,
-          username: null,
-          profilePhoto: null
-        },
-        ...existingFriends.map((friend, index) => ({ 
-          name: friend.name || '', 
-          id: `friend-${friend.id || index}`, // Ensure unique ID
-          userId: friend.id || null,
-          phoneNumber: friend.phoneNumber || null,
-          username: friend.username || null,
-          profilePhoto: friend.profilePhoto || null,
-          placeholder: false
+        { name: 'Me' },
+        ...existingFriends.map(friend => ({ 
+          name: friend.name, 
+          userId: friend.id,
+          phoneNumber: friend.phoneNumber,
+          username: friend.username,
+          profilePhoto: friend.profilePhoto
         })),
-        ...existingPlaceholders.map((p, index) => ({ 
-          name: p.name || '', 
+        ...existingPlaceholders.map(p => ({ 
+          name: p.name, 
           placeholder: true, 
-          id: p.id || `placeholder-${index}`, // Ensure unique ID
-          userId: null,
-          phoneNumber: p.phoneNumber || null,
-          username: null,
-          profilePhoto: null
+          id: p.id
         }))
       ];
       setParticipants(initialParticipants);
@@ -260,41 +198,42 @@ const AddExpenseScreen = ({ route, navigation }) => {
         setJoinEnabled(expense.join.enabled);
       }
       
-      // Set items and fees from existing expense (only take the first item for single-item expenses)
-      if (expense.items && expense.items.length > 0) {
-        // Transform the first item to new structure
-        const firstItem = expense.items[0];
-        const consumers = firstItem.selectedConsumers || [firstItem.paidBy || 0];
-        const amount = parseFloat(firstItem.amount) || 0;
-        
-        let splits = firstItem.splits || [];
-        if (splits.length === 0 && consumers.length > 0 && amount > 0) {
-          if (consumers.length === 1) {
-            // Single consumer gets 100% of the amount
-            splits = [{
-              participantIndex: consumers[0],
-              amount: amount,
-              percentage: 100
-            }];
-          } else {
-            // Multiple consumers split evenly
-            const splitAmount = amount / consumers.length;
-            splits = consumers.map((consumerIndex, i) => ({
-              participantIndex: consumerIndex,
-              amount: splitAmount,
-              percentage: 100 / consumers.length
-            }));
+      // Set items and fees from existing expense
+      if (expense.items) {
+        // Transform old items to new structure if needed
+        const transformedItems = expense.items.map(item => {
+          const consumers = item.selectedConsumers || [item.paidBy || 0];
+          const amount = parseFloat(item.amount) || 0;
+          
+          let splits = item.splits || [];
+          if (splits.length === 0 && consumers.length > 0 && amount > 0) {
+            if (consumers.length === 1) {
+              // Single consumer gets 100% of the amount
+              splits = [{
+                participantIndex: consumers[0],
+                amount: amount,
+                percentage: 100
+              }];
+            } else {
+              // Multiple consumers split evenly
+              const splitAmount = amount / consumers.length;
+              splits = consumers.map((consumerIndex, i) => ({
+                participantIndex: consumerIndex,
+                amount: splitAmount,
+                percentage: 100 / consumers.length
+              }));
+            }
           }
-        }
-        
-        const transformedItem = {
-          ...firstItem,
-          selectedConsumers: consumers,
-          splits: splits,
-          // Remove old paidBy field
-          paidBy: undefined
-        };
-        setItems([transformedItem]);
+          
+          return {
+            ...item,
+            selectedConsumers: consumers,
+            splits: splits,
+            // Remove old paidBy field
+            paidBy: undefined
+          };
+        });
+        setItems(transformedItems);
       }
       if (expense.fees) {
         setFees(expense.fees);
@@ -309,46 +248,28 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
   // Update participants when friends are selected
   useEffect(() => {
-    setParticipants(prevParticipants => {
-      const meParticipant = prevParticipants.find(p => p.name === 'Me');
-      const allParticipants = [
-        meParticipant || { 
-          name: 'Me',
-          id: 'me-participant', // Use a unique ID for "Me"
-          userId: getCurrentUser()?.uid || null, // Use current user's UID
-          placeholder: false,
-          phoneNumber: null,
-          username: null,
-          profilePhoto: null
-        },
-        ...selectedFriends.map((friend, index) => ({ 
-          name: friend.name || '', 
-          id: `friend-${friend.id || index}`, // Ensure unique ID
-          userId: friend.id || null,
-          phoneNumber: friend.phoneNumber || null,
-          username: friend.username || null,
-          profilePhoto: friend.profilePhoto || null,
-          placeholder: false
-        })),
-        ...placeholders.map((p, index) => ({ 
-          name: p.name || '', 
-          placeholder: true, 
-          id: p.id || `placeholder-${index}`, // Ensure unique ID
-          userId: null,
-          phoneNumber: p.phoneNumber || null,
-          username: null,
-          profilePhoto: null
-        }))
-      ];
-      
-      // Clean up any invalid selectedConsumers references
-      setItems(prevItems => prevItems.map(item => ({
-        ...item,
-        selectedConsumers: item.selectedConsumers?.filter(index => index < allParticipants.length) || [0]
-      })));
-      
-      return allParticipants;
-    });
+    const allParticipants = [
+      { name: 'Me' },
+      ...selectedFriends.map(friend => ({ 
+        name: friend.name, 
+        userId: friend.id,
+        phoneNumber: friend.phoneNumber,
+        username: friend.username,
+        profilePhoto: friend.profilePhoto
+      })),
+      ...placeholders.map(p => ({ 
+        name: p.name, 
+        placeholder: true, 
+        id: p.id
+      }))
+    ];
+    setParticipants(allParticipants);
+    
+    // Clean up any invalid selectedConsumers references
+    setItems(prevItems => prevItems.map(item => ({
+      ...item,
+      selectedConsumers: item.selectedConsumers?.filter(index => index < allParticipants.length) || [0]
+    })));
   }, [selectedFriends, placeholders]);
   
   const handleAddParticipant = () => {
@@ -375,7 +296,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
     removePlaceholder(ghostId, placeholders, setPlaceholders, items, setItems, selectedFriends);
   };
 
-
+  const handleAddItem = () => {
+    addItem(items, setItems, participants);
+  };
 
   const handleUpdateItem = (index, field, value) => {
     updateItem(index, field, value, items, setItems, fees, setFees);
@@ -385,7 +308,21 @@ const AddExpenseScreen = ({ route, navigation }) => {
     updateItemSplit(itemIndex, participantIndex, amount, items, setItems);
   };
 
+  const handleRemoveItem = (index) => {
+    removeItem(index, items, setItems, fees, setFees);
+  };
 
+  const handleAddFee = () => {
+    addFee(fees, setFees);
+  };
+
+  const handleUpdateFee = (index, field, value) => {
+    updateFee(index, field, value, fees, setFees, items);
+  };
+
+  const handleRemoveFee = (index) => {
+    removeFee(index, fees, setFees);
+  };
 
   const handleSaveExpense = async () => {
     saveExpense(
@@ -399,7 +336,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
       expense,
       navigation,
       setLoading,
-      calculateTotal
+      calculateTotal,
+      'receipt' // Mark as receipt
     );
   };
 
@@ -411,12 +349,53 @@ const AddExpenseScreen = ({ route, navigation }) => {
       items,
       setItems,
       handleUpdateItem,
+      handleRemoveItem,
       fees,
       setFees,
       styles
     );
   };
 
+  const renderFee = (fee, index) => {
+    const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    
+    return (
+      <View key={fee.id} style={styles.feeCard}>
+        <FeeHeader
+          feeName={fee.name}
+          onNameChange={(text) => handleUpdateFee(index, 'name', text)}
+          onDelete={() => handleRemoveFee(index)}
+        />
+
+        <FeeTypeSection
+          feeType={fee.type}
+          onTypeChange={(type) => handleUpdateFee(index, 'type', type)}
+        />
+
+        {fee.type === 'percentage' ? (
+          <PercentageSection
+            percentage={fee.percentage}
+            onPercentageChange={(percentage) => handleUpdateFee(index, 'percentage', percentage)}
+            itemsTotal={itemsTotal}
+          />
+        ) : (
+          <FixedAmountSection
+            amount={fee.amount}
+            onAmountChange={(amount) => handleUpdateFee(index, 'amount', amount)}
+          />
+        )}
+
+        <SplitTypeSection
+          splitType={fee.splitType}
+                      onSplitTypeChange={(splitType) => handleUpdateFee(index, 'splitType', splitType)}
+          feeAmount={fee.amount}
+          participantCount={participants.length}
+        />
+
+        <TotalFeeSection feeAmount={fee.amount} />
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -428,7 +407,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isEditing ? 'Edit Expense' : 'Add Expense'}
+          {isEditing ? 'Edit Receipt' : 'Add Receipt'}
         </Text>
         <TouchableOpacity 
           style={styles.settingsButton}
@@ -443,6 +422,84 @@ const AddExpenseScreen = ({ route, navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Expense Detials</Text>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="What's this expense for?"
+              placeholderTextColor={Colors.textSecondary}
+              value={title}
+              onChangeText={setTitle}
+            />
+            {/* Receipt Breakdown */}
+            {(items.length > 0 || fees.length > 0) && (
+              <View style={styles.receiptBreakdown}>
+                <View style={styles.receiptHeader}>
+                  <Ionicons name="receipt-outline" size={20} color={Colors.accent} />
+                  <Text style={styles.receiptTitle}>Receipt Breakdown</Text>
+                </View>
+                
+                {/* Items Section */}
+                {items.length > 0 && (
+                  <>
+                    <View style={styles.receiptSection}>
+                      <Text style={styles.receiptSectionTitle}>Items</Text>
+                      {items.map((item, index) => (
+                        <View key={item.id} style={styles.receiptRow}>
+                          <Text style={styles.receiptItemName} numberOfLines={2}>
+                            {item.name || `Item ${index + 1}`}
+                          </Text>
+                          <Text style={styles.receiptItemAmount}>
+                            ${(parseFloat(item.amount) || 0).toFixed(2)}
+                          </Text>
+                        </View>
+                      ))}
+                      <View style={styles.receiptSubtotal}>
+                        <Text style={styles.receiptSubtotalLabel}>Items Subtotal</Text>
+                        <Text style={styles.receiptSubtotalAmount}>
+                          ${items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0).toFixed(2)}
+                        </Text>
+                      </View>
+                    </View>
+                  </>
+                )}
+
+                {/* Fees Section */}
+                {fees.length > 0 && (
+                  <View style={styles.receiptSection}>
+                    <Text style={styles.receiptSectionTitle}>Fees & Tips</Text>
+                    {fees.map((fee, index) => (
+                      <View key={fee.id} style={styles.receiptRow}>
+                        <Text style={styles.receiptItemName} numberOfLines={2}>
+                          {fee.name || `Fee ${index + 1}`}
+                        </Text>
+                        <Text style={styles.receiptItemAmount}>
+                          ${(parseFloat(fee.amount) || 0).toFixed(2)}
+                        </Text>
+                      </View>
+                    ))}
+                    <View style={styles.receiptSubtotal}>
+                      <Text style={styles.receiptSubtotalLabel}>Fees Subtotal</Text>
+                      <Text style={styles.receiptSubtotalAmount}>
+                        ${fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0).toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Total Amount */}
+                <View style={styles.receiptTotalRow}>
+                  <Text style={styles.receiptTotalLabel}>Total Amount</Text>
+                  <Text style={styles.receiptTotalAmount}>
+                    ${calculateTotal().toFixed(2)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+
+          </View>
+
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Participants</Text>
@@ -511,8 +568,48 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}> Expense Details </Text>
-            {items.map(handleRenderItem)}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Items</Text>
+              <TouchableOpacity onPress={handleAddItem} style={styles.addButton}>
+                <Ionicons name="add-circle" size={24} color={Colors.accent} />
+              </TouchableOpacity>
+            </View>
+            {items.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
+                <Text style={styles.emptyStateText}>No items added yet</Text>
+                <Text style={styles.emptyStateSubtext}>Tap the + button to add your first item</Text>
+              </View>
+            ) : (
+              <>
+                {items.map(handleRenderItem)}
+                <TouchableOpacity
+                  style={styles.addMoreItemsButton}
+                  onPress={handleAddItem}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.addMoreItemsButtonText}>Add More Items</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
+          <View style={[styles.section, styles.lastSection]}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Fees & Tips</Text>
+              <TouchableOpacity onPress={handleAddFee} style={styles.addButton}>
+                <Ionicons name="add-circle" size={24} color={Colors.accent} />
+              </TouchableOpacity>
+            </View>
+            {fees.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="card-outline" size={48} color={Colors.textSecondary} />
+                <Text style={styles.emptyStateText}>No fees added yet</Text>
+                <Text style={styles.emptyStateSubtext}>Add tips, taxes, or service fees</Text>
+              </View>
+            ) : (
+              fees.map(renderFee)
+            )}
           </View>
         </ScrollView>
 
@@ -524,7 +621,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
             activeOpacity={0.8}
           >
             <Text style={styles.saveButtonText}>
-              {loading ? 'Saving...' : (isEditing ? 'Update Expense' : 'Save Expense')}
+              {loading ? 'Saving...' : (isEditing ? 'Update Receipt' : 'Save Receipt')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -651,9 +748,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...Typography.title,
     color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
   },
-
+  addButton: {
+    padding: Spacing.sm,
+  },
   titleInput: {
     borderWidth: 1,
     borderColor: Colors.divider,
@@ -663,6 +761,100 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     color: Colors.textPrimary,
     marginTop: Spacing.sm,
+  },
+  // Receipt Breakdown Styles
+  receiptBreakdown: {
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: Radius.md,
+  },
+  receiptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  receiptTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginLeft: Spacing.sm,
+    fontWeight: '600',
+  },
+  receiptSection: {
+    marginBottom: Spacing.md,
+  },
+  receiptSectionTitle: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 12,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: Spacing.xs,
+    minHeight: 24,
+    paddingHorizontal: Spacing.xs,
+  },
+  receiptItemName: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    flex: 1,
+    marginRight: Spacing.md,
+    lineHeight: 20,
+  },
+  receiptItemAmount: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+    textAlign: 'right',
+    minWidth: 60,
+  },
+  receiptSubtotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Spacing.sm,
+    marginTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  receiptSubtotalLabel: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  receiptSubtotalAmount: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  receiptTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: Spacing.md,
+    marginTop: Spacing.md,
+    borderTopWidth: 2,
+    borderTopColor: Colors.accent,
+  },
+  receiptTotalLabel: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  receiptTotalAmount: {
+    ...Typography.h2,
+    color: Colors.accent,
+    fontWeight: '700',
   },
   totalContainer: {
     flexDirection: 'row',
@@ -712,7 +904,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 16,
   },
-
+  addMoreItemsButton: {
+    backgroundColor: Colors.accent,
+    padding: Spacing.lg,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    ...Shadows.card,
+  },
+  addMoreItemsButtonText: {
+    ...Typography.title,
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+    marginTop: Spacing.md,
+  },
+  emptyStateText: {
+    ...Typography.title,
+    color: Colors.textPrimary,
+    marginTop: Spacing.sm,
+  },
+  emptyStateSubtext: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginTop: Spacing.xs,
+    textAlign: 'center',
+  },
   participantsNote: {
     ...Typography.label,
     color: Colors.textSecondary,
@@ -872,6 +1092,201 @@ const styles = StyleSheet.create({
   lastSection: {
     marginBottom: 0,
   },
+  // Fee styles
+  feeCard: {
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    backgroundColor: Colors.surface,
+    ...Shadows.card,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+  },
+  feeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  feeNameContainer: {
+    flex: 1,
+    marginRight: Spacing.sm,
+  },
+  feeNameLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  feeNameInput: {
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
+    ...Typography.body,
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
+    fontSize: 16,
+    minHeight: 48,
+  },
+
+  feeTypeSection: {
+    marginBottom: Spacing.md,
+  },
+  feeTypeLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  feeTypeContainer: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  feeTypeButton: {
+    flex: 1,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    alignItems: 'center',
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surface,
+    minHeight: 48,
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 2,
+  },
+  feeTypeButtonActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+    ...Shadows.button,
+    elevation: 3,
+  },
+  feeTypeText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  feeTypeTextActive: {
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  percentageSection: {
+    marginBottom: Spacing.md,
+  },
+  percentageLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  percentageButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  percentageButton: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 2,
+  },
+  percentageButtonActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+    ...Shadows.button,
+    elevation: 3,
+  },
+  percentageButtonText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  percentageButtonTextActive: {
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  customPercentageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  customPercentageLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    marginRight: Spacing.sm,
+  },
+  customPercentageInput: {
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    ...Typography.body,
+    textAlign: 'center',
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
+    width: 60,
+    marginRight: Spacing.xs,
+  },
+  percentageSymbol: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+  },
+  calculatedAmount: {
+    ...Typography.label,
+    color: Colors.accent,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  fixedAmountSection: {
+    marginBottom: Spacing.md,
+  },
+  fixedAmountLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  feeAmountInput: {
+    marginBottom: 0,
+  },
+
+  feeTotalSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+  },
+  feeTotalLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  feeTotalAmount: {
+    ...Typography.title,
+    color: Colors.accent,
+    fontWeight: '700',
+  },
   placeholdersContainer: {
     marginTop: Spacing.lg,
     paddingTop: Spacing.lg,
@@ -979,4 +1394,4 @@ const styles = StyleSheet.create({
 
 });
 
-export default AddExpenseScreen;
+export default AddReceiptScreen;

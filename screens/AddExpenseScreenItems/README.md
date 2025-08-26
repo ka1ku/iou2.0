@@ -17,16 +17,6 @@ This directory contains all the refactored components from the `AddExpenseScreen
 - **`TotalFeeSection.js`** - Total fee amount display
 - **`FixedAmountSection.js`** - Fixed amount fee input
 
-### Screen Layout Components
-- **`Header.js`** - Top navigation bar with back button, title, and settings
-- **`ExpenseDetailsSection.js`** - Expense title input and total amount display
-- **`ParticipantsSection.js`** - Friend selector and placeholder management
-- **`WhoPaidSection.js`** - Who paid for the expense selection
-- **`ItemsSection.js`** - Items list with add button and empty state
-- **`FeesSection.js`** - Fees list with add button and empty state
-- **`Footer.js`** - Save button at the bottom
-- **`SettingsModal.js`** - Expense settings modal
-
 ## New Expense Structure
 
 The AddExpenseScreen has been restructured to better handle complex expense scenarios:
@@ -69,15 +59,7 @@ import {
   PercentageSection,
   SplitTypeSection,
   TotalFeeSection,
-  FixedAmountSection,
-  Header,
-  ExpenseDetailsSection,
-  ParticipantsSection,
-  WhoPaidSection,
-  ItemsSection,
-  FeesSection,
-  Footer,
-  SettingsModal
+  FixedAmountSection
 } from '../AddExpenseScreenItems';
 ```
 
