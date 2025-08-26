@@ -8,7 +8,6 @@ export { default as SectionHeader } from './SectionHeader';
 
 // Existing Components
 export { default as ExpenseJoinHandler } from './ExpenseJoinHandler';
-export { default as FriendInvitationHandler } from './FriendInvitationHandler';
 export { default as FriendSelector } from './FriendSelector';
 export { default as InviteFriendSheet } from './InviteFriendSheet';
 export { default as PriceInput } from './PriceInput';

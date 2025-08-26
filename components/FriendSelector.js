@@ -7,10 +7,11 @@ import {
   FlatList,
   TextInput,
   Modal,
-  Image
+  Image,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../design/tokens';
+import { Colors, Shadows, Typography, Spacing, Radius } from '../design/tokens';
 import ProfilePicture from '../components/VenmoProfilePicture';
 import DeleteButton from '../components/DeleteButton';
 import * as Contacts from 'expo-contacts';
@@ -26,10 +27,13 @@ const FriendSelector = ({
   showAddButton = true,
   placeholder = "Select friends to split with...",
   allowPlaceholders = true,
-  onAddPlaceholder
+  onAddPlaceholder,
+  onClose
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
+  const [localQuery, setLocalQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   useEffect(() => {
     initContacts();
@@ -80,13 +84,28 @@ const FriendSelector = ({
     onAddPlaceholder?.(ghost);
   };
 
+  const removeFriend = (friendId) => {
+    const updated = selectedFriends.filter(f => f.id !== friendId);
+    onFriendsChange(updated);
+  };
+
+  // Add current user to the member list
+  const getCurrentUserData = () => {
+    const currentUser = getCurrentUser();
+    return {
+      id: 'current-user',
+      name: 'You',
+      profilePhoto: currentUser?.profilePhoto,
+      isCurrentUser: true
+    };
+  };
+
+  const allMembers = [getCurrentUserData(), ...selectedFriends];
+
   const SearchPane = () => {
-    const { hits, isLastPage, showMore, isSearching } = useInfiniteHits();
+    const { hits, isLastPage, showMore } = useInfiniteHits();
     const { refine } = useSearchBox();
     
-    const [localQuery, setLocalQuery] = useState('');
-    const [debouncedQuery, setDebouncedQuery] = useState('');
-
     useEffect(() => {
       const timer = setTimeout(() => {
         setDebouncedQuery(localQuery);
@@ -97,7 +116,11 @@ const FriendSelector = ({
 
     const q = (debouncedQuery || '').trim().toLowerCase();
 
-    // Filter contacts by query
+    // Get current user to filter out from results
+    const currentUser = getCurrentUser();
+    const currentUserId = currentUser?.uid;
+
+    // Filter contacts by query and exclude current user
     const filteredContacts = contacts.filter(c => {
       if (q.length === 0) return true;
       const name = (c.firstName && c.lastName) ? `${c.firstName} ${c.lastName}` : (c.name || '');
@@ -105,99 +128,86 @@ const FriendSelector = ({
       return name.toLowerCase().includes(q) || phone.includes(q);
     });
 
+    // Filter out current user from Algolia search results
+    const filteredHits = currentUserId ? hits.filter(friend => friend && friend.objectID && friend.objectID !== currentUserId) : hits;
+
+    const renderFriendItem = ({ item }) => {
+      const name = (item.fullName || `${item.firstName || ''} ${item.lastName || ''}`).trim() || 'Unknown';
+      const isSelected = selectedFriends.some(f => f.id === item.objectID);
+      
+      return (
+        <TouchableOpacity style={styles.listItem} onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}>
+          <View style={styles.avatarContainer}>
+            {item.profilePhoto ? (
+              <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{name}</Text>
+            {item.username && <Text style={styles.userHandle}>@{item.username}</Text>}
+          </View>
+          <TouchableOpacity 
+            style={[styles.addButton, isSelected && styles.addButtonSelected]} 
+            onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}
+          >
+            {isSelected ? (
+              <Ionicons name="checkmark" size={16} color={Colors.white} />
+            ) : (
+              <Text style={styles.addButtonText}>Add</Text>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      );
+    };
+
     const renderContact = ({ item }) => {
       const name = (item.firstName && item.lastName)
         ? `${item.firstName} ${item.lastName}`
         : (item.name || 'Unknown Contact');
+      const phone = item.phoneNumbers?.[0]?.number || '';
       
       return (
-        <View style={styles.rowCard}>
-          <View style={styles.avatar}>
+        <TouchableOpacity style={styles.listItem} onPress={() => inviteContact(item)}>
+          <View style={styles.avatarContainer}>
             {item.imageAvailable && item.image?.uri ? (
-              <Image source={{ uri: item.image.uri }} style={styles.avatarImg} />
+              <Image source={{ uri: item.image.uri }} style={styles.avatar} />
             ) : (
-              <View style={styles.placeholderAvatar}>
-                <Text style={styles.placeholderInitials}>{(name[0] || 'U').toUpperCase()}</Text>
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
               </View>
             )}
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{name}</Text>
-            <Text style={styles.subtitle}>Phone Contact</Text>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{name}</Text>
+            <Text style={styles.userPhone}>{phone}</Text>
           </View>
-          <TouchableOpacity style={styles.actionButton} onPress={() => inviteContact(item)}>
-            <Text style={styles.actionButtonText}>Invite</Text>
-          </TouchableOpacity>
-        </View>
+          <TouchableOpacity style={styles.inviteButton} onPress={() => inviteContact(item)}>
+            <Text style={styles.inviteButtonText}>Invite</Text>
+            </TouchableOpacity>
+        </TouchableOpacity>
       );
     };
 
     return (
-      <View style={{ flex: 1 }}>
-        <View style={styles.searchBarWrap}>
-          <View style={styles.searchBar}>
-            <Ionicons style={styles.searchIcon} name="search" size={18} color={Colors.textSecondary} />
-            <TextInput
-              style={styles.searchBarInput}
-              placeholder="Search friends and contacts..."
-              placeholderTextColor={Colors.textSecondary}
-              value={localQuery}
-              onChangeText={setLocalQuery}
-              autoCapitalize="none"
-            />
-            {isSearching && (
-              <View style={styles.loadingIndicator}>
-                <View style={styles.loadingDot} />
-                <View style={[styles.loadingDot, { animationDelay: '0.1s' }]} />
-                <View style={[styles.loadingDot, { animationDelay: '0.2s' }]} />
-              </View>
-            )}
-          </View>
-        </View>
-        
+      <View style={styles.searchContent}>
         <FlatList
           data={[
-            { type: 'friends', data: hits, title: 'Friends' },
+            { type: 'friends', data: filteredHits, title: 'Recent people' },
             { type: 'contacts', data: filteredContacts, title: 'Contacts' }
           ]}
           keyExtractor={(item, index) => `${item.type}-${index}`}
           renderItem={({ item: section }) => (
-            <View style={styles.sectionBlock}>
-              <Text style={styles.sectionHeader}>{section.title}</Text>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
               {section.type === 'friends' ? (
                 <FlatList
                   data={section.data}
                   keyExtractor={(friend) => friend.objectID}
-                  renderItem={({ item }) => {
-                    const name = (item.fullName || `${item.firstName || ''} ${item.lastName || ''}`).trim() || 'Unknown';
-                    const isSelected = selectedFriends.some(f => f.id === item.objectID);
-                    
-                    return (
-                      <TouchableOpacity style={styles.rowCard} onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}>
-                        <View style={styles.avatar}>
-                          {item.profilePhoto ? (
-                            <Image source={{ uri: item.profilePhoto }} style={styles.avatarImg} />
-                          ) : (
-                            <Text style={styles.initials}>{(name[0] || 'U').toUpperCase()}</Text>
-                          )}
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.name}>{name}</Text>
-                          {item.username ? <Text style={styles.username}>@{item.username}</Text> : null}
-                        </View>
-                        <TouchableOpacity 
-                          style={[styles.actionButton, isSelected && styles.actionButtonSelected]} 
-                          onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}
-                        >
-                          {isSelected ? (
-                            <Ionicons name="checkmark" size={16} color={Colors.white} />
-                          ) : (
-                            <Text style={styles.actionButtonText}>Add</Text>
-                          )}
-                        </TouchableOpacity>
-                      </TouchableOpacity>
-                    );
-                  }}
+                  renderItem={renderFriendItem}
                   scrollEnabled={false}
                 />
               ) : (
@@ -210,15 +220,48 @@ const FriendSelector = ({
               )}
             </View>
           )}
-          contentContainerStyle={styles.listPad}
           onEndReached={() => {
-            if (q.length > 0 && !isLastPage) showMore();
+            if (q.length > 0 && !isLastPage && filteredHits.length > 0 && currentUserId) showMore();
           }}
           onEndReachedThreshold={0.5}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
         />
       </View>
     );
   };
+
+  const renderMemberItem = ({ item }) => (
+    <View style={styles.memberItem}>
+      <View style={styles.memberAvatarContainer}>
+        {item.profilePhoto ? (
+          <Image source={{ uri: item.profilePhoto }} style={styles.memberAvatar} />
+        ) : (
+          <View style={styles.memberAvatarPlaceholder}>
+            <Text style={styles.memberAvatarInitials}>
+              {item.name === 'You' ? 'Y' : (item.name[0] || 'U').toUpperCase()}
+            </Text>
+          </View>
+        )}
+        {!item.isCurrentUser && (
+          <TouchableOpacity 
+            style={styles.removeButton}
+            onPress={() => removeFriend(item.id)}
+          >
+            <Ionicons name="close" size={14} color={Colors.white} />
+          </TouchableOpacity>
+        )}
+      </View>
+      <Text style={styles.memberName} numberOfLines={1}>
+        {item.name}
+      </Text>
+      {!item.isCurrentUser && item.username && (
+        <Text style={styles.memberUsername} numberOfLines={1}>
+          @{item.username}
+        </Text>
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -232,39 +275,59 @@ const FriendSelector = ({
         </TouchableOpacity>
       )}
 
-      {selectedFriends.length > 0 && (
-        <View style={styles.selectedFriendsContainer}>
-          <Text style={styles.selectedFriendsLabel}>Selected Friends:</Text>
-          {selectedFriends.map((friend) => (
-            <View key={friend.id} style={styles.selectedFriendChip}>
-              <View style={styles.friendAvatar}>
-                <ProfilePicture source={friend.profilePhoto || null} size={40} username={friend.name} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.selectedFriendName}>{friend.name}</Text>
-                {friend.username && (
-                  <Text style={styles.selectedFriendUsername}>@{friend.username}</Text>
-                )}
-              </View>
-              <DeleteButton onPress={() => onFriendsChange(selectedFriends.filter(f => f.id !== friend.id))} size="small" variant="subtle" />
-            </View>
-          ))}
-        </View>
-      )}
-
-      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <TouchableOpacity style={styles.closeButton} onPress={() => setShowModal(false)}>
-              <Ionicons name="close" size={24} color={Colors.textPrimary} />
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => {
+                // Call onClose callback if provided to update parent state
+                if (onClose) {
+                  onClose(selectedFriends);
+                }
+                setShowModal(false);
+              }}
+            >
+              <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Friends</Text>
-            <TouchableOpacity style={styles.doneButton} onPress={() => setShowModal(false)}>
-              <Ionicons name="checkmark" size={24} color={Colors.accent} />
-            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Group Members</Text>
+            </View>
           </View>
 
-          <View style={styles.modalContent}>
+          {/* Current Members */}
+          <View style={styles.membersContainer}>
+            <FlatList
+              data={allMembers}
+              horizontal
+              keyExtractor={(item) => item.id}
+              renderItem={renderMemberItem}
+              contentContainerStyle={styles.membersList}
+              showsHorizontalScrollIndicator={false}
+              scrollEnabled={true}
+              bounces={true}
+              decelerationRate="normal"
+            />
+          </View>
+
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons name="person" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name or username"
+                placeholderTextColor={Colors.textSecondary}
+                value={localQuery}
+                onChangeText={setLocalQuery}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          {/* Search Results */}
+          <View style={styles.resultsContainer}>
             <InstantSearch searchClient={searchClient} indexName="users">
               <Configure hitsPerPage={10} attributesToRetrieve={[ 'objectID','firstName','lastName','username','profilePhoto','fullName' ]} />
               <SearchPane />
@@ -288,217 +351,249 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.divider,
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 16,
+    borderRadius: Radius.sm,
+    padding: Spacing.lg,
+    marginTop: Spacing.lg,
+    ...Shadows.card,
   },
   selectButtonText: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    marginLeft: Spacing.md,
+    ...Typography.body1,
     color: Colors.textPrimary,
   },
-  
-  // Selected friends section
-  selectedFriendsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    paddingTop: 16,
-    marginTop: 16,
-  },
-  selectedFriendsLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  selectedFriendChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  selectedFriendName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.textPrimary,
-  },
-  selectedFriendUsername: {
-    fontSize: 14,
-    color: Colors.accent,
-    marginBottom: 4,
-  },
-  
+
   // Modal
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
+
   },
+
+  // Header
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    backgroundColor: Colors.surface,
     paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
   },
-  closeButton: {
-    padding: 8,
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.xl,
   },
-  doneButton: {
-    padding: 8,
+  headerContent: {
+    alignItems: 'flex-start',
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+  headerTitle: {
+    ...Typography.h1,
     color: Colors.textPrimary,
-    flex: 1,
+    marginBottom: Spacing.sm,
+  },
+  headerSubtitle: {
+    ...Typography.body1,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+  },
+
+  // Members section
+  membersContainer: {
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.xl, // Add horizontal padding to container
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+    overflow: 'visible', // Ensure X buttons are not clipped
+    minHeight: 120,
+  },
+  membersList: {
+    paddingHorizontal: 0,
+    backgroundColor: Colors.surface,
+
+    paddingVertical: 20, // Remove vertical padding since container handles it
+  },
+  memberItem: {
+    alignItems: 'center',
+    marginRight: Spacing.lg,
+    width: 90, // Increased width to accommodate the X button
+    paddingHorizontal: 8, // Add padding to prevent X button cutoff
+    flexShrink: 0, // Prevent items from shrinking
+  },
+  memberAvatarContainer: {
+    position: 'relative',
+    width: 70, // Fixed width container
+    height: 70, // Fixed height container
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  memberAvatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarInitials: {
+    color: Colors.white,
+    fontSize: 20,
+    fontFamily: Typography.familySemiBold,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: -4,
+    right: -4, // Adjusted position to be within the container bounds
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+  },
+  memberName: {
+    ...Typography.body,
+    fontFamily: Typography.familyMedium,
+    color: Colors.textPrimary,
     textAlign: 'center',
   },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
+  memberUsername: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
   },
-  
+
   // Search
-  searchBarWrap: {
-    paddingBottom: 16,
-    paddingHorizontal: 20,
+  searchContainer: {
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 36,
-    borderWidth: 0.5,
-    borderColor: Colors.divider,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.lg,
+    height: 48,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: Spacing.md,
   },
-  searchBarInput: {
+  searchInput: {
     flex: 1,
-    paddingVertical: 8,
-    fontSize: 15,
+    ...Typography.body1,
     color: Colors.textPrimary,
   },
-  
-  // List items
-  listPad: {
-    paddingHorizontal: 0,
+
+  // Results
+  resultsContainer: {
+    backgroundColor: Colors.surface,
+    flex: 1, // Take remaining space
   },
-  rowCard: {
+  searchContent: {
+    flex: 1, // Take remaining space
+  },
+  section: {
+    marginBottom: Spacing.xxl,
+    marginTop: Spacing.lg, // Add top margin for first section
+  },
+  sectionTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.lg, // Add top margin above section titles
+    paddingHorizontal: Spacing.xl,
+  },
+  listItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 0.5,
     borderBottomColor: Colors.divider,
-    backgroundColor: Colors.background,
   },
-  sectionBlock: {
-    marginBottom: 16,
+  avatarContainer: {
+    marginRight: Spacing.lg,
   },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    paddingHorizontal: 20,
-  },
-  
-  // Avatar
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.accent,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  avatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.textSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
   },
-  avatarImg: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 22,
-  },
-  initials: {
+  avatarInitials: {
     color: Colors.white,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontFamily: Typography.familySemiBold,
   },
-  placeholderAvatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+  userInfo: {
+    flex: 1,
   },
-  placeholderInitials: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  
-  // Text
-  name: {
-    fontSize: 15,
-    fontWeight: '500',
+  userName: {
+    ...Typography.body1,
+    fontFamily: Typography.familyMedium,
     color: Colors.textPrimary,
     marginBottom: 2,
   },
-  username: {
-    fontSize: 13,
+  userHandle: {
+    ...Typography.body,
+    color: Colors.blue,
+  },
+  userPhone: {
+    ...Typography.body,
     color: Colors.textSecondary,
   },
-  subtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  
-  // Buttons
-  actionButton: {
-    backgroundColor: Colors.surface,
+  addButton: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
     borderWidth: 1,
-    borderColor: Colors.divider,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    borderColor: Colors.border,
+    minWidth: 60,
+    alignItems: 'center',
   },
-  actionButtonSelected: {
+  addButtonSelected: {
     backgroundColor: Colors.success,
-    borderWidth: 0,
+    borderColor: Colors.success,
   },
-  actionButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
+  addButtonText: {
+    ...Typography.body2,
+    fontFamily: Typography.familySemiBold,
     color: Colors.textSecondary,
   },
-  
-  // Loading
-  loadingIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: 16,
+  inviteButton: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 60,
+    alignItems: 'center',
   },
-  loadingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: Colors.accent,
-    marginHorizontal: 3,
+  inviteButtonText: {
+    ...Typography.body2,
+    fontFamily: Typography.familySemiBold,
+    color: Colors.textSecondary,
   },
 });
 
