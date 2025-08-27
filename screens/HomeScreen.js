@@ -780,6 +780,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minWidth: 70,
     justifyContent: 'center',
+    marginRight: Spacing.sm,
   },
   typeText: {
     ...Typography.label,
