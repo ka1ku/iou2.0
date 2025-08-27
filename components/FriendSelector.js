@@ -7,125 +7,266 @@ import {
   FlatList,
   TextInput,
   Modal,
-  Alert
+  Image,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
+import { Colors, Shadows, Typography, Spacing, Radius } from '../design/tokens';
 import ProfilePicture from '../components/VenmoProfilePicture';
 import DeleteButton from '../components/DeleteButton';
+import * as Contacts from 'expo-contacts';
+import algoliasearch from 'algoliasearch';
+import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
 import { getCurrentUser } from '../services/authService';
-import { getUserFriends } from '../services/friendService';
+
+const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
 
 const FriendSelector = ({ 
   selectedFriends, 
   onFriendsChange, 
-  maxFriends = null, // Remove limit - can have unlimited friends
   showAddButton = true,
   placeholder = "Select friends to split with...",
   allowPlaceholders = true,
-  onAddPlaceholder
+  onAddPlaceholder,
+  onClose
 }) => {
-  const [friends, setFriends] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [newPlaceholder, setNewPlaceholder] = useState({ name: '', phone: '' });
+  const [contacts, setContacts] = useState([]);
+  const [localQuery, setLocalQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   useEffect(() => {
-    loadFriends();
+    initContacts();
   }, []);
 
-  const loadFriends = async () => {
+  const initContacts = async () => {
     try {
-      setLoading(true);
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        const userFriends = await getUserFriends(currentUser.uid);
-        setFriends(userFriends);
+      const { status: existingStatus } = await Contacts.getPermissionsAsync();
+      if (existingStatus !== 'granted') {
+        const { status } = await Contacts.requestPermissionsAsync();
+        if (status !== 'granted') return;
       }
-    } catch (error) {
-      console.error('Error loading friends:', error);
-    } finally {
-      setLoading(false);
+      const { data } = await Contacts.getContactsAsync({
+        fields: [
+          Contacts.Fields.FirstName,
+          Contacts.Fields.LastName,
+          Contacts.Fields.Name,
+          Contacts.Fields.PhoneNumbers,
+          Contacts.Fields.Image,
+        ],
+      });
+      setContacts(data || []);
+    } catch (e) {
+      console.error('Contacts error', e);
     }
   };
 
-  const filteredFriends = friends.filter(friend => {
-    const fullName = `${friend.friendData.firstName} ${friend.friendData.lastName}`.toLowerCase();
-    const search = searchQuery.toLowerCase();
-    return fullName.includes(search) || 
-           (friend.friendData.venmoUsername && friend.friendData.venmoUsername.toLowerCase().includes(search));
-  });
-
-  const toggleFriendSelection = (friend) => {
-    const isSelected = selectedFriends.some(selected => selected.id === friend.friendId);
-    
+  const toggleSelectUser = (user) => {
+    const isSelected = selectedFriends.some(f => f.id === user.id);
     if (isSelected) {
-      // Remove friend
-      const updated = selectedFriends.filter(selected => selected.id !== friend.friendId);
+      const updated = selectedFriends.filter(f => f.id !== user.id);
       onFriendsChange(updated);
     } else {
-      // Add friend (no limit)
-      const newFriend = {
-        id: friend.friendId,
-        name: `${friend.friendData.firstName || ''} ${friend.friendData.lastName || ''}`.trim() || 'Unknown Name',
-        username: friend.friendData.venmoUsername,
-        profilePhoto: friend.friendData.profilePhoto
-      };
-      
-      onFriendsChange([...selectedFriends, newFriend]);
+      onFriendsChange([...selectedFriends, user]);
     }
   };
 
-  const removeSelectedFriend = (friendId) => {
-    const updated = selectedFriends.filter(friend => friend.id !== friendId);
+  const inviteContact = (contact) => {
+    if (!allowPlaceholders) return;
+    const name = (contact.firstName && contact.lastName)
+      ? `${contact.firstName} ${contact.lastName}`
+      : (contact.name || 'Unknown');
+    const ghost = {
+      id: `ghost-${Date.now()}`,
+      name,
+      isPlaceholder: true,
+    };
+    onAddPlaceholder?.(ghost);
+  };
+
+  const removeFriend = (friendId) => {
+    const updated = selectedFriends.filter(f => f.id !== friendId);
     onFriendsChange(updated);
   };
 
-  const renderFriendItem = ({ item }) => {
-    const isSelected = selectedFriends.some(selected => selected.id === item.friendId);
+  // Add current user to the member list
+  const getCurrentUserData = () => {
+    const currentUser = getCurrentUser();
+    return {
+      id: 'current-user',
+      name: 'You',
+      profilePhoto: currentUser?.profilePhoto,
+      isCurrentUser: true
+    };
+  };
+
+  const allMembers = [getCurrentUserData(), ...selectedFriends];
+
+  const SearchPane = () => {
+    const { hits, isLastPage, showMore } = useInfiniteHits();
+    const { refine } = useSearchBox();
     
-    return (
-      <TouchableOpacity
-        style={[styles.friendItem, isSelected && styles.friendItemSelected]}
-        onPress={() => toggleFriendSelection(item)}
-      >
-        <View style={styles.friendInfo}>
-          <View style={styles.friendAvatar}>
-            <ProfilePicture
-              source={item.friendData.profilePhoto}
-              size={40}
-              username={item.friendData.venmoUsername || `${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`}
-            />
-          </View>
-          <View style={styles.friendDetails}>
-            <Text style={styles.friendName}>
-              {`${item.friendData.firstName || ''} ${item.friendData.lastName || ''}`.trim() || 'Unknown Name'}
-            </Text>
-            {item.friendData.venmoUsername && (
-              <Text style={styles.friendVenmo}>@{item.friendData.venmoUsername}</Text>
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        setDebouncedQuery(localQuery);
+        refine(localQuery);
+      }, 300);
+      return () => clearTimeout(timer);
+    }, [localQuery, refine]);
+
+    const q = (debouncedQuery || '').trim().toLowerCase();
+
+    // Get current user to filter out from results
+    const currentUser = getCurrentUser();
+    const currentUserId = currentUser?.uid;
+
+    // Filter contacts by query and exclude current user
+    const filteredContacts = contacts.filter(c => {
+      if (q.length === 0) return true;
+      const name = (c.firstName && c.lastName) ? `${c.firstName} ${c.lastName}` : (c.name || '');
+      const phone = (c.phoneNumbers?.[0]?.number || '').toLowerCase();
+      return name.toLowerCase().includes(q) || phone.includes(q);
+    });
+
+    // Filter out current user from Algolia search results
+    const filteredHits = currentUserId ? hits.filter(friend => friend && friend.objectID && friend.objectID !== currentUserId) : hits;
+
+    const renderFriendItem = ({ item }) => {
+      const name = (item.fullName || `${item.firstName || ''} ${item.lastName || ''}`).trim() || 'Unknown';
+      const isSelected = selectedFriends.some(f => f.id === item.objectID);
+      
+      return (
+        <TouchableOpacity style={styles.listItem} onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}>
+          <View style={styles.avatarContainer}>
+            {item.profilePhoto ? (
+              <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
+              </View>
             )}
           </View>
-        </View>
-        <View style={styles.selectionIndicator}>
-          {isSelected && (
-            <Ionicons name="checkmark-circle" size={24} color={Colors.accent} />
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{name}</Text>
+            {item.username && <Text style={styles.userHandle}>@{item.username}</Text>}
+          </View>
+          <TouchableOpacity 
+            style={[styles.addButton, isSelected && styles.addButtonSelected]} 
+            onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}
+          >
+            {isSelected ? (
+              <Ionicons name="checkmark" size={16} color={Colors.white} />
+            ) : (
+              <Text style={styles.addButtonText}>Add</Text>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      );
+    };
+
+    const renderContact = ({ item }) => {
+      const name = (item.firstName && item.lastName)
+        ? `${item.firstName} ${item.lastName}`
+        : (item.name || 'Unknown Contact');
+      const phone = item.phoneNumbers?.[0]?.number || '';
+      
+      return (
+        <TouchableOpacity style={styles.listItem} onPress={() => inviteContact(item)}>
+          <View style={styles.avatarContainer}>
+            {item.imageAvailable && item.image?.uri ? (
+              <Image source={{ uri: item.image.uri }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{name}</Text>
+            <Text style={styles.userPhone}>{phone}</Text>
+          </View>
+          <TouchableOpacity style={styles.inviteButton} onPress={() => inviteContact(item)}>
+            <Text style={styles.inviteButtonText}>Invite</Text>
+            </TouchableOpacity>
+        </TouchableOpacity>
+      );
+    };
+
+    return (
+      <View style={styles.searchContent}>
+        <FlatList
+          data={[
+            { type: 'friends', data: filteredHits, title: 'Recent people' },
+            { type: 'contacts', data: filteredContacts, title: 'Contacts' }
+          ]}
+          keyExtractor={(item, index) => `${item.type}-${index}`}
+          renderItem={({ item: section }) => (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              {section.type === 'friends' ? (
+                <FlatList
+                  data={section.data}
+                  keyExtractor={(friend) => friend.objectID}
+                  renderItem={renderFriendItem}
+                  scrollEnabled={false}
+                />
+              ) : (
+                <FlatList
+                  data={section.data}
+                  keyExtractor={(contact, index) => `contact-${index}`}
+                  renderItem={renderContact}
+                  scrollEnabled={false}
+                />
+              )}
+            </View>
           )}
-        </View>
-      </TouchableOpacity>
+          onEndReached={() => {
+            if (q.length > 0 && !isLastPage && filteredHits.length > 0 && currentUserId) showMore();
+          }}
+          onEndReachedThreshold={0.5}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled={true}
+        />
+      </View>
     );
   };
 
-
+  const renderMemberItem = ({ item }) => (
+    <View style={styles.memberItem}>
+      <View style={styles.memberAvatarContainer}>
+        {item.profilePhoto ? (
+          <Image source={{ uri: item.profilePhoto }} style={styles.memberAvatar} />
+        ) : (
+          <View style={styles.memberAvatarPlaceholder}>
+            <Text style={styles.memberAvatarInitials}>
+              {item.name === 'You' ? 'Y' : (item.name[0] || 'U').toUpperCase()}
+            </Text>
+          </View>
+        )}
+        {!item.isCurrentUser && (
+          <TouchableOpacity 
+            style={styles.removeButton}
+            onPress={() => removeFriend(item.id)}
+          >
+            <Ionicons name="close" size={14} color={Colors.white} />
+          </TouchableOpacity>
+        )}
+      </View>
+      <Text style={styles.memberName} numberOfLines={1}>
+        {item.name}
+      </Text>
+      {!item.isCurrentUser && item.username && (
+        <Text style={styles.memberUsername} numberOfLines={1}>
+          @{item.username}
+        </Text>
+      )}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
-      {/* Friend Selection Button */}
       {showAddButton && (
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setShowModal(true)}
-        >
+        <TouchableOpacity style={styles.selectButton} onPress={() => setShowModal(true)}>
           <Ionicons name="people-outline" size={20} color={Colors.accent} />
           <Text style={styles.selectButtonText}>
             {selectedFriends.length === 0 ? placeholder : `Add/Remove Friends (${selectedFriends.length})`}
@@ -134,334 +275,326 @@ const FriendSelector = ({
         </TouchableOpacity>
       )}
 
-      {/* Selected Friends Display */}
-      {selectedFriends.length > 0 && (
-        <View style={styles.selectedFriendsContainer}>
-          <Text style={styles.selectedFriendsLabel}>Selected Friends:</Text>
-          {selectedFriends.map((friend) => (
-            <View key={friend.id} style={styles.selectedFriendChip}>
-              <View style={styles.friendAvatar}>
-                <ProfilePicture
-                  source={friend.profilePhoto || null}
-                  size={40}
-                  username={friend.name}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.selectedFriendName}>{friend.name}</Text>
-                {friend.username && (
-                  <Text style={styles.selectedFriendUsername}>@{friend.username}</Text>
-                )}
-              </View>
-              <DeleteButton
-                onPress={() => removeSelectedFriend(friend.id)}
-                size="small"
-                variant="subtle"
-              />
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Friend Selection Modal */}
-      <Modal
-        visible={showModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowModal(false)}
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => {
+                // Call onClose callback if provided to update parent state
+                if (onClose) {
+                  onClose(selectedFriends);
+                }
+                setShowModal(false);
+              }}
             >
-              <Ionicons name="close" size={24} color={Colors.textPrimary} />
+              <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Select Friends</Text>
-            <TouchableOpacity
-              style={styles.doneButton}
-              onPress={() => setShowModal(false)}
-            >
-              <Ionicons name="checkmark" size={24} color={Colors.accent} />
-            </TouchableOpacity>
+            <View style={styles.headerContent}>
+              <Text style={styles.headerTitle}>Group Members</Text>
+            </View>
           </View>
 
-          <View style={styles.modalContent}>
-            {/* Search Bar */}
-            <View style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color={Colors.textSecondary} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search friends or add placeholder"
-                placeholderTextColor={Colors.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
-
-            {/* Quick Add Placeholder (integrated with search) */}
-            {allowPlaceholders && searchQuery.trim().length > 0 && (
-              <View style={styles.quickAddCard}>
-                <View style={styles.quickAddRow}>
-                  <Ionicons name="person-add" size={20} color={Colors.accent} />
-                  <Text style={styles.quickAddText}>
-                    Add "{searchQuery.trim()}" as placeholder
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.quickAddButton}
-                    onPress={() => {
-                      const name = searchQuery.trim();
-                      if (!name) return;
-                      const ghost = {
-                        id: `ghost-${Date.now()}`,
-                        name,
-                        isPlaceholder: true,
-                      };
-                      onAddPlaceholder?.(ghost);
-                      setSearchQuery('');
-                      setNewPlaceholder({ name: '', phone: '' });
-                      setShowModal(false); // Close modal after adding placeholder
-                    }}
-                  >
-                    <Text style={styles.quickAddButtonText}>Add</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* Friends List */}
+          {/* Current Members */}
+          <View style={styles.membersContainer}>
             <FlatList
-              data={filteredFriends}
-              renderItem={renderFriendItem}
-              keyExtractor={(item) => item.friendId}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.friendsList}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Ionicons name="people-outline" size={48} color={Colors.textSecondary} />
-                  <Text style={styles.emptyStateText}>
-                    {loading ? 'Loading friends...' : 'No friends found'}
-                  </Text>
-                  {!loading && searchQuery && (
-                    <Text style={styles.emptyStateSubtext}>
-                      Try adjusting your search terms
-                    </Text>
-                  )}
-                </View>
-              }
+              data={allMembers}
+              horizontal
+              keyExtractor={(item) => item.id}
+              renderItem={renderMemberItem}
+              contentContainerStyle={styles.membersList}
+              showsHorizontalScrollIndicator={false}
+              scrollEnabled={true}
+              bounces={true}
+              decelerationRate="normal"
             />
           </View>
 
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <View style={styles.searchBar}>
+              <Ionicons name="person" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name or username"
+                placeholderTextColor={Colors.textSecondary}
+                value={localQuery}
+                onChangeText={setLocalQuery}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
 
+          {/* Search Results */}
+          <View style={styles.resultsContainer}>
+            <InstantSearch searchClient={searchClient} indexName="users">
+              <Configure hitsPerPage={10} attributesToRetrieve={[ 'objectID','firstName','lastName','username','profilePhoto','fullName' ]} />
+              <SearchPane />
+            </InstantSearch>
+          </View>
         </View>
       </Modal>
-
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
   },
-  selectedFriendsContainer: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    paddingTop: Spacing.md,
-    marginTop: Spacing.md,
-  },
-  selectedFriendsLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontSize: 12,
-  },
-
-  selectedFriendChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.card,
-  },
-  selectedFriendName: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-  },
-  selectedFriendUsername: {
-    ...Typography.body,
-    color: Colors.accent,
-    marginBottom: Spacing.xs,
-  },
-  friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-
+  
+  // Main button
   selectButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.divider,
-    borderRadius: Radius.sm, // Slightly more rounded
-    padding: Spacing.lg, // More padding for better touch target
-    marginTop: Spacing.md, // Add top margin for better spacing
+    borderRadius: Radius.sm,
+    padding: Spacing.lg,
+    marginTop: Spacing.lg,
     ...Shadows.card,
   },
   selectButtonText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
     flex: 1,
-    marginLeft: Spacing.sm,
+    marginLeft: Spacing.md,
+    ...Typography.body1,
+    color: Colors.textPrimary,
   },
+
+  // Modal
   modalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: 60,
-    paddingBottom: Spacing.lg,
     backgroundColor: Colors.surface,
+
+  },
+
+  // Header
+  modalHeader: {
+    backgroundColor: Colors.surface,
+    paddingTop: 60,
+    paddingHorizontal: Spacing.xl,
+    paddingBottom: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
-  closeButton: {
-    padding: Spacing.sm,
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.xl,
   },
-  doneButton: {
-    padding: Spacing.sm,
+  headerContent: {
+    alignItems: 'flex-start',
   },
-  modalTitle: {
-    ...Typography.h2,
+  headerTitle: {
+    ...Typography.h1,
     color: Colors.textPrimary,
-    flex: 1,
+    marginBottom: Spacing.sm,
+  },
+  headerSubtitle: {
+    ...Typography.body1,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+  },
+
+  // Members section
+  membersContainer: {
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.xl, // Add horizontal padding to container
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+    overflow: 'visible', // Ensure X buttons are not clipped
+    minHeight: 120,
+  },
+  membersList: {
+    paddingHorizontal: 0,
+    backgroundColor: Colors.surface,
+
+    paddingVertical: 20, // Remove vertical padding since container handles it
+  },
+  memberItem: {
+    alignItems: 'center',
+    marginRight: Spacing.lg,
+    width: 90, // Increased width to accommodate the X button
+    paddingHorizontal: 8, // Add padding to prevent X button cutoff
+    flexShrink: 0, // Prevent items from shrinking
+  },
+  memberAvatarContainer: {
+    position: 'relative',
+    width: 70, // Fixed width container
+    height: 70, // Fixed height container
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  memberAvatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarInitials: {
+    color: Colors.white,
+    fontSize: 20,
+    fontFamily: Typography.familySemiBold,
+  },
+  removeButton: {
+    position: 'absolute',
+    top: -4,
+    right: -4, // Adjusted position to be within the container bounds
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+  },
+  memberName: {
+    ...Typography.body,
+    fontFamily: Typography.familyMedium,
+    color: Colors.textPrimary,
     textAlign: 'center',
   },
-  headerSpacer: {
-    width: 40,
+  memberUsername: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 2,
   },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
-  },
+
+  // Search
   searchContainer: {
+    backgroundColor: Colors.surface,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.lg,
+    height: 48,
     borderWidth: 1,
-    borderColor: Colors.divider,
+    borderColor: Colors.border,
+  },
+  searchIcon: {
+    marginRight: Spacing.md,
   },
   searchInput: {
     flex: 1,
-    padding: Spacing.md,
-    ...Typography.body,
+    ...Typography.body1,
     color: Colors.textPrimary,
   },
-  friendsList: {
-    paddingBottom: Spacing.xl,
-  },
-  friendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  friendItemSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + '10',
-  },
-  friendInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.md,
-  },
-  friendInitials: {
-    ...Typography.title,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  friendDetails: {
-    flex: 1,
-  },
-  friendName: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  friendVenmo: {
-    ...Typography.label,
-    color: Colors.accent,
-  },
-  selectionIndicator: {
-    width: 24,
-    alignItems: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: Spacing.xl,
-  },
-  emptyStateText: {
-    ...Typography.title,
-    color: Colors.textSecondary,
-    marginTop: Spacing.sm,
-  },
-  emptyStateSubtext: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-    textAlign: 'center',
-  },
-  quickAddCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    ...Shadows.card,
-  },
-  quickAddRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  quickAddText: { ...Typography.body, color: Colors.textPrimary, flex: 1, marginLeft: Spacing.sm },
-  quickAddButton: { backgroundColor: Colors.accent, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.pill },
-  quickAddButtonText: { ...Typography.label, color: Colors.surface, fontWeight: '600' },
 
+  // Results
+  resultsContainer: {
+    backgroundColor: Colors.surface,
+    flex: 1, // Take remaining space
+  },
+  searchContent: {
+    flex: 1, // Take remaining space
+  },
+  section: {
+    marginBottom: Spacing.xxl,
+    marginTop: Spacing.lg, // Add top margin for first section
+  },
+  sectionTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.lg, // Add top margin above section titles
+    paddingHorizontal: Spacing.xl,
+  },
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.divider,
+  },
+  avatarContainer: {
+    marginRight: Spacing.lg,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  avatarPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.textSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    color: Colors.white,
+    fontSize: 18,
+    fontFamily: Typography.familySemiBold,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    ...Typography.body1,
+    fontFamily: Typography.familyMedium,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  userHandle: {
+    ...Typography.body,
+    color: Colors.blue,
+  },
+  userPhone: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+  },
+  addButton: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  addButtonSelected: {
+    backgroundColor: Colors.success,
+    borderColor: Colors.success,
+  },
+  addButtonText: {
+    ...Typography.body2,
+    fontFamily: Typography.familySemiBold,
+    color: Colors.textSecondary,
+  },
+  inviteButton: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  inviteButtonText: {
+    ...Typography.body2,
+    fontFamily: Typography.familySemiBold,
+    color: Colors.textSecondary,
+  },
 });
 
 export default FriendSelector;

@@ -33,10 +33,7 @@ import VenmoLinkScreen from './screens/VenmoLinkScreen';
 import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
 // TwoFactorAuthScreen removed
 import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
-
 import FriendProfileScreen from './screens/FriendProfileScreen';
-import FriendsScreen from './screens/FriendsScreen';
-import FriendInvitationHandler from './components/FriendInvitationHandler';
 import ExpenseJoinHandler from './components/ExpenseJoinHandler';
 
 const Tab = createBottomTabNavigator();
@@ -84,24 +81,6 @@ const ProfileStack = () => {
         options={{ headerShown: false }}
       />
 
-      <Stack.Screen
-        name="FriendProfile"
-        component={FriendProfileScreen}
-        options={{ headerShown: false }}
-      />
-    </Stack.Navigator>
-  );
-};
-
-// Stack navigator for Friends tab (includes FriendProfile)
-const FriendsStack = () => {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="FriendsMain"
-        component={FriendsScreen}
-        options={{ headerShown: false }}
-      />
       <Stack.Screen
         name="FriendProfile"
         component={FriendProfileScreen}
@@ -166,8 +145,6 @@ const MainTabs = () => {
 
             if (route.name === 'Home') {
               iconName = focused ? 'home' : 'home-outline';
-            } else if (route.name === 'Friends') {
-              iconName = focused ? 'people' : 'people-outline';
             } else if (route.name === 'Profile') {
               iconName = focused ? 'person' : 'person-outline';
             }
@@ -196,10 +173,6 @@ const MainTabs = () => {
         <Tab.Screen
           name="Home"
           component={HomeStack}
-        />
-        <Tab.Screen
-          name="Friends"
-          component={FriendsStack}
         />
         <Tab.Screen
           name="Profile"
@@ -316,7 +289,6 @@ export default function App() {
         <StatusBar style="dark" />
         <ReceiptScanningProvider>
           {user ? <MainTabs /> : <AuthStack />}
-          <FriendInvitationHandler />
           <ExpenseJoinHandler />
         </ReceiptScanningProvider>
       </NavigationContainer>

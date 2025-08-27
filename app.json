@@ -43,7 +43,8 @@
       "infoPlist": {
         "LSApplicationQueriesSchemes": [
           "venmo"
-        ]
+        ],
+        "NSContactsUsageDescription": "This app needs access to your contacts to help you find and connect with people you know, whether they're already using the app or just in your phone contacts."
       }
     },
     "android": {
@@ -53,7 +54,8 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.READ_CONTACTS"
       ]
     },
     "plugins": [
@@ -75,7 +77,13 @@
           "cameraPermission": "The app accesses your camera to take photos of receipts for expense scanning."
         }
       ],
-      "expo-file-system"
+      "expo-file-system",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts."
+        }
+      ]
     ],
     "extra": {
       "eas": {

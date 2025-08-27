@@ -391,6 +391,22 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.settingText}>Component Demo</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('UserSearchDemo')}
+          >
+            <Ionicons name="search-outline" size={24} color={Colors.accent} />
+            <Text style={styles.settingText}>User Search Demo</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('AlgoliaSearchDemo')}
+          >
+            <Ionicons name="flash-outline" size={24} color={Colors.accent} />
+            <Text style={styles.settingText}>Algolia Search Demo</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.accent} />
+          </TouchableOpacity>
 
         </View>
       </View>
