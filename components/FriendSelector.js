@@ -404,13 +404,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
     overflow: 'visible', // Ensure X buttons are not clipped
-    minHeight: 120,
+    height: 140, // Fixed height to prevent layout shifts
   },
   membersList: {
     paddingHorizontal: 0,
+    paddingTop: 20,
     backgroundColor: Colors.surface,
-
-    paddingVertical: 20, // Remove vertical padding since container handles it
+    paddingVertical: 0, // Container now handles vertical padding
   },
   memberItem: {
     alignItems: 'center',
@@ -418,6 +418,7 @@ const styles = StyleSheet.create({
     width: 90, // Increased width to accommodate the X button
     paddingHorizontal: 8, // Add padding to prevent X button cutoff
     flexShrink: 0, // Prevent items from shrinking
+    height: 100, // Fixed height for consistent sizing
   },
   memberAvatarContainer: {
     position: 'relative',
@@ -461,6 +462,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.familyMedium,
     color: Colors.textPrimary,
     textAlign: 'center',
+    
   },
   memberUsername: {
     ...Typography.body2,
