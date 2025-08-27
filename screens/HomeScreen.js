@@ -512,14 +512,32 @@ Important guidelines:
                      (item.items && item.items.length > 1); // Multiple items often indicate a receipt
     const isExpense = item.expenseType === 'expense' || !isReceipt;
     
-    // Calculate payment summary
+    // Calculate payment summary for selected payers
     const paymentSummary = {};
-    item.items?.forEach(expenseItem => {
-      const paidByIndex = expenseItem.paidBy || 0;
-      const paidByName = item.participants?.[paidByIndex]?.name || 'Unknown';
-      const itemAmount = parseFloat(expenseItem.amount) || 0;
-      paymentSummary[paidByName] = (paymentSummary[paidByName] || 0) + itemAmount;
+    console.log(item);
+
+    // Ensure selectedPayers is an array of indices
+    const paidByIndices = Array.isArray(item.selectedPayers)
+      ? item.selectedPayers
+      : typeof item.selectedPayers === 'number'
+        ? [item.selectedPayers]
+        : [];
+
+    // Calculate total amount to be paid by selected payers
+    const totalAmount = parseFloat(item.total) || 0;
+    
+    // If there are multiple payers, split the total amount equally among them
+    const splitAmount = paidByIndices.length > 0 ? totalAmount / paidByIndices.length : 0;
+
+    paidByIndices.forEach(idx => {
+      const paidByName = item.participants?.[idx]?.name || 'Unknown';
+      paymentSummary[paidByName] = (paymentSummary[paidByName] || 0) + splitAmount;
     });
+
+    // If no payers are specified, assign the whole amount to 'Unknown'
+    if (paidByIndices.length === 0) {
+      paymentSummary['Unknown'] = (paymentSummary['Unknown'] || 0) + totalAmount;
+    }
 
     const handleItemPress = () => {
       if (isReceipt) {

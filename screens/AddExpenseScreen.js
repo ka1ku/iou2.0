@@ -21,7 +21,7 @@ import FriendSelector from '../components/FriendSelector';
 import InviteFriendSheet from '../components/InviteFriendSheet';
 import PriceInput from '../components/PriceInput';
 import DeleteButton from '../components/DeleteButton';
-import { ItemHeader, PriceInputSection, PaidBySection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection } from './AddExpenseScreenItems';
+import { ItemHeader, PriceInputSection, PaidBySection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection, CombinedConsumersAndSplitSection } from './AddExpenseScreenItems';
 import {
   updateItem,
   updateItemSplit,
@@ -467,11 +467,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               onPayersChange={setSelectedPayers}
             />
           </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}> Expense Details </Text>
             {items.map(handleRenderItem)}
-          </View>
         </ScrollView>
 
         <View style={styles.footer}>
@@ -662,7 +658,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.md,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
     ...Shadows.card,
     elevation: 8,
     shadowColor: '#000',

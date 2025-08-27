@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { ItemHeader, PriceInputSection, WhoConsumedSection, SmartSplitSection } from '../AddExpenseScreenItems';
+import { ItemHeader, PriceInputSection, CombinedConsumersAndSplitSection } from '../AddExpenseScreenItems';
 
 const renderItem = (
   item,
@@ -25,7 +25,7 @@ const renderItem = (
         onAmountChange={(amount) => updateItem(index, 'amount', amount, items, setItems, fees, setFees)}
       />
 
-      <WhoConsumedSection
+      <CombinedConsumersAndSplitSection
         participants={participants}
         selectedConsumers={item.selectedConsumers || [0]}
         onConsumersChange={(consumers) => {
@@ -55,11 +55,6 @@ const renderItem = (
           }
           setItems(updated);
         }}
-      />
-
-      <SmartSplitSection
-        participants={participants}
-        selectedConsumers={item.selectedConsumers || [0]}
         total={parseFloat(item.amount) || 0}
         initialSplits={item.splits || []}
         onSplitsChange={(newSplits) => {

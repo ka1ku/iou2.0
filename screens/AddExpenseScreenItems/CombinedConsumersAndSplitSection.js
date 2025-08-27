@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography } from '../design/tokens';
-import PriceInput from './PriceInput';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import PriceInput from '../../components/PriceInput';
 
-const SmartSplitInput = ({
+const CombinedConsumersAndSplitSection = ({
   participants,
+  selectedConsumers,
+  onConsumersChange,
   total,
   initialSplits = [],
   onSplitsChange,
@@ -20,21 +22,21 @@ const SmartSplitInput = ({
   const [participantStates, setParticipantStates] = useState([]);
   const [error, setError] = useState(null);
 
-  // Initialize when component mounts or participants/total change
+  // Initialize when component mounts or participants/total/selectedConsumers change
   useEffect(() => {
     if (participants.length > 0 && total > 0) {
       initializeParticipants();
     }
-  }, [participants.length, total]);
+  }, [participants.length, total, selectedConsumers]);
 
   // Initialize all participants with even split and unlocked
   const initializeParticipants = useCallback(() => {
     if (participants.length === 0 || total <= 0) return;
 
-    const evenAmount = total / participants.length;
+    const evenAmount = selectedConsumers.length > 0 ? total / selectedConsumers.length : 0;
     const newStates = participants.map((_, index) => ({
-      amount: evenAmount,
-      locked: false,
+      amount: selectedConsumers.includes(index) ? evenAmount : 0,
+      locked: false, // All participants start unlocked
     }));
 
     setParticipantStates(newStates);
@@ -43,7 +45,7 @@ const SmartSplitInput = ({
     if (onSplitsChange) {
       onSplitsChange(newStates.map(state => ({ amount: state.amount })));
     }
-  }, [participants, total, onSplitsChange]);
+  }, [participants, total, selectedConsumers, onSplitsChange]);
 
   // Calculate remaining balance to distribute among unlocked users
   const calculateRemainingBalance = useCallback((states) => {
@@ -56,7 +58,9 @@ const SmartSplitInput = ({
 
   // Distribute remaining balance evenly among unlocked users
   const distributeRemainingBalance = useCallback((states) => {
-    const unlockedIndices = states.map((state, index) => state.locked ? null : index).filter(i => i !== null);
+    const unlockedIndices = states.map((state, index) => 
+      state.locked ? null : index
+    ).filter(i => i !== null && selectedConsumers.includes(i));
     
     if (unlockedIndices.length === 0) return states;
     
@@ -84,7 +88,7 @@ const SmartSplitInput = ({
     });
     
     return newStates;
-  }, [calculateRemainingBalance]);
+  }, [calculateRemainingBalance, selectedConsumers]);
 
   // Handle amount change for a specific participant
   const handleAmountChange = useCallback((index, value) => {
@@ -200,6 +204,18 @@ const SmartSplitInput = ({
     }
   }, [participantStates, distributeRemainingBalance, onSplitsChange]);
 
+  // Toggle consumer selection
+  const toggleConsumer = (participantIndex) => {
+    const newConsumers = selectedConsumers.includes(participantIndex)
+      ? selectedConsumers.filter(i => i !== participantIndex)
+      : [...selectedConsumers, participantIndex];
+    
+    // Ensure at least one consumer is selected
+    if (newConsumers.length > 0) {
+      onConsumersChange(newConsumers);
+    }
+  };
+
   // Calculate allocated and unallocated amounts
   const allocatedAmount = participantStates.reduce((sum, state) => sum + (state.amount || 0), 0);
   const unallocatedAmount = Math.max(0, total - allocatedAmount);
@@ -210,14 +226,21 @@ const SmartSplitInput = ({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Header with unallocated info */}
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.label}>Split</Text>
+        <View style={styles.splitMethod}>
+          <Text style={styles.splitMethodText}>As Amounts</Text>
+          <Ionicons name="swap-vertical" size={16} color={Colors.textSecondary} />
+        </View>
+      </View>
+
+      {/* Unallocated info */}
       {unallocatedAmount > 0 && (
-        <View style={styles.header}>
-          <View style={styles.unallocatedContainer}>
-            <Text style={styles.unallocatedText}>
-              Unallocated: ${unallocatedAmount.toFixed(2)}
-            </Text>
-          </View>
+        <View style={styles.unallocatedContainer}>
+          <Text style={styles.unallocatedText}>
+            Unallocated: ${unallocatedAmount.toFixed(2)}
+          </Text>
         </View>
       )}
 
@@ -231,43 +254,93 @@ const SmartSplitInput = ({
       {/* Split rows */}
       {participants.map((participant, index) => {
         const state = participantStates[index] || { amount: 0, locked: false };
+        const isSelected = selectedConsumers.includes(index);
         
         return (
           <View key={index} style={styles.splitRow}>
+            {/* Checkbox for consumer selection */}
+            <TouchableOpacity
+              style={[
+                styles.checkbox,
+                isSelected && styles.checkboxSelected
+              ]}
+              onPress={() => toggleConsumer(index)}
+            >
+              {isSelected && (
+                <Ionicons name="checkmark" size={16} color="white" />
+              )}
+            </TouchableOpacity>
+
             {/* Participant name */}
             <View style={styles.participantInfo}>
               <View style={styles.participantTextContainer}>
-                <Text style={styles.participantName}>
+                <Text style={[
+                  styles.participantName,
+                  !isSelected && styles.participantNameDisabled
+                ]}>
                   {participant.name || `Person ${index + 1}`}
                 </Text>
                 {participant.username && (
-                  <Text style={styles.participantUsername}>
+                  <Text style={[
+                    styles.participantUsername,
+                    !isSelected && styles.participantUsernameDisabled
+                  ]}>
                     @{participant.username}
                   </Text>
                 )}
               </View>
             </View>
 
-            {/* Amount input */}
+            {/* Amount input - always show for all participants */}
             <View style={styles.inputContainer}>
               <PriceInput
-                value={state.amount}
+                value={isSelected ? state.amount : 0}
                 onChangeText={(value) => handleAmountChange(index, value)}
                 onBlur={() => handleBlur(index)}
                 placeholder="0.00"
                 style={[
                   styles.amountInput,
-                  !state.locked && styles.autoAmountInput
+                  !isSelected && styles.disabledAmountInput,
+                  !state.locked && isSelected && styles.autoAmountInput
                 ]}
-                editable={true}
+                editable={isSelected}
                 showCurrency={true}
               />
             </View>
+
+            {/* Lock/unlock button - always show for all participants */}
+            <TouchableOpacity
+              style={[
+                styles.lockButton,
+                state.locked && styles.lockButtonLocked,
+                isSelected ? styles.lockButtonSelected : styles.lockButtonUnselected
+              ]}
+              onPress={() => toggleLock(index)}
+              disabled={!isSelected}
+            >
+              <Ionicons 
+                name={state.locked ? "lock-closed" : "lock-open"} 
+                size={16} 
+                color={state.locked ? Colors.accent : Colors.textSecondary} 
+              />
+            </TouchableOpacity>
           </View>
         );
       })}
 
-   
+      {/* Consumer info */}
+      {selectedConsumers.length > 0 && (
+        <View style={styles.consumerInfo}>
+          <Text style={styles.consumerCount}>
+            {selectedConsumers.length} {selectedConsumers.length === 1 ? 'person' : 'people'} selected
+          </Text>
+          {selectedConsumers.length === 1 && (
+            <Text style={styles.singleConsumerNote}>
+              No split needed - {participants[selectedConsumers[0]]?.name} will pay the full amount
+            </Text>
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -281,12 +354,30 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.md,
   },
+  label: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  splitMethod: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  splitMethodText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
   unallocatedContainer: {
     alignItems: 'center',
+    marginBottom: Spacing.md,
   },
   unallocatedText: {
     ...Typography.body2,
@@ -310,6 +401,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.sm,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
   participantInfo: {
     flex: 1,
     flexDirection: 'row',
@@ -324,9 +430,16 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontWeight: '500',
   },
+  participantNameDisabled: {
+    color: Colors.textSecondary,
+    opacity: 0.6,
+  },
   participantUsername: {
     ...Typography.caption,
     color: Colors.textSecondary,
+  },
+  participantUsernameDisabled: {
+    opacity: 0.6,
   },
   inputContainer: {
     width: 120,
@@ -342,15 +455,51 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontStyle: 'italic',
   },
-  summary: {
+  disabledAmountInput: {
+    color: Colors.textSecondary,
+    opacity: 0.6,
+  },
+  lockButton: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockButtonSelected: {
+    borderColor: Colors.textPrimary, // Darker border for selected participants
+  },
+  lockButtonUnselected: {
+    borderColor: Colors.divider, // Lighter border for unselected participants
+    opacity: 0.6,
+  },
+  lockButtonLocked: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + '20',
+  },
+  consumerInfo: {
+    alignItems: 'center',
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
   },
-  summaryText: {
+  consumerCount: {
     ...Typography.caption,
     color: Colors.textSecondary,
     textAlign: 'center',
+    fontStyle: 'italic',
+    marginBottom: Spacing.xs,
+  },
+  singleConsumerNote: {
+    ...Typography.caption,
+    color: Colors.accent,
+    textAlign: 'center',
+    fontStyle: 'italic',
+    fontWeight: '500',
   },
 });
 
-export default SmartSplitInput;
+export default CombinedConsumersAndSplitSection; 

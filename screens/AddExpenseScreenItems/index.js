@@ -16,3 +16,4 @@ export { default as SplitTypeSection } from './SplitTypeSection';
 export { default as TotalFeeSection } from './TotalFeeSection';
 export { default as FixedAmountSection } from './FixedAmountSection';
 export { default as WhoConsumedSection } from './WhoConsumedSection';
+export { default as CombinedConsumersAndSplitSection } from './CombinedConsumersAndSplitSection';
