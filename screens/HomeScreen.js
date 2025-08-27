@@ -588,9 +588,6 @@ Important guidelines:
         
         <View style={styles.expenseDetails}>
           <Text style={styles.expenseTotal}>${item.total?.toFixed(2) || '0.00'}</Text>
-          <Text style={styles.expenseInfo}>
-            {totalItems} items • {totalParticipants} participants
-          </Text>
         </View>
 
         {/* Payment Summary */}

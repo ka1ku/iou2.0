@@ -7,7 +7,7 @@ export const Colors = {
   card: '#FFF8F0', // Slightly warmer card background
   textPrimary: '#2C2C2C',
   textSecondary: '#8A8A8A',
-  accent: '#D4A574', // Warm gold/amber accent
+  accent: '#DAA340', // Warm gold/amber accent
   accentDark: '#B8935F',
   success: '#7FB069',
   error: '#E56B6F', // Error color for validation messages

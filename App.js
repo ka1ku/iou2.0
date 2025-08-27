@@ -29,7 +29,6 @@ import AddReceiptScreen from './screens/AddReceiptScreen';
 import WelcomeScreen from './screens/auth/WelcomeScreen';
 import SignInScreen from './screens/auth/SignInScreen';
 import SignUpScreen from './screens/auth/SignUpScreen';
-import VenmoLinkScreen from './screens/VenmoLinkScreen';
 import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
 // TwoFactorAuthScreen removed
 import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
@@ -225,7 +224,6 @@ const AuthStack = () => {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="SignIn" component={SignInScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />
-      <Stack.Screen name="VenmoLink" component={VenmoLinkScreen} />
       <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
     </Stack.Navigator>
   );

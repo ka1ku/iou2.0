@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,211 @@ import { getCurrentUser } from '../services/authService';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
 
+// Memoized components to prevent unnecessary re-renders
+const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect }) => {
+  const name = (item.fullName || `${item.firstName || ''} ${item.lastName || ''}`).trim() || 'Unknown';
+  
+  return (
+    <TouchableOpacity style={styles.listItem} onPress={() => onToggleSelect({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}>
+      <View style={styles.avatarContainer}>
+        {item.profilePhoto ? (
+          <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{name}</Text>
+        {item.username && <Text style={styles.userHandle}>@{item.username}</Text>}
+      </View>
+      <TouchableOpacity 
+        style={[styles.addButton, isSelected && styles.addButtonSelected]} 
+        onPress={() => onToggleSelect({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}
+      >
+        {isSelected ? (
+          <Ionicons name="checkmark" size={16} color={Colors.white} />
+        ) : (
+          <Text style={styles.addButtonText}>Add</Text>
+        )}
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+});
+
+const MemoizedContactItem = React.memo(({ item, onInviteContact }) => {
+  const name = (item.firstName && item.lastName)
+    ? `${item.firstName} ${item.lastName}`
+    : (item.name || 'Unknown Contact');
+  const phone = item.phoneNumbers?.[0]?.number || '';
+  
+  return (
+    <TouchableOpacity style={styles.listItem} onPress={() => onInviteContact(item)}>
+      <View style={styles.avatarContainer}>
+        {item.imageAvailable && item.image?.uri ? (
+          <Image source={{ uri: item.image.uri }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{name}</Text>
+        <Text style={styles.userPhone}>{phone}</Text>
+      </View>
+      <TouchableOpacity style={styles.inviteButton} onPress={() => onInviteContact(item)}>
+        <Text style={styles.inviteButtonText}>Invite</Text>
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+});
+
+const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
+  <View style={styles.memberItem}>
+    <View style={styles.memberAvatarContainer}>
+      {item.profilePhoto ? (
+        <Image source={{ uri: item.profilePhoto }} style={styles.memberAvatar} />
+      ) : (
+        <View style={styles.memberAvatarPlaceholder}>
+          <Text style={styles.memberAvatarInitials}>
+            {item.name === 'You' ? 'Y' : (item.name[0] || 'U').toUpperCase()}
+          </Text>
+        </View>
+      )}
+      {!item.isCurrentUser && (
+        <TouchableOpacity 
+          style={styles.removeButton}
+          onPress={() => onRemoveFriend(item.id)}
+        >
+          <Ionicons name="close" size={14} color={Colors.white} />
+        </TouchableOpacity>
+      )}
+    </View>
+    <Text style={styles.memberName} numberOfLines={1}>
+      {item.name}
+    </Text>
+    {!item.isCurrentUser && item.username && (
+      <Text style={styles.memberUsername} numberOfLines={1}>
+        @{item.username}
+      </Text>
+    )}
+  </View>
+));
+
+// Move SearchPane outside to prevent recreation on every render
+const SearchPane = React.memo(({ 
+  debouncedQuery, 
+  selectedFriends, 
+  toggleSelectUser, 
+  inviteContact, 
+  filteredContacts 
+}) => {
+  const { hits } = useInfiniteHits();
+  const { refine } = useSearchBox();
+  
+  // Add 200ms delay for Algolia queries to prevent API calls while typing
+  const debouncedRefine = useRef(null);
+  
+  useEffect(() => {
+    if (debouncedRefine.current) {
+      clearTimeout(debouncedRefine.current);
+    }
+    
+    debouncedRefine.current = setTimeout(() => {
+      refine(debouncedQuery);
+    }, 200);
+    
+    return () => {
+      if (debouncedRefine.current) {
+        clearTimeout(debouncedRefine.current);
+      }
+    };
+  }, [debouncedQuery, refine]);
+
+  // Get current user to filter out from results
+  const currentUser = getCurrentUser();
+  const currentUserId = currentUser?.uid;
+
+  // Filter out current user from Algolia search results
+  const filteredHits = useMemo(() => {
+    return currentUserId ? hits.filter(friend => friend && friend.objectID && friend.objectID !== currentUserId) : hits;
+  }, [hits, currentUserId]);
+
+  // Memoize render functions to prevent recreation
+  const renderFriendItem = useCallback(({ item }) => {
+    const isSelected = selectedFriends.some(f => f.id === item.objectID);
+    return (
+      <MemoizedFriendItem 
+        item={item} 
+        isSelected={isSelected} 
+        onToggleSelect={toggleSelectUser} 
+      />
+    );
+  }, [selectedFriends, toggleSelectUser]);
+
+  const renderContact = useCallback(({ item }) => (
+    <MemoizedContactItem item={item} onInviteContact={inviteContact} />
+  ), [inviteContact]);
+
+  return (
+    <View style={styles.searchContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Recent people</Text>
+        {filteredHits.map((friend) => (
+          <View key={friend.objectID}>
+            {renderFriendItem({ item: friend })}
+          </View>
+        ))}
+      </View>
+      
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Contacts</Text>
+        {filteredContacts.map((contact, index) => (
+          <View key={`contact-${index}`}>
+            {renderContact({ item: contact })}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+});
+
+// Memoized search input to prevent re-renders
+const MemoizedSearchInput = React.memo(({ value, onChangeText }) => (
+  <View style={styles.searchContainer}>
+    <View style={styles.searchBar}>
+      <Ionicons name="person" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Search by name or username"
+        placeholderTextColor={Colors.textSecondary}
+        value={value}
+        onChangeText={onChangeText}
+        autoCapitalize="none"
+      />
+    </View>
+  </View>
+));
+
+// Memoized search results wrapper to prevent unnecessary re-renders
+const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
+  <View style={styles.resultsContainer}>
+    <InstantSearch 
+      searchClient={searchClient} 
+      indexName="users"
+      stalledSearchDelay={500}
+    >
+      <Configure 
+        hitsPerPage={10} 
+        attributesToRetrieve={[ 'objectID','firstName','lastName','username','profilePhoto','fullName' ]} 
+      />
+      <SearchPane {...searchPaneProps} />
+    </InstantSearch>
+  </View>
+));
+
 const FriendSelector = ({ 
   selectedFriends, 
   onFriendsChange, 
@@ -33,13 +238,15 @@ const FriendSelector = ({
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  
+  // Use deferred value to prevent UI flicker
+  const deferredQuery = useDeferredValue(localQuery);
 
   useEffect(() => {
     initContacts();
   }, []);
 
-  const initContacts = async () => {
+  const initContacts = useCallback(async () => {
     try {
       const { status: existingStatus } = await Contacts.getPermissionsAsync();
       if (existingStatus !== 'granted') {
@@ -59,9 +266,9 @@ const FriendSelector = ({
     } catch (e) {
       console.error('Contacts error', e);
     }
-  };
+  }, []);
 
-  const toggleSelectUser = (user) => {
+  const toggleSelectUser = useCallback((user) => {
     const isSelected = selectedFriends.some(f => f.id === user.id);
     if (isSelected) {
       const updated = selectedFriends.filter(f => f.id !== user.id);
@@ -69,9 +276,9 @@ const FriendSelector = ({
     } else {
       onFriendsChange([...selectedFriends, user]);
     }
-  };
+  }, [selectedFriends, onFriendsChange]);
 
-  const inviteContact = (contact) => {
+  const inviteContact = useCallback((contact) => {
     if (!allowPlaceholders) return;
     const name = (contact.firstName && contact.lastName)
       ? `${contact.firstName} ${contact.lastName}`
@@ -82,15 +289,15 @@ const FriendSelector = ({
       isPlaceholder: true,
     };
     onAddPlaceholder?.(ghost);
-  };
+  }, [allowPlaceholders, onAddPlaceholder]);
 
-  const removeFriend = (friendId) => {
+  const removeFriend = useCallback((friendId) => {
     const updated = selectedFriends.filter(f => f.id !== friendId);
     onFriendsChange(updated);
-  };
+  }, [selectedFriends, onFriendsChange]);
 
-  // Add current user to the member list
-  const getCurrentUserData = () => {
+  // Memoize current user data to prevent recreation
+  const currentUserData = useMemo(() => {
     const currentUser = getCurrentUser();
     return {
       id: 'current-user',
@@ -98,170 +305,48 @@ const FriendSelector = ({
       profilePhoto: currentUser?.profilePhoto,
       isCurrentUser: true
     };
-  };
+  }, []);
 
-  const allMembers = [getCurrentUserData(), ...selectedFriends];
+  // Memoize all members array
+  const allMembers = useMemo(() => [currentUserData, ...selectedFriends], [currentUserData, selectedFriends]);
 
-  const SearchPane = () => {
-    const { hits, isLastPage, showMore } = useInfiniteHits();
-    const { refine } = useSearchBox();
+  // Memoize filtered contacts based on debounced query
+  const filteredContacts = useMemo(() => {
+    const q = (deferredQuery || '').trim().toLowerCase();
+    if (q.length === 0) return contacts;
     
-    useEffect(() => {
-      const timer = setTimeout(() => {
-        setDebouncedQuery(localQuery);
-        refine(localQuery);
-      }, 300);
-      return () => clearTimeout(timer);
-    }, [localQuery, refine]);
-
-    const q = (debouncedQuery || '').trim().toLowerCase();
-
-    // Get current user to filter out from results
-    const currentUser = getCurrentUser();
-    const currentUserId = currentUser?.uid;
-
-    // Filter contacts by query and exclude current user
-    const filteredContacts = contacts.filter(c => {
-      if (q.length === 0) return true;
+    return contacts.filter(c => {
       const name = (c.firstName && c.lastName) ? `${c.firstName} ${c.lastName}` : (c.name || '');
       const phone = (c.phoneNumbers?.[0]?.number || '').toLowerCase();
       return name.toLowerCase().includes(q) || phone.includes(q);
     });
+  }, [contacts, deferredQuery]);
 
-    // Filter out current user from Algolia search results
-    const filteredHits = currentUserId ? hits.filter(friend => friend && friend.objectID && friend.objectID !== currentUserId) : hits;
+  // Memoize key extractors for FlatList
+  const memberKeyExtractor = useCallback((item) => item.id, []);
+  const friendKeyExtractor = useCallback((item) => item.objectID, []);
+  const contactKeyExtractor = useCallback((item, index) => `contact-${index}`, []);
 
-    const renderFriendItem = ({ item }) => {
-      const name = (item.fullName || `${item.firstName || ''} ${item.lastName || ''}`).trim() || 'Unknown';
-      const isSelected = selectedFriends.some(f => f.id === item.objectID);
-      
-      return (
-        <TouchableOpacity style={styles.listItem} onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}>
-          <View style={styles.avatarContainer}>
-            {item.profilePhoto ? (
-              <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{name}</Text>
-            {item.username && <Text style={styles.userHandle}>@{item.username}</Text>}
-          </View>
-          <TouchableOpacity 
-            style={[styles.addButton, isSelected && styles.addButtonSelected]} 
-            onPress={() => toggleSelectUser({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}
-          >
-            {isSelected ? (
-              <Ionicons name="checkmark" size={16} color={Colors.white} />
-            ) : (
-              <Text style={styles.addButtonText}>Add</Text>
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      );
-    };
+  // Memoize render functions for FlatList
+  const renderMemberItem = useCallback(({ item }) => (
+    <MemoizedMemberItem item={item} onRemoveFriend={removeFriend} />
+  ), [removeFriend]);
 
-    const renderContact = ({ item }) => {
-      const name = (item.firstName && item.lastName)
-        ? `${item.firstName} ${item.lastName}`
-        : (item.name || 'Unknown Contact');
-      const phone = item.phoneNumbers?.[0]?.number || '';
-      
-      return (
-        <TouchableOpacity style={styles.listItem} onPress={() => inviteContact(item)}>
-          <View style={styles.avatarContainer}>
-            {item.imageAvailable && item.image?.uri ? (
-              <Image source={{ uri: item.image.uri }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{name}</Text>
-            <Text style={styles.userPhone}>{phone}</Text>
-          </View>
-          <TouchableOpacity style={styles.inviteButton} onPress={() => inviteContact(item)}>
-            <Text style={styles.inviteButtonText}>Invite</Text>
-            </TouchableOpacity>
-        </TouchableOpacity>
-      );
-    };
+  const handleModalClose = useCallback(() => {
+    if (onClose) {
+      onClose(selectedFriends);
+    }
+    setShowModal(false);
+  }, [onClose, selectedFriends]);
 
-    return (
-      <View style={styles.searchContent}>
-        <FlatList
-          data={[
-            { type: 'friends', data: filteredHits, title: 'Recent people' },
-            { type: 'contacts', data: filteredContacts, title: 'Contacts' }
-          ]}
-          keyExtractor={(item, index) => `${item.type}-${index}`}
-          renderItem={({ item: section }) => (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-              {section.type === 'friends' ? (
-                <FlatList
-                  data={section.data}
-                  keyExtractor={(friend) => friend.objectID}
-                  renderItem={renderFriendItem}
-                  scrollEnabled={false}
-                />
-              ) : (
-                <FlatList
-                  data={section.data}
-                  keyExtractor={(contact, index) => `contact-${index}`}
-                  renderItem={renderContact}
-                  scrollEnabled={false}
-                />
-              )}
-            </View>
-          )}
-          onEndReached={() => {
-            if (q.length > 0 && !isLastPage && filteredHits.length > 0 && currentUserId) showMore();
-          }}
-          onEndReachedThreshold={0.5}
-          showsVerticalScrollIndicator={false}
-          nestedScrollEnabled={true}
-        />
-      </View>
-    );
-  };
-
-  const renderMemberItem = ({ item }) => (
-    <View style={styles.memberItem}>
-      <View style={styles.memberAvatarContainer}>
-        {item.profilePhoto ? (
-          <Image source={{ uri: item.profilePhoto }} style={styles.memberAvatar} />
-        ) : (
-          <View style={styles.memberAvatarPlaceholder}>
-            <Text style={styles.memberAvatarInitials}>
-              {item.name === 'You' ? 'Y' : (item.name[0] || 'U').toUpperCase()}
-            </Text>
-          </View>
-        )}
-        {!item.isCurrentUser && (
-          <TouchableOpacity 
-            style={styles.removeButton}
-            onPress={() => removeFriend(item.id)}
-          >
-            <Ionicons name="close" size={14} color={Colors.white} />
-          </TouchableOpacity>
-        )}
-      </View>
-      <Text style={styles.memberName} numberOfLines={1}>
-        {item.name}
-      </Text>
-      {!item.isCurrentUser && item.username && (
-        <Text style={styles.memberUsername} numberOfLines={1}>
-          @{item.username}
-        </Text>
-      )}
-    </View>
-  );
+  // Memoize the search pane props to prevent unnecessary re-renders
+  const searchPaneProps = useMemo(() => ({
+    debouncedQuery: deferredQuery,
+    selectedFriends,
+    toggleSelectUser,
+    inviteContact,
+    filteredContacts
+  }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, filteredContacts]);
 
   return (
     <View style={styles.container}>
@@ -281,13 +366,7 @@ const FriendSelector = ({
           <View style={styles.modalHeader}>
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={() => {
-                // Call onClose callback if provided to update parent state
-                if (onClose) {
-                  onClose(selectedFriends);
-                }
-                setShowModal(false);
-              }}
+              onPress={handleModalClose}
             >
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
@@ -296,43 +375,37 @@ const FriendSelector = ({
             </View>
           </View>
 
-          {/* Current Members */}
-          <View style={styles.membersContainer}>
-            <FlatList
-              data={allMembers}
-              horizontal
-              keyExtractor={(item) => item.id}
-              renderItem={renderMemberItem}
-              contentContainerStyle={styles.membersList}
-              showsHorizontalScrollIndicator={false}
-              scrollEnabled={true}
-              bounces={true}
-              decelerationRate="normal"
-            />
-          </View>
-
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <View style={styles.searchBar}>
-              <Ionicons name="person" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by name or username"
-                placeholderTextColor={Colors.textSecondary}
-                value={localQuery}
-                onChangeText={setLocalQuery}
-                autoCapitalize="none"
+          <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+            {/* Current Members */}
+            <View style={styles.membersContainer}>
+              <FlatList
+                data={allMembers}
+                horizontal
+                keyExtractor={memberKeyExtractor}
+                renderItem={renderMemberItem}
+                contentContainerStyle={styles.membersList}
+                showsHorizontalScrollIndicator={false}
+                scrollEnabled={true}
+                bounces={true}
+                decelerationRate="normal"
+                removeClippedSubviews={true}
+                initialNumToRender={5}
+                maxToRenderPerBatch={5}
+                windowSize={5}
+                getItemLayout={(data, index) => ({
+                  length: 100,
+                  offset: 100 * index,
+                  index,
+                })}
               />
             </View>
-          </View>
 
-          {/* Search Results */}
-          <View style={styles.resultsContainer}>
-            <InstantSearch searchClient={searchClient} indexName="users">
-              <Configure hitsPerPage={10} attributesToRetrieve={[ 'objectID','firstName','lastName','username','profilePhoto','fullName' ]} />
-              <SearchPane />
-            </InstantSearch>
-          </View>
+            {/* Search Bar */}
+            <MemoizedSearchInput value={localQuery} onChangeText={setLocalQuery} />
+
+            {/* Search Results */}
+            <MemoizedSearchResults searchPaneProps={searchPaneProps} />
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -404,13 +477,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
     overflow: 'visible', // Ensure X buttons are not clipped
-    minHeight: 120,
+    paddingVertical: Spacing.lg, // Add vertical padding instead of fixed height
   },
   membersList: {
     paddingHorizontal: 0,
+    paddingTop: 20,
     backgroundColor: Colors.surface,
-
-    paddingVertical: 20, // Remove vertical padding since container handles it
+    paddingVertical: 0, // Container now handles vertical padding
+    paddingBottom: Spacing.sm,
   },
   memberItem: {
     alignItems: 'center',
@@ -418,6 +492,7 @@ const styles = StyleSheet.create({
     width: 90, // Increased width to accommodate the X button
     paddingHorizontal: 8, // Add padding to prevent X button cutoff
     flexShrink: 0, // Prevent items from shrinking
+    height: 100, // Fixed height for consistent sizing
   },
   memberAvatarContainer: {
     position: 'relative',
@@ -461,6 +536,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.familyMedium,
     color: Colors.textPrimary,
     textAlign: 'center',
+    
   },
   memberUsername: {
     ...Typography.body2,
@@ -499,7 +575,7 @@ const styles = StyleSheet.create({
   // Results
   resultsContainer: {
     backgroundColor: Colors.surface,
-    flex: 1, // Take remaining space
+    paddingBottom: Spacing.xxl, // Add bottom padding for scroll space
   },
   searchContent: {
     flex: 1, // Take remaining space
@@ -594,6 +670,10 @@ const styles = StyleSheet.create({
     ...Typography.body2,
     fontFamily: Typography.familySemiBold,
     color: Colors.textSecondary,
+  },
+  scrollContainer: {
+    flex: 1,
+    paddingBottom: Spacing.xxl,
   },
 });
 
