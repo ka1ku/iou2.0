@@ -416,6 +416,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               placeholder="Add friends to split with..."
               allowPlaceholders={true}
               onAddPlaceholder={handleAddPlaceholder}
+              expenseId={expense?.id}
             />
             {/* Render placeholder chips with Invite buttons */}
             {placeholders.length > 0 && (

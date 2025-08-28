@@ -128,12 +128,12 @@ export const deleteExpense = async (expenseId, userId) => {
 
 // ---------------- Expense Invites & Join Flow ----------------
 
-// Generate a random token and a 6-digit code
+// Generate a random token and a longer, more unique code
 const generateInviteToken = () => Math.random().toString(36).slice(2, 12);
 const generateJoinCode = () => {
-  const chars = '0123456789abcdefghijklmnopqrstuvwxyz';
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // Use uppercase for better readability
   let result = '';
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) { // Increased from 8 to 12 characters
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
@@ -201,8 +201,9 @@ export const parseExpenseJoinLink = (url) => {
     const expenseId = params.get('eid');
     const token = params.get('t');
     const code = params.get('c');
+    const phone = params.get('p'); // Extract phone number parameter
     if (!expenseId || (!token && !code)) return null;
-    return { expenseId, token, code };
+    return { expenseId, token, code, phone };
   } catch (error) {
     console.error('Error parsing expense join link:', error);
     return null;
@@ -210,16 +211,17 @@ export const parseExpenseJoinLink = (url) => {
 };
 
 // Generate app deep link for expense join
-export const generateExpenseJoinLink = ({ expenseId, token, code }) => {
+export const generateExpenseJoinLink = ({ expenseId, token, code, phone }) => {
   const baseUrl = 'com.kailee.iou20://expense-join';
   const params = new URLSearchParams({ eid: expenseId });
   if (token) params.set('t', token);
   if (code) params.set('c', code);
+  if (phone) params.set('p', phone); // Add phone number parameter
   return `${baseUrl}?${params.toString()}`;
 };
 
 // Join an expense using a token or code
-export const joinExpense = async ({ expenseId, token, code, user }) => {
+export const joinExpense = async ({ expenseId, token, code, phone, user }) => {
   try {
     if (!expenseId) throw new Error('Missing expenseId');
     if (!user) throw new Error('No user signed in');
@@ -247,28 +249,106 @@ export const joinExpense = async ({ expenseId, token, code, user }) => {
     // Prepare participant record (non-destructive: append if not present)
     const participants = Array.isArray(expense.participants) ? [...expense.participants] : [];
 
-    // Try replacing first placeholder, otherwise append
-    let replaced = false;
-    const placeholderIndex = participants.findIndex(p => p && p.placeholder === true);
-    if (placeholderIndex >= 0) {
-      participants[placeholderIndex] = {
+    // If phone number is provided, validate that the user's phone matches the invited phone
+    if (phone) {
+      // Normalize phone number for comparison (remove formatting)
+      const normalizedInvitedPhone = phone.replace(/\D/g, '');
+      console.log('🔍 Validating phone number match. Invited phone:', normalizedInvitedPhone);
+      
+      // Check if the current user has a phone number and if it matches
+      let userPhoneMatches = false;
+      if (!user.phoneNumber) {
+        throw new Error('Phone number required. Please add your phone number to your profile to join expenses.');
+      }
+      
+      const normalizedUserPhone = user.phoneNumber.replace(/\D/g, '');
+      userPhoneMatches = normalizedUserPhone === normalizedInvitedPhone;
+      console.log('📱 User phone:', normalizedUserPhone, 'Invited phone:', normalizedInvitedPhone, 'Match:', userPhoneMatches);
+      
+      // If phone numbers don't match, block the join
+      if (!userPhoneMatches) {
+        throw new Error('Phone number mismatch. You can only join expenses you were specifically invited to.');
+      }
+      
+      console.log('✅ Phone number validation passed');
+      
+      // Now try to match with existing participants or placeholders
+      let matchedParticipant = null;
+      let matchedIndex = -1;
+      
+      // First, try to match with existing participants by phone number
+      matchedIndex = participants.findIndex(p => {
+        if (p.phoneNumber) {
+          const participantPhone = p.phoneNumber.replace(/\D/g, '');
+          const matches = participantPhone === normalizedInvitedPhone;
+          if (matches) {
+            console.log('✅ Found matching participant:', p.name);
+          }
+          return matches;
+        }
+        return false;
+      });
+      
+      if (matchedIndex >= 0) {
+        matchedParticipant = participants[matchedIndex];
+        console.log('🎯 Matched with existing participant at index:', matchedIndex);
+      } else {
+        // Try to match with placeholders by phone number
+        matchedIndex = participants.findIndex(p => {
+          if (p.placeholder && p.phoneNumber) {
+            const placeholderPhone = p.phoneNumber.replace(/\D/g, '');
+            const matches = placeholderPhone === normalizedInvitedPhone;
+            if (matches) {
+              console.log('✅ Found matching placeholder:', p.name);
+            }
+            return matches;
+          }
+          return false;
+        });
+        
+        if (matchedIndex >= 0) {
+          console.log('🎯 Matched with placeholder at index:', matchedIndex);
+        }
+      }
+    }
+
+    // If we found a match, update that participant
+    if (matchedParticipant) {
+      console.log('🔄 Updating matched participant with user info:', user.uid);
+      participants[matchedIndex] = {
+        ...matchedParticipant,
         name: `${user.firstName || 'Friend'} ${user.lastName || ''}`.trim() || (user.venmoUsername ? `@${user.venmoUsername}` : 'Friend'),
         userId: user.uid,
         placeholder: false,
+        phoneNumber: phone, // Keep the phone number for future reference
       };
-      replaced = true;
-    }
-    if (!replaced) {
-      // Create participant entry for the user
-      const participantName = user.firstName && user.lastName 
-        ? `${user.firstName} ${user.lastName}`.trim() 
-        : (user.username ? `@${user.username}` : 'Friend');
-      
-      participants.push({ 
-        name: participantName, 
-        userId: user.uid, 
-        placeholder: false 
-      });
+      console.log('✅ Successfully identified user as invited participant:', matchedParticipant.name);
+    } else {
+      // Try replacing first placeholder, otherwise append
+      let replaced = false;
+      const placeholderIndex = participants.findIndex(p => p && p.placeholder === true);
+      if (placeholderIndex >= 0) {
+        participants[placeholderIndex] = {
+          name: `${user.firstName || 'Friend'} ${user.lastName || ''}`.trim() || (user.venmoUsername ? `@${user.venmoUsername}` : 'Friend'),
+          userId: user.uid,
+          placeholder: false,
+          phoneNumber: phone, // Add phone number if provided
+        };
+        replaced = true;
+      }
+      if (!replaced) {
+        // Create participant entry for the user
+        const participantName = user.firstName && user.lastName 
+          ? `${user.firstName} ${user.lastName}`.trim() 
+          : (user.username ? `@${user.username}` : 'Friend');
+        
+        participants.push({ 
+          name: participantName, 
+          userId: user.uid, 
+          placeholder: false,
+          phoneNumber: phone, // Add phone number if provided
+        });
+      }
     }
 
     // Update expense participants only; splits are not recalculated here

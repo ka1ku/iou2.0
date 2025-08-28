@@ -35,12 +35,30 @@ const ExpenseJoinHandler = () => {
         Alert.alert('Sign in required', 'Please sign in to join this expense.');
         return;
       }
-      await joinExpense({ expenseId: joinData.expenseId, token: joinData.token, code: joinData.code, user });
+      await joinExpense({ 
+        expenseId: joinData.expenseId, 
+        token: joinData.token, 
+        code: joinData.code, 
+        phone: joinData.phone, // Pass phone number for identification
+        user 
+      });
       Alert.alert('Joined', 'You have joined the expense.');
       setShowModal(false);
       setJoinData(null);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to join');
+      let errorTitle = 'Error';
+      let errorMessage = error.message || 'Failed to join';
+      
+      // Handle specific phone validation errors
+      if (error.message.includes('Phone number mismatch')) {
+        errorTitle = 'Phone Number Mismatch';
+        errorMessage = 'You can only join expenses you were specifically invited to. Please check that your phone number matches the invitation.';
+      } else if (error.message.includes('Phone number required')) {
+        errorTitle = 'Phone Number Required';
+        errorMessage = 'Please add your phone number to your profile before joining expenses.';
+      }
+      
+      Alert.alert(errorTitle, errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -62,16 +80,16 @@ const ExpenseJoinHandler = () => {
               <Ionicons name="people" size={28} color={Colors.accent} />
             </View>
             <Text style={styles.modalTitle}>Join Expense</Text>
-            <Text style={styles.modalSubtitle}>You were invited to an expense</Text>
+            <Text style={styles.modalSubtitle}>Tap join to start splitting expenses</Text>
           </View>
 
           <View style={styles.detailsBox}>
-            <Text style={styles.detailRow}>Expense ID</Text>
-            <Text style={styles.detailValue}>{joinData.expenseId}</Text>
-            {joinData.code ? (
+            <Text style={styles.detailRow}>You were invited to join an expense</Text>
+            {joinData.phone ? (
               <>
-                <Text style={[styles.detailRow, { marginTop: Spacing.sm }]}>Join Code</Text>
-                <Text style={styles.codeValue}>{joinData.code}</Text>
+                <Text style={[styles.detailRow, { marginTop: Spacing.sm }]}>Invited as</Text>
+                <Text style={styles.detailValue}>Phone: {joinData.phone}</Text>
+                <Text style={[styles.detailRow, { marginTop: Spacing.sm }]}>Make sure your phone number matches to join</Text>
               </>
             ) : null}
           </View>
