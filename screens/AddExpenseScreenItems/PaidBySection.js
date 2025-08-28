@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 
 /**
@@ -21,14 +22,16 @@ const PaidBySection = ({ participants, selectedPayers, onPayersChange }) => {
       ? selectedPayers.filter(i => i !== participantIndex)
       : [...selectedPayers, participantIndex];
     
-    // Ensure at least one payer is selected
-    if (newPayers.length > 0) {
-      onPayersChange(newPayers);
-    }
+    onPayersChange(newPayers);
   };
 
   return (
     <View style={styles.paidByContainer}>
+      <View style={styles.whoPaidHeader}>
+        <Ionicons name="card-outline" size={16} color={Colors.textSecondary} />
+        <Text style={styles.whoPaidLabel}>Who Paid for This Expense?</Text>
+      </View>
+      
       <View style={styles.paidByButtons}>
         {participants.map((participant, pIndex) => (
           <TouchableOpacity
@@ -38,20 +41,31 @@ const PaidBySection = ({ participants, selectedPayers, onPayersChange }) => {
               selectedPayers.includes(pIndex) && styles.paidByButtonActive
             ]}
             onPress={() => togglePayer(pIndex)}
+            activeOpacity={0.7}
           >
-            <Text style={[
-              styles.paidByText,
-              selectedPayers.includes(pIndex) && styles.paidByTextActive
-            ]}>
-              {participant.name || `Person ${pIndex + 1}`}
-            </Text>
+            <View style={styles.paidByButtonContent}>
+              {selectedPayers.includes(pIndex) && (
+                <View style={styles.checkmarkContainer}>
+                  <Ionicons name="checkmark" size={12} color={Colors.surface} />
+                </View>
+              )}
+              <Text style={[
+                styles.paidByText,
+                selectedPayers.includes(pIndex) && styles.paidByTextActive
+              ]}>
+                {participant.name || `Person ${pIndex + 1}`}
+              </Text>
+            </View>
           </TouchableOpacity>
         ))}
       </View>
+      
       {selectedPayers.length > 0 && (
-        <Text style={styles.payerCount}>
-          {selectedPayers.length} {selectedPayers.length === 1 ? 'person' : 'people'} selected
-        </Text>
+        <View style={styles.payerSummary}>
+          <Text style={styles.payerSummaryText}>
+            {selectedPayers.length} {selectedPayers.length === 1 ? 'person' : 'people'} paying
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -62,13 +76,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     marginTop: Spacing.sm,
   },
-  paidByLabel: {
+  whoPaidHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  whoPaidLabel: {
     ...Typography.label,
     fontWeight: '600',
     color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 13,
   },
   paidByButtons: {
     flexDirection: 'row',
@@ -95,20 +113,40 @@ const styles = StyleSheet.create({
     ...Shadows.button,
     elevation: 3,
   },
+  paidByButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  checkmarkContainer: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   paidByText: {
     ...Typography.label,
     color: Colors.textSecondary,
     fontWeight: '500',
+    fontSize: 12,
   },
   paidByTextActive: {
     color: Colors.surface,
     fontWeight: '600',
   },
-  payerCount: {
+  payerSummary: {
+    alignItems: 'center',
+    paddingTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  payerSummaryText: {
     ...Typography.caption,
     color: Colors.textSecondary,
-    textAlign: 'center',
     fontStyle: 'italic',
+    fontSize: 11,
   },
 });
 

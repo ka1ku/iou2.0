@@ -11,6 +11,30 @@ const ExpenseJoinHandler = () => {
   const [showModal, setShowModal] = useState(false);
   const [processing, setProcessing] = useState(false);
 
+  // Helper function to format phone number nicely
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return '';
+    
+    // Decode URL encoding first
+    const decoded = decodeURIComponent(phone);
+    
+    // Remove all non-digits
+    const digits = decoded.replace(/\D/g, '');
+    
+    // Format as (XXX) XXX-XXXX for US numbers
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    
+    // Format as +X (XXX) XXX-XXXX for international numbers
+    if (digits.length === 11 && digits[0] === '1') {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    
+    // Return decoded version if can't format
+    return decoded;
+  };
+
   useEffect(() => {
     const unsubscribe = deepLinkService.addListener('expenseJoin', (data) => {
       setJoinData(data);
@@ -35,12 +59,30 @@ const ExpenseJoinHandler = () => {
         Alert.alert('Sign in required', 'Please sign in to join this expense.');
         return;
       }
-      await joinExpense({ expenseId: joinData.expenseId, token: joinData.token, code: joinData.code, user });
+      await joinExpense({ 
+        expenseId: joinData.expenseId, 
+        token: joinData.token, 
+        code: joinData.code, 
+        phone: joinData.phone, // Pass phone number for identification
+        user 
+      });
       Alert.alert('Joined', 'You have joined the expense.');
       setShowModal(false);
       setJoinData(null);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to join');
+      let errorTitle = 'Error';
+      let errorMessage = error.message || 'Failed to join';
+      
+      // Handle specific phone validation errors
+      if (error.message.includes('Phone number mismatch')) {
+        errorTitle = 'Phone Number Mismatch';
+        errorMessage = 'You can only join expenses you were specifically invited to. Please check that your phone number matches the invitation.';
+      } else if (error.message.includes('Phone number required')) {
+        errorTitle = 'Phone Number Required';
+        errorMessage = 'Please add your phone number to your profile before joining expenses.';
+      }
+      
+      Alert.alert(errorTitle, errorMessage);
     } finally {
       setProcessing(false);
     }
@@ -62,18 +104,29 @@ const ExpenseJoinHandler = () => {
               <Ionicons name="people" size={28} color={Colors.accent} />
             </View>
             <Text style={styles.modalTitle}>Join Expense</Text>
-            <Text style={styles.modalSubtitle}>You were invited to an expense</Text>
+            <Text style={styles.modalSubtitle}>Tap join to start splitting expenses</Text>
           </View>
 
           <View style={styles.detailsBox}>
-            <Text style={styles.detailRow}>Expense ID</Text>
-            <Text style={styles.detailValue}>{joinData.expenseId}</Text>
-            {joinData.code ? (
-              <>
-                <Text style={[styles.detailRow, { marginTop: Spacing.sm }]}>Join Code</Text>
-                <Text style={styles.codeValue}>{joinData.code}</Text>
-              </>
+            <View style={styles.inviteInfo}>
+              <Ionicons name="mail" size={16} color={Colors.accent} style={styles.infoIcon} />
+              <Text style={styles.inviteText}>You were invited to join an expense</Text>
+            </View>
+            {joinData.phone ? (
+              <View style={styles.phoneInfo}>
+                <Ionicons name="call" size={16} color={Colors.accent} style={styles.infoIcon} />
+                <View style={styles.phoneDetails}>
+                  <Text style={styles.phoneLabel}>Invited as</Text>
+                  <Text style={styles.phoneNumber}>{formatPhoneNumber(joinData.phone)}</Text>
+                </View>
+              </View>
             ) : null}
+            <View style={styles.instructionBox}>
+              <Ionicons name="information-circle" size={16} color={Colors.textSecondary} style={styles.infoIcon} />
+              <Text style={styles.instructionText}>
+                Make sure your phone number matches to join
+              </Text>
+            </View>
           </View>
 
           <View style={styles.actionsRow}>
@@ -118,10 +171,60 @@ const styles = StyleSheet.create({
   },
   modalTitle: { ...Typography.h2, color: Colors.textPrimary, marginBottom: Spacing.xs },
   modalSubtitle: { ...Typography.body, color: Colors.textSecondary },
-  detailsBox: { backgroundColor: Colors.background, borderRadius: Radius.md, padding: Spacing.lg, marginBottom: Spacing.xl },
-  detailRow: { ...Typography.label, color: Colors.textSecondary },
-  detailValue: { ...Typography.title, color: Colors.textPrimary, marginTop: 2 },
-  codeValue: { ...Typography.h2, color: Colors.accent, marginTop: 2, letterSpacing: 1 },
+  detailsBox: { 
+    backgroundColor: Colors.background, 
+    borderRadius: Radius.md, 
+    padding: Spacing.lg, 
+    marginBottom: Spacing.xl 
+  },
+  inviteInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  phoneInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  phoneDetails: {
+    flex: 1,
+    marginLeft: Spacing.sm,
+  },
+  phoneLabel: { 
+    ...Typography.label, 
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  phoneNumber: { 
+    ...Typography.title, 
+    color: Colors.textPrimary,
+    fontFamily: Typography.familyMedium,
+  },
+  instructionBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: Radius.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.accent,
+  },
+  instructionText: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    flex: 1,
+    marginLeft: Spacing.sm,
+    lineHeight: 18,
+  },
+  infoIcon: {
+    marginRight: Spacing.sm,
+  },
+  inviteText: { 
+    ...Typography.body, 
+    color: Colors.textPrimary,
+    flex: 1,
+  },
   actionsRow: { flexDirection: 'row', gap: Spacing.md },
   actionButton: { flex: 1, padding: Spacing.lg, borderRadius: Radius.md, alignItems: 'center' },
   declineButton: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.divider },

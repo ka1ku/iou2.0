@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,9 @@ import {
   TextInput,
   Modal,
   Image,
-  ScrollView
+  ScrollView,
+  Share,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Typography, Spacing, Radius } from '../design/tokens';
@@ -18,6 +20,7 @@ import * as Contacts from 'expo-contacts';
 import algoliasearch from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
 import { getCurrentUser } from '../services/authService';
+import { generateExpenseJoinLink, getExpenseJoinInfo } from '../services/expenseService';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
 
@@ -99,7 +102,7 @@ const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
           style={styles.removeButton}
           onPress={() => onRemoveFriend(item.id)}
         >
-          <Ionicons name="close" size={14} color={Colors.white} />
+          <Ionicons name="close" size={12} color={Colors.textPrimary} />
         </TouchableOpacity>
       )}
     </View>
@@ -226,15 +229,16 @@ const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
   </View>
 ));
 
-const FriendSelector = ({ 
+const FriendSelector = forwardRef(({ 
   selectedFriends, 
   onFriendsChange, 
   showAddButton = true,
   placeholder = "Select friends to split with...",
   allowPlaceholders = true,
   onAddPlaceholder,
-  onClose
-}) => {
+  onClose,
+  expenseId
+}, ref) => {
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
@@ -278,8 +282,63 @@ const FriendSelector = ({
     }
   }, [selectedFriends, onFriendsChange]);
 
-  const inviteContact = useCallback((contact) => {
+  const inviteContact = useCallback(async (contact) => {
     if (!allowPlaceholders) return;
+    
+    // If we have an expenseId, generate and share a deep link
+    if (expenseId) {
+      try {
+        const joinInfo = await getExpenseJoinInfo(expenseId, { initializeIfMissing: true });
+        if (joinInfo && joinInfo.code) {
+          // Get contact's phone number for identification
+          const phoneNumber = contact.phoneNumbers?.[0]?.number;
+          
+          const deepLink = generateExpenseJoinLink({ 
+            expenseId, 
+            code: joinInfo.code,
+            phone: phoneNumber // Pass phone number to identify the invitee
+          });
+          
+          const contactName = (contact.firstName && contact.lastName)
+            ? `${contact.firstName} ${contact.lastName}`
+            : (contact.name || 'Unknown');
+          
+          const message = `Hi ${contactName}! Join me on IOU App: ${deepLink}`;
+          
+          const result = await Share.share({
+            message,
+            title: 'Split expenses with IOU App',
+            url: deepLink // This allows the system to handle the link properly
+          });
+          
+          if (result.action === Share.sharedAction) {
+            console.log('Expense invite shared successfully');
+            // Optionally show success message or update UI
+          } else if (result.action === Share.dismissedAction) {
+            console.log('Share was dismissed');
+          }
+          
+          return;
+        } else {
+          console.warn('Could not generate join info for expense:', expenseId);
+        }
+      } catch (error) {
+        console.error('Error sharing expense invite:', error);
+        // Show user-friendly error message
+        Alert.alert(
+          'Sharing Failed',
+          'Unable to share the expense invite. Please try again later.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+    
+    // Fallback to placeholder if no expenseId or sharing fails
+    if (!expenseId) {
+      console.log('No expenseId available, adding placeholder instead of sharing');
+    }
+    
     const name = (contact.firstName && contact.lastName)
       ? `${contact.firstName} ${contact.lastName}`
       : (contact.name || 'Unknown');
@@ -289,7 +348,7 @@ const FriendSelector = ({
       isPlaceholder: true,
     };
     onAddPlaceholder?.(ghost);
-  }, [allowPlaceholders, onAddPlaceholder]);
+  }, [allowPlaceholders, onAddPlaceholder, expenseId]);
 
   const removeFriend = useCallback((friendId) => {
     const updated = selectedFriends.filter(f => f.id !== friendId);
@@ -348,6 +407,12 @@ const FriendSelector = ({
     filteredContacts
   }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, filteredContacts]);
 
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    openModal: () => setShowModal(true),
+    closeModal: () => setShowModal(false)
+  }));
+
   return (
     <View style={styles.container}>
       {showAddButton && (
@@ -393,8 +458,8 @@ const FriendSelector = ({
                 maxToRenderPerBatch={5}
                 windowSize={5}
                 getItemLayout={(data, index) => ({
-                  length: 100,
-                  offset: 100 * index,
+                  length: 88, // 80 + Spacing.lg margin
+                  offset: 88 * index,
                   index,
                 })}
               />
@@ -410,7 +475,7 @@ const FriendSelector = ({
       </Modal>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -473,46 +538,46 @@ const styles = StyleSheet.create({
   // Members section
   membersContainer: {
     backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.xl, // Add horizontal padding to container
+    paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
-    overflow: 'visible', // Ensure X buttons are not clipped
-    paddingVertical: Spacing.lg, // Add vertical padding instead of fixed height
   },
   membersList: {
-    paddingHorizontal: 0,
-    paddingTop: 20,
-    backgroundColor: Colors.surface,
-    paddingVertical: 0, // Container now handles vertical padding
-    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
   },
   memberItem: {
     alignItems: 'center',
     marginRight: Spacing.lg,
-    width: 90, // Increased width to accommodate the X button
-    paddingHorizontal: 8, // Add padding to prevent X button cutoff
-    flexShrink: 0, // Prevent items from shrinking
-    height: 100, // Fixed height for consistent sizing
+    width: 80,
+    flexShrink: 0,
   },
   memberAvatarContainer: {
     position: 'relative',
-    width: 70, // Fixed width container
-    height: 70, // Fixed height container
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: Spacing.sm,
   },
   memberAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.avatar,
   },
   memberAvatarPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.textSecondary,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.accent,
+    borderWidth: 2,
+    borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    ...Shadows.avatar,
   },
   memberAvatarInitials: {
     color: Colors.white,
@@ -521,28 +586,29 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     position: 'absolute',
-    top: -4,
-    right: -4, // Adjusted position to be within the container bounds
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.danger,
+    top: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.divider,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.button,
   },
   memberName: {
-    ...Typography.body,
+    ...Typography.body2,
     fontFamily: Typography.familyMedium,
     color: Colors.textPrimary,
     textAlign: 'center',
-    
+    marginBottom: 2,
   },
   memberUsername: {
-    ...Typography.body2,
+    ...Typography.caption,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginTop: 2,
   },
 
   // Search
@@ -581,14 +647,14 @@ const styles = StyleSheet.create({
     flex: 1, // Take remaining space
   },
   section: {
-    marginBottom: Spacing.xxl,
-    marginTop: Spacing.lg, // Add top margin for first section
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.md,
   },
   sectionTitle: {
     ...Typography.h3,
     color: Colors.textPrimary,
-    marginBottom: Spacing.lg,
-    marginTop: Spacing.lg, // Add top margin above section titles
+    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
     paddingHorizontal: Spacing.xl,
   },
   listItem: {

@@ -5,6 +5,7 @@ export const Colors = {
   surface: '#FFFFFF',
   white: '#FFFFFF', // Pure white for text and icons
   card: '#FFF8F0', // Slightly warmer card background
+  surfaceLight: '#FEFCF8', // Very light surface color for subtle backgrounds
   textPrimary: '#2C2C2C',
   textSecondary: '#8A8A8A',
   accent: '#DAA340', // Warm gold/amber accent
@@ -51,6 +52,13 @@ export const Shadows = {
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+  },
+  avatar: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
 };
 
