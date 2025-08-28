@@ -40,6 +40,7 @@ const styles = StyleSheet.create({
   itemNameContainer: {
     flex: 1,
     marginRight: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
   itemNameLabel: {
     ...Typography.label,

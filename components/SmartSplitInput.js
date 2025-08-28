@@ -9,31 +9,76 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import PriceInput from './PriceInput';
 
+/**
+ * Smart rounding utility to handle infinite decimal splits
+ * 
+ * When splitting amounts that result in infinite decimals (e.g., $5 ÷ 3 = 1.6666...),
+ * this function distributes the rounding error to the first few participants.
+ * 
+ * Example: $5 split among 3 people = [$1.67, $1.67, $1.66]
+ * The first two participants get $1.67, the last gets $1.66
+ * Total: $1.67 + $1.67 + $1.66 = $5.00
+ */
+const smartRoundSplit = (total, count) => {
+  if (count <= 0) return [];
+  
+  // Calculate base amount and remainder
+  const baseAmount = Math.floor((total * 100) / count) / 100;
+  const remainder = Math.round((total - (baseAmount * count)) * 100) / 100;
+  
+  // Create array with base amounts
+  const amounts = new Array(count).fill(baseAmount);
+  
+  // Distribute remainder cents to first few participants
+  const remainderCents = Math.round(remainder * 100);
+  for (let i = 0; i < remainderCents; i++) {
+    amounts[i] = Math.round((amounts[i] + 0.01) * 100) / 100;
+  }
+  
+  // Validate that the sum equals the total (should always be true, but good to verify)
+  const calculatedTotal = amounts.reduce((sum, amount) => sum + amount, 0);
+  if (Math.abs(calculatedTotal - total) > 0.01) {
+    // If there's a discrepancy, adjust the last amount to make it exact
+    const difference = total - calculatedTotal;
+    amounts[count - 1] = Math.round((amounts[count - 1] + difference) * 100) / 100;
+  }
+  
+  return amounts;
+};
+
 const SmartSplitInput = ({
   participants,
   total,
   initialSplits = [],
   onSplitsChange,
   style,
+  renderRow, // Custom render function for each row
+  selectedConsumers = null, // Optional: only include selected consumers in split logic
 }) => {
   // State for each participant: amount and locked status
   const [participantStates, setParticipantStates] = useState([]);
   const [error, setError] = useState(null);
 
-  // Initialize when component mounts or participants/total change
+  // Initialize when component mounts or participants/total/selectedConsumers change
   useEffect(() => {
     if (participants.length > 0 && total > 0) {
       initializeParticipants();
     }
-  }, [participants.length, total]);
+  }, [participants.length, total, selectedConsumers]);
 
   // Initialize all participants with even split and unlocked
   const initializeParticipants = useCallback(() => {
     if (participants.length === 0 || total <= 0) return;
 
-    const evenAmount = total / participants.length;
+    // Determine which participants to include in the split
+    const activeParticipants = selectedConsumers || participants.map((_, index) => index);
+    
+    if (activeParticipants.length === 0) return;
+
+    // Use smart rounding to handle infinite decimals
+    const roundedAmounts = smartRoundSplit(total, activeParticipants.length);
     const newStates = participants.map((_, index) => ({
-      amount: evenAmount,
+      amount: activeParticipants.includes(index) ? roundedAmounts[activeParticipants.indexOf(index)] : 0,
       locked: false,
     }));
 
@@ -43,7 +88,7 @@ const SmartSplitInput = ({
     if (onSplitsChange) {
       onSplitsChange(newStates.map(state => ({ amount: state.amount })));
     }
-  }, [participants, total, onSplitsChange]);
+  }, [participants, total, selectedConsumers, onSplitsChange]);
 
   // Calculate remaining balance to distribute among unlocked users
   const calculateRemainingBalance = useCallback((states) => {
@@ -56,7 +101,9 @@ const SmartSplitInput = ({
 
   // Distribute remaining balance evenly among unlocked users
   const distributeRemainingBalance = useCallback((states) => {
-    const unlockedIndices = states.map((state, index) => state.locked ? null : index).filter(i => i !== null);
+    const unlockedIndices = states.map((state, index) => 
+      state.locked ? null : index
+    ).filter(i => i !== null && (!selectedConsumers || selectedConsumers.includes(i)));
     
     if (unlockedIndices.length === 0) return states;
     
@@ -69,22 +116,16 @@ const SmartSplitInput = ({
       return newStates;
     }
 
-    // Distribute evenly among unlocked users
-    const baseAmount = Math.floor(remainingBalance * 100 / unlockedIndices.length) / 100;
-    const remainder = Math.round((remainingBalance - (baseAmount * unlockedIndices.length)) * 100) / 100;
+    // Use smart rounding to distribute remaining balance
+    const roundedAmounts = smartRoundSplit(remainingBalance, unlockedIndices.length);
     
     const newStates = [...states];
-    unlockedIndices.forEach((rowIndex, arrayIndex) => {
-      let amount = baseAmount;
-      // Distribute remainder cents to first few rows
-      if (arrayIndex < Math.floor(remainder * 100)) {
-        amount += 0.01;
-      }
-      newStates[rowIndex].amount = Math.round(amount * 100) / 100;
+    unlockedIndices.forEach((arrayIndex, index) => {
+      newStates[arrayIndex].amount = roundedAmounts[index];
     });
     
     return newStates;
-  }, [calculateRemainingBalance]);
+  }, [calculateRemainingBalance, selectedConsumers]);
 
   // Handle amount change for a specific participant
   const handleAmountChange = useCallback((index, value) => {
@@ -232,6 +273,15 @@ const SmartSplitInput = ({
       {participants.map((participant, index) => {
         const state = participantStates[index] || { amount: 0, locked: false };
         
+        // Use custom render function if provided, otherwise use default
+        if (renderRow) {
+          return renderRow(participant, index, state, {
+            onAmountChange: (value) => handleAmountChange(index, value),
+            onBlur: () => handleBlur(index),
+            onToggleLock: () => toggleLock(index),
+          });
+        }
+        
         return (
           <View key={index} style={styles.splitRow}>
             {/* Participant name */}
@@ -277,7 +327,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     padding: Spacing.md,
-    marginVertical: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
   header: {
     flexDirection: 'row',
@@ -341,15 +391,6 @@ const styles = StyleSheet.create({
   autoAmountInput: {
     color: Colors.textSecondary,
     fontStyle: 'italic',
-  },
-  summary: {
-    marginTop: Spacing.md,
-    paddingTop: Spacing.md,
-  },
-  summaryText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    textAlign: 'center',
   },
 });
 

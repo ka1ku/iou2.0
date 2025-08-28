@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.divider,
     paddingHorizontal: Spacing.md,
-    minHeight: 48,
+    minHeight: 36,
   },
   currencySymbol: {
     ...Typography.body,

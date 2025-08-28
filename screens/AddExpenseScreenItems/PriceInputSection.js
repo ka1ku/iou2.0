@@ -49,11 +49,7 @@ const PriceInputSection = ({
       
       {/* Who Paid Section */}
       <View style={styles.whoPaidSection}>
-        <View style={styles.whoPaidHeader}>
-          <Ionicons name="card-outline" size={16} color={Colors.textSecondary} />
-          <Text style={styles.whoPaidLabel}>Who Paid</Text>
-        </View>
-        
+          <Text style={styles.whoPaidLabel}>Payers</Text>        
         <View style={styles.payerChips}>
           {participants.map((participant, pIndex) => (
             <TouchableOpacity
@@ -96,7 +92,7 @@ const PriceInputSection = ({
 
 const styles = StyleSheet.create({
   priceSection: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   priceLabel: {
     ...Typography.label,
@@ -109,7 +105,7 @@ const styles = StyleSheet.create({
   priceInputContainer: {
     flex: 1,
     marginRight: Spacing.sm,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   amountInput: {
     marginBottom: Spacing.sm,
@@ -118,23 +114,20 @@ const styles = StyleSheet.create({
   whoPaidSection: {
     marginBottom: Spacing.sm,
   },
-  whoPaidHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-    gap: Spacing.xs,
-  },
   whoPaidLabel: {
     ...Typography.label,
     color: Colors.textSecondary,
     fontWeight: '600',
-    fontSize: 13,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.xs,
   },
   payerChips: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.xs,
     marginBottom: Spacing.sm,
+    letterSpacing: 0.5,
+
   },
   payerChip: {
     paddingHorizontal: Spacing.sm,
@@ -181,14 +174,12 @@ const styles = StyleSheet.create({
   payerSummary: {
     alignItems: 'center',
     paddingTop: Spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
+
   },
   payerSummaryText: {
-    ...Typography.caption,
+    ...Typography.body2,
     color: Colors.textSecondary,
     fontStyle: 'italic',
-    fontSize: 11,
   },
 });
 

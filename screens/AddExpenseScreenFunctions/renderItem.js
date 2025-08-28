@@ -48,12 +48,22 @@ const renderItem = (
               }];
             } else {
               // Multiple consumers split evenly
-              const splitAmount = amount / consumers.length;
+              // Split amount evenly and round to nearest cent for each consumer
+              const baseAmount = Math.floor((amount * 100) / consumers.length) / 100;
+              const remainder = Math.round((amount - (baseAmount * consumers.length)) * 100) / 100;
+              const splitAmounts = new Array(consumers.length).fill(baseAmount);
+              console.log(splitAmounts, 'splitAmounts')
+              // Distribute the remainder cents to the first few consumers
+              const remainderCents = Math.round(remainder * 100);
+              for (let i = 0; i < remainderCents; i++) {
+                splitAmounts[i] = Math.round((splitAmounts[i] + 0.01) * 100) / 100;
+              }
               updated[index].splits = consumers.map((consumerIndex, i) => ({
                 participantIndex: consumerIndex,
-                amount: splitAmount,
+                amount: splitAmounts[i],
                 percentage: 100 / consumers.length
               }));
+
             }
           } else {
             updated[index].splits = [];
