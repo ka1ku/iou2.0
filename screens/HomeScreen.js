@@ -21,6 +21,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { getApp } from '@react-native-firebase/app';
 import { getAI, getGenerativeModel } from '@react-native-firebase/ai';
 import { useReceiptScanning } from '../App';
+import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
+import Purchases from 'react-native-purchases';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -123,8 +125,61 @@ const HomeScreen = ({ navigation }) => {
 
 
 
+  const checkUserEntitlements = async () => {
+    try {
+      const customerInfo = await Purchases.getCustomerInfo();
+      return customerInfo.entitlements.active['Pro'] !== undefined;
+    } catch (error) {
+      console.error('Error checking user entitlements:', error);
+      return false;
+    }
+  };
+
+  const presentCustomPaywall = async () => {console.log('getting offerings')
+    try {
+      // Get available offerings
+      const offerings = await Purchases.getOfferings();
+      console.log('Offerings:', offerings);
+      if (!offerings.current) {
+        console.error('No offerings available');
+        return PAYWALL_RESULT.ERROR;
+      }
+
+      // Present paywall with specific offering
+      const paywallResult = await RevenueCatUI.presentPaywall({
+        offering: offerings.current,
+        onDismiss: () => {
+          console.log('Paywall dismissed');
+        },
+        onRestoreCompleted: ({ customerInfo }) => {
+          console.log('Restore completed:', customerInfo);
+        }
+      });
+
+      return paywallResult;
+    } catch (error) {
+      console.error('Error presenting paywall:', error);
+      return PAYWALL_RESULT.ERROR;
+    }
+  };
+
   const handleReceiptScan = async () => {
     try {
+      // Check if user already has access
+      const hasAccess = await checkUserEntitlements();
+      
+      if (!hasAccess) {
+        // Show paywall for users without access
+        const paywallResult = await presentCustomPaywall();
+
+        // Check if user gained access through purchase
+        if (paywallResult !== PAYWALL_RESULT.PURCHASED && paywallResult !== PAYWALL_RESULT.RESTORED) {
+          // User doesn't have access, paywall was shown but purchase was not completed
+          return;
+        }
+      }
+
+      // User has access, proceed with receipt scanning
       // Check permissions
       const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
       const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();

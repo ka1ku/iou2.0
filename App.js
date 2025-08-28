@@ -17,6 +17,9 @@ import '@react-native-firebase/app';
 import '@react-native-firebase/auth';
 import '@react-native-firebase/firestore';
 
+// Initialize RevenueCat
+import Purchases from 'react-native-purchases';
+
 // Import auth service 
 import { onAuthStateChange } from './services/authService';
 import deepLinkService from './services/deepLinkService';
@@ -253,10 +256,22 @@ export default function App() {
     const unsubscribe = onAuthStateChange(async (user) => {
       setUser(user);
       setLoading(false);
+      
+      // Update RevenueCat user ID when user changes
+      if (user?.uid) {
+        Purchases.setAppUserID(user.uid);
+      }
     });
 
     // Initialize deep link service
     deepLinkService.initialize();
+
+    // Initialize RevenueCat
+    // TODO: Replace 'YOUR_REVENUECAT_API_KEY' with your actual API key
+    Purchases.configure({
+      apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe', // Replace with your actual API key
+      appUserID: null, // Will be set when user logs in
+    });
 
     // Cleanup on unmount
     return () => {
