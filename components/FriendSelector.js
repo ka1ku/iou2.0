@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, useDeferredValue, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -229,7 +229,7 @@ const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
   </View>
 ));
 
-const FriendSelector = ({ 
+const FriendSelector = forwardRef(({ 
   selectedFriends, 
   onFriendsChange, 
   showAddButton = true,
@@ -238,7 +238,7 @@ const FriendSelector = ({
   onAddPlaceholder,
   onClose,
   expenseId
-}) => {
+}, ref) => {
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
@@ -407,6 +407,12 @@ const FriendSelector = ({
     filteredContacts
   }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, filteredContacts]);
 
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    openModal: () => setShowModal(true),
+    closeModal: () => setShowModal(false)
+  }));
+
   return (
     <View style={styles.container}>
       {showAddButton && (
@@ -469,7 +475,7 @@ const FriendSelector = ({
       </Modal>
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

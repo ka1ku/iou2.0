@@ -11,7 +11,9 @@ const renderItem = (
   updateItem,
   fees,
   setFees,
-  styles
+  styles,
+  selectedPayers,
+  onPayersChange
 ) => {
   return (
     <View key={item.id} style={styles.itemCard}>
@@ -23,6 +25,9 @@ const renderItem = (
       <PriceInputSection
         amount={item.amount}
         onAmountChange={(amount) => updateItem(index, 'amount', amount, items, setItems, fees, setFees)}
+        participants={participants}
+        selectedPayers={selectedPayers}
+        onPayersChange={onPayersChange}
       />
 
       <CombinedConsumersAndSplitSection

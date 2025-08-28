@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   Alert,
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,9 +19,8 @@ import { getUserProfile } from '../services/friendService';
 
 import FriendSelector from '../components/FriendSelector';
 import InviteFriendSheet from '../components/InviteFriendSheet';
-import PriceInput from '../components/PriceInput';
 import DeleteButton from '../components/DeleteButton';
-import { ItemHeader, PriceInputSection, PaidBySection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection, CombinedConsumersAndSplitSection } from './AddExpenseScreenItems';
+import { ItemHeader, PriceInputSection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection, CombinedConsumersAndSplitSection } from './AddExpenseScreenItems';
 import {
   updateItem,
   updateItemSplit,
@@ -30,8 +29,6 @@ import {
   removeFee,
   saveExpense,
   renderItem,
-  addParticipant,
-  updateParticipant,
   removeParticipant,
   removePlaceholder
 } from './AddExpenseScreenFunctions';
@@ -55,6 +52,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [placeholders, setPlaceholders] = useState([]);
   const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
   const [showSettings, setShowSettings] = useState(false);
+  const [showAllParticipants, setShowAllParticipants] = useState(false);
+  const [showGroupMembers, setShowGroupMembers] = useState(false);
   const [joinEnabled, setJoinEnabled] = useState(true);
   const [items, setItems] = useState([{
     id: Date.now().toString(),
@@ -66,6 +65,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
+  const friendSelectorRef = useRef(null);
 
   // Calculate total from items and fees
   const calculateTotal = () => {
@@ -309,14 +309,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
     });
   }, [selectedFriends, placeholders]);
   
-  const handleAddParticipant = () => {
-    addParticipant(participants, setParticipants);
-  };
-
-  const handleUpdateParticipant = (index, name) => {
-    updateParticipant(index, name, participants, setParticipants);
-  };
-
   const handleRemoveParticipant = (index) => {
     removeParticipant(index, participants, setParticipants, items, setItems);
   };
@@ -371,7 +363,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
       handleUpdateItem,
       fees,
       setFees,
-      styles
+      styles,
+      selectedPayers,
+      setSelectedPayers
     );
   };
 
@@ -410,14 +404,128 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 </Text>
               </View>
             </View>
+            
+            {/* Participants Compact Grid Layout */}
+            {/* Main Participants Grid */}
+            <View style={styles.participantsGrid}>
+              {/* Add Participant Button - First Item */}
+              <TouchableOpacity 
+                style={styles.addParticipantGridButton}
+                onPress={() => {
+                  if (friendSelectorRef.current) {
+                    friendSelectorRef.current.openModal();
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.addParticipantGridIcon}>
+                  <Ionicons name="add" size={24} color={Colors.accent} />
+                </View>
+                <Text style={styles.addParticipantGridText}>Add</Text>
+              </TouchableOpacity>
+              
+              {/* Show first 5 participants in the remaining grid spots */}
+              {participants.slice(0, 5).map((participant, index) => (
+                <TouchableOpacity 
+                  key={participant.id}
+                  style={styles.participantGridItem}
+                  onPress={() => {
+                    if (participant.userId && participant.userId !== getCurrentUser()?.uid) {
+                      navigation.navigate('FriendProfile', { friendId: participant.userId });
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.participantGridAvatarContainer}>
+                    {participant.profilePhoto ? (
+                      <Image source={{ uri: participant.profilePhoto }} style={styles.participantGridAvatar} />
+                    ) : (
+                      <View style={[
+                        styles.participantGridAvatarPlaceholder,
+                        participant.name === 'Me' && styles.currentUserAvatar
+                      ]}>
+                        <Text style={[
+                          styles.participantGridAvatarInitials,
+                          participant.name === 'Me' && styles.currentUserInitials
+                        ]}>
+                          {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
+                        </Text>
+                      </View>
+                    )}
+                    {participant.placeholder && (
+                      <View style={styles.placeholderIndicator}>
+                        <Ionicons name="person-outline" size={10} color={Colors.surface} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.participantGridName} numberOfLines={1}>
+                    {participant.name}
+                  </Text>
+                  {participant.username && (
+                    <Text style={styles.participantGridUsername} numberOfLines={1}>
+                      @{participant.username}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+              
+              {/* Show remaining participants count if more than 5 */}
+              {participants.length > 5 && (
+                <TouchableOpacity 
+                  style={styles.moreParticipantsButton}
+                  onPress={() => setShowAllParticipants(true)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.moreParticipantsIcon}>
+                    <Text style={styles.moreParticipantsCount}>+{participants.length - 5}</Text>
+                  </View>
+                  <Text style={styles.moreParticipantsText}>More</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {/* Group Management Row */}
+            <View style={styles.groupManagementRow}>
+              <View style={styles.groupInfo}>
+                <Text style={styles.groupInfoText}>
+                  {participants.length} {participants.length === 1 ? 'person' : 'people'} in this expense
+                </Text>
+                {placeholders.length > 0 && (
+                  <Text style={styles.pendingInvitesText}>
+                    {placeholders.length} pending invite{placeholders.length !== 1 ? 's' : ''}
+                  </Text>
+                )}
+                {participants.length > 5 && (
+                  <Text style={styles.pendingInvitesText}>
+                    Tap "More" to see all participants
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity 
+                style={styles.manageGroupButton}
+                onPress={() => {
+                  if (friendSelectorRef.current) {
+                    friendSelectorRef.current.openModal();
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="people-outline" size={16} color={Colors.surface} />
+                <Text style={styles.manageGroupButtonText}>Manage</Text>
+              </TouchableOpacity>
+            </View>
+            
             <FriendSelector
+              ref={friendSelectorRef}
               selectedFriends={selectedFriends}
               onFriendsChange={setSelectedFriends}
               placeholder="Add friends to split with..."
               allowPlaceholders={true}
               onAddPlaceholder={handleAddPlaceholder}
               expenseId={expense?.id}
+              showAddButton={false}
             />
+            
             {/* Render placeholder chips with Invite buttons */}
             {placeholders.length > 0 && (
               <View style={styles.placeholdersContainer}>
@@ -455,20 +563,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 ))}
               </View>
             )}
-            <View style={styles.participantsNoteContainer}>
-              <Text style={styles.participantsNote}>You'll automatically be included as a participant</Text>
-            </View>
+
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Who Paid for This Expense?</Text>
-            <PaidBySection
-              participants={participants}
-              selectedPayers={selectedPayers}
-              onPayersChange={setSelectedPayers}
-            />
-          </View>
-            {items.map(handleRenderItem)}
+
+            {items.map((item, index) => handleRenderItem(item, index))}
         </ScrollView>
 
         <View style={styles.footer}>
@@ -493,6 +592,212 @@ const AddExpenseScreen = ({ route, navigation }) => {
         phoneNumber={inviteTarget?.phone || ''}
       />
 
+      {/* All Participants Modal */}
+      <Modal
+        visible={showAllParticipants}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAllParticipants(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowAllParticipants(false)}
+            >
+              <Ionicons name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>All Participants</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.allParticipantsList}>
+              {participants.map((participant, index) => (
+                <View key={participant.id} style={styles.allParticipantItem}>
+                  <View style={styles.allParticipantContent}>
+                    <View style={styles.allParticipantAvatarContainer}>
+                      {participant.profilePhoto ? (
+                        <Image source={{ uri: participant.profilePhoto }} style={styles.allParticipantAvatar} />
+                      ) : (
+                        <View style={[
+                          styles.allParticipantAvatarPlaceholder,
+                          participant.name === 'Me' && styles.currentUserAvatar
+                        ]}>
+                          <Text style={[
+                            styles.allParticipantAvatarInitials,
+                            participant.name === 'Me' && styles.currentUserInitials
+                          ]}>
+                            {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      {participant.placeholder && (
+                        <View style={styles.placeholderIndicator}>
+                          <Ionicons name="person-outline" size={12} color={Colors.surface} />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.allParticipantInfo}>
+                      <Text style={styles.allParticipantName}>{participant.name}</Text>
+                      {participant.username && (
+                        <Text style={styles.allParticipantUsername}>@{participant.username}</Text>
+                      )}
+                      {participant.placeholder && (
+                        <Text style={styles.allParticipantTag}>Placeholder</Text>
+                      )}
+                      {participant.name === 'Me' && (
+                        <Text style={styles.allParticipantTag}>You</Text>
+                      )}
+                    </View>
+                  </View>
+                  {participant.name !== 'Me' && (
+                    <View style={styles.allParticipantActions}>
+                      {participant.placeholder ? (
+                        <TouchableOpacity 
+                          style={styles.inviteButton} 
+                          onPress={() => {
+                            setShowAllParticipants(false);
+                            handleInvitePlaceholder(participant);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="qr-code-outline" size={16} color={Colors.surface} />
+                          <Text style={styles.inviteButtonText}>Invite</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity 
+                          style={styles.removeParticipantButton}
+                          onPress={() => {
+                            setShowAllParticipants(false);
+                            handleRemoveParticipant(index);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="close-circle" size={20} color={Colors.error} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Group Members Modal */}
+      <Modal
+        visible={showGroupMembers}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowGroupMembers(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowGroupMembers(false)}
+            >
+              <Ionicons name="close" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Manage Group Members</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          <View style={styles.modalContent}>
+            {/* Participants Management Section */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Add/Remove Participants</Text>
+              <FriendSelector
+                selectedFriends={selectedFriends}
+                onFriendsChange={setSelectedFriends}
+                placeholder="Add friends to split with..."
+                allowPlaceholders={true}
+                onAddPlaceholder={handleAddPlaceholder}
+                expenseId={expense?.id}
+                showAddButton={false}
+              />
+            </View>
+            
+            {/* Current Participants List */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Current Participants</Text>
+              <View style={styles.currentParticipantsList}>
+                {participants.map((participant, index) => (
+                  <View key={participant.id} style={styles.currentParticipantItem}>
+                    <View style={styles.currentParticipantContent}>
+                      <View style={styles.currentParticipantAvatarContainer}>
+                        {participant.profilePhoto ? (
+                          <Image source={{ uri: participant.profilePhoto }} style={styles.currentParticipantAvatar} />
+                        ) : (
+                          <View style={[
+                            styles.currentParticipantAvatarPlaceholder,
+                            participant.name === 'Me' && styles.currentUserAvatar
+                          ]}>
+                            <Text style={[
+                              styles.currentParticipantAvatarInitials,
+                              participant.name === 'Me' && styles.currentUserInitials
+                            ]}>
+                              {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        {participant.placeholder && (
+                          <View style={styles.placeholderIndicator}>
+                            <Ionicons name="person-outline" size={12} color={Colors.surface} />
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.currentParticipantInfo}>
+                        <Text style={styles.currentParticipantName}>{participant.name}</Text>
+                        {participant.username && (
+                          <Text style={styles.currentParticipantUsername}>@{participant.username}</Text>
+                        )}
+                        {participant.placeholder && (
+                          <Text style={styles.currentParticipantTag}>Placeholder</Text>
+                        )}
+                        {participant.name === 'Me' && (
+                          <Text style={styles.currentParticipantTag}>You</Text>
+                        )}
+                      </View>
+                    </View>
+                    {participant.name !== 'Me' && (
+                      <View style={styles.currentParticipantActions}>
+                        {participant.placeholder ? (
+                          <TouchableOpacity 
+                            style={styles.inviteButton} 
+                            onPress={() => {
+                              setShowGroupMembers(false);
+                              handleInvitePlaceholder(participant);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="qr-code-outline" size={16} color={Colors.surface} />
+                            <Text style={styles.inviteButtonText}>Invite</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity 
+                            style={styles.removeParticipantButton}
+                            onPress={() => {
+                              setShowGroupMembers(false);
+                              handleRemoveParticipant(index);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="close-circle" size={20} color={Colors.error} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Settings Modal */}
       <Modal
         visible={showSettings}
@@ -513,25 +818,43 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles.modalContent}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingTitle}>Allow join by room code</Text>
-                <Text style={styles.settingDescription}>
-                  Let others join this expense using the room code
-                </Text>
+            {/* Participants Management Section */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Manage Participants</Text>
+              <FriendSelector
+                selectedFriends={selectedFriends}
+                onFriendsChange={setSelectedFriends}
+                placeholder="Add friends to split with..."
+                allowPlaceholders={true}
+                onAddPlaceholder={handleAddPlaceholder}
+                expenseId={expense?.id}
+                showAddButton={false}
+              />
+            </View>
+            
+            {/* Settings Section */}
+            <View style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>Expense Settings</Text>
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <Text style={styles.settingTitle}>Allow join by room code</Text>
+                  <Text style={styles.settingDescription}>
+                    Let others join this expense using the room code
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleButton,
+                    joinEnabled && styles.toggleButtonActive
+                  ]}
+                  onPress={() => setJoinEnabled(!joinEnabled)}
+                >
+                  <View style={[
+                    styles.toggleThumb,
+                    joinEnabled && styles.toggleThumbActive
+                  ]} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  joinEnabled && styles.toggleButtonActive
-                ]}
-                onPress={() => setJoinEnabled(!joinEnabled)}
-              >
-                <View style={[
-                  styles.toggleThumb,
-                  joinEnabled && styles.toggleThumbActive
-                ]} />
-              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -604,52 +927,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   sectionTitle: {
-    ...Typography.title,
+    ...Typography.h3,
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
-  },
-
-  titleInput: {
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
-    ...Typography.body,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-    marginTop: Spacing.sm,
-  },
-  totalContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  totalLabel: {
-    ...Typography.h3,
-    color: Colors.textSecondary,
-  },
-  totalText: {
-    ...Typography.h2,
-    color: Colors.accent,
     fontWeight: '600',
   },
-  participantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: Spacing.sm,
-  },
-  participantInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.sm,
-    padding: Spacing.md,
-    ...Typography.body,
-    marginRight: Spacing.sm,
-    backgroundColor: Colors.surface,
-    color: Colors.textPrimary,
-  },
+
+
   removeParticipantButton: {
     padding: Spacing.sm,
   },
@@ -668,33 +952,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
   },
 
-  participantsNote: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  participantsNoteContainer: {
-    backgroundColor: Colors.surfaceLight,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.md,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
-  placeholderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.card,
-  },
+
   placeholderAvatar: {
     width: 40,
     height: 40,
@@ -752,6 +1010,15 @@ const styles = StyleSheet.create({
   modalContent: {
     flex: 1,
     padding: Spacing.lg,
+  },
+  modalSection: {
+    marginBottom: Spacing.xl,
+  },
+  modalSectionTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.md,
+    fontWeight: '600',
   },
   settingRow: {
     flexDirection: 'row',
@@ -883,25 +1150,169 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
     fontWeight: '600',
   },
-  placeholderPhone: {
+
+
+  placeholderIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.button,
+    elevation: 2,
+  },
+
+  // Essential grid styles
+  participantsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  participantGridItem: {
+    alignItems: 'center',
+    width: '30%',
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.xs,
+    minHeight: 100,
+  },
+  participantGridAvatarContainer: {
+    position: 'relative',
+    width: 72,
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  participantGridAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.avatar,
+  },
+  participantGridAvatarPlaceholder: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.accent,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.avatar,
+  },
+  participantGridAvatarInitials: {
+    color: Colors.white,
+    fontSize: 24,
+    fontFamily: Typography.familySemiBold,
+  },
+  participantGridName: {
     ...Typography.body,
-    color: Colors.textSecondary,
-    fontSize: 14,
-  },
-  placeholderTag: {
-    ...Typography.label,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
+    textAlign: 'center',
     fontSize: 11,
-    marginTop: Spacing.xs,
-    fontStyle: 'italic',
-    opacity: 0.8,
+    fontWeight: '500',
   },
-  placeholderActions: {
+  participantGridUsername: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 9,
+  },
+  addParticipantGridButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '30%',
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.xs,
+    minHeight: 100,
+  },
+  addParticipantGridIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  addParticipantGridText: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  moreParticipantsButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '30%',
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.xs,
+    minHeight: 100,
+  },
+  moreParticipantsIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+  },
+  moreParticipantsCount: {
+    ...Typography.title,
+    color: Colors.accent,
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  moreParticipantsText: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  groupManagementRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
   },
-  inviteButton: {
+  groupInfo: {
+    flex: 1,
+  },
+  groupInfoText: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  pendingInvitesText: {
+    ...Typography.caption,
+    color: Colors.accent,
+    fontSize: 11,
+    marginTop: Spacing.xs,
+    fontWeight: '500',
+  },
+  manageGroupButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
@@ -912,24 +1323,203 @@ const styles = StyleSheet.create({
     ...Shadows.button,
     elevation: 2,
   },
-  inviteButtonText: { 
-    ...Typography.label, 
-    color: Colors.surface, 
+  manageGroupButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 12,
   },
   participantsCount: {
     backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
     borderRadius: Radius.pill,
     ...Shadows.button,
-    elevation: 2,
+    elevation: 3,
   },
   participantsCountText: {
     ...Typography.label,
     color: Colors.surface,
     fontWeight: '600',
+    fontSize: 11,
+  },
+
+  currentUserAvatar: {
+    borderColor: Colors.accent,
+    borderWidth: 3,
+    backgroundColor: Colors.accent,
+  },
+  currentUserInitials: {
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: 24,
+  },
+
+  allParticipantsList: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  allParticipantItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    ...Shadows.card,
+    elevation: 2,
+    minHeight: 72,
+  },
+  allParticipantContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  allParticipantAvatarContainer: {
+    position: 'relative',
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  allParticipantAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.avatar,
+  },
+  allParticipantAvatarPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.accent,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.avatar,
+  },
+  allParticipantAvatarInitials: {
+    color: Colors.white,
+    fontSize: 18,
+    fontFamily: Typography.familySemiBold,
+  },
+  allParticipantInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  allParticipantName: {
+    ...Typography.title,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+  },
+  allParticipantUsername: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontSize: 10,
+  },
+  allParticipantTag: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontSize: 11,
+    marginTop: Spacing.xs,
+    fontStyle: 'italic',
+    opacity: 0.8,
+  },
+  allParticipantActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  removeParticipantButton: {
+    padding: Spacing.sm,
+  },
+
+  currentParticipantsList: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  currentParticipantItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    ...Shadows.card,
+    elevation: 2,
+    minHeight: 72,
+  },
+  currentParticipantContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  currentParticipantAvatarContainer: {
+    position: 'relative',
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  currentParticipantAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.avatar,
+  },
+  currentParticipantAvatarPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.accent,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.avatar,
+  },
+  currentParticipantAvatarInitials: {
+    color: Colors.white,
+    fontSize: 18,
+    fontFamily: Typography.familySemiBold,
+  },
+  currentParticipantInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  currentParticipantName: {
+    ...Typography.title,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+  },
+  currentParticipantUsername: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontSize: 10,
+  },
+  currentParticipantTag: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontSize: 11,
+    marginTop: Spacing.xs,
+    fontStyle: 'italic',
+    opacity: 0.8,
+  },
+  currentParticipantActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
 
 });

@@ -45,6 +45,11 @@ const saveExpense = async (
     return;
   }
 
+  if (!selectedPayers || selectedPayers.length === 0) {
+    Alert.alert('Error', 'Please select at least one person who paid for this expense');
+    return;
+  }
+
   setLoading(true);
   try {
     const currentUser = getCurrentUser();
