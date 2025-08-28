@@ -121,8 +121,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: Colors.divider,
     paddingHorizontal: Spacing.md,
@@ -133,14 +133,16 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginRight: Spacing.xs,
     fontWeight: '500',
+    fontSize: 16,
   },
   currencySymbolFocused: { color: Colors.accent },
   input: {
     flex: 1,
     ...Typography.body,
     color: Colors.textPrimary,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     minHeight: 20,
+    fontSize: 16,
   },
   containerFocused: { borderColor: Colors.accent },
   inputDisabled: {
