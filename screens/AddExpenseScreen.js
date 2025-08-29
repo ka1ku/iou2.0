@@ -11,6 +11,7 @@ import {
   Modal,
   Image,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
@@ -410,30 +411,34 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {isEditing ? 'Edit Expense' : 'Add Expense'}
-        </Text>
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => setShowSettings(true)}
-        >
-          <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-      </View>
-      
-      <KeyboardAvoidingView 
+            <View style={styles.container}>
+        <BlurView intensity={30} tint="light" style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {isEditing ? 'Edit Expense' : 'Add Expense'}
+          </Text>
+          <TouchableOpacity 
+            style={styles.settingsButton}
+            onPress={() => setShowSettings(true)}
+          >
+            <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        </BlurView>
+        
+        <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: insets.top + 100, paddingBottom: 120 }}
+        >
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Participants</Text>
@@ -609,7 +614,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
             {items.map((item, index) => handleRenderItem(item, index))}
         </ScrollView>
 
-        <View style={styles.footer}>
+        <BlurView intensity={30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom}]}>
           <TouchableOpacity
             style={[styles.saveButton, loading && styles.saveButtonDisabled]}
             onPress={handleSaveExpense}
@@ -620,7 +625,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               {loading ? 'Saving...' : (isEditing ? 'Update Expense' : 'Save Expense')}
             </Text>
           </TouchableOpacity>
-        </View>
+        </BlurView>
       </KeyboardAvoidingView>
 
       <InviteFriendSheet
@@ -908,22 +913,28 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.xl,
     paddingBottom: Spacing.lg,
-    backgroundColor: Colors.surface,
-    ...Shadows.card,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: Radius.md,
-    backgroundColor: Colors.card,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.card,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   headerTitle: {
     ...Typography.h2,
@@ -939,10 +950,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: Radius.md,
-    backgroundColor: Colors.card,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.card,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -1109,19 +1121,24 @@ const styles = StyleSheet.create({
     transform: [{ translateX: 20 }],
   },
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.lg,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
+    paddingBottom: Spacing.xl,
     borderTopWidth: 1,
-    borderTopColor: Colors.divider,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   saveButton: {
     backgroundColor: Colors.accent,
     padding: Spacing.lg,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     alignItems: 'center',
-    ...Shadows.card,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
   },
   saveButtonDisabled: {
     backgroundColor: Colors.textSecondary,
