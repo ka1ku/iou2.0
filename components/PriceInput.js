@@ -10,6 +10,7 @@ const PriceInput = ({
   disabled = false,
   showCurrency = true,
   maxDecimals = 2,
+  selected = false, // New prop to control selection styling
   ...props
 }) => {
   const [displayValue, setDisplayValue] = useState('');
@@ -94,9 +95,18 @@ const PriceInput = ({
   const getPlaceholderText = () => (isFocused && !displayValue ? '0' : placeholder);
 
   return (
-    <View style={[styles.container, style, isFocused && styles.containerFocused]}>
+    <View style={[
+      styles.container, 
+      style, 
+      selected && styles.containerSelected,
+      isFocused && styles.containerFocused
+    ]}>
       {showCurrency && (
-        <Text style={[styles.currencySymbol, isFocused && styles.currencySymbolFocused]}>
+        <Text style={[
+          styles.currencySymbol, 
+          selected && styles.currencySymbolSelected,
+          isFocused && styles.currencySymbolFocused
+        ]}>
           $
         </Text>
       )}
@@ -126,24 +136,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.divider,
     paddingHorizontal: Spacing.md,
-    minHeight: 36,
+    minHeight: 32,
   },
   currencySymbol: {
     ...Typography.body,
     color: Colors.textSecondary,
     marginRight: Spacing.xs,
     fontWeight: '500',
-    fontSize: 16,
+    fontSize: '15'
   },
+  currencySymbolSelected: { color: Colors.accent },
   currencySymbolFocused: { color: Colors.accent },
   input: {
     flex: 1,
     ...Typography.body,
     color: Colors.textPrimary,
-    paddingVertical: Spacing.md,
-    minHeight: 20,
-    fontSize: 16,
+    paddingVertical: Spacing.sm,
+    fontSize: '15'
   },
+  containerSelected: { borderColor: Colors.accent },
   containerFocused: { borderColor: Colors.accent },
   inputDisabled: {
     backgroundColor: Colors.background,

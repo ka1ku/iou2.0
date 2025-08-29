@@ -13,7 +13,8 @@ const renderItem = (
   setFees,
   styles,
   selectedPayers,
-  onPayersChange
+  onPayersChange,
+  isReceipt = false
 ) => {
   return (
     <View key={item.id} style={styles.itemCard}>
@@ -26,8 +27,8 @@ const renderItem = (
         amount={item.amount}
         onAmountChange={(amount) => updateItem(index, 'amount', amount, items, setItems, fees, setFees)}
         participants={participants}
-        selectedPayers={selectedPayers}
-        onPayersChange={onPayersChange}
+        selectedPayers={isReceipt ? undefined : selectedPayers}
+        onPayersChange={isReceipt ? undefined : onPayersChange}
       />
 
       <CombinedConsumersAndSplitSection
@@ -78,6 +79,7 @@ const renderItem = (
           updated[index].splits = newSplits;
           setItems(updated);
         }}
+        isReceipt={isReceipt}
       />
     </View>
   );

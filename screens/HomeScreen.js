@@ -126,13 +126,14 @@ const HomeScreen = ({ navigation }) => {
 
 
   const checkUserEntitlements = async () => {
-    try {
-      const customerInfo = await Purchases.getCustomerInfo();
-      return customerInfo.entitlements.active['Pro'] !== undefined;
-    } catch (error) {
-      console.error('Error checking user entitlements:', error);
-      return false;
-    }
+    // try {
+    //   const customerInfo = await Purchases.getCustomerInfo();
+    //   return customerInfo.entitlements.active['Pro'] !== undefined;
+    // } catch (error) {
+    //   console.error('Error checking user entitlements:', error);
+    //   return false;
+    // }
+    return true
   };
 
   const presentCustomPaywall = async () => {console.log('getting offerings')
@@ -164,6 +165,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleReceiptScan = async () => {
+    
     try {
       // Check if user already has access
       const hasAccess = await checkUserEntitlements();

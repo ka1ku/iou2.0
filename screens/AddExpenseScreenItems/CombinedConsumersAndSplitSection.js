@@ -18,6 +18,7 @@ const CombinedConsumersAndSplitSection = ({
   initialSplits = [],
   onSplitsChange,
   style,
+  isReceipt = false,
 }) => {
 
   // Toggle consumer selection
@@ -42,7 +43,10 @@ const CombinedConsumersAndSplitSection = ({
       <Text style={styles.label}>Split</Text>
       
       {/* Split card content */}
-      <View style={styles.splitCard}>
+      <View style={[
+        styles.splitCard,
+        isReceipt && styles.splitCardReceipt
+      ]}>
         {/* Consumer info - moved to top */}
         {selectedConsumers.length > 0 && (
           <View style={styles.consumerInfo}>
@@ -80,39 +84,47 @@ const CombinedConsumersAndSplitSection = ({
                 {/* Participant name */}
                 <View style={styles.participantInfo}>
                   <View style={styles.participantTextContainer}>
-                    <Text style={[
-                      styles.participantName,
-                      !isSelected && styles.participantNameDisabled
-                    ]}>
+                    <Text 
+                      style={[
+                        styles.participantName,
+                        !isSelected && styles.participantNameDisabled
+                      ]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       {participant.name || `Person ${index + 1}`}
                     </Text>
                     {participant.username && (
-                      <Text style={[
-                        styles.participantUsername,
-                        !isSelected && styles.participantUsernameDisabled
-                      ]}>
+                      <Text 
+                        style={[
+                          styles.participantUsername,
+                          !isSelected && styles.participantUsernameDisabled
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
                         @{participant.username}
                       </Text>
                     )}
                   </View>
                 </View>
 
-                {/* Amount input - always show for all participants */}
-                <View style={styles.inputContainer}>
-                  <PriceInput
-                    value={isSelected ? state.amount : 0}
-                    onChangeText={handlers.onAmountChange}
-                    onBlur={handlers.onBlur}
-                    placeholder="0.00"
-                    style={[
-                      styles.amountInput,
-                      !isSelected && styles.disabledAmountInput,
-                      !state.locked && isSelected && styles.autoAmountInput
-                    ]}
-                    editable={isSelected}
-                    showCurrency={true}
-                  />
-                </View>
+                  {/* Amount input - always show for all participants */}
+                  <View style={styles.inputContainer}>
+                    <PriceInput
+                      value={isSelected ? state.amount : 0}
+                      onChangeText={handlers.onAmountChange}
+                      onBlur={handlers.onBlur}
+                      placeholder="0.00"
+                      style={[
+                        styles.amountInput,
+                        !isSelected && styles.disabledAmountInput
+                      ]}
+                      editable={isSelected}
+                      showCurrency={true}
+                      selected={isSelected}
+                    />
+                  </View>
 
                 {/* Lock/unlock button - always show for all participants */}
                 <TouchableOpacity
@@ -126,7 +138,7 @@ const CombinedConsumersAndSplitSection = ({
                 >
                   <Ionicons 
                     name={state.locked ? "lock-closed" : "lock-open"} 
-                    size={16} 
+                    size={18} 
                     color={state.locked ? Colors.accent : Colors.textSecondary} 
                   />
                 </TouchableOpacity>
@@ -156,6 +168,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.sm,
     marginVertical: Spacing.sm,
+    borderColor: Colors.border,
+    borderWidth: 1,
+  },
+  splitCardReceipt: {
+    paddingHorizontal: 0, // Remove horizontal padding for receipts
   },
   splitRow: {
     flexDirection: 'row',
@@ -198,9 +215,12 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   participantName: {
-    ...Typography.body1,
+    ...Typography.body2,
     color: Colors.textPrimary,
     fontWeight: '500',
+    fontSize: '15',
+    numberOfLines: 1,
+    ellipsizeMode: 'tail'
   },
   participantNameDisabled: {
     color: Colors.textSecondary,
@@ -209,12 +229,14 @@ const styles = StyleSheet.create({
   participantUsername: {
     ...Typography.caption,
     color: Colors.textSecondary,
+    numberOfLines: 1,
+    ellipsizeMode: 'tail'
   },
   participantUsernameDisabled: {
     opacity: 0.6,
   },
   inputContainer: {
-    width: 80,
+    width: 90,
     marginRight: Spacing.sm,
   },
   amountInput: {
@@ -223,28 +245,26 @@ const styles = StyleSheet.create({
     ...Typography.body1,
     color: Colors.textPrimary,
   },
-  autoAmountInput: {
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
+
   disabledAmountInput: {
     color: Colors.textSecondary,
     opacity: 0.6,
   },
   lockButton: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: Radius.sm,
     borderWidth: 1,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    borderColor: Colors.border, // Default border color
   },
   lockButtonSelected: {
-    borderColor: Colors.textPrimary, // Darker border for selected participants
+    borderColor: Colors.accent, // Accent border for selected participants
   },
   lockButtonUnselected: {
-    borderColor: Colors.divider, // Lighter border for unselected participants
+    borderColor: Colors.border, // Default border for unselected participants
     opacity: 0.6,
   },
   lockButtonLocked: {

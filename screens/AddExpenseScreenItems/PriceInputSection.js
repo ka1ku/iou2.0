@@ -47,45 +47,47 @@ const PriceInputSection = ({
         />
       </View>
       
-      {/* Who Paid Section */}
-      <View style={styles.whoPaidSection}>
+      {/* Who Paid Section - Only show if selectedPayers and onPayersChange are provided */}
+      {selectedPayers && onPayersChange && (
+        <View style={styles.whoPaidSection}>
           <Text style={styles.whoPaidLabel}>Payers</Text>        
-        <View style={styles.payerChips}>
-          {participants.map((participant, pIndex) => (
-            <TouchableOpacity
-              key={pIndex}
-              style={[
-                styles.payerChip,
-                selectedPayers.includes(pIndex) && styles.payerChipActive
-              ]}
-              onPress={() => togglePayer(pIndex)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.payerChipContent}>
-                {selectedPayers.includes(pIndex) && (
-                  <View style={styles.checkmarkContainer}>
-                    <Ionicons name="checkmark" size={12} color={Colors.surface} />
-                  </View>
-                )}
-                <Text style={[
-                  styles.payerChipText,
-                  selectedPayers.includes(pIndex) && styles.payerChipTextActive
-                ]}>
-                  {participant.name || `Person ${pIndex + 1}`}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-        
-        {selectedPayers.length > 0 && (
-          <View style={styles.payerSummary}>
-            <Text style={styles.payerSummaryText}>
-              {selectedPayers.length} {selectedPayers.length === 1 ? 'person' : 'people'} paying
-            </Text>
+          <View style={styles.payerChips}>
+            {participants.map((participant, pIndex) => (
+              <TouchableOpacity
+                key={pIndex}
+                style={[
+                  styles.payerChip,
+                  selectedPayers.includes(pIndex) && styles.payerChipActive
+                ]}
+                onPress={() => togglePayer(pIndex)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.payerChipContent}>
+                  {selectedPayers.includes(pIndex) && (
+                    <View style={styles.checkmarkContainer}>
+                      <Ionicons name="checkmark" size={12} color={Colors.surface} />
+                    </View>
+                  )}
+                  <Text style={[
+                    styles.payerChipText,
+                    selectedPayers.includes(pIndex) && styles.payerChipTextActive
+                  ]}>
+                    {participant.name || `Person ${pIndex + 1}`}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
           </View>
-        )}
-      </View>
+          
+          {selectedPayers.length > 0 && (
+            <View style={styles.payerSummary}>
+              <Text style={styles.payerSummaryText}>
+                {selectedPayers.length} {selectedPayers.length === 1 ? 'person' : 'people'} paying
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
     </View>
   );
 };

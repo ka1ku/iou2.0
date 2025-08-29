@@ -15,7 +15,8 @@ const saveExpense = async (
   navigation,
   setLoading,
   calculateTotal,
-  expenseType = 'expense' // Default to expense, can be 'receipt' or 'expense'
+  expenseType = 'expense', // Default to expense, can be 'receipt' or 'expense'
+  resetChanges = null // New parameter for resetting change tracker
 ) => {
   // Generate a default title from the item name if no title is provided
   let finalTitle = title.trim();
@@ -120,6 +121,10 @@ const saveExpense = async (
     if (isEditing) {
       await updateExpense(expense.id, expenseData, currentUser.uid);
       Alert.alert('Success', 'Expense updated successfully');
+      // Reset change tracker after successful update
+      if (resetChanges) {
+        resetChanges();
+      }
     } else {
       await createExpense(expenseData, currentUser.uid);
       Alert.alert('Success', 'Expense created successfully');

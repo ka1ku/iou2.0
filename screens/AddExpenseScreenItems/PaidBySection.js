@@ -27,11 +27,6 @@ const PaidBySection = ({ participants, selectedPayers, onPayersChange }) => {
 
   return (
     <View style={styles.paidByContainer}>
-      <View style={styles.whoPaidHeader}>
-        <Ionicons name="card-outline" size={16} color={Colors.textSecondary} />
-        <Text style={styles.whoPaidLabel}>Who Paid for This Expense?</Text>
-      </View>
-      
       <View style={styles.paidByButtons}>
         {participants.map((participant, pIndex) => (
           <TouchableOpacity
@@ -73,7 +68,7 @@ const PaidBySection = ({ participants, selectedPayers, onPayersChange }) => {
 
 const styles = StyleSheet.create({
   paidByContainer: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
     marginTop: Spacing.sm,
   },
   whoPaidHeader: {
@@ -139,8 +134,6 @@ const styles = StyleSheet.create({
   payerSummary: {
     alignItems: 'center',
     paddingTop: Spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
   },
   payerSummaryText: {
     ...Typography.caption,

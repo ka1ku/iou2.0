@@ -36,6 +36,8 @@ import {
   removePlaceholder
 } from './AddExpenseScreenFunctions';
 import { getCurrentUser } from '../services/authService';
+import useFormChangeTracker from '../hooks/useFormChangeTracker';
+import useNavigationWarning from '../hooks/useNavigationWarning';
 
 const AddReceiptScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
@@ -53,6 +55,27 @@ const AddReceiptScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
 
+  // Form change tracking for navigation warning
+  const { hasChanges, updateChangeStatus, resetChanges } = useFormChangeTracker(
+    isEditing && expense ? {
+      title: expense.title || '',
+      participants: expense.participants || [],
+      items: expense.items || [],
+      fees: expense.fees || [],
+      selectedPayers: expense.selectedPayers || [0],
+      joinEnabled: expense.join?.enabled || true
+    } : null,
+    isEditing
+  );
+
+  // Navigation warning when trying to leave with unsaved changes
+  useNavigationWarning(
+    hasChanges,
+    navigation,
+    null,
+    'You have unsaved changes to this receipt. Are you sure you want to leave?'
+  );
+
   // Calculate total from items and fees
   const calculateTotal = () => {
     const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
@@ -63,6 +86,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       title: isEditing ? 'Edit Receipt' : 'Add Receipt',
+      tabBarStyle: { display: 'none' },
     });
   }, [isEditing, navigation]);
 
@@ -219,6 +243,20 @@ const AddReceiptScreen = ({ route, navigation }) => {
       }
     }
   }, [expense, isEditing]);
+
+  // Track form changes for navigation warning
+  useEffect(() => {
+    const currentFormData = {
+      title,
+      participants: participants.map(p => ({ name: p.name, userId: p.userId, placeholder: p.placeholder })),
+      items: items.map(item => ({ name: item.name, amount: item.amount, selectedConsumers: item.selectedConsumers })),
+      fees: fees.map(fee => ({ name: fee.name, amount: fee.amount, type: fee.type, percentage: fee.percentage })),
+      selectedPayers,
+      joinEnabled
+    };
+    updateChangeStatus(currentFormData);
+  }, [title, participants, items, fees, selectedPayers, joinEnabled, updateChangeStatus]);
+
   // Update participants when friends are selected
   useEffect(() => {
     const allParticipants = [
@@ -305,7 +343,8 @@ const AddReceiptScreen = ({ route, navigation }) => {
       navigation,
       setLoading,
       calculateTotal,
-      'receipt' // Mark as receipt
+      'receipt', // Mark as receipt
+      resetChanges
     );
   };
 
@@ -319,7 +358,10 @@ const AddReceiptScreen = ({ route, navigation }) => {
       handleUpdateItem,
       fees,
       setFees,
-      styles
+      styles,
+      selectedPayers,
+      (newPayers) => setSelectedPayers(newPayers),
+      true // isReceipt = true for AddReceiptScreen
     );
   };
 
@@ -736,8 +778,8 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
+    borderWidth: 1,
+    borderColor: Colors.border,
     backgroundColor: Colors.surfaceLight,
     borderRadius: Radius.md,
   },
@@ -863,6 +905,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.divider,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
+    paddingBottom: 0,
     marginBottom: Spacing.md,
     backgroundColor: Colors.surface,
     ...Shadows.card,

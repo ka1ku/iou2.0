@@ -32,6 +32,8 @@ import {
   removeParticipant,
   removePlaceholder
 } from './AddExpenseScreenFunctions';
+import useFormChangeTracker from '../hooks/useFormChangeTracker';
+import useNavigationWarning from '../hooks/useNavigationWarning';
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
@@ -67,6 +69,27 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
   const friendSelectorRef = useRef(null);
 
+  // Form change tracking for navigation warning
+  const { hasChanges, updateChangeStatus, resetChanges } = useFormChangeTracker(
+    isEditing && expense ? {
+      title: expense.title || '',
+      participants: expense.participants || [],
+      items: expense.items || [],
+      fees: expense.fees || [],
+      selectedPayers: expense.selectedPayers || [0],
+      joinEnabled: expense.join?.enabled || true
+    } : null,
+    isEditing
+  );
+
+  // Navigation warning when trying to leave with unsaved changes
+  useNavigationWarning(
+    hasChanges,
+    navigation,
+    null,
+    'You have unsaved changes to this expense. Are you sure you want to leave?'
+  );
+
   // Calculate total from items and fees
   const calculateTotal = () => {
     const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
@@ -77,6 +100,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       title: isEditing ? 'Edit Expense' : 'Add Expense',
+      tabBarStyle: { display: 'none' },
     });
   }, [isEditing, navigation]);
 
@@ -270,6 +294,19 @@ const AddExpenseScreen = ({ route, navigation }) => {
     }
   }, [expense, isEditing]);
 
+  // Track form changes for navigation warning
+  useEffect(() => {
+    const currentFormData = {
+      title,
+      participants: participants.map(p => ({ name: p.name, userId: p.userId, placeholder: p.placeholder })),
+      items: items.map(item => ({ name: item.name, amount: item.amount, selectedConsumers: item.selectedConsumers })),
+      fees: fees.map(fee => ({ name: fee.name, amount: fee.amount, type: fee.type, percentage: fee.percentage })),
+      selectedPayers,
+      joinEnabled
+    };
+    updateChangeStatus(currentFormData);
+  }, [title, participants, items, fees, selectedPayers, joinEnabled, updateChangeStatus]);
+
   // Update participants when friends are selected
   useEffect(() => {
     setParticipants(prevParticipants => {
@@ -349,7 +386,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
       expense,
       navigation,
       setLoading,
-      calculateTotal
+      calculateTotal,
+      'expense',
+      resetChanges
     );
   };
 
@@ -942,6 +981,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.divider,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
+    paddingBottom: 0,
     marginBottom: Spacing.md,
     backgroundColor: Colors.background,
     ...Shadows.card,
