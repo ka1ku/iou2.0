@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, createContext, useContext, useRef } from 'react';
 import { View, StyleSheet, Text, Animated, Dimensions } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -57,7 +57,7 @@ const HomeStack = () => {
           headerShown: false,
         }}
       />
-            <Stack.Screen
+      <Stack.Screen
         name="AddReceipt"
         component={AddReceiptScreen}
         options={{
@@ -141,36 +141,43 @@ const MainTabs = () => {
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
+        screenOptions={({ route }) => {
+          // Get the currently focused route name within the stack
+          const routeName = getFocusedRouteNameFromRoute(route);
+          
+          return {
+            tabBarIcon: ({ focused, color, size }) => {
+              let iconName;
 
-            if (route.name === 'Home') {
-              iconName = focused ? 'home' : 'home-outline';
-            } else if (route.name === 'Profile') {
-              iconName = focused ? 'person' : 'person-outline';
-            }
+              if (route.name === 'Home') {
+                iconName = focused ? 'home' : 'home-outline';
+              } else if (route.name === 'Profile') {
+                iconName = focused ? 'person' : 'person-outline';
+              }
 
-            return <Ionicons name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: Colors.tabActive,
-          tabBarInactiveTintColor: Colors.tabInactive,
-          tabBarStyle: {
-            backgroundColor: Colors.surface,
-            borderTopWidth: 0,
-            elevation: 0,
-            shadowOpacity: 0,
-            height: 90,
-            paddingBottom: 30,
-            paddingTop: 10,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontFamily: Typography.familyMedium,
-            marginTop: 4,
-          },
-          headerShown: false,
-        })}
+              return <Ionicons name={iconName} size={size} color={color} />;
+            },
+            tabBarActiveTintColor: Colors.tabActive,
+            tabBarInactiveTintColor: Colors.tabInactive,
+            tabBarStyle: {
+              backgroundColor: Colors.surface,
+              borderTopWidth: 0,
+              elevation: 0,
+              shadowOpacity: 0,
+              height: 90,
+              paddingBottom: 30,
+              paddingTop: 10,
+              // Hide tab bar when on AddExpense or AddReceipt screens
+              display: (routeName === 'AddExpense' || routeName === 'AddReceipt') ? 'none' : 'flex',
+            },
+            tabBarLabelStyle: {
+              fontSize: 12,
+              fontFamily: Typography.familyMedium,
+              marginTop: 4,
+            },
+            headerShown: false,
+          };
+        }}
       >
         <Tab.Screen
           name="Home"
@@ -205,6 +212,8 @@ const MainTabs = () => {
     </View>
   );
 };
+
+
 
 // Loading screen component
 const LoadingScreen = () => {
@@ -272,6 +281,24 @@ export default function App() {
       apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe', // Replace with your actual API key
       appUserID: null, // Will be set when user logs in
     });
+
+    // Add RevenueCat debug logging
+    Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+    
+    // Test RevenueCat connection
+    Purchases.getOfferings()
+      .then(offerings => {
+        console.log('RevenueCat offerings loaded successfully:', offerings);
+        if (offerings.current) {
+          console.log('Current offering:', offerings.current);
+          console.log('Available packages:', offerings.current.availablePackages);
+        } else {
+          console.warn('No current offering available');
+        }
+      })
+      .catch(error => {
+        console.error('RevenueCat offerings error:', error);
+      });
 
     // Cleanup on unmount
     return () => {
