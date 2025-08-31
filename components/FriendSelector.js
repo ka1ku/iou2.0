@@ -60,22 +60,24 @@ const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect }) => 
 });
 
 const MemoizedContactItem = React.memo(({ item, onInviteContact, onSMSInvite }) => {
-  const [inviteSent, setInviteSent] = useState(false);
   const name = (item.firstName && item.lastName)
     ? `${item.firstName} ${item.lastName}`
     : (item.name || 'Unknown Contact');
   const phone = item.phoneNumbers?.[0]?.number || '';
   
   const handleInvitePress = () => {
-    if (!inviteSent) {
-      // First time - send SMS and add placeholder
-      setInviteSent(true);
-      onSMSInvite(item);
-      onInviteContact(item); // Add as placeholder
-    } else {
-      // Already invited - just open SMS again
-      onSMSInvite(item);
-    }
+    const contactName = (item.firstName && item.lastName)
+      ? `${item.firstName} ${item.lastName}`
+      : (item.name || 'Unknown Contact');
+    
+    Alert.alert(
+      'Contact Invited',
+      `${contactName} will automatically be added to the expense if they join with this phone number.`,
+      [{ text: 'OK' }]
+    );
+    
+    onSMSInvite(item);
+    onInviteContact(item);
   };
   
   return (
@@ -94,26 +96,42 @@ const MemoizedContactItem = React.memo(({ item, onInviteContact, onSMSInvite }) 
         <Text style={styles.userPhone}>{phone}</Text>
       </View>
       <TouchableOpacity 
-        style={[
-          styles.inviteButton, 
-          inviteSent && styles.inviteButtonSent
-        ]} 
+        style={styles.inviteButton} 
         onPress={handleInvitePress}
         activeOpacity={0.8}
       >
-        {inviteSent ? (
-          <>
-            <Ionicons name="checkmark" size={16} color={Colors.white} />
-            <Text style={styles.inviteButtonText}>Invited</Text>
-          </>
-        ) : (
-          <>
-            <Ionicons name="paper-plane" size={16} color={Colors.accent} />
-            <Text style={styles.inviteButtonText}>Invite</Text>
-          </>
-        )}
+        <Ionicons name="paper-plane" size={16} color={Colors.accent} />
+        <Text style={styles.inviteButtonText}>Invite</Text>
       </TouchableOpacity>
     </TouchableOpacity>
+  );
+});
+
+const MemoizedInvitedContactItem = React.memo(({ item, onSMSInvite }) => {
+  return (
+    <View style={styles.listItem}>
+      <View style={styles.avatarContainer}>
+        {item.profilePhoto ? (
+          <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarInitials}>{(item.name[0] || 'U').toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={styles.userPhone}>{item.phoneNumber}</Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.inviteButton} 
+        onPress={() => onSMSInvite(item)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="paper-plane" size={16} color={Colors.accent} />
+        <Text style={styles.inviteButtonText}>Invite</Text>
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -156,7 +174,9 @@ const SearchPane = React.memo(({
   toggleSelectUser, 
   inviteContact, 
   handleSMSInvite,
-  filteredContacts 
+  filteredContacts,
+  invitedContacts,
+  filteredInvitedContacts
 }) => {
   const { hits } = useInfiniteHits();
   const { refine } = useSearchBox();
@@ -205,6 +225,10 @@ const SearchPane = React.memo(({
     <MemoizedContactItem item={item} onInviteContact={inviteContact} onSMSInvite={handleSMSInvite} />
   ), [inviteContact, handleSMSInvite]);
 
+  const renderInvitedContact = useCallback(({ item }) => (
+    <MemoizedInvitedContactItem item={item} onSMSInvite={handleSMSInvite} />
+  ), [handleSMSInvite]);
+
   return (
     <View style={styles.searchContent}>
       <View style={styles.section}>
@@ -212,6 +236,14 @@ const SearchPane = React.memo(({
         {filteredHits.map((friend) => (
           <View key={friend.objectID}>
             {renderFriendItem({ item: friend })}
+          </View>
+        ))}
+        {filteredInvitedContacts.map((contact) => (
+          <View key={contact.id}>
+            <MemoizedInvitedContactItem 
+              item={contact} 
+              onSMSInvite={handleSMSInvite}
+            />
           </View>
         ))}
       </View>
@@ -268,12 +300,12 @@ const FriendSelector = forwardRef(({
   showAddButton = true,
   placeholder = "Select friends to split with...",
   onClose,
-  expenseId,
-  placeholders = []
+  expenseId
 }, ref) => {
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
+  const [invitedContacts, setInvitedContacts] = useState([]); // Track invited contacts
   
   // Use deferred value to prevent UI flicker
   const deferredQuery = useDeferredValue(localQuery);
@@ -315,43 +347,49 @@ const FriendSelector = forwardRef(({
   }, [selectedFriends, onFriendsChange]);
 
   const inviteContact = useCallback(async (contact) => {
-    // Check if already added as a friend or placeholder
+    // Check if already added as a friend
     const isAlreadyAdded = selectedFriends.some(friend => 
       friend.phoneNumber === contact.phoneNumbers?.[0]?.number ||
       friend.name.toLowerCase() === ((contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.name || '')).toLowerCase()
     );
     
-    // Also check against existing placeholders
-    const isAlreadyPlaceholder = placeholders.some(placeholder => 
-      placeholder.phoneNumber === contact.phoneNumbers?.[0]?.number ||
-      placeholder.name.toLowerCase() === ((contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.name || '')).toLowerCase()
-    );
-    
-    if (isAlreadyAdded || isAlreadyPlaceholder) {
+    if (isAlreadyAdded) {
       // Already added, don't add again
       return;
     }
     
-    // Create placeholder contact
+    // Create a simple contact object for SMS invitation
     const name = (contact.firstName && contact.lastName)
       ? `${contact.firstName} ${contact.lastName}`
       : (contact.name || 'Unknown');
     
-    const placeholder = {
-      id: `placeholder-${Date.now()}-${Math.random()}`,
+    // Add to invited contacts list so they appear in "Recent people"
+    const invitedContact = {
+      id: `invited-${Date.now()}-${Math.random()}`,
       name,
       phoneNumber: contact.phoneNumbers?.[0]?.number,
-      isPlaceholder: true,
-      invited: true, // Mark as invited
+      profilePhoto: contact.imageAvailable && contact.image?.uri ? contact.image.uri : null,
+      isInvited: true,
       invitedAt: new Date().toISOString()
     };
     
-    // Add to selected friends (this will show in the horizontal list)
-    onFriendsChange([...selectedFriends, placeholder]);
-  }, [selectedFriends, onFriendsChange, placeholders]);
+    setInvitedContacts(prev => {
+      // Check if already invited
+      const alreadyInvited = prev.some(ic => 
+        ic.phoneNumber === invitedContact.phoneNumber ||
+        ic.name.toLowerCase() === invitedContact.name.toLowerCase()
+      );
+      if (alreadyInvited) return prev;
+      return [...prev, invitedContact];
+    });
+    
+    // Open SMS to invite them to download the app
+    handleSMSInvite(contact);
+  }, [selectedFriends, onFriendsChange]);
 
   const handleSMSInvite = useCallback((contact) => {
-    const phoneNumber = contact.phoneNumbers?.[0]?.number;
+    // Handle both regular contacts and invited contacts
+    const phoneNumber = contact.phoneNumbers?.[0]?.number || contact.phoneNumber;
     if (!phoneNumber) {
       Alert.alert('No Phone Number', 'This contact doesn\'t have a phone number.');
       return;
@@ -439,6 +477,18 @@ const FriendSelector = forwardRef(({
     });
   }, [contacts, deferredQuery]);
 
+  // Memoize filtered invited contacts based on query
+  const filteredInvitedContacts = useMemo(() => {
+    const q = (deferredQuery || '').trim().toLowerCase();
+    if (q.length === 0) return invitedContacts;
+    
+    return invitedContacts.filter(ic => {
+      const name = ic.name.toLowerCase();
+      const phone = (ic.phoneNumber || '').toLowerCase();
+      return name.includes(q) || phone.includes(q);
+    });
+  }, [invitedContacts, deferredQuery]);
+
   // Memoize key extractors for FlatList
   const memberKeyExtractor = useCallback((item) => item.id, []);
   const friendKeyExtractor = useCallback((item) => item.objectID, []);
@@ -463,8 +513,10 @@ const FriendSelector = forwardRef(({
     toggleSelectUser,
     inviteContact,
     handleSMSInvite,
-    filteredContacts
-  }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, handleSMSInvite, filteredContacts]);
+    filteredContacts,
+    invitedContacts,
+    filteredInvitedContacts
+  }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, handleSMSInvite, filteredContacts, invitedContacts, filteredInvitedContacts]);
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -833,6 +885,18 @@ const styles = StyleSheet.create({
     color: Colors.white,
     marginLeft: Spacing.xs,
     fontSize: 12,
+  },
+  invitedTag: {
+    ...Typography.caption,
+    color: Colors.white,
+    marginTop: Spacing.xs,
+    fontWeight: '600',
+    fontSize: 11,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    alignSelf: 'flex-start',
   },
 });
 

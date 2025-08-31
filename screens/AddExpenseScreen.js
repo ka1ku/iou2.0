@@ -36,7 +36,7 @@ import useFormChangeTracker from '../hooks/useFormChangeTracker';
 import useNavigationWarning from '../hooks/useNavigationWarning';
 
 const AddExpenseScreen = ({ route, navigation }) => {
-  const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
+  const { expense } = route.params || {};
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
 
@@ -51,8 +51,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
     profilePhoto: null
   }]);
   const [selectedFriends, setSelectedFriends] = useState([]);
-  const [placeholders, setPlaceholders] = useState([]); // Track invited placeholders
-  const [showSettings, setShowSettings] = useState(false);
+
   const [showAllParticipants, setShowAllParticipants] = useState(false);
   const [showGroupMembers, setShowGroupMembers] = useState(false);
   const [joinEnabled, setJoinEnabled] = useState(true);
@@ -137,102 +136,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
     initializeMeParticipant();
   }, []);
 
-  // Handle scanned receipt data
-  useEffect(() => {
-    if (scannedReceipt && fromReceiptScan) {
-      // Populate form with scanned data
-      setTitle(scannedReceipt.title || '');
-      
-      // Set participants if available
-      if (scannedReceipt.participants && scannedReceipt.participants.length > 0) {
-        // Only add participants that have user IDs (real users, not placeholders)
-        const realParticipants = scannedReceipt.participants.filter(p => p.userId);
-        if (realParticipants.length > 0) {
-          setParticipants(prev => [
-            prev[0], // Keep "Me"
-            ...realParticipants.map((p, index) => ({
-              name: p.name || '',
-              id: `scanned-${index}`,
-              userId: p.userId,
-              phoneNumber: p.phoneNumber || null,
-              username: p.username || null,
-              profilePhoto: p.profilePhoto || null,
-              placeholder: false
-            }))
-          ]);
-        }
-      }
-      
-      // Set items if available (only take the first item for single-item expenses)
-      if (scannedReceipt.items && scannedReceipt.items.length > 0) {
-        const firstItem = scannedReceipt.items[0];
-        const formattedItem = {
-          id: Date.now().toString(),
-          name: firstItem.name || '',
-          amount: parseFloat(firstItem.amount) || 0,
-          selectedConsumers: [0], // Default to first participant
-          splits: [{
-            participantIndex: 0,
-            amount: parseFloat(firstItem.amount) || 0,
-            percentage: 100
-          }]
-        };
-        setItems([formattedItem]);
-      }
-      
-      // Set default payers to first participant
-      setSelectedPayers([0]);
-      
-      // Set fees if available (e.g., tax, tip)
-      if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
-        const subtotalFromReceipt = Number(scannedReceipt.subtotal);
-        const fallbackItemsTotal = (scannedReceipt.items || []).reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
-        const baseline = Number.isFinite(subtotalFromReceipt) ? subtotalFromReceipt : fallbackItemsTotal;
 
-        const formattedFees = scannedReceipt.fees.map((fee, index) => {
-          const rawType = fee.type === 'percentage' || fee.type === 'fixed' ? fee.type : undefined;
-          let percentage = fee.percentage !== undefined && fee.percentage !== null ? Number(fee.percentage) : null;
-          let amount = fee.amount !== undefined && fee.amount !== null ? Number(fee.amount) : null;
-          let type = rawType || (Number.isFinite(percentage) ? 'percentage' : 'fixed');
 
-          if (type === 'percentage') {
-            if (!Number.isFinite(percentage)) {
-              // Try deriving percentage from amount
-              if (Number.isFinite(amount) && baseline > 0) {
-                percentage = (amount / baseline) * 100;
-              }
-            }
-            if (!Number.isFinite(amount) && Number.isFinite(percentage)) {
-              amount = (baseline * percentage) / 100;
-            }
-          }
-
-          if (!Number.isFinite(amount)) amount = 0;
-          if (!Number.isFinite(percentage)) percentage = null;
-
-          return {
-            id: Date.now().toString() + 'fee' + index,
-            name: fee.name || 'Fee',
-            amount,
-            type,
-            percentage,
-            splitType: 'proportional',
-            splits: []
-          };
-        });
-        setFees(formattedFees);
-      }
-      
-      // Show success message
-      Alert.alert(
-        'Receipt Scanned Successfully!',
-        'The receipt information has been automatically filled in. Please review and make any necessary adjustments.',
-        [{ text: 'OK' }]
-      );
-    }
-  }, [scannedReceipt, fromReceiptScan]);
-
-  // Initialize selectedFriends and placeholders when editing an existing expense
+  // Initialize selectedFriends when editing an existing expense
   useEffect(() => {
     if (expense && isEditing) {
       // Extract friends from existing participants (exclude current user)
@@ -305,13 +211,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
     setParticipants(prevParticipants => {
       const meParticipant = prevParticipants.find(p => p.name === 'Me');
       
-      // Separate regular friends from placeholders
-      const regularFriends = selectedFriends.filter(friend => !friend.isPlaceholder);
-      const invitedPlaceholders = selectedFriends.filter(friend => friend.isPlaceholder);
-      
-      // Update placeholders state
-      setPlaceholders(invitedPlaceholders);
-      
       const allParticipants = [
         meParticipant || { 
           name: 'Me',
@@ -322,7 +221,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
           username: null,
           profilePhoto: null
         },
-        ...regularFriends.map((friend, index) => ({ 
+        ...selectedFriends.map((friend, index) => ({ 
           name: friend.name || '', 
           id: `friend-${friend.id || index}`, // Ensure unique ID
           userId: friend.id || null,
@@ -330,16 +229,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
           username: friend.username || null,
           profilePhoto: friend.profilePhoto || null,
           placeholder: false
-        })),
-        ...invitedPlaceholders.map((placeholder, index) => ({ 
-          name: placeholder.name || '', 
-          placeholder: true, 
-          invited: true, // Mark as invited
-          id: placeholder.id || `placeholder-${index}`, // Ensure unique ID
-          userId: null,
-          phoneNumber: placeholder.phoneNumber || null,
-          username: null,
-          profilePhoto: null
         }))
       ];
       
@@ -351,11 +240,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
     removeParticipant(index, participants, setParticipants, items, setItems);
   };
 
-  const handleRemovePlaceholder = (placeholderId) => {
-    setPlaceholders(prev => prev.filter(p => p.id !== placeholderId));
-    // Also remove from selectedFriends
-    setSelectedFriends(prev => prev.filter(f => f.id !== placeholderId));
-  };
+
 
   const handleUpdateItem = (index, field, value) => {
     updateItem(index, field, value, items, setItems, fees, setFees);
@@ -416,7 +301,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
           </Text>
           <TouchableOpacity 
             style={styles.settingsButton}
-            onPress={() => setShowSettings(true)}
+            onPress={() => navigation.navigate('ExpenseSettings', { expense: { 
+              id: expense?.id,
+              title,
+              participants,
+              items,
+              fees,
+              createdBy: getCurrentUser()?.uid,
+              join: { enabled: joinEnabled }
+            }})}
           >
             <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
@@ -441,12 +334,14 @@ const AddExpenseScreen = ({ route, navigation }) => {
               </View>
             </View>
             
+
+            
             {/* Participants Compact Grid Layout */}
             <FlatList
               data={[
                 // Add button always first
                 { id: 'add-button', type: 'add-button' },
-                // Then participants in order: Me → real friends → invited placeholders
+                // Then participants in order: Me → real friends
                 ...(participantsExpanded ? participants : participants.slice(0, 5))
               ]}
               numColumns={3}
@@ -489,8 +384,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
                       ) : (
                         <View style={[
                           styles.participantGridAvatarPlaceholder,
-                          participant.name === 'Me' && styles.currentUserAvatar,
-                          participant.invited && styles.invitedAvatar
+                          participant.name === 'Me' && styles.currentUserAvatar
                         ]}>
                           <Text style={[
                             styles.participantGridAvatarInitials,
@@ -498,11 +392,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                           ]}>
                             {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
                           </Text>
-                        </View>
-                      )}
-                      {participant.invited && (
-                        <View style={styles.invitedIndicator}>
-                          <Ionicons name="paper-plane" size={12} color={Colors.surface} />
                         </View>
                       )}
                     </View>
@@ -514,11 +403,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                         @{participant.username}
                       </Text>
                     )}
-                    {participant.invited && (
-                      <Text style={styles.invitedTag} numberOfLines={1}>
-                        Invited
-                      </Text>
-                      )}
                   </TouchableOpacity>
                 );
               }}
@@ -553,11 +437,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 <Text style={styles.groupInfoText}>
                   {participants.length} {participants.length === 1 ? 'person' : 'people'} in this expense
                 </Text>
-                {placeholders.length > 0 && (
-                  <Text style={styles.pendingInvitesText}>
-                    {placeholders.length} invite{placeholders.length !== 1 ? 's' : ''} sent
-                  </Text>
-                )}
                 {participants.length > 5 && (
                   <Text style={styles.pendingInvitesText}>
                     Tap "More" to see all participants
@@ -585,7 +464,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
               placeholder="Add friends to split with..."
               expenseId={expense?.id}
               showAddButton={false}
-              placeholders={placeholders}
             />
 
           </View>
@@ -709,7 +587,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 placeholder="Add friends to split with..."
                 expenseId={expense?.id}
                 showAddButton={false}
-                placeholders={placeholders}
               />
             </View>
             
@@ -769,66 +646,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      {/* Settings Modal */}
-      <Modal
-        visible={showSettings}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowSettings(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowSettings(false)}
-            >
-              <Ionicons name="close" size={24} color={Colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Expense Settings</Text>
-            <View style={styles.headerSpacer} />
-          </View>
 
-          <View style={styles.modalContent}>
-            {/* Participants Management Section */}
-            <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>Manage Participants</Text>
-              <FriendSelector
-                selectedFriends={selectedFriends}
-                onFriendsChange={setSelectedFriends}
-                placeholder="Add friends to split with..."
-                expenseId={expense?.id}
-                showAddButton={false}
-                placeholders={placeholders}
-              />
-            </View>
-            
-            {/* Settings Section */}
-            <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>Expense Settings</Text>
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Allow join by room code</Text>
-                  <Text style={styles.settingDescription}>
-                    Let others join this expense using the room code
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    joinEnabled && styles.toggleButtonActive
-                  ]}
-                  onPress={() => setJoinEnabled(!joinEnabled)}
-                >
-                  <View style={[
-                    styles.toggleThumb,
-                    joinEnabled && styles.toggleThumbActive
-                  ]} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -967,54 +785,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     fontWeight: '600',
   },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    marginBottom: Spacing.md,
-    ...Shadows.card,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: Spacing.md,
-  },
-  settingTitle: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  settingDescription: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  toggleButton: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.divider,
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleButtonActive: {
-    backgroundColor: Colors.accent,
-  },
-  toggleThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: Colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  toggleThumbActive: {
-    transform: [{ translateX: 20 }],
-  },
+
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -1396,33 +1167,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
 
-  invitedAvatar: {
-    borderColor: Colors.accent,
-    borderWidth: 3,
-    backgroundColor: Colors.accent,
-  },
-  invitedIndicator: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.surface,
-    ...Shadows.button,
-    elevation: 2,
-  },
-  invitedTag: {
-    ...Typography.label,
-    color: Colors.surface,
-    fontSize: 9,
-    marginTop: Spacing.xs,
-    fontWeight: '600',
-  },
+
 
   toggleParticipantsButton: {
     flexDirection: 'row',
@@ -1451,6 +1196,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
+
+
 
 });
 

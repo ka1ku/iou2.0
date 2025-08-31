@@ -1,7 +1,7 @@
 import { Alert } from 'react-native';
 import { getCurrentUser } from '../../services/authService';
 import { getUserProfile } from '../../services/friendService';
-import { createExpense, updateExpense } from '../../services/expenseService';
+import { createExpense, updateExpense, updateExpenseParticipants } from '../../services/expenseService';
 
 const saveExpense = async (
   title,
@@ -119,7 +119,13 @@ const saveExpense = async (
     };
     console.log(expenseData)
     if (isEditing) {
-      await updateExpense(expense.id, expenseData, currentUser.uid);
+      // Update participants separately to ensure participantsMap is updated
+      await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
+      
+      // Update other fields
+      const { participants, ...otherFields } = expenseData;
+      await updateExpense(expense.id, otherFields, currentUser.uid);
+      
       Alert.alert('Success', 'Expense updated successfully');
       // Reset change tracker after successful update
       if (resetChanges) {

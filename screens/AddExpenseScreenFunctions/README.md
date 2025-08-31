@@ -40,8 +40,7 @@ Updates a participant's name at the specified index.
 ### `removeParticipant(index, participants, setParticipants, items, setItems)`
 Removes a participant and updates related item splits and consumers accordingly.
 
-### `removePlaceholder(ghostId, placeholders, setPlaceholders, items, setItems, selectedFriends)`
-Removes a placeholder participant and updates related item splits and consumers accordingly.
+
 
 ## Usage
 
