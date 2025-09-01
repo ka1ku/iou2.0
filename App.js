@@ -30,6 +30,7 @@ import ProfileScreen from './screens/ProfileScreen';
 import AddExpenseScreen from './screens/AddExpenseScreen';
 import AddReceiptScreen from './screens/AddReceiptScreen';
 import SettleUpScreen from './screens/SettleUpScreen';
+import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
 import WelcomeScreen from './screens/auth/WelcomeScreen';
 import SignInScreen from './screens/auth/SignInScreen';
 import SignUpScreen from './screens/auth/SignUpScreen';
@@ -68,6 +69,13 @@ const HomeStack = () => {
       <Stack.Screen
         name="SettleUp"
         component={SettleUpScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="ExpenseSettings"
+        component={ExpenseSettingsScreen}
         options={{
           headerShown: false,
         }}

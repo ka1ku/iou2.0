@@ -10,7 +10,9 @@ import {
   Image,
   ScrollView,
   Share,
-  Alert
+  Alert,
+  Linking,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Typography, Spacing, Radius } from '../design/tokens';
@@ -57,11 +59,26 @@ const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect }) => 
   );
 });
 
-const MemoizedContactItem = React.memo(({ item, onInviteContact }) => {
+const MemoizedContactItem = React.memo(({ item, onInviteContact, onSMSInvite }) => {
   const name = (item.firstName && item.lastName)
     ? `${item.firstName} ${item.lastName}`
     : (item.name || 'Unknown Contact');
   const phone = item.phoneNumbers?.[0]?.number || '';
+  
+  const handleInvitePress = () => {
+    const contactName = (item.firstName && item.lastName)
+      ? `${item.firstName} ${item.lastName}`
+      : (item.name || 'Unknown Contact');
+    
+    Alert.alert(
+      'Contact Invited',
+      `${contactName} will automatically be added to the expense if they join with this phone number.`,
+      [{ text: 'OK' }]
+    );
+    
+    onSMSInvite(item);
+    onInviteContact(item);
+  };
   
   return (
     <TouchableOpacity style={styles.listItem} onPress={() => onInviteContact(item)}>
@@ -78,10 +95,43 @@ const MemoizedContactItem = React.memo(({ item, onInviteContact }) => {
         <Text style={styles.userName}>{name}</Text>
         <Text style={styles.userPhone}>{phone}</Text>
       </View>
-      <TouchableOpacity style={styles.inviteButton} onPress={() => onInviteContact(item)}>
+      <TouchableOpacity 
+        style={styles.inviteButton} 
+        onPress={handleInvitePress}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="paper-plane" size={16} color={Colors.accent} />
         <Text style={styles.inviteButtonText}>Invite</Text>
       </TouchableOpacity>
     </TouchableOpacity>
+  );
+});
+
+const MemoizedInvitedContactItem = React.memo(({ item, onSMSInvite }) => {
+  return (
+    <View style={styles.listItem}>
+      <View style={styles.avatarContainer}>
+        {item.profilePhoto ? (
+          <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Text style={styles.avatarInitials}>{(item.name[0] || 'U').toUpperCase()}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <Text style={styles.userPhone}>{item.phoneNumber}</Text>
+      </View>
+      <TouchableOpacity 
+        style={styles.inviteButton} 
+        onPress={() => onSMSInvite(item)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="paper-plane" size={16} color={Colors.accent} />
+        <Text style={styles.inviteButtonText}>Invite</Text>
+      </TouchableOpacity>
+    </View>
   );
 });
 
@@ -123,7 +173,10 @@ const SearchPane = React.memo(({
   selectedFriends, 
   toggleSelectUser, 
   inviteContact, 
-  filteredContacts 
+  handleSMSInvite,
+  filteredContacts,
+  invitedContacts,
+  filteredInvitedContacts
 }) => {
   const { hits } = useInfiniteHits();
   const { refine } = useSearchBox();
@@ -169,8 +222,12 @@ const SearchPane = React.memo(({
   }, [selectedFriends, toggleSelectUser]);
 
   const renderContact = useCallback(({ item }) => (
-    <MemoizedContactItem item={item} onInviteContact={inviteContact} />
-  ), [inviteContact]);
+    <MemoizedContactItem item={item} onInviteContact={inviteContact} onSMSInvite={handleSMSInvite} />
+  ), [inviteContact, handleSMSInvite]);
+
+  const renderInvitedContact = useCallback(({ item }) => (
+    <MemoizedInvitedContactItem item={item} onSMSInvite={handleSMSInvite} />
+  ), [handleSMSInvite]);
 
   return (
     <View style={styles.searchContent}>
@@ -179,6 +236,14 @@ const SearchPane = React.memo(({
         {filteredHits.map((friend) => (
           <View key={friend.objectID}>
             {renderFriendItem({ item: friend })}
+          </View>
+        ))}
+        {filteredInvitedContacts.map((contact) => (
+          <View key={contact.id}>
+            <MemoizedInvitedContactItem 
+              item={contact} 
+              onSMSInvite={handleSMSInvite}
+            />
           </View>
         ))}
       </View>
@@ -234,14 +299,13 @@ const FriendSelector = forwardRef(({
   onFriendsChange, 
   showAddButton = true,
   placeholder = "Select friends to split with...",
-  allowPlaceholders = true,
-  onAddPlaceholder,
   onClose,
   expenseId
 }, ref) => {
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
+  const [invitedContacts, setInvitedContacts] = useState([]); // Track invited contacts
   
   // Use deferred value to prevent UI flicker
   const deferredQuery = useDeferredValue(localQuery);
@@ -283,72 +347,104 @@ const FriendSelector = forwardRef(({
   }, [selectedFriends, onFriendsChange]);
 
   const inviteContact = useCallback(async (contact) => {
-    if (!allowPlaceholders) return;
+    // Check if already added as a friend
+    const isAlreadyAdded = selectedFriends.some(friend => 
+      friend.phoneNumber === contact.phoneNumbers?.[0]?.number ||
+      friend.name.toLowerCase() === ((contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.name || '')).toLowerCase()
+    );
     
-    // If we have an expenseId, generate and share a deep link
-    if (expenseId) {
-      try {
-        const joinInfo = await getExpenseJoinInfo(expenseId, { initializeIfMissing: true });
-        if (joinInfo && joinInfo.code) {
-          // Get contact's phone number for identification
-          const phoneNumber = contact.phoneNumbers?.[0]?.number;
-          
-          const deepLink = generateExpenseJoinLink({ 
-            expenseId, 
-            code: joinInfo.code,
-            phone: phoneNumber // Pass phone number to identify the invitee
-          });
-          
-          const contactName = (contact.firstName && contact.lastName)
-            ? `${contact.firstName} ${contact.lastName}`
-            : (contact.name || 'Unknown');
-          
-          const message = `Hi ${contactName}! Join me on IOU App: ${deepLink}`;
-          
-          const result = await Share.share({
-            message,
-            title: 'Split expenses with IOU App',
-            url: deepLink // This allows the system to handle the link properly
-          });
-          
-          if (result.action === Share.sharedAction) {
-            console.log('Expense invite shared successfully');
-            // Optionally show success message or update UI
-          } else if (result.action === Share.dismissedAction) {
-            console.log('Share was dismissed');
-          }
-          
-          return;
-        } else {
-          console.warn('Could not generate join info for expense:', expenseId);
-        }
-      } catch (error) {
-        console.error('Error sharing expense invite:', error);
-        // Show user-friendly error message
-        Alert.alert(
-          'Sharing Failed',
-          'Unable to share the expense invite. Please try again later.',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
+    if (isAlreadyAdded) {
+      // Already added, don't add again
+      return;
     }
     
-    // Fallback to placeholder if no expenseId or sharing fails
-    if (!expenseId) {
-      console.log('No expenseId available, adding placeholder instead of sharing');
-    }
-    
+    // Create a simple contact object for SMS invitation
     const name = (contact.firstName && contact.lastName)
       ? `${contact.firstName} ${contact.lastName}`
       : (contact.name || 'Unknown');
-    const ghost = {
-      id: `ghost-${Date.now()}`,
+    
+    // Add to invited contacts list so they appear in "Recent people"
+    const invitedContact = {
+      id: `invited-${Date.now()}-${Math.random()}`,
       name,
-      isPlaceholder: true,
+      phoneNumber: contact.phoneNumbers?.[0]?.number,
+      profilePhoto: contact.imageAvailable && contact.image?.uri ? contact.image.uri : null,
+      isInvited: true,
+      invitedAt: new Date().toISOString()
     };
-    onAddPlaceholder?.(ghost);
-  }, [allowPlaceholders, onAddPlaceholder, expenseId]);
+    
+    setInvitedContacts(prev => {
+      // Check if already invited
+      const alreadyInvited = prev.some(ic => 
+        ic.phoneNumber === invitedContact.phoneNumber ||
+        ic.name.toLowerCase() === invitedContact.name.toLowerCase()
+      );
+      if (alreadyInvited) return prev;
+      return [...prev, invitedContact];
+    });
+    
+    // Open SMS to invite them to download the app
+    handleSMSInvite(contact);
+  }, [selectedFriends, onFriendsChange]);
+
+  const handleSMSInvite = useCallback((contact) => {
+    // Handle both regular contacts and invited contacts
+    const phoneNumber = contact.phoneNumbers?.[0]?.number || contact.phoneNumber;
+    if (!phoneNumber) {
+      Alert.alert('No Phone Number', 'This contact doesn\'t have a phone number.');
+      return;
+    }
+
+    // Create a simple invite message immediately
+    const contactName = (contact.firstName && contact.lastName)
+      ? `${contact.firstName} ${contact.lastName}`
+      : (contact.name || 'Unknown');
+    
+    let message = `Hi ${contactName}! I'd like to invite you to join IOU App so we can split expenses together. Download it from the App Store!`;
+    
+    // If we have an expenseId, try to add a deep link (non-blocking)
+    if (expenseId) {
+      // Fire and forget - don't block the UI
+      getExpenseJoinInfo(expenseId, { initializeIfMissing: true })
+        .then(joinInfo => {
+          if (joinInfo && joinInfo.code) {
+            const deepLink = generateExpenseJoinLink({ 
+              expenseId, 
+              code: joinInfo.code,
+              phone: phoneNumber
+            });
+            message = `Hi ${contactName}! Join me on IOU App to split expenses: ${deepLink}`;
+            
+            // Open SMS with updated message
+            const body = encodeURIComponent(message);
+            const separator = Platform.OS === 'ios' ? '&' : '?';
+            const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
+            Linking.openURL(smsUrl).catch(() => {
+              // Fallback to basic SMS
+              Linking.openURL(`sms:${phoneNumber}`);
+            });
+          }
+        })
+        .catch(error => {
+          console.log('Could not generate deep link, using fallback message');
+          // Use fallback message and open SMS immediately
+          const body = encodeURIComponent(message);
+          const separator = Platform.OS === 'ios' ? '&' : '?';
+          const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
+          Linking.openURL(smsUrl).catch(() => {
+            Linking.openURL(`sms:${phoneNumber}`);
+          });
+        });
+    } else {
+      // No expenseId, open SMS immediately with fallback message
+      const body = encodeURIComponent(message);
+      const separator = Platform.OS === 'ios' ? '&' : '?';
+      const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
+      Linking.openURL(smsUrl).catch(() => {
+        Linking.openURL(`sms:${phoneNumber}`);
+      });
+    }
+  }, [expenseId]);
 
   const removeFriend = useCallback((friendId) => {
     const updated = selectedFriends.filter(f => f.id !== friendId);
@@ -381,6 +477,18 @@ const FriendSelector = forwardRef(({
     });
   }, [contacts, deferredQuery]);
 
+  // Memoize filtered invited contacts based on query
+  const filteredInvitedContacts = useMemo(() => {
+    const q = (deferredQuery || '').trim().toLowerCase();
+    if (q.length === 0) return invitedContacts;
+    
+    return invitedContacts.filter(ic => {
+      const name = ic.name.toLowerCase();
+      const phone = (ic.phoneNumber || '').toLowerCase();
+      return name.includes(q) || phone.includes(q);
+    });
+  }, [invitedContacts, deferredQuery]);
+
   // Memoize key extractors for FlatList
   const memberKeyExtractor = useCallback((item) => item.id, []);
   const friendKeyExtractor = useCallback((item) => item.objectID, []);
@@ -404,8 +512,11 @@ const FriendSelector = forwardRef(({
     selectedFriends,
     toggleSelectUser,
     inviteContact,
-    filteredContacts
-  }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, filteredContacts]);
+    handleSMSInvite,
+    filteredContacts,
+    invitedContacts,
+    filteredInvitedContacts
+  }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, handleSMSInvite, filteredContacts, invitedContacts, filteredInvitedContacts]);
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -731,15 +842,61 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     minWidth: 60,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  inviteButtonSent: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
   inviteButtonText: {
     ...Typography.body2,
     fontFamily: Typography.familySemiBold,
-    color: Colors.textSecondary,
+    color: Colors.accent,
   },
   scrollContainer: {
     flex: 1,
     paddingBottom: Spacing.xxl,
+  },
+  contactActions: {
+    flexDirection: 'row',
+    marginLeft: Spacing.md,
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  smsInviteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.blue,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    minWidth: 60,
+    justifyContent: 'center',
+  },
+  smsInviteButtonPressed: {
+    backgroundColor: Colors.success,
+    opacity: 0.8,
+  },
+  smsInviteButtonText: {
+    ...Typography.body2,
+    fontFamily: Typography.familySemiBold,
+    color: Colors.white,
+    marginLeft: Spacing.xs,
+    fontSize: 12,
+  },
+  invitedTag: {
+    ...Typography.caption,
+    color: Colors.white,
+    marginTop: Spacing.xs,
+    fontWeight: '600',
+    fontSize: 11,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    alignSelf: 'flex-start',
   },
 });
 

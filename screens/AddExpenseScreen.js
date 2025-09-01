@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   Image,
+  FlatList,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +20,6 @@ import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 
 import FriendSelector from '../components/FriendSelector';
-import InviteFriendSheet from '../components/InviteFriendSheet';
 import DeleteButton from '../components/DeleteButton';
 import { 
   ItemHeader, 
@@ -46,15 +46,14 @@ import {
   saveExpense,
   saveExpenseWithSettlement,
   renderItem,
-  removeParticipant,
-  removePlaceholder
+  removeParticipant
 } from './AddExpenseScreenFunctions';
 import useFormChangeTracker from '../hooks/useFormChangeTracker';
 import useNavigationWarning from '../hooks/useNavigationWarning';
 
 
 const AddExpenseScreen = ({ route, navigation }) => {
-  const { expense, scannedReceipt, fromReceiptScan, previousScreen } = route.params || {};
+  const { expense } = route.params || {};
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
 
@@ -75,6 +74,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [showAllParticipants, setShowAllParticipants] = useState(false);
   const [showGroupMembers, setShowGroupMembers] = useState(false);
   const [joinEnabled, setJoinEnabled] = useState(true);
+  const [participantsExpanded, setParticipantsExpanded] = useState(false);
   const [items, setItems] = useState([{
     id: Date.now().toString(),
     name: '',
@@ -157,80 +157,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
     initializeMeParticipant();
   }, []);
 
-  // Handle scanned receipt data
-  useEffect(() => {
-    if (scannedReceipt && fromReceiptScan) {
-      setTitle(scannedReceipt.title || '');
-      
-      if (scannedReceipt.participants && scannedReceipt.participants.length > 0) {
-        setParticipants(scannedReceipt.participants);
-      }
-      
-      if (scannedReceipt.items && scannedReceipt.items.length > 0) {
-        const firstItem = scannedReceipt.items[0];
-        const formattedItem = {
-          id: Date.now().toString(),
-          name: firstItem.name || '',
-          amount: parseFloat(firstItem.amount) || 0,
-          selectedConsumers: [0],
-          splits: [{
-            participantIndex: 0,
-            amount: parseFloat(firstItem.amount) || 0,
-            percentage: 100
-          }]
-        };
-        setItems([formattedItem]);
-      }
-      
-      setSelectedPayers([0]);
-      
-      if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
-        const subtotalFromReceipt = Number(scannedReceipt.subtotal);
-        const fallbackItemsTotal = (scannedReceipt.items || []).reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
-        const baseline = Number.isFinite(subtotalFromReceipt) ? subtotalFromReceipt : fallbackItemsTotal;
 
-        const formattedFees = scannedReceipt.fees.map((fee, index) => {
-          const rawType = fee.type === 'percentage' || fee.type === 'fixed' ? fee.type : undefined;
-          let percentage = fee.percentage !== undefined && fee.percentage !== null ? Number(fee.percentage) : null;
-          let amount = fee.amount !== undefined && fee.amount !== null ? Number(fee.amount) : null;
-          let type = rawType || (Number.isFinite(percentage) ? 'percentage' : 'fixed');
 
-          if (type === 'percentage') {
-            if (!Number.isFinite(percentage)) {
-              if (Number.isFinite(amount) && baseline > 0) {
-                percentage = (amount / baseline) * 100;
-              }
-            }
-            if (!Number.isFinite(amount) && Number.isFinite(percentage)) {
-              amount = (baseline * percentage) / 100;
-            }
-          }
-
-          if (!Number.isFinite(amount)) amount = 0;
-          if (!Number.isFinite(percentage)) percentage = null;
-
-          return {
-            id: Date.now().toString() + 'fee' + index,
-            name: fee.name || 'Fee',
-            amount,
-            type,
-            percentage,
-            splitType: 'proportional',
-            splits: []
-          };
-        });
-        setFees(formattedFees);
-      }
-      
-      Alert.alert(
-        'Receipt Scanned Successfully!',
-        'The receipt information has been automatically filled in. Please review and make any necessary adjustments.',
-        [{ text: 'OK' }]
-      );
-    }
-  }, [scannedReceipt, fromReceiptScan]);
-
-  // Initialize selectedFriends and placeholders when editing an existing expense
+  // Initialize selectedFriends when editing an existing expense
   useEffect(() => {
     if (expense && isEditing) {
       const existingFriends = expense.participants
@@ -321,6 +250,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   useEffect(() => {
     setParticipants(prevParticipants => {
       const meParticipant = prevParticipants.find(p => p.name === 'Me');
+      
       const allParticipants = [
         meParticipant || { 
           name: 'Me',
@@ -353,7 +283,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
       
       return allParticipants;
     });
-  }, [selectedFriends, placeholders]);
+  }, [selectedFriends]);
   
   const handleRemoveParticipant = (index) => {
     removeParticipant(index, participants, setParticipants, items, setItems);
@@ -544,80 +474,102 @@ const AddExpenseScreen = ({ route, navigation }) => {
               </View>
             </View>
             
+
+            
             {/* Participants Compact Grid Layout */}
-            <View style={styles.participantsGrid}>
+            <FlatList
+              data={[
+                // Add button always first
+                { id: 'add-button', type: 'add-button' },
+                // Then participants in order: Me → real friends
+                ...(participantsExpanded ? participants : participants.slice(0, 5))
+              ]}
+              numColumns={3}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item, index }) => {
+                if (item.type === 'add-button') {
+                  return (
+                    <TouchableOpacity 
+                      style={styles.addParticipantGridButton}
+                      onPress={() => {
+                        if (friendSelectorRef.current) {
+                          friendSelectorRef.current.openModal();
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.addParticipantGridIcon}>
+                        <Ionicons name="add" size={24} color={Colors.accent} />
+                      </View>
+                      <Text style={styles.addParticipantGridText}>Add</Text>
+                    </TouchableOpacity>
+                  );
+                }
+
+                const participant = item;
+                return (
+                  <TouchableOpacity 
+                    key={participant.id}
+                    style={styles.participantGridItem}
+                    onPress={() => {
+                      if (participant.userId && participant.userId !== getCurrentUser()?.uid) {
+                        navigation.navigate('FriendProfile', { friendId: participant.userId });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.participantGridAvatarContainer}>
+                      {participant.profilePhoto ? (
+                        <Image source={{ uri: participant.profilePhoto }} style={styles.participantGridAvatar} />
+                      ) : (
+                        <View style={[
+                          styles.participantGridAvatarPlaceholder,
+                          participant.name === 'Me' && styles.currentUserAvatar
+                        ]}>
+                          <Text style={[
+                            styles.participantGridAvatarInitials,
+                            participant.name === 'Me' && styles.currentUserInitials
+                          ]}>
+                            {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.participantGridName} numberOfLines={1}>
+                      {participant.name}
+                    </Text>
+                    {participant.username && (
+                      <Text style={styles.participantGridUsername} numberOfLines={1}>
+                        @{participant.username}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+              contentContainerStyle={styles.participantsGridContainer}
+              showsVerticalScrollIndicator={false}
+              scrollEnabled={false}
+            />
+            
+            {/* Show More/Less toggle button */}
+            {participants.length > 5 && (
               <TouchableOpacity 
-                style={styles.addParticipantGridButton}
-                onPress={() => {
-                  if (friendSelectorRef.current) {
-                    friendSelectorRef.current.openModal();
-                  }
-                }}
+                style={styles.toggleParticipantsButton}
+                onPress={() => setParticipantsExpanded(!participantsExpanded)}
                 activeOpacity={0.7}
               >
-                <View style={styles.addParticipantGridIcon}>
-                  <Ionicons name="add" size={24} color={Colors.accent} />
+                <View style={styles.toggleParticipantsIcon}>
+                  <Ionicons 
+                    name={participantsExpanded ? "chevron-up" : "chevron-down"} 
+                    size={16} 
+                    color={Colors.surface} 
+                  />
                 </View>
-                <Text style={styles.addParticipantGridText}>Add</Text>
+                <Text style={styles.toggleParticipantsText}>
+                  {participantsExpanded ? "Show Less" : `Show ${participants.length - 5} More`}
+                </Text>
               </TouchableOpacity>
-              
-              {participants.slice(0, 5).map((participant, index) => (
-                <TouchableOpacity 
-                  key={participant.id}
-                  style={styles.participantGridItem}
-                  onPress={() => {
-                    if (participant.userId && participant.userId !== getCurrentUser()?.uid) {
-                      navigation.navigate('FriendProfile', { friendId: participant.userId });
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.participantGridAvatarContainer}>
-                    {participant.profilePhoto ? (
-                      <Image source={{ uri: participant.profilePhoto }} style={styles.participantGridAvatar} />
-                    ) : (
-                      <View style={[
-                        styles.participantGridAvatarPlaceholder,
-                        participant.name === 'Me' && styles.currentUserAvatar
-                      ]}>
-                        <Text style={[
-                          styles.participantGridAvatarInitials,
-                          participant.name === 'Me' && styles.currentUserInitials
-                        ]}>
-                          {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                    {participant.placeholder && (
-                      <View style={styles.placeholderIndicator}>
-                        <Ionicons name="person-outline" size={10} color={Colors.surface} />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.participantGridName} numberOfLines={1}>
-                    {participant.name}
-                  </Text>
-                  {participant.username && (
-                    <Text style={styles.participantGridUsername} numberOfLines={1}>
-                      @{participant.username}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-              
-              {participants.length > 5 && (
-                <TouchableOpacity 
-                  style={styles.moreParticipantsButton}
-                  onPress={() => setShowAllParticipants(true)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.moreParticipantsIcon}>
-                    <Text style={styles.moreParticipantsCount}>+{participants.length - 5}</Text>
-                  </View>
-                  <Text style={styles.moreParticipantsText}>More</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            )}
             
             {/* Group Management Row */}
             <View style={styles.groupManagementRow}>
@@ -625,11 +577,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 <Text style={styles.groupInfoText}>
                   {participants.length} {participants.length === 1 ? 'person' : 'people'} in this expense
                 </Text>
-                {placeholders.length > 0 && (
-                  <Text style={styles.pendingInvitesText}>
-                    {placeholders.length} pending invite{placeholders.length !== 1 ? 's' : ''}
-                  </Text>
-                )}
                 {participants.length > 5 && (
                   <Text style={styles.pendingInvitesText}>
                     Tap "More" to see all participants
@@ -655,8 +602,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
               selectedFriends={selectedFriends}
               onFriendsChange={setSelectedFriends}
               placeholder="Add friends to split with..."
-              allowPlaceholders={true}
-              onAddPlaceholder={handleAddPlaceholder}
               expenseId={expense?.id}
               showAddButton={false}
             />
@@ -822,19 +767,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
                           </Text>
                         </View>
                       )}
-                      {participant.placeholder && (
-                        <View style={styles.placeholderIndicator}>
-                          <Ionicons name="person-outline" size={12} color={Colors.surface} />
-                        </View>
-                      )}
                     </View>
                     <View style={styles.allParticipantInfo}>
                       <Text style={styles.allParticipantName}>{participant.name}</Text>
                       {participant.username && (
                         <Text style={styles.allParticipantUsername}>@{participant.username}</Text>
-                      )}
-                      {participant.placeholder && (
-                        <Text style={styles.allParticipantTag}>Placeholder</Text>
                       )}
                       {participant.name === 'Me' && (
                         <Text style={styles.allParticipantTag}>You</Text>
@@ -843,30 +780,16 @@ const AddExpenseScreen = ({ route, navigation }) => {
                   </View>
                   {participant.name !== 'Me' && (
                     <View style={styles.allParticipantActions}>
-                      {participant.placeholder ? (
-                        <TouchableOpacity 
-                          style={styles.inviteButton} 
-                          onPress={() => {
-                            setShowAllParticipants(false);
-                            handleInvitePlaceholder(participant);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons name="qr-code-outline" size={16} color={Colors.surface} />
-                          <Text style={styles.inviteButtonText}>Invite</Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <TouchableOpacity 
-                          style={styles.removeParticipantButton}
-                          onPress={() => {
-                            setShowAllParticipants(false);
-                            handleRemoveParticipant(index);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <Ionicons name="close-circle" size={20} color={Colors.error} />
-                        </TouchableOpacity>
-                      )}
+                      <TouchableOpacity 
+                        style={styles.removeParticipantButton}
+                        onPress={() => {
+                          setShowAllParticipants(false);
+                          handleRemoveParticipant(index);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="close-circle" size={20} color={Colors.error} />
+                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
@@ -903,8 +826,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 selectedFriends={selectedFriends}
                 onFriendsChange={setSelectedFriends}
                 placeholder="Add friends to split with..."
-                allowPlaceholders={true}
-                onAddPlaceholder={handleAddPlaceholder}
                 expenseId={expense?.id}
                 showAddButton={false}
               />
@@ -933,19 +854,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
                             </Text>
                           </View>
                         )}
-                        {participant.placeholder && (
-                          <View style={styles.placeholderIndicator}>
-                            <Ionicons name="person-outline" size={12} color={Colors.surface} />
-                          </View>
-                        )}
                       </View>
                       <View style={styles.currentParticipantInfo}>
                         <Text style={styles.currentParticipantName}>{participant.name}</Text>
                         {participant.username && (
                           <Text style={styles.currentParticipantUsername}>@{participant.username}</Text>
-                        )}
-                        {participant.placeholder && (
-                          <Text style={styles.currentParticipantTag}>Placeholder</Text>
                         )}
                         {participant.name === 'Me' && (
                           <Text style={styles.currentParticipantTag}>You</Text>
@@ -954,30 +867,16 @@ const AddExpenseScreen = ({ route, navigation }) => {
                     </View>
                     {participant.name !== 'Me' && (
                       <View style={styles.currentParticipantActions}>
-                        {participant.placeholder ? (
-                          <TouchableOpacity 
-                            style={styles.inviteButton} 
-                            onPress={() => {
-                              setShowGroupMembers(false);
-                              handleInvitePlaceholder(participant);
-                            }}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons name="qr-code-outline" size={16} color={Colors.surface} />
-                            <Text style={styles.inviteButtonText}>Invite</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <TouchableOpacity 
-                            style={styles.removeParticipantButton}
-                            onPress={() => {
-                              setShowGroupMembers(false);
-                              handleRemoveParticipant(index);
-                            }}
-                            activeOpacity={0.8}
-                          >
-                            <Ionicons name="close-circle" size={20} color={Colors.error} />
-                          </TouchableOpacity>
-                        )}
+                        <TouchableOpacity 
+                          style={styles.removeParticipantButton}
+                          onPress={() => {
+                            setShowGroupMembers(false);
+                            handleRemoveParticipant(index);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name="close-circle" size={20} color={Colors.error} />
+                        </TouchableOpacity>
                       </View>
                     )}
                   </View>
@@ -988,67 +887,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      {/* Settings Modal */}
-      <Modal
-        visible={showSettings}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowSettings(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowSettings(false)}
-            >
-              <Ionicons name="close" size={24} color={Colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.modalTitle}>Expense Settings</Text>
-            <View style={styles.headerSpacer} />
-          </View>
 
-          <View style={styles.modalContent}>
-            {/* Participants Management Section */}
-            <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>Manage Participants</Text>
-              <FriendSelector
-                selectedFriends={selectedFriends}
-                onFriendsChange={setSelectedFriends}
-                placeholder="Add friends to split with..."
-                allowPlaceholders={true}
-                onAddPlaceholder={handleAddPlaceholder}
-                expenseId={expense?.id}
-                showAddButton={false}
-              />
-            </View>
-            
-            {/* Settings Section */}
-            <View style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>Expense Settings</Text>
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingTitle}>Allow join by room code</Text>
-                  <Text style={styles.settingDescription}>
-                    Let others join this expense using the room code
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    joinEnabled && styles.toggleButtonActive
-                  ]}
-                  onPress={() => setJoinEnabled(!joinEnabled)}
-                >
-                  <View style={[
-                    styles.toggleThumb,
-                    joinEnabled && styles.toggleThumbActive
-                  ]} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -1230,54 +1069,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     fontWeight: '600',
   },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: Spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    marginBottom: Spacing.md,
-    ...Shadows.card,
-  },
-  settingInfo: {
-    flex: 1,
-    marginRight: Spacing.md,
-  },
-  settingTitle: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-  },
-  settingDescription: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-  },
-  toggleButton: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Colors.divider,
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  toggleButtonActive: {
-    backgroundColor: Colors.accent,
-  },
-  toggleThumb: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: Colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  toggleThumbActive: {
-    transform: [{ translateX: 20 }],
-  },
+
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -1330,93 +1122,15 @@ const styles = StyleSheet.create({
   lastSection: {
     marginBottom: 0,
   },
-  placeholdersContainer: {
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-  },
-  placeholdersLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontSize: 12,
-  },
-  placeholderCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.card,
-    elevation: 2,
-    minHeight: 72,
-  },
-  placeholderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  placeholderAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-    borderWidth: 2,
-    borderColor: Colors.divider,
-    position: 'relative',
-  },
-  placeholderInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  placeholderName: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
-  },
-
-
-  placeholderIndicator: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    width: 28,
-    height: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: Colors.surface,
-    ...Shadows.button,
-    elevation: 2,
-  },
-
-  // Essential grid styles
-  participantsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  participantsGridContainer: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   participantGridItem: {
     alignItems: 'center',
-    width: '30%',
-    marginBottom: Spacing.md,
+    width: '33.33%', // Exactly one-third width for 3 columns
+    marginBottom: Spacing.sm,
     paddingVertical: Spacing.xs,
     minHeight: 100,
   },
@@ -1468,8 +1182,8 @@ const styles = StyleSheet.create({
   addParticipantGridButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: '30%',
-    marginBottom: Spacing.md,
+    width: '33.33%', // Exactly one-third width for 3 columns
+    marginBottom: Spacing.sm,
     paddingVertical: Spacing.xs,
     minHeight: 100,
   },
@@ -1494,7 +1208,7 @@ const styles = StyleSheet.create({
   moreParticipantsButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: '30%',
+    width: '33.33%', // Exactly one-third width for 3 columns
     marginBottom: Spacing.md,
     paddingVertical: Spacing.xs,
     minHeight: 100,
@@ -1821,6 +1535,38 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: '700',
   },
+
+
+
+  toggleParticipantsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: Radius.pill,
+    ...Shadows.button,
+    elevation: 2,
+  },
+  toggleParticipantsIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.xs,
+  },
+  toggleParticipantsText: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+
+
 
 });
 

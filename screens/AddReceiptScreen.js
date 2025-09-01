@@ -33,8 +33,7 @@ import {
   renderItem,
   addParticipant,
   updateParticipant,
-  removeParticipant,
-  removePlaceholder
+  removeParticipant
 } from './AddExpenseScreenFunctions';
 import { getCurrentUser } from '../services/authService';
 import useFormChangeTracker from '../hooks/useFormChangeTracker';
@@ -48,7 +47,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
   const [title, setTitle] = useState('');
   const [participants, setParticipants] = useState([{ name: 'Me' }]);
   const [selectedFriends, setSelectedFriends] = useState([]);
-  const [placeholders, setPlaceholders] = useState([]);
   const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
   const [showSettings, setShowSettings] = useState(false);
   const [joinEnabled, setJoinEnabled] = useState(true);
@@ -190,21 +188,12 @@ const AddReceiptScreen = ({ route, navigation }) => {
     }
   }, [scannedReceipt, fromReceiptScan]);
 
-  // Initialize selectedFriends and placeholders when editing an existing expense
+  // Initialize selectedFriends when editing an existing expense
   useEffect(() => {
     if (expense && isEditing) {
-        console.log('expense', expense.items[2].splits)
-      const currentUser = getCurrentUser();
-      // Extract friends from existing participants (exclude current user and placeholders)
+      // Extract friends from existing participants (exclude current user)
       const existingFriends = expense.participants
-        .filter(p => {
-          // Exclude placeholders
-          if (p.placeholder) return false;
-          // Exclude the current user (either by name 'Me' or by userId matching createdBy)
-          if (p.name === 'Me' || (p.userId && expense.createdBy && p.userId === expense.createdBy)) return false;
-          // Must have a userId to be considered a friend
-          return p.userId;
-        })
+        .filter(p => p.name !== 'Me' && p.userId && p.userId !== getCurrentUser()?.uid)
         .map(p => ({
           id: p.userId,
           name: p.name,
@@ -213,36 +202,27 @@ const AddReceiptScreen = ({ route, navigation }) => {
           profilePhoto: p.profilePhoto
         }));
       
-      // Extract placeholders from existing participants
-      const existingPlaceholders = expense.participants
-        .filter(p => p.placeholder)
-        .map(p => ({
-          id: p.id || `ghost-${Date.now()}-${Math.random()}`,
-          name: p.name,
-          phoneNumber: p.phoneNumber,
-          isPlaceholder: true
-        }));
-      
       setSelectedFriends(existingFriends);
-      setPlaceholders(existingPlaceholders);
-      // Set initial participants (this will be updated by the other useEffect)
-      const initialParticipants = [
-        { name: 'Me' },
-        ...existingFriends.map(friend => ({ 
-          name: friend.name, 
-          userId: friend.id,
-          phoneNumber: friend.phoneNumber,
-          username: friend.username,
-          profilePhoto: friend.profilePhoto
-        })),
-        ...existingPlaceholders.map(p => ({ 
-          name: p.name, 
-          placeholder: true, 
-          id: p.id
+      setParticipants(prev => [
+        { 
+          name: 'Me',
+          id: 'me-participant',
+          userId: getCurrentUser()?.uid || null,
+          placeholder: false,
+          phoneNumber: null,
+          username: null,
+          profilePhoto: null
+        },
+        ...existingFriends.map((friend, index) => ({ 
+          name: friend.name || '', 
+          id: `friend-${friend.id || index}`,
+          userId: friend.id || null,
+          phoneNumber: friend.phoneNumber || null,
+          username: friend.username || null,
+          profilePhoto: friend.profilePhoto || null,
+          placeholder: false
         }))
-      ];
-      setParticipants(initialParticipants);
-      
+      ]);
       // Set title and other fields from existing expense
       if (expense.title) {
         setTitle(expense.title);
@@ -250,54 +230,48 @@ const AddReceiptScreen = ({ route, navigation }) => {
       if (expense.join) {
         setJoinEnabled(expense.join.enabled);
       }
-      
       if (expense.fees) {
         setFees(expense.fees);
-      }
-      
-      // Set selected payers if available
-      if (expense.selectedPayers) {
-        setSelectedPayers(expense.selectedPayers);
       }
       if (expense.items) {
         setItems(expense.items);
       }
+      // Set selected payers if available
+      if (expense.selectedPayers) {
+        setSelectedPayers(expense.selectedPayers);
+      }
     }
   }, [expense, isEditing]);
 
-  // Track form changes for navigation warning
-  useEffect(() => {
-    const currentFormData = {
-      title,
-      participants: participants.map(p => ({ name: p.name, userId: p.userId, placeholder: p.placeholder })),
-      items: items.map(item => ({ name: item.name, amount: item.amount, selectedConsumers: item.selectedConsumers })),
-      fees: fees.map(fee => ({ name: fee.name, amount: fee.amount, type: fee.type, percentage: fee.percentage })),
-      selectedPayers,
-      joinEnabled
-    };
-    updateChangeStatus(currentFormData);
-  }, [title, participants, items, fees, selectedPayers, joinEnabled, updateChangeStatus]);
-
   // Update participants when friends are selected
   useEffect(() => {
-    const allParticipants = [
-      { name: 'Me' },
-      ...selectedFriends.map(friend => ({ 
-        name: friend.name, 
-        userId: friend.id,
-        phoneNumber: friend.phoneNumber,
-        username: friend.username,
-        profilePhoto: friend.profilePhoto
-      })),
-      ...placeholders.map(p => ({ 
-        name: p.name, 
-        placeholder: true, 
-        id: p.id
-      }))
-    ];
-    setParticipants(allParticipants);
-    
-  }, [selectedFriends, placeholders]);
+    setParticipants(prevParticipants => {
+      const meParticipant = prevParticipants.find(p => p.name === 'Me');
+      
+      const allParticipants = [
+        meParticipant || { 
+          name: 'Me',
+          id: 'me-participant',
+          userId: getCurrentUser()?.uid || null,
+          placeholder: false,
+          phoneNumber: null,
+          username: null,
+          profilePhoto: null
+        },
+        ...selectedFriends.map((friend, index) => ({ 
+          name: friend.name || '', 
+          id: `friend-${friend.id || index}`,
+          userId: friend.id || null,
+          phoneNumber: friend.phoneNumber || null,
+          username: friend.username || null,
+          profilePhoto: friend.profilePhoto || null,
+          placeholder: false
+        }))
+      ];
+      
+      return allParticipants;
+    });
+  }, [selectedFriends]);
   
   const handleAddParticipant = () => {
     addParticipant(participants, setParticipants);
@@ -309,18 +283,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
 
   const handleRemoveParticipant = (index) => {
     removeParticipant(index, participants, setParticipants, items, setItems);
-  };
-
-  const handleAddPlaceholder = (ghost) => {
-    setPlaceholders(prev => [...prev, ghost]);
-  };
-
-  const handleInvitePlaceholder = (ghost) => {
-    setInviteTarget({ name: ghost.name, phone: ghost.phoneNumber || '' });
-  };
-
-  const handleRemovePlaceholder = (ghostId) => {
-    removePlaceholder(ghostId, placeholders, setPlaceholders, items, setItems, selectedFriends);
   };
 
   const handleAddItem = () => {
@@ -592,47 +554,10 @@ const AddReceiptScreen = ({ route, navigation }) => {
               selectedFriends={selectedFriends}
               onFriendsChange={setSelectedFriends}
               placeholder="Add friends to split with..."
-              allowPlaceholders={true}
-              onAddPlaceholder={handleAddPlaceholder}
               expenseId={expense?.id}
+              showAddButton={false}
+
             />
-            {/* Render placeholder chips with Invite buttons */}
-            {placeholders.length > 0 && (
-              <View style={styles.placeholdersContainer}>
-                <Text style={styles.placeholdersLabel}>Pending Invites</Text>
-                {placeholders.map((p, idx) => (
-                  <View key={p.id} style={styles.placeholderCard}>
-                    <View style={styles.placeholderContent}>
-                      <View style={styles.placeholderAvatar}>
-                        <Text style={styles.placeholderInitials}>{p.name?.[0]?.toUpperCase() || '?'}</Text>
-                      </View>
-                      <View style={styles.placeholderInfo}>
-                        <Text style={styles.placeholderName}>{p.name}</Text>
-                        {p.phoneNumber && (
-                          <Text style={styles.placeholderPhone}>{p.phoneNumber}</Text>
-                        )}
-                        <Text style={styles.placeholderTag}>Placeholder</Text>
-                      </View>
-                    </View>
-                    <View style={styles.placeholderActions}>
-                      <TouchableOpacity 
-                        style={styles.inviteButton} 
-                        onPress={() => handleInvitePlaceholder(p)}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="qr-code-outline" size={16} color={Colors.surface} />
-                        <Text style={styles.inviteButtonText}>Invite</Text>
-                      </TouchableOpacity>
-                      <DeleteButton
-                        onPress={() => handleRemovePlaceholder(p.id)}
-                        size="small"
-                        variant="subtle"
-                      />
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
             <View style={styles.participantsNoteContainer}>
               <Text style={styles.participantsNote}>You'll automatically be included as a participant</Text>
             </View>
@@ -1381,97 +1306,7 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: '700',
   },
-  placeholdersContainer: {
-    marginTop: Spacing.lg,
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-  },
-  placeholdersLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontSize: 12,
-  },
-  placeholderCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    ...Shadows.card,
-    elevation: 2,
-    minHeight: 72,
-  },
-  placeholderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  placeholderAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-    borderWidth: 2,
-    borderColor: Colors.divider,
-    position: 'relative',
-  },
-  placeholderInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  placeholderName: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
-  },
-  placeholderPhone: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    fontSize: 14,
-  },
-  placeholderTag: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    fontSize: 11,
-    marginTop: Spacing.xs,
-    fontStyle: 'italic',
-    opacity: 0.8,
-  },
-  placeholderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  inviteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
-    ...Shadows.button,
-    elevation: 2,
-  },
-  inviteButtonText: { 
-    ...Typography.label, 
-    color: Colors.surface, 
-    fontWeight: '600',
-    fontSize: 14,
-  },
+
   participantsCount: {
     backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.sm,

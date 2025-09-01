@@ -10,4 +10,4 @@ export { default as renderItem } from './renderItem';
 export { default as addParticipant } from './addParticipant';
 export { default as updateParticipant } from './updateParticipant';
 export { default as removeParticipant } from './removeParticipant';
-export { default as removePlaceholder } from './removePlaceholder';
+
