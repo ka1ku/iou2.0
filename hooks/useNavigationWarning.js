@@ -7,18 +7,20 @@ import { Alert } from 'react-native';
  * @param {Function} navigation - Navigation object from React Navigation
  * @param {Function} onConfirmNavigation - Callback to execute when user confirms navigation
  * @param {string} warningMessage - Custom warning message
+ * @param {boolean} isSaving - Whether a save operation is in progress (disables warnings)
  */
 const useNavigationWarning = (
   hasChanges,
   navigation,
   onConfirmNavigation = null,
-  warningMessage = 'You have unsaved changes. Are you sure you want to leave?'
+  warningMessage = 'You have unsaved changes. Are you sure you want to leave?',
+  isSaving = false
 ) => {
   // Handle back button press, swipe gestures, and hardware back button
   useFocusEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (!hasChanges) {
-        // If no changes, allow navigation
+      if (!hasChanges || isSaving) {
+        // If no changes or if saving, allow navigation
         return;
       }
 

@@ -2,18 +2,38 @@ import { useState, useEffect, useRef } from 'react';
 
 /**
  * Custom hook to track form changes and provide navigation warning functionality
- * @param {Object} initialData - The initial form data to compare against
+ * @param {Object} initialData - The initial form data to compare against (can be null for new forms)
  * @param {boolean} isEditing - Whether the form is in edit mode
  * @returns {Object} - Object containing hasChanges and resetChanges functions
  */
 const useFormChangeTracker = (initialData, isEditing = false) => {
   const [hasChanges, setHasChanges] = useState(false);
   const initialDataRef = useRef(null);
+  const isInitializedRef = useRef(false);
 
-  // Initialize the initial data reference only once when editing starts
+  // Initialize the initial data reference when the form first loads
   useEffect(() => {
-    if (isEditing && initialData) {
-      initialDataRef.current = JSON.stringify(initialData);
+    // For editing: use the provided initial data
+    // For creating: initialize with empty/default form state
+    if (!isInitializedRef.current) {
+      if (isEditing && initialData) {
+        // Editing existing expense/receipt
+        initialDataRef.current = JSON.stringify(initialData);
+        console.log('Initial data captured (editing):', initialDataRef.current);
+      } else {
+        // Creating new expense/receipt - initialize with empty state
+        const emptyFormData = {
+          title: '',
+          participants: [{ name: 'Me', userId: null, placeholder: false }],
+          items: [{ name: '', amount: 0, selectedConsumers: [0] }],
+          fees: [],
+          selectedPayers: [0],
+          joinEnabled: true
+        };
+        initialDataRef.current = JSON.stringify(emptyFormData);
+        console.log('Initial data captured (creating):', initialDataRef.current);
+      }
+      isInitializedRef.current = true;
     }
   }, [isEditing, initialData]);
 
@@ -46,8 +66,8 @@ const useFormChangeTracker = (initialData, isEditing = false) => {
 
   // Check if current data differs from initial data
   const checkForChanges = (currentData) => {
-    if (!isEditing || !initialDataRef.current) {
-      console.log('No editing or no initial data');
+    if (!initialDataRef.current) {
+      console.log('No initial data available');
       return false;
     }
     
@@ -74,8 +94,25 @@ const useFormChangeTracker = (initialData, isEditing = false) => {
 
   // Reset the change tracker (useful after successful save)
   const resetChanges = () => {
-    if (isEditing && initialData) {
-      initialDataRef.current = JSON.stringify(initialData);
+    // Reset to current form state after successful save
+    if (initialDataRef.current) {
+      // For editing: reset to the original data
+      // For creating: reset to current form state (since it's now "saved")
+      if (isEditing && initialData) {
+        initialDataRef.current = JSON.stringify(initialData);
+      } else {
+        // For new forms, update the initial data to current state
+        // This prevents showing "unsaved changes" after saving
+        const currentFormData = {
+          title: '',
+          participants: [{ name: 'Me', userId: null, placeholder: false }],
+          items: [{ name: '', amount: 0, selectedConsumers: [0] }],
+          fees: [],
+          selectedPayers: [0],
+          joinEnabled: true
+        };
+        initialDataRef.current = JSON.stringify(currentFormData);
+      }
     }
     setHasChanges(false);
   };

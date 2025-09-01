@@ -64,6 +64,7 @@ const ProfileScreen = ({ navigation }) => {
         console.log('userExpenses', userExpenses);
         // Calculate balances
         const calculatedBalances = calculateUserBalances(userExpenses, currentUser.uid);
+        console.log('calculatedBalances', calculatedBalances)
         // console.log('calculatedBalances', calculatedBalances)
         setBalances(calculatedBalances);
       }
@@ -143,22 +144,35 @@ const ProfileScreen = ({ navigation }) => {
   );
 
   const renderExpenseSummary = (expense) => {
-    // Calculate user's share of this expense
-    let userTotal = 0;
+    // Calculate user's net balance (owed or owes) for this expense
+    // Find the current user's participant index (assume 0 if not found)
+    const userIndex = 0;
+    const payers = expense.selectedPayers;
+    let paidByUser
+    if (payers.includes(userIndex)) {
+      paidByUser = Math.abs(expense.total / payers.length).toFixed(2)
+    } else {
+      paidByUser = 0
+    }
+    let owedByUser = 0;
+
+    // For each item, determine how much the user owes
     expense.items?.forEach(item => {
-      if (item.splitType === 'even') {
-        userTotal += item.amount / expense.participants.length;
-      } else if (item.splitType === 'custom') {
-        const userSplit = item.splits?.find(split => split.participantIndex === 0);
-        userTotal += userSplit?.amount || 0;
-      }
-    });
+      // Find the split for the current user, if any
+      const itemConsumers = item.selectedConsumers;
+      if (itemConsumers.includes(userIndex)) {
+        owedByUser += item.splits[userIndex].amount
+    }})
+
+    // Net: positive means user is owed, negative means user owes
+    let userTotal = paidByUser - owedByUser;
 
     // Determine if this is a receipt or individual expense
     const isReceipt = expense.expenseType === 'receipt';
     const screenName = isReceipt ? 'AddReceipt' : 'AddExpense';
     const iconName = isReceipt ? 'receipt-outline' : 'card-outline';
     const typeLabel = isReceipt ? 'Receipt' : 'Expense';
+    
 
     return (
       <TouchableOpacity
@@ -182,7 +196,7 @@ const ProfileScreen = ({ navigation }) => {
           <View style={styles.expenseSummaryLeft}>
             <Text style={styles.expenseTypeLabel}>{typeLabel}</Text>
             <Text style={styles.expenseSummaryInfo}>
-              Your share: ${userTotal.toFixed(2)}
+              {userTotal < 0 ? 'You owe' : 'You are owed'} ${Math.abs(userTotal).toFixed(2)}
             </Text>
           </View>
           <Text style={styles.expenseSummaryInfo}>
@@ -697,3 +711,6 @@ const styles = StyleSheet.create({
 });
 
 export default ProfileScreen;
+
+
+

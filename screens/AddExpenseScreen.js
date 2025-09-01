@@ -21,31 +21,48 @@ import { getUserProfile } from '../services/friendService';
 import FriendSelector from '../components/FriendSelector';
 import InviteFriendSheet from '../components/InviteFriendSheet';
 import DeleteButton from '../components/DeleteButton';
-import { ItemHeader, PriceInputSection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection, CombinedConsumersAndSplitSection } from './AddExpenseScreenItems';
+import { 
+  ItemHeader, 
+  PriceInputSection, 
+  SmartSplitSection, 
+  SplitTypeSection, 
+  WhoConsumedSection, 
+  FeeHeader, 
+  FeeTypeSection, 
+  PercentageSection, 
+  FixedAmountSection, 
+  TotalFeeSection, 
+  CombinedConsumersAndSplitSection, 
+  PaidBySection 
+} from './AddExpenseScreenItems';
 import {
+  addItem,
   updateItem,
   updateItemSplit,
+  removeItem,
   addFee,
   updateFee,
   removeFee,
   saveExpense,
+  saveExpenseWithSettlement,
   renderItem,
   removeParticipant,
   removePlaceholder
 } from './AddExpenseScreenFunctions';
 import useFormChangeTracker from '../hooks/useFormChangeTracker';
 import useNavigationWarning from '../hooks/useNavigationWarning';
+import SettlementProposalModal from '../components/SettlementProposalModal';
 
 const AddExpenseScreen = ({ route, navigation }) => {
-  const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
+  const { expense, scannedReceipt, fromReceiptScan, previousScreen } = route.params || {};
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
 
   const [title, setTitle] = useState('');
   const [participants, setParticipants] = useState([{ 
     name: 'Me',
-    id: 'me-participant', // Use a unique ID for "Me"
-    userId: getCurrentUser()?.uid || null, // Use current user's UID
+    id: 'me-participant',
+    userId: getCurrentUser()?.uid || null,
     placeholder: false,
     phoneNumber: null,
     username: null,
@@ -53,7 +70,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   }]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [placeholders, setPlaceholders] = useState([]);
-  const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
+  const [inviteTarget, setInviteTarget] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showAllParticipants, setShowAllParticipants] = useState(false);
   const [showGroupMembers, setShowGroupMembers] = useState(false);
@@ -62,12 +79,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
     id: Date.now().toString(),
     name: '',
     amount: 0,
-    selectedConsumers: [0], // Default to first participant (usually "Me")
+    selectedConsumers: [0],
     splits: []
   }]);
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
+  const [selectedPayers, setSelectedPayers] = useState([0]);
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [pendingExpenseData, setPendingExpenseData] = useState(null);
+  const [pendingSettlement, setPendingSettlement] = useState(null);
   const friendSelectorRef = useRef(null);
 
   // Form change tracking for navigation warning
@@ -88,7 +108,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
     hasChanges,
     navigation,
     null,
-    'You have unsaved changes to this expense. Are you sure you want to leave?'
+    'You have unsaved changes. Are you sure you want to leave?',
+    loading
   );
 
   // Calculate total from items and fees
@@ -117,7 +138,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               const updated = [...prev];
               if (updated.length > 0 && updated[0].name === 'Me') {
                 updated[0] = {
-                  ...updated[0], // Preserve existing ID and structure
+                  ...updated[0],
                   name: 'Me',
                   userId: currentUser.uid,
                   placeholder: false,
@@ -141,22 +162,19 @@ const AddExpenseScreen = ({ route, navigation }) => {
   // Handle scanned receipt data
   useEffect(() => {
     if (scannedReceipt && fromReceiptScan) {
-      // Populate form with scanned data
       setTitle(scannedReceipt.title || '');
       
-      // Set participants if available
       if (scannedReceipt.participants && scannedReceipt.participants.length > 0) {
         setParticipants(scannedReceipt.participants);
       }
       
-      // Set items if available (only take the first item for single-item expenses)
       if (scannedReceipt.items && scannedReceipt.items.length > 0) {
         const firstItem = scannedReceipt.items[0];
         const formattedItem = {
           id: Date.now().toString(),
           name: firstItem.name || '',
           amount: parseFloat(firstItem.amount) || 0,
-          selectedConsumers: [0], // Default to first participant
+          selectedConsumers: [0],
           splits: [{
             participantIndex: 0,
             amount: parseFloat(firstItem.amount) || 0,
@@ -166,10 +184,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
         setItems([formattedItem]);
       }
       
-      // Set default payers to first participant
       setSelectedPayers([0]);
       
-      // Set fees if available (e.g., tax, tip)
       if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
         const subtotalFromReceipt = Number(scannedReceipt.subtotal);
         const fallbackItemsTotal = (scannedReceipt.items || []).reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
@@ -183,7 +199,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
           if (type === 'percentage') {
             if (!Number.isFinite(percentage)) {
-              // Try deriving percentage from amount
               if (Number.isFinite(amount) && baseline > 0) {
                 percentage = (amount / baseline) * 100;
               }
@@ -209,7 +224,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
         setFees(formattedFees);
       }
       
-      // Show success message
       Alert.alert(
         'Receipt Scanned Successfully!',
         'The receipt information has been automatically filled in. Please review and make any necessary adjustments.',
@@ -221,7 +235,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
   // Initialize selectedFriends and placeholders when editing an existing expense
   useEffect(() => {
     if (expense && isEditing) {
-      // Extract friends from existing participants (exclude current user)
       const existingFriends = expense.participants
         .filter(p => p.name !== 'Me' && !p.placeholder && p.userId && p.userId !== getCurrentUser()?.uid)
         .map(p => ({
@@ -232,7 +245,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
           profilePhoto: p.profilePhoto
         }));
       
-      // Extract placeholders from existing participants
       const existingPlaceholders = expense.participants
         .filter(p => p.placeholder)
         .map(p => ({
@@ -245,12 +257,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
       setSelectedFriends(existingFriends);
       setPlaceholders(existingPlaceholders);
 
-      // Set initial participants (this will be updated by the other useEffect)
       const initialParticipants = [
         { 
           name: 'Me',
-          id: 'me-participant', // Use a unique ID for "Me"
-          userId: getCurrentUser()?.uid || null, // Use current user's UID
+          id: 'me-participant',
+          userId: getCurrentUser()?.uid || null,
           placeholder: false,
           phoneNumber: null,
           username: null,
@@ -258,7 +269,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         },
         ...existingFriends.map((friend, index) => ({ 
           name: friend.name || '', 
-          id: `friend-${friend.id || index}`, // Ensure unique ID
+          id: `friend-${friend.id || index}`,
           userId: friend.id || null,
           phoneNumber: friend.phoneNumber || null,
           username: friend.username || null,
@@ -268,14 +279,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
         ...existingPlaceholders.map((p, index) => ({ 
           name: p.name || '', 
           placeholder: true, 
-          id: p.id || `placeholder-${index}`, // Ensure unique ID
+          id: p.id || `placeholder-${index}`,
           userId: null,
           phoneNumber: p.phoneNumber || null,
           username: null,
           profilePhoto: null
         }))
       ];
-      setParticipants(initialParticipants);      // Set title and other fields from existing expense
+      setParticipants(initialParticipants);
+      
       if (expense.title) {
         setTitle(expense.title);
       }
@@ -288,7 +300,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
       if (expense.items) {
         setItems(expense.items);
       }
-      // Set selected payers if available
       if (expense.selectedPayers) {
         setSelectedPayers(expense.selectedPayers);
       }
@@ -315,8 +326,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
       const allParticipants = [
         meParticipant || { 
           name: 'Me',
-          id: 'me-participant', // Use a unique ID for "Me"
-          userId: getCurrentUser()?.uid || null, // Use current user's UID
+          id: 'me-participant',
+          userId: getCurrentUser()?.uid || null,
           placeholder: false,
           phoneNumber: null,
           username: null,
@@ -324,7 +335,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         },
         ...selectedFriends.map((friend, index) => ({ 
           name: friend.name || '', 
-          id: `friend-${friend.id || index}`, // Ensure unique ID
+          id: `friend-${friend.id || index}`,
           userId: friend.id || null,
           phoneNumber: friend.phoneNumber || null,
           username: friend.username || null,
@@ -334,14 +345,13 @@ const AddExpenseScreen = ({ route, navigation }) => {
         ...placeholders.map((p, index) => ({ 
           name: p.name || '', 
           placeholder: true, 
-          id: p.id || `placeholder-${index}`, // Ensure unique ID
+          id: p.id || `placeholder-${index}`,
           userId: null,
           phoneNumber: p.phoneNumber || null,
           username: null,
           profilePhoto: null
         }))
       ];
-    
       
       return allParticipants;
     });
@@ -363,8 +373,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
     removePlaceholder(ghostId, placeholders, setPlaceholders, items, setItems, selectedFriends);
   };
 
-
-
   const handleUpdateItem = (index, field, value) => {
     updateItem(index, field, value, items, setItems, fees, setFees);
   };
@@ -373,7 +381,61 @@ const AddExpenseScreen = ({ route, navigation }) => {
     updateItemSplit(itemIndex, participantIndex, amount, items, setItems);
   };
 
+  const handleAddItem = () => {
+    addItem(items, setItems, participants);
+  };
 
+  const handleRemoveItem = (index) => {
+    removeItem(index, items, setItems, fees, setFees);
+  };
+
+  const handleAddFee = () => {
+    addFee(fees, setFees);
+  };
+
+  const handleUpdateFee = (index, field, value) => {
+    updateFee(index, field, value, fees, setFees, items);
+  };
+
+  const handleRemoveFee = (index) => {
+    removeFee(index, fees, setFees);
+  };
+
+  const handleShowSettlementProposal = (expenseData, settlement) => {
+    setPendingExpenseData(expenseData);
+    setPendingSettlement(settlement);
+    setShowSettlementModal(true);
+  };
+
+  const handleAcceptSettlement = async (settlements, settlementType) => {
+    await saveExpenseWithSettlement(
+      pendingExpenseData,
+      getCurrentUser(),
+      settlements,
+      settlementType,
+      navigation,
+      resetChanges
+    );
+  };
+
+  const handleSkipSettlement = async () => {
+    await saveExpense(
+      title,
+      participants,
+      items,
+      fees,
+      selectedPayers,
+      joinEnabled,
+      isEditing,
+      expense,
+      navigation,
+      setLoading,
+      calculateTotal,
+      'expense',
+      resetChanges,
+      null
+    );
+  };
 
   const handleSaveExpense = async () => {
     saveExpense(
@@ -389,7 +451,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
       setLoading,
       calculateTotal,
       'expense',
-      resetChanges
+      resetChanges,
+      handleShowSettlementProposal
     );
   };
 
@@ -409,28 +472,81 @@ const AddExpenseScreen = ({ route, navigation }) => {
     );
   };
 
+  // Render fee using the existing components
+  const renderFee = (fee, index) => {
+    const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    
+    return (
+      <View key={fee.id} style={styles.feeCard}>
+        <FeeHeader
+          feeName={fee.name}
+          onNameChange={(text) => handleUpdateFee(index, 'name', text)}
+          onDelete={() => handleRemoveFee(index)}
+        />
+
+        <FeeTypeSection
+          feeType={fee.type}
+          onTypeChange={(type) => handleUpdateFee(index, 'type', type)}
+        />
+
+        {fee.type === 'percentage' ? (
+          <PercentageSection
+            percentage={fee.percentage}
+            onPercentageChange={(percentage) => handleUpdateFee(index, 'percentage', percentage)}
+                      itemsTotal={itemsTotal}
+          />
+        ) : (
+          <FixedAmountSection
+            amount={fee.amount}
+            onAmountChange={(amount) => handleUpdateFee(index, 'amount', amount)}
+          />
+        )}
+
+        <TotalFeeSection feeAmount={fee.amount} />
+      </View>
+    );
+  };
 
   return (
-            <View style={styles.container}>
-        <BlurView intensity={30} tint="light" style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isEditing ? 'Edit Expense' : 'Add Expense'}
-          </Text>
-          <TouchableOpacity 
-            style={styles.settingsButton}
-            onPress={() => setShowSettings(true)}
-          >
-            <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </BlurView>
-        
-        <KeyboardAvoidingView 
+    <View style={styles.container}>
+      <BlurView intensity={30} tint="light" style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => {
+            if (previousScreen === 'ProfileMain') {
+              navigation.getParent()?.navigate('Profile');
+              navigation.getParent()?.getParent()?.reset({
+                index: 0,
+                routes: [
+                  {
+                    name: 'Home',
+                    state: {
+                      routes: [{ name: 'HomeMain' }],
+                      index: 0,
+                    },
+                  },
+                  { name: 'Profile' },
+                ],
+              });
+            } else {
+              navigation.goBack();
+            }
+          }}
+        >
+          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {isEditing ? 'Edit Expense' : 'Add Expense'}
+        </Text>
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => setShowSettings(true)}
+        >
+          <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+      </BlurView>
+      
+      <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
@@ -439,6 +555,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: insets.top + 100, paddingBottom: 120 }}
         >
+          {/* Participants Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Participants</Text>
@@ -450,9 +567,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
             </View>
             
             {/* Participants Compact Grid Layout */}
-            {/* Main Participants Grid */}
             <View style={styles.participantsGrid}>
-              {/* Add Participant Button - First Item */}
               <TouchableOpacity 
                 style={styles.addParticipantGridButton}
                 onPress={() => {
@@ -468,7 +583,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 <Text style={styles.addParticipantGridText}>Add</Text>
               </TouchableOpacity>
               
-              {/* Show first 5 participants in the remaining grid spots */}
               {participants.slice(0, 5).map((participant, index) => (
                 <TouchableOpacity 
                   key={participant.id}
@@ -513,7 +627,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               ))}
               
-              {/* Show remaining participants count if more than 5 */}
               {participants.length > 5 && (
                 <TouchableOpacity 
                   style={styles.moreParticipantsButton}
@@ -607,11 +720,52 @@ const AddExpenseScreen = ({ route, navigation }) => {
                 ))}
               </View>
             )}
-
           </View>
 
+          {/* Items Section */}
+          {items.map((item, index) => handleRenderItem(item, index))}
 
-            {items.map((item, index) => handleRenderItem(item, index))}
+          {/* Add Item Button */}
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.addItemButton}
+              onPress={handleAddItem}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
+              <Text style={styles.addItemButtonText}>Add Item</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Fees Section */}
+          {fees.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Fees & Tips</Text>
+              </View>
+              {fees.map((fee, index) => renderFee(fee, index))}
+            </View>
+          )}
+
+          {/* Add Fee Button */}
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.addFeeButton}
+              onPress={handleAddFee}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={Colors.accent} />
+              <Text style={styles.addFeeButtonText}>Add Fee</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Total Section */}
+          <View style={styles.section}>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+            </View>
+          </View>
         </ScrollView>
 
         <BlurView intensity={30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom}]}>
@@ -634,6 +788,19 @@ const AddExpenseScreen = ({ route, navigation }) => {
         expenseId={expense?.id}
         placeholderName={inviteTarget?.name || ''}
         phoneNumber={inviteTarget?.phone || ''}
+      />
+
+      {/* Settlement Proposal Modal */}
+      <SettlementProposalModal
+        visible={showSettlementModal}
+        onClose={() => {
+          setShowSettlementModal(false);
+          setPendingExpenseData(null);
+          setPendingSettlement(null);
+        }}
+        onAccept={handleAcceptSettlement}
+        expense={pendingExpenseData}
+        participants={participants}
       />
 
       {/* All Participants Modal */}
@@ -1024,6 +1191,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   placeholderName: { ...Typography.title, color: Colors.textPrimary },
+  placeholderPhone: { ...Typography.caption, color: Colors.textSecondary, fontSize: 12 },
+  placeholderTag: { ...Typography.label, color: Colors.textSecondary, fontSize: 11, fontStyle: 'italic' },
+  placeholderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  placeholderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   inviteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1577,6 +1756,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+
+  feeCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    ...Shadows.card,
+    elevation: 2,
+  },
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surfaceLight,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    marginTop: Spacing.md,
+    ...Shadows.button,
+    elevation: 2,
+  },
+  addItemButtonText: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  addFeeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    backgroundColor: Colors.surfaceLight,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    marginTop: Spacing.md,
+    ...Shadows.button,
+    elevation: 2,
+  },
+  addFeeButtonText: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    marginTop: Spacing.md,
+    ...Shadows.card,
+    elevation: 2,
+  },
+  totalLabel: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  totalAmount: {
+    ...Typography.h3,
+    color: Colors.accent,
+    fontWeight: '700',
   },
 
 });

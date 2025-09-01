@@ -29,6 +29,7 @@ import {
   updateFee,
   removeFee,
   saveExpense,
+  saveExpenseWithSettlement,
   renderItem,
   addParticipant,
   updateParticipant,
@@ -38,9 +39,10 @@ import {
 import { getCurrentUser } from '../services/authService';
 import useFormChangeTracker from '../hooks/useFormChangeTracker';
 import useNavigationWarning from '../hooks/useNavigationWarning';
+import SettlementProposalModal from '../components/SettlementProposalModal';
 
 const AddReceiptScreen = ({ route, navigation }) => {
-  const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
+  const { expense, scannedReceipt, fromReceiptScan, previousScreen } = route.params || {};
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
   const [title, setTitle] = useState('');
@@ -54,6 +56,9 @@ const AddReceiptScreen = ({ route, navigation }) => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [pendingExpenseData, setPendingExpenseData] = useState(null);
+  const [pendingSettlement, setPendingSettlement] = useState(null);
 
   // Form change tracking for navigation warning
   const { hasChanges, updateChangeStatus, resetChanges } = useFormChangeTracker(
@@ -73,7 +78,8 @@ const AddReceiptScreen = ({ route, navigation }) => {
     hasChanges,
     navigation,
     null,
-    'You have unsaved changes to this receipt. Are you sure you want to leave?'
+    'You have unsaved changes. Are you sure you want to leave?',
+    loading // Pass loading state as isSaving flag
   );
 
   // Calculate total from items and fees
@@ -121,12 +127,13 @@ const AddReceiptScreen = ({ route, navigation }) => {
       setSelectedPayers([0]);
       
       // Set fees if available (e.g., tax, tip)
+      let formattedFees = [];
       if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
         const subtotalFromReceipt = Number(scannedReceipt.subtotal);
         const fallbackItemsTotal = (scannedReceipt.items || []).reduce((sum, it) => sum + (Number(it.amount) || 0), 0);
         const baseline = Number.isFinite(subtotalFromReceipt) ? subtotalFromReceipt : fallbackItemsTotal;
 
-        const formattedFees = scannedReceipt.fees.map((fee, index) => {
+        formattedFees = scannedReceipt.fees.map((fee, index) => {
           const rawType = fee.type === 'percentage' || fee.type === 'fixed' ? fee.type : undefined;
           let percentage = fee.percentage !== undefined && fee.percentage !== null ? Number(fee.percentage) : null;
           let amount = fee.amount !== undefined && fee.amount !== null ? Number(fee.amount) : null;
@@ -157,8 +164,22 @@ const AddReceiptScreen = ({ route, navigation }) => {
             splits: []
           };
         });
-        setFees(formattedFees);
       }
+
+      // Add default tip card after existing fees
+      const defaultTipFee = {
+        id: Date.now().toString() + 'tip',
+        name: 'Tip',
+        amount: 0,
+        type: 'percentage',
+        percentage: 0,
+        splitType: 'proportional',
+        splits: []
+      };
+      
+      // Add the default tip card to the end of the fees array
+      formattedFees.push(defaultTipFee);
+      setFees(formattedFees);
       
       // Show success message
       Alert.alert(
@@ -330,6 +351,55 @@ const AddReceiptScreen = ({ route, navigation }) => {
     removeFee(index, fees, setFees);
   };
 
+  const handleShowSettlementProposal = (expenseData, settlement) => {
+    setPendingExpenseData(expenseData);
+    setPendingSettlement(settlement);
+    setShowSettlementModal(true);
+  };
+
+  const handleAcceptSettlement = async (settlements, settlementType) => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      Alert.alert('Error', 'No user signed in');
+      return;
+    }
+
+    await saveExpenseWithSettlement(
+      pendingExpenseData,
+      currentUser,
+      settlements,
+      settlementType,
+      navigation,
+      resetChanges
+    );
+  };
+
+  const handleSkipSettlement = async () => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      Alert.alert('Error', 'No user signed in');
+      return;
+    }
+
+    // Save expense without settlement data
+    await saveExpense(
+      title,
+      participants,
+      items,
+      fees,
+      selectedPayers,
+      joinEnabled,
+      isEditing,
+      expense,
+      navigation,
+      setLoading,
+      calculateTotal,
+      'receipt',
+      resetChanges,
+      null // Don't show settlement proposal
+    );
+  };
+
   const handleSaveExpense = async () => {
     saveExpense(
       title,
@@ -344,7 +414,8 @@ const AddReceiptScreen = ({ route, navigation }) => {
       setLoading,
       calculateTotal,
       'receipt', // Mark as receipt
-      resetChanges
+      resetChanges,
+      handleShowSettlementProposal
     );
   };
 
@@ -394,13 +465,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
           />
         )}
 
-        <SplitTypeSection
-          splitType={fee.splitType}
-                      onSplitTypeChange={(splitType) => handleUpdateFee(index, 'splitType', splitType)}
-          feeAmount={fee.amount}
-          participantCount={participants.length}
-        />
-
         <TotalFeeSection feeAmount={fee.amount} />
       </View>
     );
@@ -411,7 +475,13 @@ const AddReceiptScreen = ({ route, navigation }) => {
       <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            if (previousScreen === 'ProfileMain') {
+              navigation.navigate('Profile');
+            } else {
+              navigation.goBack();
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
@@ -643,6 +713,19 @@ const AddReceiptScreen = ({ route, navigation }) => {
         expenseId={expense?.id}
         placeholderName={inviteTarget?.name || ''}
         phoneNumber={inviteTarget?.phone || ''}
+      />
+
+      {/* Settlement Proposal Modal */}
+      <SettlementProposalModal
+        visible={showSettlementModal}
+        onClose={() => {
+          setShowSettlementModal(false);
+          setPendingExpenseData(null);
+          setPendingSettlement(null);
+        }}
+        onAccept={handleAcceptSettlement}
+        expense={pendingExpenseData}
+        participants={participants}
       />
 
       {/* Settings Modal */}

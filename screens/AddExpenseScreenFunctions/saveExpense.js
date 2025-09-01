@@ -2,6 +2,7 @@ import { Alert } from 'react-native';
 import { getCurrentUser } from '../../services/authService';
 import { getUserProfile } from '../../services/friendService';
 import { createExpense, updateExpense } from '../../services/expenseService';
+import { calculateSettlement } from '../../utils/settlementCalculator';
 
 const saveExpense = async (
   title,
@@ -16,7 +17,8 @@ const saveExpense = async (
   setLoading,
   calculateTotal,
   expenseType = 'expense', // Default to expense, can be 'receipt' or 'expense'
-  resetChanges = null // New parameter for resetting change tracker
+  resetChanges = null, // New parameter for resetting change tracker
+  onShowSettlementProposal = null // New parameter for showing settlement proposal
 ) => {
   // Generate a default title from the item name if no title is provided
   let finalTitle = title.trim();
@@ -118,6 +120,24 @@ const saveExpense = async (
       }
     };
     console.log(expenseData)
+    
+    // Check if we should show settlement proposal
+    const shouldShowSettlement = !isEditing && onShowSettlementProposal && participants.length > 1;
+    
+    if (shouldShowSettlement) {
+      // Calculate settlement for the expense
+      const settlement = calculateSettlement(expenseData);
+      
+      // Only show settlement proposal if there are actual settlements needed
+      if (settlement.settlements.length > 0) {
+        // Show settlement proposal modal instead of immediately saving
+        onShowSettlementProposal(expenseData, settlement);
+        setLoading(false);
+        return;
+      }
+    }
+    
+    // Save the expense
     if (isEditing) {
       await updateExpense(expense.id, expenseData, currentUser.uid);
       Alert.alert('Success', 'Expense updated successfully');
@@ -136,6 +156,47 @@ const saveExpense = async (
     Alert.alert('Error', 'Failed to save expense: ' + error.message);
   } finally {
     setLoading(false);
+  }
+};
+
+// Function to handle settlement proposal acceptance and save expense
+export const saveExpenseWithSettlement = async (
+  expenseData,
+  currentUser,
+  settlements,
+  settlementType,
+  navigation,
+  resetChanges = null
+) => {
+  try {
+    // Add settlement information to the expense data
+    const expenseWithSettlement = {
+      ...expenseData,
+      settlement: {
+        type: settlementType,
+        settlements: settlements,
+        createdAt: new Date().toISOString(),
+        accepted: true
+      }
+    };
+
+    // Save the expense with settlement data
+    await createExpense(expenseWithSettlement, currentUser.uid);
+    
+    Alert.alert(
+      'Success', 
+      `Expense created successfully with ${settlements.length} settlement${settlements.length !== 1 ? 's' : ''} proposed.`
+    );
+
+    // Reset change tracker if provided
+    if (resetChanges) {
+      resetChanges();
+    }
+
+    navigation.goBack();
+  } catch (error) {
+    console.error('Error saving expense with settlement:', error);
+    Alert.alert('Error', 'Failed to save expense: ' + error.message);
   }
 };
 

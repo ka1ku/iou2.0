@@ -9,7 +9,8 @@ import {
   RefreshControl,
   ActivityIndicator,
   Animated,
-  Dimensions
+  Dimensions,
+  Linking
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -182,30 +183,14 @@ const HomeScreen = ({ navigation }) => {
       }
 
       // User has access, proceed with receipt scanning
-      // Check permissions
-      const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-      const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
-        Alert.alert(
-          'Permissions Needed', 
-          'Camera and photo library permissions are required to scan receipts. Please grant these permissions in your device settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => ImagePicker.openSettingsAsync() }
-          ]
-        );
-        return;
-      }
-
-      // Show options to user
+      // Show options to user first
       Alert.alert(
         'Scan Receipt',
-        'Choose how you want to scan your receipt',
+        'Choose how you want to scan your receipt.',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Take Photo', onPress: () => takePhoto() },
-          { text: 'Choose from Gallery', onPress: () => pickImage() }
+          { text: 'Take Photo', onPress: () => handleTakePhoto() },
+          { text: 'Choose from Gallery', onPress: () => handlePickImage() }
         ]
       );
     } catch (error) {
@@ -215,6 +200,37 @@ const HomeScreen = ({ navigation }) => {
   };
 
 
+
+  const handleTakePhoto = async () => {
+    try {
+      // Check camera permission first
+      let { status: cameraStatus } = await ImagePicker.getCameraPermissionsAsync();
+      
+      // Request permission if not granted
+      if (cameraStatus !== 'granted') {
+        const { status: newCameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+        cameraStatus = newCameraStatus;
+      }
+      
+      if (cameraStatus !== 'granted') {
+        Alert.alert(
+          'Camera Permission Needed',
+          'Camera permission is required to take photos. Please grant camera permission in your device settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
+        );
+        return;
+      }
+      
+      // Permission granted, proceed with taking photo
+      await takePhoto();
+    } catch (error) {
+      console.error('Error handling camera permission:', error);
+      Alert.alert('Error', 'Failed to access camera');
+    }
+  };
 
   const takePhoto = async () => {
     try {
@@ -231,6 +247,37 @@ const HomeScreen = ({ navigation }) => {
     } catch (error) {
       console.error('Error taking photo:', error);
       Alert.alert('Error', 'Failed to take photo');
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      // Check media library permission first
+      let { status: libraryStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
+      
+      // Request permission if not granted
+      if (libraryStatus !== 'granted') {
+        const { status: newLibraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        libraryStatus = newLibraryStatus;
+      }
+      
+      if (libraryStatus !== 'granted') {
+        Alert.alert(
+          'Photo Library Permission Needed',
+          'Photo library permission is required to select images. Please grant photo library permission in your device settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
+        );
+        return;
+      }
+      
+      // Permission granted, proceed with picking image
+      await pickImage();
+    } catch (error) {
+      console.error('Error handling media library permission:', error);
+      Alert.alert('Error', 'Failed to access photo library');
     }
   };
 

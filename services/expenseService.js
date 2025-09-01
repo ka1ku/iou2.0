@@ -366,62 +366,87 @@ export const joinExpense = async ({ expenseId, token, code, phone, user }) => {
 
 // Helper function to calculate balances for profile screen
 export const calculateUserBalances = (expenses, userId) => {
-  let totalOwed = 0;
-  let totalOwes = 0;
-  const debtBreakdown = {}; // { participantName: amount } - positive means they owe you, negative means you owe them  
-  expenses.forEach(expense => {
-    const currentUserIndex = 0;
-    const paidByIndices = expense.selectedPayers
-    const paidByParticipants = expense.participants?.[paidByIndices];
+  const currentUserIndex = 0; // By convention, user is always index 0
+  const participantBalances = {}; // { participantName: netAmount }
+  let totalPaidByUser = 0;
+  let totalOwedByUser = 0;
 
-    expense.items?.forEach(item => { console.log(item)
-      if (!paidByParticipants || !item.amount || !expense.participants?.length) {
-        return; // Skip invalid items
-      }
-      
-      if (item.splitType === 'even') {
-        const splitAmount = parseFloat(item.amount) / expense.participants.length;
-        
-        // If current user paid, others owe them
-        if (paidByIndices.includes(currentUserIndex)) { {
-          expense.participants.forEach((participant, index) => {
-            if (index !== currentUserIndex) {
-              totalOwed += splitAmount;
-              debtBreakdown[participant.name] = (debtBreakdown[participant.name] || 0) + splitAmount;
-            }
-          })};
-        } else {
-          // Someone else paid, current user owes them
-          totalOwes += splitAmount;
-          debtBreakdown[paidByParticipants.name] = (debtBreakdown[paidByParticipants.name] || 0) - splitAmount;
-        }
-      } else {
-        item.splits?.forEach(split => {
-          const splitParticipant = expense.participants?.[split.participantIndex];
-          const splitAmount = parseFloat(split.amount) || 0;
-          
-          if (!splitParticipant || splitAmount === 0) {
-            return; // Skip invalid splits
-          }
-          if (paidByIndices.includes(currentUserIndex) && split.participantIndex !== currentUserIndex) {
-            // Current user paid, someone else owes them
-            totalOwed += splitAmount;
-            debtBreakdown[splitParticipant.name] = (debtBreakdown[splitParticipant.name] || 0) + splitAmount;
-          } else if (!paidByIndices.includes(currentUserIndex) && split.participantIndex === currentUserIndex) {
-            // Someone else paid, current user owes them
-            totalOwes += splitAmount;
-            debtBreakdown[paidByParticipants.name] = (debtBreakdown[paidByParticipants.name] || 0) - splitAmount;
-          }
-          
-        });
+  expenses.forEach(expense => {
+    const paidByIndices = Array.isArray(expense.selectedPayers) ? expense.selectedPayers : [];
+    const participants = Array.isArray(expense.participants) ? expense.participants : [];
+    const items = Array.isArray(expense.items) ? expense.items : [];
+
+    // --- Calculate how much the current user paid for this expense ---
+    let paidByUser = 0;
+    if (paidByIndices.includes(currentUserIndex) && paidByIndices.length > 0) {
+      paidByUser = Math.abs(Number(expense.total) / paidByIndices.length);
+    }
+
+    // --- Calculate how much the current user owes for this expense ---
+    let owedByUser = 0;
+    items.forEach(item => {
+      const itemConsumers = Array.isArray(item.selectedConsumers) ? item.selectedConsumers : [];
+      const itemSplits = Array.isArray(item.splits) ? item.splits : [];
+      // Find the split for the current user
+      const userSplitIndex = itemConsumers.indexOf(currentUserIndex);
+      if (userSplitIndex !== -1 && itemSplits[userSplitIndex]) {
+        owedByUser += parseFloat(itemSplits[userSplitIndex].amount) || 0;
       }
     });
+
+    const netBalance = paidByUser - owedByUser;
+    if (netBalance > 0) {
+      totalPaidByUser += netBalance;
+    } else if (netBalance < 0) {
+      totalOwedByUser += Math.abs(netBalance);
+    }
+
+    // --- Calculate net amounts for each participant in this expense ---
+    participants.forEach((participant, participantIndex) => {
+      if (participantIndex === currentUserIndex || !participant?.name) return;
+
+      // How much this participant paid
+      let participantPaid = 0;
+      if (paidByIndices.includes(participantIndex) && paidByIndices.length > 0) {
+        participantPaid = Math.abs(Number(expense.total) / paidByIndices.length);
+      }
+
+      // How much this participant owes
+      let participantOwed = 0;
+      items.forEach(item => {
+        const itemConsumers = Array.isArray(item.selectedConsumers) ? item.selectedConsumers : [];
+        const itemSplits = Array.isArray(item.splits) ? item.splits : [];
+        const splitIdx = itemConsumers.indexOf(participantIndex);
+        if (splitIdx !== -1 && itemSplits[splitIdx]) {
+          participantOwed += parseFloat(itemSplits[splitIdx].amount) || 0;
+        }
+      });
+
+      // Net for this participant: positive means they owe money, negative means they are owed money
+      const participantNet = participantOwed - participantPaid;
+
+      participantBalances[participant.name] = (participantBalances[participant.name] || 0) + participantNet
+    });
   });
-  
+
+  // Calculate totals from the participant balances
+  let totalOwed = 0;
+  let totalOwes = 0;
+  Object.values(participantBalances).forEach(balance => {
+    if (balance > 0) {
+      totalOwed += balance;
+    } else {
+      totalOwes += Math.abs(balance);
+    }
+  });
+
   return {
-    totalOwed,
-    totalOwes,
-    netBalance: totalOwed - totalOwes,
-    debtBreakdown
+    totalOwed: totalPaidByUser,
+    totalOwes: totalOwedByUser,
+    netBalance: totalPaidByUser - totalOwedByUser,
+    debtBreakdown: participantBalances,
   };
 };
+
+  
+ 
