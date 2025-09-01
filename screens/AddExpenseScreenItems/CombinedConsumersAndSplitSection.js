@@ -33,7 +33,7 @@ const CombinedConsumersAndSplitSection = ({
     }
   };
 
-  if (participants.length === 0 || total <= 0) {
+  if (participants.length === 0) {
     return null;
   }
 
@@ -118,7 +118,8 @@ const CombinedConsumersAndSplitSection = ({
                       placeholder="0.00"
                       style={[
                         styles.amountInput,
-                        !isSelected && styles.disabledAmountInput
+                        !isSelected && styles.disabledAmountInput,
+                        total === 0 && styles.placeholderAmountInput
                       ]}
                       editable={isSelected}
                       showCurrency={true}
@@ -249,6 +250,10 @@ const styles = StyleSheet.create({
   disabledAmountInput: {
     color: Colors.textSecondary,
     opacity: 0.6,
+  },
+  placeholderAmountInput: {
+    color: Colors.textSecondary,
+    opacity: 0.4,
   },
   lockButton: {
     width: 38,

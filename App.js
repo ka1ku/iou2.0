@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
-import { BlurView } from 'expo-blur';
+
 import LottieView from 'lottie-react-native';
 import { Colors, Typography, Spacing } from './design/tokens';
 
@@ -205,12 +205,10 @@ const MainTabs = () => {
         />
       </Tab.Navigator>
       
-      {/* Receipt Scanning Blur Overlay - covers entire screen including tab bar */}
+      {/* Receipt Scanning Background Overlay - covers entire screen including tab bar */}
       {isReceiptScanning && (
-        <BlurView 
-          tint="dark"
-          intensity={50}
-          style={[StyleSheet.absoluteFillObject, { zIndex: 1000 }]}
+        <View 
+          style={[StyleSheet.absoluteFillObject, { zIndex: 1000, backgroundColor: 'white' }]}
         />
       )}
       

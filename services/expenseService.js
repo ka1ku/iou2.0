@@ -40,18 +40,12 @@ export const createExpense = async (expenseData, userId) => {
   try {
     console.log('Creating expense with Firestore for user:', userId);
     
-    // Create a participants map for easy querying
+    // Create a simple participants map for efficient querying
     const participantsMap = {};
     if (expenseData.participants) {
-      expenseData.participants.forEach((participant, index) => {
+      expenseData.participants.forEach((participant) => {
         if (participant.userId) {
-          participantsMap[participant.userId] = {
-            index,
-            name: participant.name,
-            phoneNumber: participant.phoneNumber,
-            username: participant.username,
-            profilePhoto: participant.profilePhoto
-          };
+          participantsMap[participant.userId] = true;
         }
       });
     }
@@ -94,10 +88,11 @@ export const getUserExpenses = async (userId) => {
     const firestoreInstance = getFirestore(getApp());
     
     // Query expenses where user is a participant (including creator)
-    // We can't use orderBy with inequality on participantsMap, so we'll fetch and sort in memory
+    // Use Firestore's native ordering for better performance
     const expensesQuery = query(
       collection(firestoreInstance, 'expenses'),
-      where(`participantsMap.${userId}`, '!=', null)
+      where(`participantsMap.${userId}`, '==', true),
+      orderBy('createdAt', 'desc')
     );
     
     const snapshot = await getDocs(expensesQuery);
@@ -106,13 +101,6 @@ export const getUserExpenses = async (userId) => {
       id: doc.id,
       ...doc.data()
     }));
-    
-    // Sort by creation date in memory
-    expenses.sort((a, b) => {
-      const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt);
-      const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt);
-      return dateB - dateA;
-    });
     
     console.log('Fetched', expenses.length, 'expenses from Firestore where user is participant');
     return expenses;
@@ -131,48 +119,19 @@ export const updateExpense = async (expenseId, updateData, userId) => {
     
     if (updateData.participants) {
       const participantsMap = {};
-      updateData.participants.forEach((participant, index) => {
+      updateData.participants.forEach((participant) => {
         if (participant.userId) {
-          participantsMap[participant.userId] = {
-            index,
-            name: participant.name || '',
-            phoneNumber: participant.phoneNumber || null,
-            username: participant.username || null,
-            profilePhoto: participant.profilePhoto || null
-          };
+          participantsMap[participant.userId] = true;
         }
       });
       finalUpdateData.participantsMap = participantsMap;
     }
     
-    // Deep clean the update data to remove undefined, null, and invalid values
-    const deepCleanData = (obj) => {
-      if (obj === null || obj === undefined) return null;
-      if (typeof obj !== 'object') return obj;
-      
-      if (Array.isArray(obj)) {
-        return obj
-          .map(item => deepCleanData(item))
-          .filter(item => item !== null && item !== undefined);
-      }
-      
-      const cleaned = {};
-      for (const [key, value] of Object.entries(obj)) {
-        const cleanedValue = deepCleanData(value);
-        if (cleanedValue !== null && cleanedValue !== undefined) {
-          cleaned[key] = cleanedValue;
-        }
-      }
-      return cleaned;
-    };
-    
-    const cleanUpdateData = deepCleanData(finalUpdateData);
-    
-    console.log('Cleaned update data:', cleanUpdateData);
+
     
     const firestoreInstance = getFirestore(getApp());
     await updateDoc(doc(firestoreInstance, 'expenses', expenseId), {
-      ...cleanUpdateData,
+      ...finalUpdateData,
       updatedAt: serverTimestamp()
     });
     
@@ -408,13 +367,7 @@ export const joinExpenseByCode = async (code, userId, userPhone) => {
     
     // Update participantsMap
     const participantsMap = { ...(expenseData.participantsMap || {}) };
-    participantsMap[userId] = {
-      index: updatedParticipants.length - 1,
-      name: newParticipant.name,
-      phoneNumber: newParticipant.phoneNumber,
-      username: newParticipant.username,
-      profilePhoto: newParticipant.profilePhoto
-    };
+    participantsMap[userId] = true;
     
     await updateDoc(expenseDoc.ref, {
       participants: updatedParticipants,
@@ -441,17 +394,11 @@ export const updateExpenseParticipants = async (expenseId, participants, userId)
   try {
     console.log('Updating expense participants:', expenseId);
     
-    // Create participantsMap for easy querying
+    // Create simple participantsMap for efficient querying
     const participantsMap = {};
-    participants.forEach((participant, index) => {
+    participants.forEach((participant) => {
       if (participant.userId) {
-        participantsMap[participant.userId] = {
-          index,
-          name: participant.name,
-          phoneNumber: participant.phoneNumber,
-          username: participant.username,
-          profilePhoto: participant.profilePhoto
-        };
+        participantsMap[participant.userId] = true;
       }
     });
     

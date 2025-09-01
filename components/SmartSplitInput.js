@@ -61,22 +61,22 @@ const SmartSplitInput = ({
 
   // Initialize when component mounts or participants/total/selectedConsumers change
   useEffect(() => {
-    if (participants.length > 0 && total > 0) {
+    if (participants.length > 0) {
       initializeParticipants();
     }
   }, [participants.length, total, selectedConsumers]);
 
   // Initialize all participants with even split and unlocked
   const initializeParticipants = useCallback(() => {
-    if (participants.length === 0 || total <= 0) return;
+    if (participants.length === 0) return;
 
     // Determine which participants to include in the split
     const activeParticipants = selectedConsumers || participants.map((_, index) => index);
     
     if (activeParticipants.length === 0) return;
 
-    // Use smart rounding to handle infinite decimals
-    const roundedAmounts = smartRoundSplit(total, activeParticipants.length);
+    // Use smart rounding to handle infinite decimals, or default to 0 if total is 0
+    const roundedAmounts = total > 0 ? smartRoundSplit(total, activeParticipants.length) : new Array(activeParticipants.length).fill(0);
     const newStates = participants.map((_, index) => ({
       amount: activeParticipants.includes(index) ? roundedAmounts[activeParticipants.indexOf(index)] : 0,
       locked: false,
@@ -245,18 +245,29 @@ const SmartSplitInput = ({
   const allocatedAmount = participantStates.reduce((sum, state) => sum + (state.amount || 0), 0);
   const unallocatedAmount = Math.max(0, total - allocatedAmount);
 
-  if (participants.length === 0 || total <= 0) {
+  if (participants.length === 0) {
     return null;
   }
 
   return (
     <View style={[styles.container, style]}>
       {/* Header with unallocated info */}
-      {unallocatedAmount > 0 && (
+      {total > 0 && unallocatedAmount > 0 && (
         <View style={styles.header}>
           <View style={styles.unallocatedContainer}>
             <Text style={styles.unallocatedText}>
               Unallocated: ${unallocatedAmount.toFixed(2)}
+            </Text>
+          </View>
+        </View>
+      )}
+      
+      {/* Show message when total is 0 */}
+      {total === 0 && (
+        <View style={styles.header}>
+          <View style={styles.unallocatedContainer}>
+            <Text style={styles.unallocatedText}>
+              Enter a price to see split breakdown
             </Text>
           </View>
         </View>
@@ -307,7 +318,8 @@ const SmartSplitInput = ({
                 placeholder="0.00"
                 style={[
                   styles.amountInput,
-                  !state.locked && styles.autoAmountInput
+                  !state.locked && styles.autoAmountInput,
+                  total === 0 && styles.placeholderAmountInput
                 ]}
                 editable={true}
                 showCurrency={true}
@@ -391,6 +403,10 @@ const styles = StyleSheet.create({
   autoAmountInput: {
     color: Colors.textSecondary,
     fontStyle: 'italic',
+  },
+  placeholderAmountInput: {
+    color: Colors.textSecondary,
+    opacity: 0.6,
   },
 });
 
