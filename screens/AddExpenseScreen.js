@@ -51,7 +51,7 @@ import {
 } from './AddExpenseScreenFunctions';
 import useFormChangeTracker from '../hooks/useFormChangeTracker';
 import useNavigationWarning from '../hooks/useNavigationWarning';
-import SettlementProposalModal from '../components/SettlementProposalModal';
+
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan, previousScreen } = route.params || {};
@@ -85,9 +85,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]);
-  const [showSettlementModal, setShowSettlementModal] = useState(false);
-  const [pendingExpenseData, setPendingExpenseData] = useState(null);
-  const [pendingSettlement, setPendingSettlement] = useState(null);
+
   const friendSelectorRef = useRef(null);
 
   // Form change tracking for navigation warning
@@ -401,24 +399,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
     removeFee(index, fees, setFees);
   };
 
-  const handleShowSettlementProposal = (expenseData, settlement) => {
-    setPendingExpenseData(expenseData);
-    setPendingSettlement(settlement);
-    setShowSettlementModal(true);
-  };
-
-  const handleAcceptSettlement = async (settlements, settlementType) => {
-    await saveExpenseWithSettlement(
-      pendingExpenseData,
-      getCurrentUser(),
-      settlements,
-      settlementType,
-      navigation,
-      resetChanges
-    );
-  };
-
-  const handleSkipSettlement = async () => {
+  const handleSettleLater = async () => {
     await saveExpense(
       title,
       participants,
@@ -437,23 +418,20 @@ const AddExpenseScreen = ({ route, navigation }) => {
     );
   };
 
-  const handleSaveExpense = async () => {
-    saveExpense(
-      title,
-      participants,
-      items,
-      fees,
-      selectedPayers,
-      joinEnabled,
-      isEditing,
-      expense,
-      navigation,
-      setLoading,
-      calculateTotal,
-      'expense',
-      resetChanges,
-      handleShowSettlementProposal
-    );
+  const handleSettleNow = async () => {
+    // Navigate to SettleUp screen with the expense data
+    navigation.navigate('SettleUp', {
+      expense: {
+        title,
+        participants,
+        items,
+        fees,
+        selectedPayers,
+        joinEnabled,
+        ...(isEditing && expense ? { id: expense.id } : {})
+      },
+      participants
+    });
   };
 
   const handleRenderItem = (item, index) => {
@@ -769,16 +747,28 @@ const AddExpenseScreen = ({ route, navigation }) => {
         </ScrollView>
 
         <BlurView intensity={30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom}]}>
-          <TouchableOpacity
-            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-            onPress={handleSaveExpense}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>
-              {loading ? 'Saving...' : (isEditing ? 'Update Expense' : 'Save Expense')}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.settleLaterButton, loading && styles.buttonDisabled]}
+              onPress={handleSettleLater}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.settleLaterButtonText}>
+                {loading ? 'Saving...' : (isEditing ? 'Update Expense' : 'Settle Later')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.settleNowButton, loading && styles.buttonDisabled]}
+              onPress={handleSettleNow}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.settleNowButtonText}>
+              {loading ? 'Saving...' : (isEditing ? 'Settle' : 'Settle Now')}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </BlurView>
       </KeyboardAvoidingView>
 
@@ -790,18 +780,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         phoneNumber={inviteTarget?.phone || ''}
       />
 
-      {/* Settlement Proposal Modal */}
-      <SettlementProposalModal
-        visible={showSettlementModal}
-        onClose={() => {
-          setShowSettlementModal(false);
-          setPendingExpenseData(null);
-          setPendingSettlement(null);
-        }}
-        onAccept={handleAcceptSettlement}
-        expense={pendingExpenseData}
-        participants={participants}
-      />
+
 
       {/* All Participants Modal */}
       <Modal
@@ -1305,24 +1284,45 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
-  saveButton: {
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  settleLaterButton: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    ...Shadows.button,
+  },
+  settleNowButton: {
+    flex: 1,
     backgroundColor: Colors.accent,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     borderRadius: Radius.lg,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.1)',
+    ...Shadows.button,
   },
-  saveButtonDisabled: {
+  buttonDisabled: {
     backgroundColor: Colors.textSecondary,
   },
-  saveButtonText: {
+  settleLaterButtonText: {
+    ...Typography.title,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  settleNowButtonText: {
     ...Typography.title,
     color: Colors.surface,
     fontWeight: '600',

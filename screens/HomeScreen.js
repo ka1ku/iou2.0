@@ -604,6 +604,12 @@ Important guidelines:
     }
   };
 
+  const calculateExpenseTotal = (expense) => {
+    const itemsTotal = (expense.items || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const feesTotal = (expense.fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
+    return itemsTotal + feesTotal;
+  };
+
   const renderExpenseItem = ({ item }) => {
     const totalItems = item.items?.length || 0;
     const totalParticipants = item.participants?.length || 0;
@@ -628,7 +634,7 @@ Important guidelines:
         : [];
 
     // Calculate total amount to be paid by selected payers
-    const totalAmount = parseFloat(item.total) || 0;
+    const totalAmount = calculateExpenseTotal(item);
     
     // If there are multiple payers, split the total amount equally among them
     const splitAmount = paidByIndices.length > 0 ? totalAmount / paidByIndices.length : 0;
@@ -691,7 +697,7 @@ Important guidelines:
         </View>
         
         <View style={styles.expenseDetails}>
-          <Text style={styles.expenseTotal}>${item.total?.toFixed(2) || '0.00'}</Text>
+          <Text style={styles.expenseTotal}>${calculateExpenseTotal(item).toFixed(2)}</Text>
         </View>
 
         {/* Payment Summary */}

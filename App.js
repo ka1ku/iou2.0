@@ -29,6 +29,7 @@ import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AddExpenseScreen from './screens/AddExpenseScreen';
 import AddReceiptScreen from './screens/AddReceiptScreen';
+import SettleUpScreen from './screens/SettleUpScreen';
 import WelcomeScreen from './screens/auth/WelcomeScreen';
 import SignInScreen from './screens/auth/SignInScreen';
 import SignUpScreen from './screens/auth/SignUpScreen';
@@ -60,6 +61,13 @@ const HomeStack = () => {
       <Stack.Screen
         name="AddReceipt"
         component={AddReceiptScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="SettleUp"
+        component={SettleUpScreen}
         options={{
           headerShown: false,
         }}
@@ -167,8 +175,8 @@ const MainTabs = () => {
               height: 90,
               paddingBottom: 30,
               paddingTop: 10,
-              // Hide tab bar when on AddExpense or AddReceipt screens
-              display: (routeName === 'AddExpense' || routeName === 'AddReceipt') ? 'none' : 'flex',
+              // Hide tab bar when on AddExpense, AddReceipt, or SettleUp screens
+              display: (routeName === 'AddExpense' || routeName === 'AddReceipt' || routeName === 'SettleUp') ? 'none' : 'flex',
             },
             tabBarLabelStyle: {
               fontSize: 12,

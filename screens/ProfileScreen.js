@@ -143,14 +143,21 @@ const ProfileScreen = ({ navigation }) => {
     </View>
   );
 
+  const calculateExpenseTotal = (expense) => {
+    const itemsTotal = (expense.items || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const feesTotal = (expense.fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
+    return itemsTotal + feesTotal;
+  };
+
   const renderExpenseSummary = (expense) => {
     // Calculate user's net balance (owed or owes) for this expense
     // Find the current user's participant index (assume 0 if not found)
     const userIndex = 0;
     const payers = expense.selectedPayers;
+    const expenseTotal = calculateExpenseTotal(expense);
     let paidByUser
     if (payers.includes(userIndex)) {
-      paidByUser = Math.abs(expense.total / payers.length).toFixed(2)
+      paidByUser = Math.abs(expenseTotal / payers.length).toFixed(2)
     } else {
       paidByUser = 0
     }
@@ -189,7 +196,7 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.expenseSummaryTitle}>{expense.title}</Text>
           </View>
           <Text style={styles.expenseSummaryTotal}>
-            ${expense.total?.toFixed(2) || '0.00'}
+            ${calculateExpenseTotal(expense).toFixed(2)}
           </Text>
         </View>
         <View style={styles.expenseSummaryDetails}>

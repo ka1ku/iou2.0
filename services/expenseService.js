@@ -364,6 +364,13 @@ export const joinExpense = async ({ expenseId, token, code, phone, user }) => {
   }
 };
 
+// Helper function to calculate expense total from items and fees
+const calculateExpenseTotal = (expense) => {
+  const itemsTotal = (expense.items || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const feesTotal = (expense.fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
+  return itemsTotal + feesTotal;
+};
+
 // Helper function to calculate balances for profile screen
 export const calculateUserBalances = (expenses, userId) => {
   const currentUserIndex = 0; // By convention, user is always index 0
@@ -379,7 +386,7 @@ export const calculateUserBalances = (expenses, userId) => {
     // --- Calculate how much the current user paid for this expense ---
     let paidByUser = 0;
     if (paidByIndices.includes(currentUserIndex) && paidByIndices.length > 0) {
-      paidByUser = Math.abs(Number(expense.total) / paidByIndices.length);
+      paidByUser = Math.abs(calculateExpenseTotal(expense) / paidByIndices.length);
     }
 
     // --- Calculate how much the current user owes for this expense ---
@@ -408,7 +415,7 @@ export const calculateUserBalances = (expenses, userId) => {
       // How much this participant paid
       let participantPaid = 0;
       if (paidByIndices.includes(participantIndex) && paidByIndices.length > 0) {
-        participantPaid = Math.abs(Number(expense.total) / paidByIndices.length);
+        participantPaid = Math.abs(calculateExpenseTotal(expense) / paidByIndices.length);
       }
 
       // How much this participant owes
