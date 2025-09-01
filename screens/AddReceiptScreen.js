@@ -13,7 +13,6 @@ import {
   FlatList,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import Svg, { Polygon } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
@@ -21,21 +20,16 @@ import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 
 import FriendSelector from '../components/FriendSelector';
-import InviteFriendSheet from '../components/InviteFriendSheet';
 import PriceInput from '../components/PriceInput';
 import { PaidBySection } from './AddExpenseScreenItems';
 import {
   addItem,
   updateItem,
-  updateItemSplit,
   removeItem,
   addFee,
   updateFee,
   removeFee,
   saveExpense,
-  addParticipant,
-  updateParticipant,
-  removeParticipant
 } from './AddExpenseScreenFunctions';
 import useFormChangeTracker from '../hooks/useFormChangeTracker';
 import useNavigationWarning from '../hooks/useNavigationWarning';
@@ -58,9 +52,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
   const [title, setTitle] = useState('');
   const [participants, setParticipants] = useState([createMeParticipant()]);
   const [selectedFriends, setSelectedFriends] = useState([]);
-  const [inviteTarget, setInviteTarget] = useState(null); // { name, phone }
-
-  const [joinEnabled, setJoinEnabled] = useState(true);
   const [participantsExpanded, setParticipantsExpanded] = useState(false);
   const [items, setItems] = useState([{
     id: Date.now().toString(),
@@ -73,18 +64,12 @@ const AddReceiptScreen = ({ route, navigation }) => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
-
-  const [receiptWidth, setReceiptWidth] = useState(0);
   const [editingItem, setEditingItem] = useState(null); // {index, field, value}
   const [editingFee, setEditingFee] = useState(null); // {index, field, value}
-  const [showCustomTip, setShowCustomTip] = useState(false);
-  const [customTipValue, setCustomTipValue] = useState('');
-  const [customTipType, setCustomTipType] = useState('percentage'); // 'percentage' or 'amount'
   const friendSelectorRef = useRef(null);
   const scrollViewRef = useRef(null);
 
-  const ZIGZAG_HEIGHT = 14; // depth of teeth (bigger)
-  const ZIGZAG_STEP = 22;   // width of teeth (slightly wider)
+
 
   const itemsSubtotal = useMemo(
     () => items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0),
@@ -101,11 +86,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
     }
   };
 
-  const removeTip = () => setFees(prev => prev.filter(fee => fee.name !== 'Tip'));
-  const setTipAmount = (amount) => setFees(prev => [
-    ...prev.filter(fee => fee.name !== 'Tip'),
-    { id: Date.now().toString(), name: 'Tip', amount: Number(amount).toFixed(2) }
-  ]);
+
 
   const toggleParticipantsExpanded = () => setParticipantsExpanded(!participantsExpanded);
 
@@ -117,60 +98,11 @@ const AddReceiptScreen = ({ route, navigation }) => {
     }
   };
 
-  const startEditingItem = (index, field, value) => {
-    setEditingItem({ index, field, value });
-  };
 
-  const startEditingFee = (index, field, value) => {
-    setEditingFee({ index, field, value });
-  };
 
-  const handleCustomTipTypeChange = (type) => {
-    setCustomTipType(type);
-    setCustomTipValue('');
-    removeTip();
-  };
 
-  const handleTipPresetSelect = (tipAmount) => {
-    setShowCustomTip(false);
-    setCustomTipValue('');
-    removeTip();
-    setTipAmount(tipAmount);
-  };
 
-  const handleCustomTipToggle = () => {
-    setShowCustomTip(true);
-    removeTip();
-  };
 
-  const getZigzagPoints = (width, height, step, invert = false) => {
-    const points = [];
-    const totalSteps = Math.ceil(width / step);
-    if (!invert) {
-      // Top: downward triangles
-      points.push(`0,0`);
-      for (let i = 0; i < totalSteps; i++) {
-        const xMid = i * step + step / 2;
-        const xNext = (i + 1) * step;
-        points.push(`${xMid},${height}`);
-        points.push(`${xNext},0`);
-      }
-      points.push(`${width},0`);
-      points.push(`0,0`);
-    } else {
-      // Bottom: upward triangles
-      points.push(`0,${height}`);
-      for (let i = 0; i < totalSteps; i++) {
-        const xMid = i * step + step / 2;
-        const xNext = (i + 1) * step;
-        points.push(`${xMid},0`);
-        points.push(`${xNext},${height}`);
-      }
-      points.push(`${width},${height}`);
-      points.push(`0,${height}`);
-    }
-    return points.join(' ');
-  };
 
   // Form change tracking for navigation warning
   const { hasChanges, updateChangeStatus, resetChanges } = useFormChangeTracker(
@@ -179,8 +111,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
       participants: expense.participants || [],
       items: expense.items || [],
       fees: expense.fees || [],
-      selectedPayers: expense.selectedPayers || [0],
-      joinEnabled: expense.join?.enabled || true
+      selectedPayers: expense.selectedPayers || [0]
     } : null,
     isEditing
   );
@@ -342,9 +273,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
       if (expense.title) {
         setTitle(expense.title);
       }
-      if (expense.join) {
-        setJoinEnabled(expense.join.enabled);
-      }
       if (expense.fees) {
         setFees(expense.fees);
       }
@@ -388,17 +316,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
   
   // Removed auto-selection of all participants - users should manually select who consumed each item
   
-  const handleAddParticipant = () => {
-    addParticipant(participants, setParticipants);
-  };
 
-  const handleUpdateParticipant = (index, name) => {
-    updateParticipant(index, name, participants, setParticipants);
-  };
-
-  const handleRemoveParticipant = (index) => {
-    removeParticipant(index, participants, setParticipants, items, setItems);
-  };
 
   const handleAddItem = () => {
     addItem(items, setItems, participants);
@@ -408,9 +326,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
     updateItem(index, field, value, items, setItems, fees, setFees);
   };
 
-  const handleUpdateItemSplit = (itemIndex, participantIndex, amount) => {
-    updateItemSplit(itemIndex, participantIndex, amount, items, setItems);
-  };
+
 
   const handleRemoveItem = (index) => {
     removeItem(index, items, setItems, fees, setFees);
@@ -435,7 +351,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
       items,
       fees,
       selectedPayers,
-      joinEnabled,
+      true, // joinEnabled always true for receipts
       isEditing,
       expense,
       navigation,
@@ -469,7 +385,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
               items,
               fees,
               createdBy: getCurrentUser()?.uid,
-              join: { enabled: joinEnabled }
+              join: { enabled: true }
             }})}
           >
             <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
@@ -624,56 +540,22 @@ const AddReceiptScreen = ({ route, navigation }) => {
             />
           </View>
 
-          {/* Enhanced Receipt Breakdown */}
-            {(items.length > 0 || fees.length > 0) && (
-            <View
-              style={styles.receiptBreakdownContainer}
-              onLayout={(e) => setReceiptWidth(e.nativeEvent.layout.width)}
-            >
-              {receiptWidth > 0 && (
-                <>
-                  <Svg
-                    width={receiptWidth}
-                    height={ZIGZAG_HEIGHT}
-                    style={styles.zigzagTop}
-                  >
-                    <Polygon
-                      points={getZigzagPoints(receiptWidth, ZIGZAG_HEIGHT, ZIGZAG_STEP, false)}
-                      fill={Colors.background}
-                    />
-                  </Svg>
-                  <Svg
-                    width={receiptWidth}
-                    height={ZIGZAG_HEIGHT}
-                    style={styles.zigzagBottom}
-                  >
-                    <Polygon
-                      points={getZigzagPoints(receiptWidth, ZIGZAG_HEIGHT, ZIGZAG_STEP, true)}
-                      fill={Colors.background}
-                    />
-                  </Svg>
-                </>
-              )}
-
-              <View style={styles.receiptBreakdown}>
-                <View style={styles.receiptHeader}>
-                  <View style={styles.receiptHeaderLeft}>
-                  <Ionicons name="receipt-outline" size={20} color={Colors.accent} />
-                  <Text style={styles.receiptTitle}>Receipt Breakdown</Text>
-                  </View>
-                </View>
+          {/* Receipt Breakdown */}
+          {(items.length > 0 || fees.length > 0) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Receipt Breakdown</Text>
                 
-                {/* Items Section */}
-                {items.length > 0 && (
-                    <View style={styles.receiptSection}>
-                      <Text style={styles.receiptSectionTitle}>Items</Text>
+              {/* Items Section */}
+              {items.length > 0 && (
+                <View style={styles.itemsSection}>
+                  <Text style={styles.subsectionTitle}>Items</Text>
                       {items.map((item, index) => (
                     <View key={item.id} style={styles.receiptItemContainer}>
                       {/* Item Name and Amount Row */}
                       <View style={styles.receiptItemHeader}>
                         <TouchableOpacity 
                           style={styles.receiptItemNameContainer}
-                          onPress={() => startEditingItem(index, 'name', item.name || `Item ${index + 1}`)}
+                          onPress={() => setEditingItem({ index, field: 'name', value: item.name || `Item ${index + 1}` })}
                           activeOpacity={0.8}
                         >
                           {editingItem?.index === index && editingItem?.field === 'name' ? (
@@ -707,7 +589,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
                         
                         <TouchableOpacity 
                           style={styles.receiptItemAmountContainer}
-                          onPress={() => startEditingItem(index, 'amount', item.amount || '0.00')}
+                          onPress={() => setEditingItem({ index, field: 'amount', value: item.amount === null || item.amount === undefined ? 0 : item.amount })}
                           activeOpacity={0.8}
                         >
                           {editingItem?.index === index && editingItem?.field === 'amount' ? (
@@ -806,200 +688,54 @@ const AddReceiptScreen = ({ route, navigation }) => {
                       </View>
                     ))}
                    
-                   {/* Add Item Button */}
-                   <TouchableOpacity
-                     style={styles.addItemButtonBelow}
-                     onPress={handleAddItem}
-                     activeOpacity={0.8}
-                   >
-                     <Ionicons name="add" size={20} color={Colors.accent} />
-                     <Text style={styles.addItemButtonText}>Add Item</Text>
-                   </TouchableOpacity>
-                   
-                    <View style={styles.receiptSubtotal}>
-                     <Text style={styles.receiptSubtotalLabel}>Items Subtotal</Text>
-                      <Text style={styles.receiptSubtotalAmount}>
-                       ${itemsSubtotal.toFixed(2)}
-                      </Text>
-                    </View>
+                  {/* Add Item Button */}
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={handleAddItem}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add" size={20} color={Colors.accent} />
+                    <Text style={styles.addButtonText}>Add Item</Text>
+                  </TouchableOpacity>
+                  
+                  <View style={styles.subtotalRow}>
+                    <Text style={styles.subtotalLabel}>Items Subtotal</Text>
+                    <Text style={styles.subtotalAmount}>
+                      ${itemsSubtotal.toFixed(2)}
+                    </Text>
                   </View>
-                )}
+                </View>
+              )}
 
-               {/* If no items, show add item button */}
-               {items.length === 0 && (
-                 <View style={styles.receiptSection}>
-                   <Text style={styles.receiptSectionTitle}>Items</Text>
-                   <TouchableOpacity
-                     style={styles.addItemButtonBelow}
-                     onPress={handleAddItem}
-                     activeOpacity={0.8}
-                   >
-                     <Ionicons name="add" size={20} color={Colors.accent} />
-                     <Text style={styles.addItemButtonText}>Add First Item</Text>
-                   </TouchableOpacity>
-              </View>
-            )}
+              {/* If no items, show add item button */}
+              {items.length === 0 && (
+                <View style={styles.itemsSection}>
+                  <Text style={styles.subsectionTitle}>Items</Text>
+                  <TouchableOpacity
+                    style={styles.addButton}
+                    onPress={handleAddItem}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="add" size={20} color={Colors.accent} />
+                    <Text style={styles.addButtonText}>Add First Item</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
-                               {/* Tips & Fees Section */}
-               <View style={styles.receiptSection}>
-                 <View style={styles.tipsFeesHeader}>
-                   <Text style={styles.receiptSectionTitle}>Tips & Fees</Text>
-                   <Text style={styles.splitNote}>Split proportionally by item consumption</Text>
-                 </View>
-                 
-                                  {/* Tip Percentage Selector */}
-                 <View style={styles.tipSection}>
-                   <Text style={styles.tipLabel}>Tip</Text>
-                   <View style={styles.tipPercentageRow}>
-                     {[18, 20, 22].map((percentage) => {
-                       const tipAmount = (itemsSubtotal * percentage / 100);
-                       const isSelected = fees.some(fee => fee.name === 'Tip' && Math.abs(parseFloat(fee.amount) - tipAmount) < 0.01) && !showCustomTip;
-                       
-                       return (
-                         <TouchableOpacity
-                           key={percentage}
-                           style={[
-                             styles.tipPercentageButton,
-                             isSelected && styles.tipPercentageButtonSelected
-                           ]}
-                           onPress={() => handleTipPresetSelect(tipAmount)}
-                           activeOpacity={0.8}
-                         >
-                           <Text style={[
-                             styles.tipPercentageText,
-                             isSelected && styles.tipPercentageTextSelected
-                           ]}>
-                             {percentage}%
-                           </Text>
-                           <Text style={[
-                             styles.tipAmountText,
-                             isSelected && styles.tipAmountTextSelected
-                           ]}>
-                             ${tipAmount.toFixed(2)}
-                           </Text>
-                         </TouchableOpacity>
-                       );
-                     })}
-                     
-                     {/* Custom Tip Button */}
-                     <TouchableOpacity
-                       style={[
-                         styles.tipPercentageButton,
-                         showCustomTip && styles.tipPercentageButtonSelected
-                       ]}
-                       onPress={handleCustomTipToggle}
-                       activeOpacity={0.8}
-                     >
-                       <Text style={[
-                         styles.customButtonText,
-                         showCustomTip && styles.customButtonTextSelected
-                       ]}>
-                         Custom
-                       </Text>
-                     </TouchableOpacity>
-          </View>
+              {/* Tips & Fees Section */}
+              <View style={styles.feesSection}>
+                <Text style={styles.subsectionTitle}>Tips & Fees</Text>
 
-                   {/* Custom Tip Input - Only show when Custom is selected */}
-                   {showCustomTip && (
-                     <View style={styles.customTipSection}>
-                       <Text style={styles.customTipLabel}>Custom tip amount</Text>
-                       
-                       {/* Toggle between percentage and dollar amount */}
-                       <View style={styles.customTipToggle}>
-                         <TouchableOpacity
-                           style={[
-                             styles.customTipToggleButton,
-                             styles.customTipToggleLeft,
-                             customTipType === 'percentage' && styles.customTipToggleButtonActive
-                           ]}
-                           onPress={() => handleCustomTipTypeChange('percentage')}
-                           activeOpacity={0.8}
-                         >
-                           <Text style={[
-                             styles.customTipToggleText,
-                             customTipType === 'percentage' && styles.customTipToggleTextActive
-                           ]}>
-                             Percentage
-                </Text>
-                         </TouchableOpacity>
-                         
-                         <TouchableOpacity
-                           style={[
-                             styles.customTipToggleButton,
-                             styles.customTipToggleRight,
-                             customTipType === 'amount' && styles.customTipToggleButtonActive
-                           ]}
-                           onPress={() => handleCustomTipTypeChange('amount')}
-                           activeOpacity={0.8}
-                         >
-                           <Text style={[
-                             styles.customTipToggleText,
-                             customTipType === 'amount' && styles.customTipToggleTextActive
-                           ]}>
-                             Amount
-                           </Text>
-                         </TouchableOpacity>
-              </View>
-                       
-                       {/* Input field with prefix/suffix */}
-                       <View style={styles.customTipInputContainer}>
-                         {customTipType === 'amount' && (
-                           <Text style={styles.customTipPrefix}>$</Text>
-                         )}
-                         <TextInput
-                           style={[
-                             styles.customTipInput,
-                             customTipType === 'amount' && styles.customTipInputWithPrefix
-                           ]}
-                           placeholder={customTipType === 'percentage' ? '15' : '5.00'}
-                           placeholderTextColor={Colors.textSecondary}
-                           value={customTipValue}
-                           keyboardType="numeric"
-                           onChangeText={(text) => {
-                             setCustomTipValue(text);
-                             
-                             if (text.trim() === '') {
-                               // Remove custom tip if input is cleared
-                               removeTip();
-                               return;
-                             }
-                             
-                             let tipAmount = 0;
-                             const number = parseFloat(text);
-                             
-                             if (!isNaN(number) && number > 0) {
-                               if (customTipType === 'percentage') {
-                                 tipAmount = itemsSubtotal * number / 100;
-                               } else {
-                                 tipAmount = number;
-                               }
-                                
-                               // Remove existing tip and add new one
-                               setTipAmount(tipAmount);
-                             }
-                           }}
-                           autoFocus={true}
-                         />
-                         {customTipType === 'percentage' && (
-                           <Text style={styles.customTipSuffix}>%</Text>
-                         )}
-            </View>
-          </View>
-                   )}
-          </View>
-
-                 {/* Other Fees */}
-                 {fees.filter(fee => fee.name !== 'Tip').length > 0 && (
-                   <View style={styles.otherFeesSection}>
-                     <Text style={styles.otherFeesLabel}>Other Fees</Text>
-                     {fees.filter(fee => fee.name !== 'Tip').map((fee, feeIndex) => {
-                       const originalIndex = fees.indexOf(fee);
+                {/* Fees List */}
+                {fees.length > 0 && (
+                  <View>
+                    {fees.map((fee, originalIndex) => {
                        return (
                          <View key={fee.id} style={styles.feeRowContainer}>
                            {/* Fee Name */}
                            <TouchableOpacity
                              style={styles.feeNameContainer}
-                             onPress={() => startEditingFee(originalIndex, 'name', fee.name || `Fee ${feeIndex + 1}`)}
+                             onPress={() => setEditingFee({ index: originalIndex, field: 'name', value: fee.name || `Fee ${originalIndex + 1}` })}
                              activeOpacity={0.8}
                            >
                              {editingFee?.index === originalIndex && editingFee?.field === 'name' ? (
@@ -1022,7 +758,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
                                />
                              ) : (
                                <Text style={styles.feeName} numberOfLines={1}>
-                                 {fee.name || `Fee ${feeIndex + 1}`}
+                                 {fee.name || `Fee ${originalIndex + 1}`}
                                </Text>
                              )}
                            </TouchableOpacity>
@@ -1030,7 +766,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
                            {/* Fee Amount */}
                            <TouchableOpacity
                              style={styles.feeAmountContainer}
-                             onPress={() => startEditingFee(originalIndex, 'amount', fee.amount || '0.00')}
+                             onPress={() => setEditingFee({ index: originalIndex, field: 'amount', value: fee.amount === null || fee.amount === undefined ? 0 : fee.amount })}
                              activeOpacity={0.8}
                            >
                              {editingFee?.index === originalIndex && editingFee?.field === 'amount' ? (
@@ -1062,41 +798,40 @@ const AddReceiptScreen = ({ route, navigation }) => {
                            </TouchableOpacity>
                          </View>
                        );
-                     })}
-                   </View>
-                 )}
-                 
-                 {/* Add Other Fee Button */}
+                    })}
+                  </View>
+                )}
+                
+                {/* Add Fee Button */}
                 <TouchableOpacity
-                   style={styles.addFeeButtonBelow}
-                   onPress={handleAddFee}
+                  style={styles.addButton}
+                  onPress={handleAddFee}
                   activeOpacity={0.8}
                 >
-                   <Ionicons name="add" size={16} color={Colors.accent} />
-                   <Text style={styles.addFeeButtonText}>Add Fee</Text>
+                  <Ionicons name="add" size={16} color={Colors.accent} />
+                  <Text style={styles.addButtonText}>Add Fee</Text>
                 </TouchableOpacity>
-                 
-                 {/* Fees Subtotal */}
-                 {fees.length > 0 && (
-                   <View style={styles.receiptSubtotal}>
-                     <Text style={styles.receiptSubtotalLabel}>Tips & Fees</Text>
-                     <Text style={styles.receiptSubtotalAmount}>
-                       ${feesSubtotal.toFixed(2)}
-                     </Text>
-                   </View>
-            )}
-          </View>
-
-                {/* Total Amount */}
-                <View style={styles.receiptTotalRow}>
-                  <Text style={styles.receiptTotalLabel}>Total Amount</Text>
-                  <Text style={styles.receiptTotalAmount}>
-                    ${calculateTotal().toFixed(2)}
-                  </Text>
-            </View>
+                
+                {/* Fees Subtotal */}
+                {fees.length > 0 && (
+                  <View style={styles.subtotalRow}>
+                    <Text style={styles.subtotalLabel}>Tips & Fees</Text>
+                    <Text style={styles.subtotalAmount}>
+                      ${feesSubtotal.toFixed(2)}
+                    </Text>
+                  </View>
+                )}
               </View>
-          </View>
-        )}
+
+              {/* Total Amount */}
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total Amount</Text>
+                <Text style={styles.totalAmount}>
+                  ${calculateTotal().toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          )}
 
 
         </ScrollView>
@@ -1114,14 +849,6 @@ const AddReceiptScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </BlurView>
       </KeyboardAvoidingView>
-
-      <InviteFriendSheet
-        visible={!!inviteTarget}
-        onClose={() => setInviteTarget(null)}
-        expenseId={expense?.id}
-        placeholderName={inviteTarget?.name || ''}
-        phoneNumber={inviteTarget?.phone || ''}
-      />
 
 
 
@@ -1219,65 +946,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.divider,
     fontSize: 16,
   },
-  // Receipt Breakdown Styles
-  receiptBreakdownContainer: {
-    marginVertical: Spacing.lg,
-    backgroundColor: Colors.surfaceLight,
-    overflow: 'hidden',
-    paddingTop: Spacing.lg, // more space below top zigzag
-    paddingBottom: Spacing.lg, // more space above bottom zigzag
-    // Receipt paper effect
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  zigzagTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  zigzagBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  receiptBreakdown: {
-    paddingTop: Spacing.lg,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.surfaceLight,
-  },
-  receiptHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  // Section styles
+  itemsSection: {
     marginBottom: Spacing.md,
   },
-  receiptHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  receiptHeaderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  receiptTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    marginLeft: Spacing.sm,
-    fontWeight: '600',
-  },
-  receiptSection: {
+  feesSection: {
     marginBottom: Spacing.md,
   },
-  receiptSectionTitle: {
+  subsectionTitle: {
     ...Typography.label,
     color: Colors.textSecondary,
     marginBottom: Spacing.sm,
@@ -1286,37 +962,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontSize: 12,
   },
-  receiptRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingVertical: Spacing.xs,
-    minHeight: 24,
-    paddingHorizontal: Spacing.xs,
-  },
-  receiptItemLeft: {
-    flex: 1,
-    marginRight: Spacing.md,
-  },
-  receiptItemName: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    lineHeight: 20,
-    marginBottom: Spacing.xs,
-  },
-  receiptItemAmount: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontWeight: '500',
-    textAlign: 'right',
-    minWidth: 60,
-  },
-  receiptItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  // New inline assignment styles
+
+  // Item container styles
   receiptItemContainer: {
     backgroundColor: Colors.white,
     borderRadius: Radius.sm,
@@ -1360,6 +1007,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-end',
   },
+  receiptItemName: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    lineHeight: 20,
+  },
+  receiptItemAmount: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+    textAlign: 'right',
+  },
   receiptItemNameInput: {
     ...Typography.body,
     color: Colors.textPrimary,
@@ -1367,7 +1025,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     padding: Spacing.sm,
     borderWidth: 2,
-    borderColor: Colors.accent, // Gold color
+    borderColor: Colors.accent,
     minHeight: 40,
   },
   receiptItemAmountInput: {
@@ -1462,8 +1120,8 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 4,
   },
-  // Add Item Button Styles
-  addItemButtonBelow: {
+  // Add Button Styles
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1475,209 +1133,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent,
     borderStyle: 'dashed',
   },
-  addItemButtonText: {
+  addButtonText: {
     ...Typography.body,
     color: Colors.accent,
     marginLeft: Spacing.sm,
     fontWeight: '500',
   },
-  // Tips & Fees Header Styles
-  tipsFeesHeader: {
-    marginBottom: Spacing.md,
-  },
-  splitNote: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: Spacing.xs,
-  },
-  // Tip Section Styles
-  tipSection: {
-    marginBottom: Spacing.lg,
-  },
-  tipLabel: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tipPercentageRow: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
-  },
-  tipPercentageButton: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    minHeight: 52,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  tipPercentageButtonSelected: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  tipPercentageText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  tipPercentageTextSelected: {
-    color: Colors.white,
-  },
-  tipAmountText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 2,
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  tipAmountTextSelected: {
-    color: Colors.white,
-    opacity: 0.9,
-  },
-  // Custom Button Text Styles
-  customButtonText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  customButtonTextSelected: {
-    color: Colors.white,
-  },
-  customTipSection: {
-    marginTop: Spacing.sm,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  customTipLabel: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    fontWeight: '500',
-    textAlign: 'center',
-    fontSize: 12,
-  },
-  // Toggle Styles
-  customTipToggle: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.sm,
-    padding: 1,
-    marginBottom: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  customTipToggleButton: {
-    flex: 1,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 28,
-  },
-  customTipToggleLeft: {
-    borderTopLeftRadius: Radius.sm,
-    borderBottomLeftRadius: Radius.sm,
-  },
-  customTipToggleRight: {
-    borderTopRightRadius: Radius.sm,
-    borderBottomRightRadius: Radius.sm,
-  },
-  customTipToggleButtonActive: {
-    backgroundColor: Colors.accent,
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  customTipToggleText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-    fontSize: 12,
-  },
-  customTipToggleTextActive: {
-    color: Colors.white,
-  },
-  // Input Container Styles
-  customTipInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    minHeight: 32,
-    maxWidth: 100,
-    alignSelf: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
-  },
-  customTipPrefix: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    paddingLeft: Spacing.xs,
-  },
-  customTipSuffix: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    paddingRight: Spacing.xs,
-  },
-  customTipInput: {
-    ...Typography.body,
-    flex: 1,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.xs,
-    color: Colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'left',
-    minWidth: 35,
-  },
-  customTipInputWithPrefix: {
-    paddingLeft: 2,
-  },
-  // Other Fees Styles
-  otherFeesSection: {
-    marginBottom: Spacing.lg,
-  },
-  otherFeesLabel: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    fontWeight: '500',
-  },
+
   feeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1738,23 +1200,7 @@ const styles = StyleSheet.create({
   removeFeeButton: {
     padding: Spacing.xs,
   },
-  addFeeButtonBelow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    borderStyle: 'dashed',
-  },
-  addFeeButtonText: {
-    ...Typography.caption,
-    color: Colors.accent,
-    marginLeft: Spacing.xs,
-    fontWeight: '500',
-  },
+
   // Item Assignment Styles
   itemAssignmentContainer: {
     flexDirection: 'row',
@@ -1799,7 +1245,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '600',
   },
-  receiptSubtotal: {
+  subtotalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1808,17 +1254,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
   },
-  receiptSubtotalLabel: {
+  subtotalLabel: {
     ...Typography.body,
     color: Colors.textSecondary,
     fontWeight: '500',
   },
-  receiptSubtotalAmount: {
+  subtotalAmount: {
     ...Typography.body,
     color: Colors.textPrimary,
     fontWeight: '600',
   },
-  receiptTotalRow: {
+  totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1827,12 +1273,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 2,
     borderTopColor: Colors.accent,
   },
-  receiptTotalLabel: {
+  totalLabel: {
     ...Typography.h3,
     color: Colors.textPrimary,
     fontWeight: '600',
   },
-  receiptTotalAmount: {
+  totalAmount: {
     ...Typography.h2,
     color: Colors.accent,
     fontWeight: '700',

@@ -38,8 +38,28 @@ const saveExpense = async (
     return;
   }
 
-  if (items.some(item => !item.name.trim() || !item.amount || parseFloat(item.amount) <= 0)) {
-    Alert.alert('Error', 'Please fill in all item details with valid amounts');
+  // Check for items with missing names or invalid amounts
+  const invalidItems = items.filter(item => {
+    // Item name is required
+    if (!item.name || !item.name.trim()) {
+      return true;
+    }
+    
+    // Amount can be 0, null, or undefined (which will be treated as 0)
+    // But if amount is provided as a string or number, it must be valid
+    if (item.amount !== null && item.amount !== undefined && item.amount !== '') {
+      const numAmount = parseFloat(item.amount);
+      // Invalid if not a number or negative
+      if (isNaN(numAmount) || numAmount < 0) {
+        return true;
+      }
+    }
+    
+    return false;
+  });
+  
+  if (invalidItems.length > 0) {
+    Alert.alert('Error', 'Please fill in all item names and ensure amounts are valid (0 or positive numbers)');
     return;
   }
 
@@ -101,14 +121,14 @@ const saveExpense = async (
       items: items.map(item => ({
         id: item.id,
         name: item.name.trim(),
-        amount: parseFloat(item.amount) || 0,
+        amount: item.amount === null || item.amount === undefined || item.amount === '' ? 0 : parseFloat(item.amount) || 0,
         selectedConsumers: item.selectedConsumers || [0],
         splits: item.splits || []
       })),
       fees: fees.map(fee => ({
         id: fee.id,
         name: fee.name.trim(),
-        amount: parseFloat(fee.amount) || 0,
+        amount: fee.amount === null || fee.amount === undefined || fee.amount === '' ? 0 : parseFloat(fee.amount) || 0,
         type: fee.type || 'fixed',
         percentage: fee.percentage || null,
         splitType: fee.splitType || 'proportional',
