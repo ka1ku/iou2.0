@@ -717,14 +717,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
         </BlurView>
       </KeyboardAvoidingView>
 
-      <InviteFriendSheet
-        visible={!!inviteTarget}
-        onClose={() => setInviteTarget(null)}
-        expenseId={expense?.id}
-        placeholderName={inviteTarget?.name || ''}
-        phoneNumber={inviteTarget?.phone || ''}
-      />
-
 
 
       {/* All Participants Modal */}
