@@ -21,6 +21,7 @@ import { getUserProfile } from '../services/friendService';
 
 import FriendSelector from '../components/FriendSelector';
 import DeleteButton from '../components/DeleteButton';
+import SettlementProposalModal from '../components/SettlementProposalModal';
 import { ItemHeader, PriceInputSection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection, CombinedConsumersAndSplitSection } from './AddExpenseScreenItems';
 import {
   updateItem,
@@ -65,6 +66,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
+  const [showSettlementModal, setShowSettlementModal] = useState(false);
+  const [savedExpense, setSavedExpense] = useState(null);
   const friendSelectorRef = useRef(null);
   const scrollViewRef = useRef(null);
 
@@ -276,7 +279,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
 
 
-  const handleSettleNow = async () => {
+  const handleSaveExpense = async () => {
     saveExpense(
       title,
       participants,
@@ -294,22 +297,69 @@ const AddExpenseScreen = ({ route, navigation }) => {
     );
   };
 
+  const handleSettleNow = async () => {
+    // Create expense data and show settlement modal
+    setLoading(true);
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        throw new Error('No user signed in');
+      }
+
+      // Get the current user's profile from Firestore
+      const userProfile = await getUserProfile(currentUser.uid);
+      if (!userProfile) {
+        throw new Error('Failed to get user profile');
+      }
+
+      // Map participants with proper user data
+      const mappedParticipants = participants.map((p, index) => {
+        if (p.name === 'Me') {
+          return {
+            ...p,
+            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+            userId: p.userId || currentUser.uid,
+            placeholder: false,
+            phoneNumber: userProfile.phoneNumber,
+            username: userProfile.username,
+            profilePhoto: userProfile.profilePhoto
+          };
+        }
+        return p;
+      });
+
+      // Create expense data for settlement modal
+      const expenseData = {
+        id: expense?.id, // Include ID if editing
+        title: title.trim() || 'Expense',
+        participants: mappedParticipants,
+        items: items.map(item => ({
+          ...item,
+          amount: parseFloat(item.amount) || 0
+        })),
+        fees: fees.map(fee => ({
+          ...fee,
+          amount: parseFloat(fee.amount) || 0
+        })),
+        selectedPayers,
+        join: { enabled: joinEnabled },
+        createdBy: currentUser.uid,
+        createdAt: expense?.createdAt || new Date(),
+        total: calculateTotal()
+      };
+
+      setSavedExpense(expenseData);
+      setShowSettlementModal(true);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error preparing expense for settlement:', error);
+      setLoading(false);
+    }
+  };
+
   const handleSettleLater = async () => {
-    saveExpense(
-      title,
-      participants,
-      items,
-      fees,
-      selectedPayers,
-      joinEnabled,
-      isEditing,
-      expense,
-      navigation,
-      setLoading,
-      calculateTotal,
-      'expense',
-      resetChanges
-    );
+    // Just save the expense without showing settlement modal
+    await handleSaveExpense();
   };
 
   const handleRenderItem = (item, index) => {
@@ -548,7 +598,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         </ScrollView>
 
         <BlurView intensity={30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom}]}>
-          <View style={styles.footerButtonsContainer}>
+          <View style={styles.footerButtons}>
             <TouchableOpacity
               style={[styles.settleLaterButton, loading && styles.buttonDisabled]}
               onPress={handleSettleLater}
@@ -556,7 +606,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               activeOpacity={0.8}
             >
               <Text style={styles.settleLaterButtonText}>
-                {loading ? 'Saving...' : 'Settle Later'}
+                {loading ? 'Saving...' : (isEditing ? 'Update Expense' : 'Settle Later')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -566,7 +616,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               activeOpacity={0.8}
             >
               <Text style={styles.settleNowButtonText}>
-                {loading ? 'Saving...' : 'Settle Now'}
+                {loading ? 'Saving...' : (isEditing ? 'Update & Settle' : 'Settle Now')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -733,6 +783,56 @@ const AddExpenseScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
+      {/* Settlement Proposal Modal */}
+      <SettlementProposalModal
+        visible={showSettlementModal}
+        onClose={() => setShowSettlementModal(false)}
+        onAccept={async (settlements, settlementType) => {
+          // Handle settlement acceptance and save expense
+          try {
+            setLoading(true);
+            const currentUser = getCurrentUser();
+            if (!currentUser) {
+              throw new Error('No user signed in');
+            }
+
+            // Add settlement information to the expense data
+            const expenseWithSettlement = {
+              ...savedExpense,
+              settlement: {
+                type: settlementType,
+                settlements: settlements,
+                createdAt: new Date().toISOString(),
+                accepted: true
+              }
+            };
+
+            // Save the expense with settlement data
+            await saveExpense(
+              expenseWithSettlement.title,
+              expenseWithSettlement.participants,
+              expenseWithSettlement.items,
+              expenseWithSettlement.fees,
+              expenseWithSettlement.selectedPayers,
+              expenseWithSettlement.join.enabled,
+              isEditing, // Use the isEditing flag
+              expense, // Pass the original expense if editing
+              navigation,
+              setLoading,
+              calculateTotal,
+              'expense',
+              resetChanges
+            );
+
+            setShowSettlementModal(false);
+            setSavedExpense(null);
+          } catch (error) {
+            console.error('Error saving expense with settlement:', error);
+            setLoading(false);
+          }
+        }}
+        expense={savedExpense}
+      />
 
     </View>
   );
@@ -868,7 +968,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
-  footerButtonsContainer: {
+  footerButtons: {
     flexDirection: 'row',
     gap: Spacing.md,
   },
@@ -879,7 +979,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.accent,
+    borderColor: Colors.divider,
+  },
+  settleLaterButtonText: {
+    ...Typography.title,
+    color: Colors.textPrimary,
+    fontWeight: '600',
   },
   settleNowButton: {
     flex: 1,
@@ -890,18 +995,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.1)',
   },
-  buttonDisabled: {
-    backgroundColor: Colors.textSecondary,
-  },
-  settleLaterButtonText: {
-    ...Typography.title,
-    color: Colors.accent,
-    fontWeight: '600',
-  },
   settleNowButtonText: {
     ...Typography.title,
     color: Colors.surface,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    backgroundColor: Colors.textSecondary,
   },
 
   participantsGridContainer: {
