@@ -79,16 +79,12 @@ const useFormChangeTracker = (initialData, isEditing = false) => {
     const initialDataString = JSON.stringify(normalizedInitial);
     
     const hasChanged = currentDataString !== initialDataString;
-    console.log('Checking changes:', hasChanged);
-    console.log('Current (normalized):', currentDataString);
-    console.log('Initial (normalized):', initialDataString);
     return hasChanged;
   };
 
   // Update the hasChanges state
   const updateChangeStatus = (currentData) => {
     const changed = checkForChanges(currentData);
-    console.log('changed', changed);
     setHasChanges(changed);
   };
 

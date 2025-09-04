@@ -7,6 +7,8 @@ import {
   ScrollView,
   Dimensions,
   Image,
+  Linking,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -14,6 +16,7 @@ import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { calculateSettlement, calculateHubSettlement, getSettlementSummary } from '../utils/settlementCalculator';
 import { getCurrentUser } from '../services/authService';
+import { getUserProfile } from '../services/friendService';
 import { saveExpenseWithSettlement } from './AddExpenseScreenFunctions';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -33,7 +36,6 @@ const SettleUpScreen = ({ route, navigation }) => {
   }
 
   const name = participants[0].name;
-
   // Calculate settlements based on current type
   const optimalSettlement = calculateSettlement(expense);
   console.log('optimalSettlement', optimalSettlement);
@@ -66,20 +68,77 @@ const SettleUpScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleSkip = async () => {
-    // Navigate back to home screen without saving settlement
-    navigation.getParent()?.getParent()?.reset({
-      index: 0,
-      routes: [
-        {
-          name: 'Home',
-          state: {
-            routes: [{ name: 'HomeMain' }],
-            index: 0,
-          },
-        },
-      ],
-    });
+
+
+  const handleMakePayment = async (settlement) => {
+    try {
+      // Find the participant who should receive the payment
+      const recipientParticipant = participants.find(p => p.name === settlement.to);
+      
+      if (!recipientParticipant?.userId) {
+        Alert.alert('Error', 'Unable to find recipient information');
+        return;
+      }
+
+      // Get the recipient's profile to get their Venmo username
+      const recipientProfile = await getUserProfile(recipientParticipant.userId);
+      
+      if (!recipientProfile?.venmoUsername) {
+        Alert.alert('Error', 'Recipient does not have a Venmo username set up');
+        return;
+      }
+      console.log('recipientProfile', recipientProfile);
+      // Create Venmo deeplink
+      const amount = settlement.amount.toFixed(2);
+      const note = `IOU Payment - ${expense.title || 'Expense'}`;
+      const deeplink = `venmo://paycharge?txn=pay&recipients=${recipientProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
+      // Open the deeplink
+      const supported = await Linking.canOpenURL(deeplink);
+      if (supported) {
+        await Linking.openURL(deeplink);
+      } else {
+        Alert.alert('Error', 'Venmo is not installed on this device');
+      }
+    } catch (error) {
+      console.error('Error opening Venmo deeplink:', error);
+      Alert.alert('Error', 'Failed to open Venmo. Please try again.');
+    }
+  };
+
+  const handleRequestPayment = async (settlement) => {
+    try {
+      // Find the participant who should make the payment
+      const payerParticipant = participants.find(p => p.name === settlement.from);
+      
+      if (!payerParticipant?.userId) {
+        Alert.alert('Error', 'Unable to find payer information');
+        return;
+      }
+
+      // Get the payer's profile to get their Venmo username
+      const payerProfile = await getUserProfile(payerParticipant.userId);
+      
+      if (!payerProfile?.username) {
+        Alert.alert('Error', 'Payer does not have a Venmo username set up');
+        return;
+      }
+
+      // Create Venmo deeplink for requesting payment
+      const amount = settlement.amount.toFixed(2);
+      const note = `IOU Payment Request - ${expense.title || 'Expense'}`;
+      const deeplink = `venmo://paycharge?txn=charge&recipients=${payerProfile.username}&amount=${amount}&note=${encodeURIComponent(note)}`;
+
+      // Open the deeplink
+      const supported = await Linking.canOpenURL(deeplink);
+      if (supported) {
+        await Linking.openURL(deeplink);
+      } else {
+        Alert.alert('Error', 'Venmo is not installed on this device');
+      }
+    } catch (error) {
+      console.error('Error opening Venmo deeplink:', error);
+      Alert.alert('Error', 'Failed to open Venmo. Please try again.');
+    }
   };
 
   const renderSettlementItem = (settlement, index) => {
@@ -210,6 +269,43 @@ const SettleUpScreen = ({ route, navigation }) => {
             )}
           </View>
         </View>
+        
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
+        <TouchableOpacity
+            style={styles.markAsPaidButton}
+            onPress={() => {
+              // TODO: Add mark as paid functionality
+              console.log('Mark as paid for:', settlement);
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.requestPaymentButton}
+            onPress={() => {
+              if (settlement.from === name) {
+                handleMakePayment(settlement);
+              } else if (settlement.to === name) {
+                handleRequestPayment(settlement);
+              } else {
+                // TODO: Add send reminder functionality
+                console.log('Send reminder for:', settlement);
+              }
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.requestPaymentButtonText}>
+              {settlement.from === name 
+                ? 'Make Payment' 
+                : settlement.to === name 
+                ? 'Request Payment' 
+                : 'Send Reminder'
+              }
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -328,26 +424,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Footer */}
-      <BlurView intensity={30} tint="light" style={styles.footer}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={handleSkip}
-          disabled={loading}
-        >
-          <Text style={styles.cancelButtonText}>Skip</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.acceptButton, loading && styles.acceptButtonDisabled]}
-          onPress={handleAccept}
-          disabled={loading}
-        >
-          <Ionicons name="checkmark" size={20} color={Colors.surface} />
-          <Text style={styles.acceptButtonText}>
-            {loading ? 'Saving...' : 'Accept Proposal'}
-          </Text>
-        </TouchableOpacity>
-      </BlurView>
+      
     </View>
   );
 };
@@ -604,43 +681,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: Spacing.sm,
   },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    flexDirection: 'row',
-    padding: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    gap: Spacing.md,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    backgroundColor: Colors.surface,
-  },
-  cancelButtonText: {
-    ...Typography.title,
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  acceptButton: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
-    gap: Spacing.sm,
-    ...Shadows.button,
-  },
+
   acceptButtonDisabled: {
     backgroundColor: Colors.textSecondary,
   },
@@ -648,6 +689,41 @@ const styles = StyleSheet.create({
     ...Typography.title,
     color: Colors.surface,
     fontWeight: '600',
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    marginTop: Spacing.md,
+    gap: Spacing.sm,
+  },
+  requestPaymentButton: {
+    flex: 1,
+    backgroundColor: Colors.accent,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    ...Shadows.button,
+  },
+  requestPaymentButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  markAsPaidButton: {
+    flex: 1,
+    backgroundColor: Colors.success,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    ...Shadows.button,
+  },
+  markAsPaidButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
   },
 });
 

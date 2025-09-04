@@ -21,7 +21,6 @@ import { getUserProfile } from '../services/friendService';
 
 import FriendSelector from '../components/FriendSelector';
 import DeleteButton from '../components/DeleteButton';
-import SettlementProposalModal from '../components/SettlementProposalModal';
 import { ItemHeader, PriceInputSection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection, CombinedConsumersAndSplitSection } from './AddExpenseScreenItems';
 import {
   updateItem,
@@ -66,8 +65,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const [fees, setFees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
-  const [showSettlementModal, setShowSettlementModal] = useState(false);
-  const [savedExpense, setSavedExpense] = useState(null);
   const friendSelectorRef = useRef(null);
   const scrollViewRef = useRef(null);
 
@@ -297,63 +294,147 @@ const AddExpenseScreen = ({ route, navigation }) => {
     );
   };
 
-  const handleSettleNow = async () => {
-    // Create expense data and show settlement modal
-    setLoading(true);
-    try {
-      const currentUser = getCurrentUser();
-      if (!currentUser) {
-        throw new Error('No user signed in');
-      }
+  const saveExpenseSilently = async () => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      throw new Error('No user signed in');
+    }
 
-      // Get the current user's profile from Firestore
-      const userProfile = await getUserProfile(currentUser.uid);
-      if (!userProfile) {
-        throw new Error('Failed to get user profile');
-      }
+    // Get user profile for proper participant mapping
+    const userProfile = await getUserProfile(currentUser.uid);
+    if (!userProfile) {
+      throw new Error('Failed to get user profile');
+    }
 
-      // Map participants with proper user data
-      const mappedParticipants = participants.map((p, index) => {
-        if (p.name === 'Me') {
-          return {
-            ...p,
-            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-            userId: p.userId || currentUser.uid,
-            placeholder: false,
-            phoneNumber: userProfile.phoneNumber,
-            username: userProfile.username,
-            profilePhoto: userProfile.profilePhoto
-          };
+    // Map participants with proper user data
+    const mappedParticipants = participants.map((p, index) => {
+      if (p.name === 'Me') {
+        return {
+          ...p,
+          name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+          userId: p.userId || currentUser.uid,
+          placeholder: false,
+          phoneNumber: userProfile.phoneNumber,
+          username: userProfile.username,
+          profilePhoto: userProfile.profilePhoto
+        };
+      }
+      return p;
+    });
+
+    // Create expense data
+    const expenseData = {
+      title: title.trim() || 'Expense',
+      total: calculateTotal(),
+      expenseType: 'expense', // Mark as manual expense
+      participants: mappedParticipants,
+      items: items.map(item => ({
+        id: item.id || null,
+        name: item.name.trim(),
+        amount: item.amount === null || item.amount === undefined || item.amount === '' ? 0 : parseFloat(item.amount) || 0,
+        selectedConsumers: item.selectedConsumers || [0],
+        splits: item.splits || [],
+        selectedPayers: item.selectedPayers || [0]
+      })),
+      fees: fees.map(fee => ({
+        id: fee.id || null,
+        name: fee.name.trim(),
+        amount: fee.amount === null || fee.amount === undefined || fee.amount === '' ? 0 : parseFloat(fee.amount) || 0,
+        type: fee.type || 'fixed',
+        percentage: fee.percentage || null,
+        splitType: fee.splitType || 'proportional',
+        splits: fee.splits || []
+      })),
+      selectedPayers: selectedPayers || [0],
+      join: {
+        enabled: joinEnabled || false,
+      },
+      createdBy: currentUser.uid,
+      createdAt: expense?.createdAt || new Date()
+    };
+
+    // Only include ID if editing
+    if (isEditing && expense?.id) {
+      expenseData.id = expense.id;
+    }
+
+    console.log('Expense data being saved:', JSON.stringify(expenseData, null, 2));
+
+    // Check for undefined values that would cause Firestore errors
+    const checkForUndefined = (obj, path = '') => {
+      for (const key in obj) {
+        const currentPath = path ? `${path}.${key}` : key;
+        if (obj[key] === undefined) {
+          console.error(`Found undefined value at path: ${currentPath}`);
+          return false;
         }
-        return p;
+        if (typeof obj[key] === 'object' && obj[key] !== null) {
+          if (!checkForUndefined(obj[key], currentPath)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+
+    if (!checkForUndefined(expenseData)) {
+      throw new Error('Expense data contains undefined values');
+    }
+
+    // Import the service functions
+    const { createExpense, updateExpense, updateExpenseParticipants } = await import('../services/expenseService');
+
+    // Save the expense
+    if (isEditing) {
+      // Update participants separately to ensure participantsMap is updated
+      await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
+      
+      // Update other fields
+      const { participants, ...otherFields } = expenseData;
+      await updateExpense(expense.id, otherFields, currentUser.uid);
+    } else {
+      await createExpense(expenseData, currentUser.uid);
+    }
+
+    // Reset change tracker after successful save
+    if (resetChanges) {
+      resetChanges();
+    }
+  };
+
+  const handleSettleNow = async () => {
+    try {
+      // Save the expense silently first
+      await saveExpenseSilently();
+      
+      // Then navigate to SettleUp screen
+      navigation.navigate('SettleUp', {
+        expense: {
+          title,
+          participants,
+          items,
+          fees,
+          selectedPayers,
+          joinEnabled,
+          ...(isEditing && expense ? { id: expense.id } : {})
+        },
+        participants
       });
-
-      // Create expense data for settlement modal
-      const expenseData = {
-        id: expense?.id, // Include ID if editing
-        title: title.trim() || 'Expense',
-        participants: mappedParticipants,
-        items: items.map(item => ({
-          ...item,
-          amount: parseFloat(item.amount) || 0
-        })),
-        fees: fees.map(fee => ({
-          ...fee,
-          amount: parseFloat(fee.amount) || 0
-        })),
-        selectedPayers,
-        join: { enabled: joinEnabled },
-        createdBy: currentUser.uid,
-        createdAt: expense?.createdAt || new Date(),
-        total: calculateTotal()
-      };
-
-      setSavedExpense(expenseData);
-      setShowSettlementModal(true);
-      setLoading(false);
     } catch (error) {
-      console.error('Error preparing expense for settlement:', error);
-      setLoading(false);
+      console.error('Error saving expense before settlement:', error);
+      // Still navigate even if save fails
+      navigation.navigate('SettleUp', {
+        expense: {
+          title,
+          participants,
+          items,
+          fees,
+          selectedPayers,
+          joinEnabled,
+          ...(isEditing && expense ? { id: expense.id } : {})
+        },
+        participants
+      });
     }
   };
 
@@ -616,7 +697,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
               activeOpacity={0.8}
             >
               <Text style={styles.settleNowButtonText}>
-                {loading ? 'Saving...' : (isEditing ? 'Update & Settle' : 'Settle Now')}
+                {isEditing ? 'Update & Settle' : 'Settle Now'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -783,56 +864,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      {/* Settlement Proposal Modal */}
-      <SettlementProposalModal
-        visible={showSettlementModal}
-        onClose={() => setShowSettlementModal(false)}
-        onAccept={async (settlements, settlementType) => {
-          // Handle settlement acceptance and save expense
-          try {
-            setLoading(true);
-            const currentUser = getCurrentUser();
-            if (!currentUser) {
-              throw new Error('No user signed in');
-            }
-
-            // Add settlement information to the expense data
-            const expenseWithSettlement = {
-              ...savedExpense,
-              settlement: {
-                type: settlementType,
-                settlements: settlements,
-                createdAt: new Date().toISOString(),
-                accepted: true
-              }
-            };
-
-            // Save the expense with settlement data
-            await saveExpense(
-              expenseWithSettlement.title,
-              expenseWithSettlement.participants,
-              expenseWithSettlement.items,
-              expenseWithSettlement.fees,
-              expenseWithSettlement.selectedPayers,
-              expenseWithSettlement.join.enabled,
-              isEditing, // Use the isEditing flag
-              expense, // Pass the original expense if editing
-              navigation,
-              setLoading,
-              calculateTotal,
-              'expense',
-              resetChanges
-            );
-
-            setShowSettlementModal(false);
-            setSavedExpense(null);
-          } catch (error) {
-            console.error('Error saving expense with settlement:', error);
-            setLoading(false);
-          }
-        }}
-        expense={savedExpense}
-      />
 
     </View>
   );

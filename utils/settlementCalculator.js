@@ -7,22 +7,21 @@
 
 /**
  * Calculate settlement proposal for an expense
- * @param {Object} expense - The expense object with participants, items, and selectedPayers
+ * @param {Object} expense - The expense object with participants, items (each with selectedPayers), and fees
  * @returns {Object} Settlement proposal with payers, receivers, and amounts
  */
 export const calculateSettlement = (expense) => {
-  const { participants, items, fees, selectedPayers } = expense;
-  if (!participants || !items || !selectedPayers) {
+  const { participants, items, fees } = expense;
+  if (!participants || !items) {
     return { settlements: [], totalSettlements: 0 };
   }
-
   // Calculate total by summing items and fees
   const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
   const feesTotal = (fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
   const total = itemsTotal + feesTotal;
 
   // Calculate net balance for each participant
-  const balances = calculateParticipantBalances(participants, items, fees, selectedPayers, total);
+  const balances = calculateParticipantBalances(participants, items, fees, total);
   console.log('balances', balances);
   const settlements = generateSettlementProposal(balances);
   return {
@@ -36,24 +35,32 @@ export const calculateSettlement = (expense) => {
 /**
  * Calculate the net balance for each participant
  * @param {Array} participants - Array of participant objects
- * @param {Array} items - Array of item objects with splits
+ * @param {Array} items - Array of item objects with splits and selectedPayers
  * @param {Array} fees - Array of fee objects with splits
- * @param {Array} selectedPayers - Array of participant indices who paid
  * @param {number} total - Total expense amount
  * @returns {Array} Array of balance objects { name, balance, index }
  */
-const calculateParticipantBalances = (participants, items, fees, selectedPayers, total) => {
+const calculateParticipantBalances = (participants, items, fees, total) => {
   const balances = participants.map((participant, index) => ({
     name: participant.name,
     index,
     balance: 0 // Positive = owes money, Negative = is owed money
   }));
-  console.log('selectedPayers', selectedPayers);
   console.log('total', total);
-  // Calculate how much each participant paid, under the assumption of even split
-  const amountPerPayer = total / selectedPayers.length;
-  selectedPayers.forEach(payerIndex => {
-    balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
+  
+  // Calculate how much each participant paid for each item
+  items.forEach(item => {
+    const itemAmount = parseFloat(item.amount) || 0;
+    const itemPayers = item.selectedPayers || [];
+    
+    if (itemPayers.length > 0) {
+      const amountPerPayer = itemAmount / itemPayers.length;
+      itemPayers.forEach(payerIndex => {
+        if (payerIndex < balances.length) {
+          balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
+        }
+      });
+    }
   });
   console.log('balances after payers', balances);
   
