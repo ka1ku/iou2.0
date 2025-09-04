@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  RefreshControl
+  RefreshControl,
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -29,13 +30,18 @@ const ProfileScreen = ({ navigation }) => {
   });
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [expensesLoading, setExpensesLoading] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [displayedExpensesCount, setDisplayedExpensesCount] = useState(3);
+  const [showAllExpenses, setShowAllExpenses] = useState(false);
 
   useEffect(() => {
     // Listen for auth state changes and load data when user is available
     const unsubscribe = onAuthStateChange((user) => {
       setUser(user);
       if (user) {
-        loadData();
+        loadCriticalData();
       } else {
         setLoading(false);
       }
@@ -47,14 +53,63 @@ const ProfileScreen = ({ navigation }) => {
   // Refresh profile data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
-      loadData();
-    }, [])
+      if (user) {
+        loadCriticalData();
+      }
+    }, [user])
   );
 
-  const loadData = async () => {
+  // Load only critical data first (profile info)
+  const loadCriticalData = useCallback(async () => {
     try {
       const currentUser = getCurrentUser();
       if (currentUser) {
+        setProfileLoading(true);
+        // Load user profile from Firestore first
+        await loadUserProfile(currentUser.uid);
+        
+        // Load expenses and balances in background after profile is loaded
+        setTimeout(() => {
+          loadExpensesData(currentUser.uid);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error loading critical data:', error);
+      Alert.alert('Error', 'Failed to load profile data: ' + error.message);
+    } finally {
+      setLoading(false);
+      setProfileLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Load expenses and calculate balances separately
+  const loadExpensesData = useCallback(async (userId) => {
+    try {
+      setExpensesLoading(true);
+      const userExpenses = await getUserExpenses(userId);
+      setExpenses(userExpenses);
+      console.log('userExpenses', userExpenses);
+      
+      // Calculate balances with a slight delay to not block UI
+      setTimeout(() => {
+        const calculatedBalances = calculateUserBalances(userExpenses, userId);
+        setBalances(calculatedBalances);
+        setStatsLoading(false);
+      }, 50);
+    } catch (error) {
+      console.error('Error loading expenses data:', error);
+    } finally {
+      setExpensesLoading(false);
+    }
+  }, []);
+
+  // Full data refresh (for pull-to-refresh)
+  const loadData = useCallback(async () => {
+    try {
+      const currentUser = getCurrentUser();
+      if (currentUser) {
+        setStatsLoading(true);
         // Load user profile from Firestore
         await loadUserProfile(currentUser.uid);
         
@@ -64,8 +119,6 @@ const ProfileScreen = ({ navigation }) => {
         console.log('userExpenses', userExpenses);
         // Calculate balances
         const calculatedBalances = calculateUserBalances(userExpenses, currentUser.uid);
-        console.log('calculatedBalances', calculatedBalances)
-        // console.log('calculatedBalances', calculatedBalances)
         setBalances(calculatedBalances);
       }
     } catch (error) {
@@ -74,8 +127,9 @@ const ProfileScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setStatsLoading(false);
     }
-  };
+  }, []);
 
   const loadUserProfile = async (userId) => {
     try {
@@ -109,7 +163,7 @@ const ProfileScreen = ({ navigation }) => {
     loadData();
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = useCallback(() => {
     Alert.alert(
       'Sign Out',
       'Are you sure you want to sign out?',
@@ -129,9 +183,35 @@ const ProfileScreen = ({ navigation }) => {
         }
       ]
     );
-  };
+  }, []);
 
-  const renderBalanceCard = (title, amount, color, icon) => (
+  // Memoize expensive calculations
+  const memoizedBalances = useMemo(() => balances, [balances]);
+  
+  const memoizedExpenseStats = useMemo(() => {
+    return {
+      totalExpenses: expenses.length,
+      totalItems: expenses.reduce((sum, exp) => sum + (exp.items?.length || 0), 0),
+      totalAmount: expenses.reduce((sum, exp) => sum + (exp.total || 0), 0)
+    };
+  }, [expenses]);
+
+  const recentExpenses = useMemo(() => {
+    return showAllExpenses ? expenses : expenses.slice(0, displayedExpensesCount);
+  }, [expenses, displayedExpensesCount, showAllExpenses]);
+
+  const loadMoreExpenses = useCallback(() => {
+    if (displayedExpensesCount < expenses.length) {
+      setDisplayedExpensesCount(prev => Math.min(prev + 5, expenses.length));
+    }
+  }, [displayedExpensesCount, expenses.length]);
+
+  const toggleShowAllExpenses = useCallback(() => {
+    setShowAllExpenses(prev => !prev);
+    setDisplayedExpensesCount(showAllExpenses ? 3 : expenses.length);
+  }, [showAllExpenses, expenses.length]);
+
+  const renderBalanceCard = useCallback((title, amount, color, icon) => (
     <View style={[styles.balanceCard, { borderLeftColor: color }]}>
       <View style={styles.balanceHeader}>
         <Ionicons name={icon} size={24} color={color} />
@@ -141,45 +221,33 @@ const ProfileScreen = ({ navigation }) => {
         ${Math.abs(amount).toFixed(2)}
       </Text>
     </View>
-  );
+  ), []);
 
-  const calculateExpenseTotal = (expense) => {
-    const itemsTotal = (expense.items || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const feesTotal = (expense.fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-    return itemsTotal + feesTotal;
-  };
+  // Skeleton loading component
+  const SkeletonLoader = memo(() => (
+    <View style={styles.skeletonLoader}>
+      <ActivityIndicator size="small" color={Colors.accent} />
+      <Text style={styles.skeletonText}>Loading...</Text>
+    </View>
+  ));
 
-  const renderExpenseSummary = (expense) => {
-    // Calculate user's net balance (owed or owes) for this expense
-    // Find the current user's participant index (assume 0 if not found)
-    const userIndex = 0;
-    const payers = expense.selectedPayers;
-    const expenseTotal = calculateExpenseTotal(expense);
-    let paidByUser
-    if (payers.includes(userIndex)) {
-      paidByUser = Math.abs(expenseTotal / payers.length).toFixed(2)
-    } else {
-      paidByUser = 0
-    }
-    let owedByUser = 0;
-
-    // For each item, determine how much the user owes
+  const renderExpenseSummary = useCallback((expense) => {
+    // Calculate user's share of this expense
+    let userTotal = 0;
     expense.items?.forEach(item => {
-      // Find the split for the current user, if any
-      const itemConsumers = item.selectedConsumers;
-      if (itemConsumers.includes(userIndex)) {
-        owedByUser += item.splits[userIndex].amount
-    }})
-
-    // Net: positive means user is owed, negative means user owes
-    let userTotal = paidByUser - owedByUser;
+      if (item.splitType === 'even') {
+        userTotal += item.amount / expense.participants.length;
+      } else if (item.splitType === 'custom') {
+        const userSplit = item.splits?.find(split => split.participantIndex === 0);
+        userTotal += userSplit?.amount || 0;
+      }
+    });
 
     // Determine if this is a receipt or individual expense
     const isReceipt = expense.expenseType === 'receipt';
     const screenName = isReceipt ? 'AddReceipt' : 'AddExpense';
     const iconName = isReceipt ? 'receipt-outline' : 'card-outline';
     const typeLabel = isReceipt ? 'Receipt' : 'Expense';
-    
 
     return (
       <TouchableOpacity
@@ -196,14 +264,14 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.expenseSummaryTitle}>{expense.title}</Text>
           </View>
           <Text style={styles.expenseSummaryTotal}>
-            ${calculateExpenseTotal(expense).toFixed(2)}
+            ${expense.total?.toFixed(2) || '0.00'}
           </Text>
         </View>
         <View style={styles.expenseSummaryDetails}>
           <View style={styles.expenseSummaryLeft}>
             <Text style={styles.expenseTypeLabel}>{typeLabel}</Text>
             <Text style={styles.expenseSummaryInfo}>
-              {userTotal < 0 ? 'You owe' : 'You are owed'} ${Math.abs(userTotal).toFixed(2)}
+              Your share: ${userTotal.toFixed(2)}
             </Text>
           </View>
           <Text style={styles.expenseSummaryInfo}>
@@ -212,7 +280,7 @@ const ProfileScreen = ({ navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [navigation]);
 
   if (loading) {
     return (
@@ -257,66 +325,76 @@ const ProfileScreen = ({ navigation }) => {
       <View style={styles.balancesSection}>
         <Text style={styles.sectionTitle}>Your Balance Summary</Text>
         
-        <View style={styles.netBalanceCard}>
-          <Text style={styles.netBalanceLabel}>Net Balance</Text>
-          <Text style={[
-            styles.netBalanceAmount,
-            { color: balances.netBalance >= 0 ? '#4CAF50' : '#ff4444' }
-          ]}>
-            {balances.netBalance >= 0 ? '+' : ''}${balances.netBalance.toFixed(2)}
-          </Text>
-          <Text style={styles.netBalanceSubtext}>
-            {balances.netBalance >= 0 
-              ? 'You are owed money overall' 
-              : 'You owe money overall'
-            }
-          </Text>
-        </View>
+        {expensesLoading ? (
+          <SkeletonLoader />
+        ) : (
+          <>
+            <View style={styles.netBalanceCard}>
+              <Text style={styles.netBalanceLabel}>Net Balance</Text>
+              <Text style={[
+                styles.netBalanceAmount,
+                { color: memoizedBalances.netBalance >= 0 ? '#4CAF50' : '#ff4444' }
+              ]}>
+                {memoizedBalances.netBalance >= 0 ? '+' : ''}${memoizedBalances.netBalance.toFixed(2)}
+              </Text>
+              <Text style={styles.netBalanceSubtext}>
+                {memoizedBalances.netBalance >= 0 
+                  ? 'You are owed money overall' 
+                  : 'You owe money overall'
+                }
+              </Text>
+            </View>
 
-        <View style={styles.balanceCardsContainer}>
-          {renderBalanceCard(
-            'Total Owed to You',
-            balances.totalOwed,
-            '#4CAF50',
-            'arrow-down-circle'
-          )}
-          {renderBalanceCard(
-            'Total You Owe',
-            balances.totalOwes,
-            '#ff4444',
-            'arrow-up-circle'
-          )}
-        </View>
+            <View style={styles.balanceCardsContainer}>
+              {renderBalanceCard(
+                'Total Owed to You',
+                memoizedBalances.totalOwed,
+                '#4CAF50',
+                'arrow-down-circle'
+              )}
+              {renderBalanceCard(
+                'Total You Owe',
+                memoizedBalances.totalOwes,
+                '#ff4444',
+                'arrow-up-circle'
+              )}
+            </View>
+          </>
+        )}
       </View>
 
       {/* Debt Breakdown Section */}
-      {balances.debtBreakdown && Object.keys(balances.debtBreakdown).length > 0 && (
+      {memoizedBalances.debtBreakdown && Object.keys(memoizedBalances.debtBreakdown).length > 0 && (
         <View style={styles.debtSection}>
           <Text style={styles.sectionTitle}>Debt Breakdown</Text>
-          <View style={styles.debtList}>
-            {Object.entries(balances.debtBreakdown).map(([participantName, amount]) => {
-              if (Math.abs(amount) < 0.01) return null; // Skip negligible amounts
-              
-              return (
-                <View key={participantName} style={styles.debtItem}>
-                  <View style={styles.debtHeader}>
-                    <Ionicons 
-                      name={amount > 0 ? "arrow-down-circle" : "arrow-up-circle"} 
-                      size={20} 
-                      color={amount > 0 ? "#4CAF50" : "#ff4444"} 
-                    />
-                    <Text style={styles.debtParticipant}>{participantName}</Text>
+          {expensesLoading ? (
+            <SkeletonLoader />
+          ) : (
+            <View style={styles.debtList}>
+              {Object.entries(memoizedBalances.debtBreakdown).map(([participantName, amount]) => {
+                if (Math.abs(amount) < 0.01) return null; // Skip negligible amounts
+                
+                return (
+                  <View key={participantName} style={styles.debtItem}>
+                    <View style={styles.debtHeader}>
+                      <Ionicons 
+                        name={amount > 0 ? "arrow-down-circle" : "arrow-up-circle"} 
+                        size={20} 
+                        color={amount > 0 ? "#4CAF50" : "#ff4444"} 
+                      />
+                      <Text style={styles.debtParticipant}>{participantName}</Text>
+                    </View>
+                    <Text style={[
+                      styles.debtAmount,
+                      { color: amount > 0 ? "#4CAF50" : "#ff4444" }
+                    ]}>
+                      {amount > 0 ? 'owes you' : 'you owe'} ${Math.abs(amount).toFixed(2)}
+                    </Text>
                   </View>
-                  <Text style={[
-                    styles.debtAmount,
-                    { color: amount > 0 ? "#4CAF50" : "#ff4444" }
-                  ]}>
-                    {amount > 0 ? 'owes you' : 'you owe'} ${Math.abs(amount).toFixed(2)}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
 
@@ -324,26 +402,34 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
             <Text style={styles.sectionTitle}>Recent Expenses</Text>
-            <View style={styles.expenseTypeCounts}>
-              <View style={styles.typeCount}>
-                <Ionicons name="card-outline" size={16} color={Colors.accent} />
-                <Text style={styles.typeCountText}>
-                  {expenses.filter(exp => exp.expenseType !== 'receipt').length}
-                </Text>
+            {!expensesLoading && (
+              <View style={styles.expenseTypeCounts}>
+                <View style={styles.typeCount}>
+                  <Ionicons name="card-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.typeCountText}>
+                    {expenses.filter(exp => exp.expenseType !== 'receipt').length}
+                  </Text>
+                </View>
+                <View style={styles.typeCount}>
+                  <Ionicons name="receipt-outline" size={16} color={Colors.accent} />
+                  <Text style={styles.typeCountText}>
+                    {expenses.filter(exp => exp.expenseType === 'receipt').length}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.typeCount}>
-                <Ionicons name="receipt-outline" size={16} color={Colors.accent} />
-                <Text style={styles.typeCountText}>
-                  {expenses.filter(exp => exp.expenseType === 'receipt').length}
-                </Text>
-              </View>
-            </View>
+            )}
           </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.viewAllButton}>
-            <Text style={styles.viewAllLink}>View All</Text>
-          </TouchableOpacity>
+          {expenses.length > 3 && (
+            <TouchableOpacity onPress={toggleShowAllExpenses} style={styles.viewAllButton}>
+              <Text style={styles.viewAllLink}>
+                {showAllExpenses ? 'Show Less' : 'View All'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
-        {expenses.length === 0 ? (
+        {expensesLoading ? (
+          <SkeletonLoader />
+        ) : expenses.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={48} color="#ccc" />
             <Text style={styles.emptyStateText}>No expenses yet</Text>
@@ -357,32 +443,46 @@ const ProfileScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.expensesList}>
-            {expenses.slice(0, 3).map(renderExpenseSummary)}
-          </View>
+          <>
+            <View style={styles.expensesList}>
+              {recentExpenses.map(renderExpenseSummary)}
+            </View>
+            {!showAllExpenses && displayedExpensesCount < expenses.length && (
+              <TouchableOpacity onPress={loadMoreExpenses} style={styles.loadMoreButton}>
+                <Text style={styles.loadMoreText}>
+                  Load More ({expenses.length - displayedExpensesCount} remaining)
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={Colors.accent} />
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
 
       <View style={styles.statsSection}>
         <Text style={styles.sectionTitle}>Statistics</Text>
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{expenses.length}</Text>
-            <Text style={styles.statLabel}>Total Expenses</Text>
+        {statsLoading ? (
+          <SkeletonLoader />
+        ) : (
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{memoizedExpenseStats.totalExpenses}</Text>
+              <Text style={styles.statLabel}>Total Expenses</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>
+                {memoizedExpenseStats.totalItems}
+              </Text>
+              <Text style={styles.statLabel}>Total Items</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>
+                ${memoizedExpenseStats.totalAmount.toFixed(0)}
+              </Text>
+              <Text style={styles.statLabel}>Total Amount</Text>
+            </View>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              {expenses.reduce((sum, exp) => sum + (exp.items?.length || 0), 0)}
-            </Text>
-            <Text style={styles.statLabel}>Total Items</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
-              ${expenses.reduce((sum, exp) => sum + (exp.total || 0), 0).toFixed(0)}
-            </Text>
-            <Text style={styles.statLabel}>Total Amount</Text>
-          </View>
-        </View>
+        )}
       </View>
 
       {/* Settings Section */}
@@ -715,9 +815,39 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.md,
   },
+  skeletonLoader: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: Spacing.md,
+    ...Shadows.card,
+  },
+  skeletonText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginTop: Spacing.sm,
+  },
+  loadMoreButton: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    ...Shadows.card,
+  },
+  loadMoreText: {
+    ...Typography.body,
+    color: Colors.accent,
+    marginRight: Spacing.sm,
+    fontFamily: Typography.familyMedium,
+  },
 });
 
 export default ProfileScreen;
-
-
-

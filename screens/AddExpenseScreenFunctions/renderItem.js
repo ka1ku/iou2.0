@@ -1,6 +1,9 @@
 import React from 'react';
 import { View } from 'react-native';
 import { ItemHeader, PriceInputSection, CombinedConsumersAndSplitSection } from '../AddExpenseScreenItems';
+import Card from '../../components/Card';
+import DeleteButton from '../../components/DeleteButton';
+import { Colors } from '../../design/tokens';
 
 const renderItem = (
   item,
@@ -12,23 +15,52 @@ const renderItem = (
   fees,
   setFees,
   styles,
-  selectedPayers,
-  onPayersChange,
-  isReceipt = false
+  isReceipt = false,
+  selectedPayers = [0]
 ) => {
   return (
-    <View key={item.id} style={styles.itemCard}>
-      <ItemHeader
-        itemName={item.name}
-        onNameChange={(text) => updateItem(index, 'name', text, items, setItems, fees, setFees)}
-      />
+    <Card 
+      key={item.id} 
+      variant="default" 
+      padding="large" 
+      margin="none"
+      style={{ 
+        marginBottom: 16,
+        backgroundColor: Colors.surfaceLight
+      }}
+    >
+      {/* Item Header with Delete Button */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <View style={{ flex: 1 }}>
+          <ItemHeader
+            itemName={item.name}
+            onNameChange={(text) => updateItem(index, 'name', text, items, setItems, fees, setFees)}
+          />
+        </View>
+        {items.length > 1 && (
+          <DeleteButton
+            onPress={() => {
+              const updated = [...items];
+              updated.splice(index, 1);
+              setItems(updated);
+            }}
+            size="small"
+            variant="subtle"
+            style={{ marginLeft: 8 }}
+          />
+        )}
+      </View>
 
       <PriceInputSection
         amount={item.amount}
         onAmountChange={(amount) => updateItem(index, 'amount', amount, items, setItems, fees, setFees)}
         participants={participants}
-        selectedPayers={isReceipt ? undefined : selectedPayers}
-        onPayersChange={isReceipt ? undefined : onPayersChange}
+        selectedPayers={item.selectedPayers || selectedPayers}
+        onPayersChange={(newPayers) => {
+          const updated = [...items];
+          updated[index].selectedPayers = newPayers;
+          setItems(updated);
+        }}
       />
 
       <CombinedConsumersAndSplitSection
@@ -81,7 +113,7 @@ const renderItem = (
         }}
         isReceipt={isReceipt}
       />
-    </View>
+    </Card>
   );
 };
 
