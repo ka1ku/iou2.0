@@ -424,7 +424,20 @@ const SettleUpScreen = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
-      
+      {/* Return Home Button */}
+      <View style={styles.bottomButtonContainer}>
+        <TouchableOpacity
+          style={styles.returnHomeButton}
+          onPress={() => {
+            // Navigate back to home screen
+            navigation.navigate('HomeMain');
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="home" size={20} color={Colors.surface} style={styles.returnHomeIcon} />
+          <Text style={styles.returnHomeButtonText}>Return Home</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -724,6 +737,37 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     fontWeight: '600',
     fontSize: 14,
+  },
+  bottomButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.lg,
+    paddingBottom: Spacing.xl + 20, // Extra padding for safe area
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  returnHomeButton: {
+    backgroundColor: Colors.accent,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+  },
+  returnHomeIcon: {
+    marginRight: Spacing.sm,
+  },
+  returnHomeButtonText: {
+    ...Typography.title,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 16,
   },
 });
 
