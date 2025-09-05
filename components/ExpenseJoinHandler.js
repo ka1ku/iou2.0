@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import deepLinkService from '../services/deepLinkService';
 import { getCurrentUser } from '../services/authService';
-import { joinExpense } from '../services/expenseService';
+import { joinExpenseByCode } from '../services/expenseService';
 
 const ExpenseJoinHandler = () => {
   const [joinData, setJoinData] = useState(null);
@@ -59,13 +59,7 @@ const ExpenseJoinHandler = () => {
         Alert.alert('Sign in required', 'Please sign in to join this expense.');
         return;
       }
-      await joinExpense({ 
-        expenseId: joinData.expenseId, 
-        token: joinData.token, 
-        code: joinData.code, 
-        phone: joinData.phone, // Pass phone number for identification
-        user 
-      });
+      await joinExpenseByCode(joinData.code, user.uid, user.phoneNumber);
       Alert.alert('Joined', 'You have joined the expense.');
       setShowModal(false);
       setJoinData(null);
