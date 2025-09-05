@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
 import ProfilePicture from '../components/VenmoProfilePicture';
 import { getCurrentUser } from '../services/authService';
-import { getUserExpenses, calculateUserBalances } from '../services/expenseService';
+import { getUserExpenses } from '../services/expenseService';
 
 const FriendProfileScreen = ({ route, navigation }) => {
   const { friend } = route.params;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Image,
   FlatList,
   TextInput,
+  Alert,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,83 +19,232 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
+import { createExpense, updateExpense, updateExpenseParticipants } from '../services/expenseService';
+import { 
+  FriendSelector, 
+  Card, 
+  DeleteButton, 
+  PriceInput, 
+  SmartSplitInput,
+  ExpenseHeader,
+  ExpenseFooter,
+  ParticipantsGrid
+} from '../components';
+import { useFocusEffect } from '@react-navigation/native';
 
-import FriendSelector from '../components/FriendSelector';
-import DeleteButton from '../components/DeleteButton';
-import { ItemHeader, PriceInputSection, SmartSplitSection, SplitTypeSection, WhoConsumedSection, FeeHeader, FeeTypeSection, PercentageSection, FixedAmountSection, TotalFeeSection, CombinedConsumersAndSplitSection } from './AddExpenseScreenItems';
-import {
-  updateItem,
-  updateItemSplit,
-  saveExpense,
-  renderItem,
-  removeParticipant,
-  addItem
-} from './AddExpenseScreenFunctions';
-import useFormChangeTracker from '../hooks/useFormChangeTracker';
-import useNavigationWarning from '../hooks/useNavigationWarning';
+// Unified expense state management
+const useExpenseState = (initialExpense = null) => {
+  const currentUserId = getCurrentUser()?.uid;
+  
+  const createMeParticipant = useCallback(() => ({
+    name: 'Me',
+    id: 'me-participant',
+    userId: currentUserId,
+    placeholder: false,
+    phoneNumber: null,
+    username: null,
+    profilePhoto: null
+  }), [currentUserId]);
+
+  const [state, setState] = useState(() => ({
+    title: initialExpense?.title || '',
+    participants: [{
+      name: 'Me',
+      id: 'me-participant',
+      userId: currentUserId,
+      placeholder: false,
+      phoneNumber: null,
+      username: null,
+      profilePhoto: null
+    }],
+    selectedFriends: [],
+    items: [{
+      id: Date.now().toString(),
+      name: '',
+      amount: 0,
+      selectedConsumers: [0],
+      splits: [],
+      selectedPayers: [0]
+    }],
+    fees: [],
+    selectedPayers: [0],
+    joinEnabled: initialExpense?.join?.enabled ?? true,
+    loading: false,
+    showAllParticipants: false,
+    showGroupMembers: false,
+    participantsExpanded: false
+  }));
+
+  const updateState = useCallback((updates) => {
+    setState(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const total = useMemo(() => {
+    const itemsTotal = state.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const feesTotal = state.fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
+    return itemsTotal + feesTotal;
+  }, [state.items, state.fees]);
+
+  return { state, updateState, total, createMeParticipant };
+};
 
 const AddExpenseScreen = ({ route, navigation }) => {
   const { expense } = route.params || {};
   const isEditing = !!expense;
   const insets = useSafeAreaInsets();
-
-  const [title, setTitle] = useState('');
-  const [participants, setParticipants] = useState([{ 
-    name: 'Me',
-    id: 'me-participant', // Use a unique ID for "Me"
-    userId: getCurrentUser()?.uid || null, // Use current user's UID
-    placeholder: false,
-    phoneNumber: null,
-    username: null,
-    profilePhoto: null
-  }]);
-  const [selectedFriends, setSelectedFriends] = useState([]);
-
-  const [showAllParticipants, setShowAllParticipants] = useState(false);
-  const [showGroupMembers, setShowGroupMembers] = useState(false);
-  const [joinEnabled, setJoinEnabled] = useState(true);
-  const [participantsExpanded, setParticipantsExpanded] = useState(false);
-  const [items, setItems] = useState([{
-    id: Date.now().toString(),
-    name: '',
-    amount: 0,
-    selectedConsumers: [0], // Will be updated when participants are loaded
-    splits: [],
-    selectedPayers: [0] // Default to "Me"
-  }]);
-  const [fees, setFees] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedPayers, setSelectedPayers] = useState([0]); // Default to "Me"
+  const { state, updateState, total, createMeParticipant } = useExpenseState(expense);
   const friendSelectorRef = useRef(null);
   const scrollViewRef = useRef(null);
 
-  // Form change tracking for navigation warning
-  const { hasChanges, updateChangeStatus, resetChanges } = useFormChangeTracker(
-    isEditing && expense ? {
-      title: expense.title || '',
-      participants: expense.participants || [],
-      items: expense.items || [],
-      fees: expense.fees || [],
-      selectedPayers: expense.selectedPayers || [0],
-      joinEnabled: expense.join?.enabled || true
-    } : null,
-    isEditing
+  // Simple form change tracking
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const initialStateRef = useRef(null);
+
+  // Initialize baseline state
+  useEffect(() => {
+    if (!initialStateRef.current) {
+      initialStateRef.current = isEditing && expense ? {
+        title: expense.title || '',
+        participantCount: expense.participants?.length || 1,
+        itemCount: expense.items?.length || 1,
+        feeCount: expense.fees?.length || 0
+      } : {
+        title: '',
+        participantCount: 1,
+        itemCount: 1,
+        feeCount: 0
+      };
+    }
+  }, [isEditing, expense]);
+
+  // Check for changes on state updates
+  useEffect(() => {
+    if (initialStateRef.current) {
+      const currentState = {
+        title: state.title,
+        participantCount: state.participants.length,
+        itemCount: state.items.length,
+        feeCount: state.fees.length
+      };
+      
+      const hasChanges = JSON.stringify(currentState) !== JSON.stringify(initialStateRef.current);
+      setHasUnsavedChanges(hasChanges);
+    }
+  }, [state.title, state.participants.length, state.items.length, state.fees.length]);
+
+  // Navigation warning
+  useFocusEffect(
+    useCallback(() => {
+      const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+        if (!hasUnsavedChanges || state.loading) {
+          return;
+        }
+
+        e.preventDefault();
+        Alert.alert(
+          'Unsaved Changes',
+          'You have unsaved changes to this expense. Are you sure you want to leave?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Leave',
+              style: 'destructive',
+              onPress: () => navigation.dispatch(e.data.action),
+            },
+          ]
+        );
+      });
+
+      return unsubscribe;
+    }, [navigation, hasUnsavedChanges, state.loading])
   );
 
-  // Navigation warning when trying to leave with unsaved changes
-  useNavigationWarning(
-    hasChanges,
-    navigation,
-    null,
-    'You have unsaved changes to this expense. Are you sure you want to leave?'
-  );
+  const resetChanges = useCallback(() => {
+    setHasUnsavedChanges(false);
+  }, []);
 
-  // Calculate total from items and fees
-  const calculateTotal = () => {
-    const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const feesTotal = fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-    return itemsTotal + feesTotal;
-  };
+  // Unified action handlers
+  const actions = useMemo(() => ({
+    addItem: () => {
+      const lastItem = state.items[state.items.length - 1];
+      const payersToUse = lastItem?.selectedPayers || [0];
+      const newItem = {
+        id: Date.now().toString(),
+        name: '',
+        amount: 0,
+        selectedConsumers: [],
+        splits: [],
+        selectedPayers: payersToUse
+      };
+      updateState({ items: [...state.items, newItem] });
+    },
+
+    updateItem: (index, field, value) => {
+      const updated = [...state.items];
+      updated[index] = { ...updated[index], [field]: value };
+      
+      if (field === 'amount') {
+        const amount = parseFloat(value) || 0;
+        const selectedConsumers = updated[index].selectedConsumers || [0];
+        if (selectedConsumers.length > 0) {
+          if (selectedConsumers.length === 1) {
+            updated[index].splits = [{
+              participantIndex: selectedConsumers[0],
+              amount: amount,
+              percentage: 100
+            }];
+          } else {
+            const baseAmount = Math.floor((amount * 100) / selectedConsumers.length) / 100;
+            const remainder = Math.round((amount - (baseAmount * selectedConsumers.length)) * 100) / 100;
+            const splitAmounts = new Array(selectedConsumers.length).fill(baseAmount);
+            const remainderCents = Math.round(remainder * 100);
+            for (let i = 0; i < remainderCents; i++) {
+              splitAmounts[i] = Math.round((splitAmounts[i] + 0.01) * 100) / 100;
+            }
+            updated[index].splits = selectedConsumers.map((consumerIndex, i) => ({
+              participantIndex: consumerIndex,
+              amount: splitAmounts[i],
+              percentage: 100 / selectedConsumers.length
+            }));
+          }
+        }
+      }
+      
+      const updatedState = { items: updated };
+      
+      if (field === 'amount') {
+        const updatedFees = state.fees.map(fee => {
+          if (fee.type === 'percentage') {
+            const itemsTotal = updated.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+            return { ...fee, amount: (itemsTotal * fee.percentage) / 100 };
+          }
+          return fee;
+        });
+        updatedState.fees = updatedFees;
+      }
+      
+      updateState(updatedState);
+    },
+
+    removeParticipant: (index) => {
+      if (state.participants.length > 1) {
+        const newParticipants = state.participants.filter((_, i) => i !== index);
+        const newItems = state.items.map(item => ({
+          ...item,
+          selectedConsumers: item.selectedConsumers?.filter(consumerIndex => consumerIndex !== index)
+            .map(consumerIndex => consumerIndex > index ? consumerIndex - 1 : consumerIndex) || [],
+          splits: item.splits?.filter(split => split.participantIndex !== index)
+            .map(split => ({
+              ...split,
+              participantIndex: split.participantIndex > index ? split.participantIndex - 1 : split.participantIndex
+            }))
+        }));
+        updateState({ participants: newParticipants, items: newItems });
+      } else {
+        Alert.alert('Error', 'Cannot remove the last participant');
+      }
+    }
+  }), [state, updateState]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -111,21 +261,19 @@ const AddExpenseScreen = ({ route, navigation }) => {
         if (currentUser) {
           const userProfile = await getUserProfile(currentUser.uid);
           if (userProfile) {
-            setParticipants(prev => {
-              const updated = [...prev];
-              if (updated.length > 0 && updated[0].name === 'Me') {
-                updated[0] = {
-                  ...updated[0], // Preserve existing ID and structure
-                  name: 'Me',
-                  userId: currentUser.uid,
-                  placeholder: false,
-                  phoneNumber: userProfile.phoneNumber,
-                  username: userProfile.username,
-                  profilePhoto: userProfile.profilePhoto
-                };
-              }
-              return updated;
-            });
+            const updatedParticipants = [...state.participants];
+            if (updatedParticipants.length > 0 && updatedParticipants[0].name === 'Me') {
+              updatedParticipants[0] = {
+                ...updatedParticipants[0],
+                name: 'Me',
+                userId: currentUser.uid,
+                placeholder: false,
+                phoneNumber: userProfile.phoneNumber,
+                username: userProfile.username,
+                profilePhoto: userProfile.profilePhoto
+              };
+              updateState({ participants: updatedParticipants });
+            }
           }
         }
       } catch (error) {
@@ -141,9 +289,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
   // Initialize selectedFriends when editing an existing expense
   useEffect(() => {
     if (expense && isEditing) {
-      // Extract friends from existing participants (exclude current user)
+      const currentUserId = getCurrentUser()?.uid;
       const existingFriends = expense.participants
-        .filter(p => p.name !== 'Me' && !p.placeholder && p.userId && p.userId !== getCurrentUser()?.uid)
+        .filter(p => p.name !== 'Me' && !p.placeholder && p.userId && p.userId !== currentUserId)
         .map(p => ({
           id: p.userId,
           name: p.name,
@@ -152,84 +300,11 @@ const AddExpenseScreen = ({ route, navigation }) => {
           profilePhoto: p.profilePhoto
         }));
       
-      setSelectedFriends(existingFriends);
-      setParticipants(prev => [
-        { 
-          name: 'Me',
-          id: 'me-participant', // Use a unique ID for "Me"
-          userId: getCurrentUser()?.uid || null, // Use current user's UID
-          placeholder: false,
-          phoneNumber: null,
-          username: null,
-          profilePhoto: null
-        },
+      const newParticipants = [
+        createMeParticipant(),
         ...existingFriends.map((friend, index) => ({ 
           name: friend.name || '', 
-          id: `friend-${friend.id || index}`, // Ensure unique ID
-          userId: friend.id || null,
-          phoneNumber: friend.phoneNumber || null,
-          username: friend.username || null,
-          profilePhoto: friend.profilePhoto || null,
-          placeholder: false
-        }))
-      ]);
-      // Set title and other fields from existing expense
-      if (expense.title) {
-        setTitle(expense.title);
-      }
-      if (expense.join) {
-        setJoinEnabled(expense.join.enabled);
-      }
-      if (expense.fees) {
-        setFees(expense.fees);
-      }
-      if (expense.items) {
-        // Ensure each item has selectedPayers field and selectedConsumers field
-        const itemsWithPayers = expense.items.map(item => ({
-          ...item,
-          selectedPayers: item.selectedPayers || [0], // Default to "Me" if not set
-          selectedConsumers: item.selectedConsumers || [0] // Default to "Me" if not set
-        }));
-        setItems(itemsWithPayers);
-      }
-      // Set selected payers if available
-      if (expense.selectedPayers) {
-        setSelectedPayers(expense.selectedPayers);
-      }
-    }
-  }, [expense, isEditing]);
-
-  // Track form changes for navigation warning
-  useEffect(() => {
-    const currentFormData = {
-      title,
-      participants: participants.map(p => ({ name: p.name, userId: p.userId, placeholder: p.placeholder })),
-      items: items.map(item => ({ name: item.name, amount: item.amount, selectedConsumers: item.selectedConsumers })),
-      fees: fees.map(fee => ({ name: fee.name, amount: fee.amount, type: fee.type, percentage: fee.percentage })),
-      selectedPayers,
-      joinEnabled
-    };
-    updateChangeStatus(currentFormData);
-  }, [title, participants, items, fees, selectedPayers, joinEnabled, updateChangeStatus]);
-
-  // Update participants when friends are selected
-  useEffect(() => {
-    setParticipants(prevParticipants => {
-      const meParticipant = prevParticipants.find(p => p.name === 'Me');
-      
-      const allParticipants = [
-        meParticipant || { 
-          name: 'Me',
-          id: 'me-participant', // Use a unique ID for "Me"
-          userId: getCurrentUser()?.uid || null, // Use current user's UID
-          placeholder: false,
-          phoneNumber: null,
-          username: null,
-          profilePhoto: null
-        },
-        ...selectedFriends.map((friend, index) => ({ 
-          name: friend.name || '', 
-          id: `friend-${friend.id || index}`, // Ensure unique ID
+          id: `friend-${friend.id || index}`,
           userId: friend.id || null,
           phoneNumber: friend.phoneNumber || null,
           username: friend.username || null,
@@ -238,76 +313,193 @@ const AddExpenseScreen = ({ route, navigation }) => {
         }))
       ];
       
-      return allParticipants;
-    });
-  }, [selectedFriends]);
+      const itemsWithPayers = expense.items?.map(item => ({
+        ...item,
+        selectedPayers: item.selectedPayers || [0],
+        selectedConsumers: item.selectedConsumers || [0]
+      })) || [];
+      
+      updateState({
+        selectedFriends: existingFriends,
+        participants: newParticipants,
+        title: expense.title || '',
+        joinEnabled: expense.join?.enabled ?? true,
+        fees: expense.fees || [],
+        items: itemsWithPayers,
+        selectedPayers: expense.selectedPayers || [0]
+      });
+    }
+  }, [expense, isEditing, createMeParticipant, updateState]);
+
+  // Form change tracking is now handled above with simpler logic
+
+  // Update participants when friends are selected
+  useEffect(() => {
+    const meParticipant = state.participants.find(p => p.name === 'Me');
+    const allParticipants = [
+      meParticipant || createMeParticipant(),
+      ...state.selectedFriends.map((friend, index) => ({ 
+        name: friend.name || '', 
+        id: `friend-${friend.id || index}`,
+        userId: friend.id || null,
+        phoneNumber: friend.phoneNumber || null,
+        username: friend.username || null,
+        profilePhoto: friend.profilePhoto || null,
+        placeholder: false
+      }))
+    ];
+    
+    // Only update if participants actually changed
+    const participantsChanged = JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
+    if (participantsChanged) {
+      updateState({ participants: allParticipants });
+    }
+  }, [state.selectedFriends, createMeParticipant, updateState, state.participants]);
   
   // Update initial item to include all participants as consumers when participants change (only for new expenses)
   useEffect(() => {
-    if (participants.length > 0 && items.length > 0 && !isEditing) {
-      const allParticipantIndices = participants.map((_, index) => index);
-      setItems(prevItems => {
-        const updatedItems = [...prevItems];
-        // Update the first item if it's empty (initial state)
-        if (updatedItems[0] && !updatedItems[0].name && updatedItems[0].amount === 0) {
-          updatedItems[0] = {
-            ...updatedItems[0],
-            selectedConsumers: allParticipantIndices
+    if (state.participants.length > 0 && state.items.length > 0 && !isEditing) {
+      const allParticipantIndices = state.participants.map((_, index) => index);
+      const updatedItems = [...state.items];
+      if (updatedItems[0] && !updatedItems[0].name && updatedItems[0].amount === 0) {
+        const newItem = {
+          ...updatedItems[0],
+          selectedConsumers: allParticipantIndices
+        };
+        
+        // Only update if the item actually changed
+        const itemChanged = JSON.stringify(newItem) !== JSON.stringify(updatedItems[0]);
+        if (itemChanged) {
+          updatedItems[0] = newItem;
+          updateState({ items: updatedItems });
+        }
+      }
+    }
+  }, [state.participants.length, isEditing, updateState]);
+  
+  // Save functions
+  const handleSaveExpense = useCallback(async () => {
+    const finalTitle = state.title.trim() || (state.items.length > 0 && state.items[0].name.trim()) || 'Expense';
+
+    if (state.participants.some(p => !p.name.trim())) {
+      Alert.alert('Error', 'Please enter names for all participants');
+      return;
+    }
+
+    if (state.items.length === 0) {
+      Alert.alert('Error', 'Please add at least one item');
+      return;
+    }
+
+    const invalidItems = state.items.filter(item => {
+      if (!item.name || !item.name.trim()) return true;
+      if (item.amount !== null && item.amount !== undefined && item.amount !== '') {
+        const numAmount = parseFloat(item.amount);
+        if (isNaN(numAmount) || numAmount < 0) return true;
+      }
+      return false;
+    });
+    
+    if (invalidItems.length > 0) {
+      Alert.alert('Error', 'Please fill in all item names and ensure amounts are valid (0 or positive numbers)');
+      return;
+    }
+
+    if (state.fees.some(fee => !fee.name.trim())) {
+      Alert.alert('Error', 'Please fill in all fee names');
+      return;
+    }
+
+    if (!state.selectedPayers || state.selectedPayers.length === 0) {
+      Alert.alert('Error', 'Please select at least one person who paid for this expense');
+      return;
+    }
+
+    updateState({ loading: true });
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) throw new Error('No user signed in');
+
+      const userProfile = await getUserProfile(currentUser.uid);
+      if (!userProfile) throw new Error('Failed to get user profile');
+
+      const mappedParticipants = state.participants.map((p) => {
+        if (p.name === 'Me') {
+          return {
+            ...p,
+            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+            userId: p.userId || currentUser.uid,
+            placeholder: false,
+            phoneNumber: userProfile.phoneNumber,
+            username: userProfile.username,
+            profilePhoto: userProfile.profilePhoto
           };
         }
-        return updatedItems;
+        return {
+          ...p,
+          name: p.name.trim(),
+          userId: p.userId || null,
+          placeholder: p.placeholder || false,
+          phoneNumber: p.phoneNumber || null,
+          username: p.username || null,
+          profilePhoto: p.profilePhoto || null
+        };
       });
+
+      const expenseData = {
+        title: finalTitle,
+        total: total,
+        expenseType: 'expense',
+        participants: mappedParticipants,
+        items: state.items.map(item => ({
+          id: item.id,
+          name: item.name.trim(),
+          amount: item.amount === null || item.amount === undefined || item.amount === '' ? 0 : parseFloat(item.amount) || 0,
+          selectedConsumers: item.selectedConsumers || [0],
+          splits: item.splits || []
+        })),
+        fees: state.fees.map(fee => ({
+          id: fee.id,
+          name: fee.name.trim(),
+          amount: fee.amount === null || fee.amount === undefined || fee.amount === '' ? 0 : parseFloat(fee.amount) || 0,
+          type: fee.type || 'fixed',
+          percentage: fee.percentage || null,
+          splitType: fee.splitType || 'proportional',
+          splits: fee.splits || []
+        })),
+        selectedPayers: state.selectedPayers || [0],
+        join: { enabled: state.joinEnabled || false }
+      };
+      
+      if (isEditing) {
+        await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
+        const { participants, ...otherFields } = expenseData;
+        await updateExpense(expense.id, otherFields, currentUser.uid);
+        Alert.alert('Success', 'Expense updated successfully');
+        resetChanges();
+      } else {
+        await createExpense(expenseData, currentUser.uid);
+        Alert.alert('Success', 'Expense created successfully');
+      }
+
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      Alert.alert('Error', 'Failed to save expense: ' + error.message);
+    } finally {
+      updateState({ loading: false });
     }
-  }, [participants, isEditing]);
-  
-  const handleRemoveParticipant = (index) => {
-    removeParticipant(index, participants, setParticipants, items, setItems);
-  };
+  }, [state, total, isEditing, expense, navigation, resetChanges, updateState]);
 
-
-
-  const handleUpdateItem = (index, field, value) => {
-    updateItem(index, field, value, items, setItems, fees, setFees);
-  };
-
-  const handleUpdateItemSplit = (itemIndex, participantIndex, amount) => {
-    updateItemSplit(itemIndex, participantIndex, amount, items, setItems);
-  };
-
-
-
-  const handleSaveExpense = async () => {
-    saveExpense(
-      title,
-      participants,
-      items,
-      fees,
-      selectedPayers,
-      joinEnabled,
-      isEditing,
-      expense,
-      navigation,
-      setLoading,
-      calculateTotal,
-      'expense',
-      resetChanges
-    );
-  };
-
-  const saveExpenseSilently = async () => {
+  const saveExpenseSilently = useCallback(async () => {
+    const finalTitle = state.title.trim() || 'Expense';
     const currentUser = getCurrentUser();
-    if (!currentUser) {
-      throw new Error('No user signed in');
-    }
+    if (!currentUser) throw new Error('No user signed in');
 
-    // Get user profile for proper participant mapping
     const userProfile = await getUserProfile(currentUser.uid);
-    if (!userProfile) {
-      throw new Error('Failed to get user profile');
-    }
+    if (!userProfile) throw new Error('Failed to get user profile');
 
-    // Map participants with proper user data
-    const mappedParticipants = participants.map((p, index) => {
+    const mappedParticipants = state.participants.map((p) => {
       if (p.name === 'Me') {
         return {
           ...p,
@@ -322,13 +514,12 @@ const AddExpenseScreen = ({ route, navigation }) => {
       return p;
     });
 
-    // Create expense data
     const expenseData = {
-      title: title.trim() || 'Expense',
-      total: calculateTotal(),
-      expenseType: 'expense', // Mark as manual expense
+      title: finalTitle,
+      total: total,
+      expenseType: 'expense',
       participants: mappedParticipants,
-      items: items.map(item => ({
+      items: state.items.map(item => ({
         id: item.id || null,
         name: item.name.trim(),
         amount: item.amount === null || item.amount === undefined || item.amount === '' ? 0 : parseFloat(item.amount) || 0,
@@ -336,7 +527,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         splits: item.splits || [],
         selectedPayers: item.selectedPayers || [0]
       })),
-      fees: fees.map(fee => ({
+      fees: state.fees.map(fee => ({
         id: fee.id || null,
         name: fee.name.trim(),
         amount: fee.amount === null || fee.amount === undefined || fee.amount === '' ? 0 : parseFloat(fee.amount) || 0,
@@ -345,148 +536,302 @@ const AddExpenseScreen = ({ route, navigation }) => {
         splitType: fee.splitType || 'proportional',
         splits: fee.splits || []
       })),
-      selectedPayers: selectedPayers || [0],
-      join: {
-        enabled: joinEnabled || false,
-      },
+      selectedPayers: state.selectedPayers || [0],
+      join: { enabled: state.joinEnabled || false },
       createdBy: currentUser.uid,
       createdAt: expense?.createdAt || new Date()
     };
 
-    // Only include ID if editing
-    if (isEditing && expense?.id) {
-      expenseData.id = expense.id;
-    }
+    if (isEditing && expense?.id) expenseData.id = expense.id;
 
-    console.log('Expense data being saved:', JSON.stringify(expenseData, null, 2));
-
-    // Check for undefined values that would cause Firestore errors
-    const checkForUndefined = (obj, path = '') => {
-      for (const key in obj) {
-        const currentPath = path ? `${path}.${key}` : key;
-        if (obj[key] === undefined) {
-          console.error(`Found undefined value at path: ${currentPath}`);
-          return false;
-        }
-        if (typeof obj[key] === 'object' && obj[key] !== null) {
-          if (!checkForUndefined(obj[key], currentPath)) {
-            return false;
-          }
-        }
-      }
-      return true;
-    };
-
-    if (!checkForUndefined(expenseData)) {
-      throw new Error('Expense data contains undefined values');
-    }
-
-    // Import the service functions
-    const { createExpense, updateExpense, updateExpenseParticipants } = await import('../services/expenseService');
-
-    // Save the expense
     if (isEditing) {
-      // Update participants separately to ensure participantsMap is updated
       await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
-      
-      // Update other fields
       const { participants, ...otherFields } = expenseData;
       await updateExpense(expense.id, otherFields, currentUser.uid);
     } else {
       await createExpense(expenseData, currentUser.uid);
     }
 
-    // Reset change tracker after successful save
-    if (resetChanges) {
-      resetChanges();
-    }
-  };
+    resetChanges();
+  }, [state, total, isEditing, expense, resetChanges]);
 
-  const handleSettleNow = async () => {
+  const handleSettleNow = useCallback(async () => {
     try {
-      // Save the expense silently first
       await saveExpenseSilently();
-      
-      // Then navigate to SettleUp screen
       navigation.navigate('SettleUp', {
         expense: {
-          title,
-          participants,
-          items,
-          fees,
-          selectedPayers,
-          joinEnabled,
+          title: state.title,
+          participants: state.participants,
+          items: state.items,
+          fees: state.fees,
+          selectedPayers: state.selectedPayers,
+          joinEnabled: state.joinEnabled,
           ...(isEditing && expense ? { id: expense.id } : {})
         },
-        participants
+        participants: state.participants
       });
     } catch (error) {
       console.error('Error saving expense before settlement:', error);
-      // Still navigate even if save fails
       navigation.navigate('SettleUp', {
         expense: {
-          title,
-          participants,
-          items,
-          fees,
-          selectedPayers,
-          joinEnabled,
+          title: state.title,
+          participants: state.participants,
+          items: state.items,
+          fees: state.fees,
+          selectedPayers: state.selectedPayers,
+          joinEnabled: state.joinEnabled,
           ...(isEditing && expense ? { id: expense.id } : {})
         },
-        participants
+        participants: state.participants
       });
     }
-  };
+  }, [saveExpenseSilently, navigation, state, isEditing, expense]);
 
-  const handleSettleLater = async () => {
-    // Just save the expense without showing settlement modal
+  const handleSettleLater = useCallback(async () => {
     await handleSaveExpense();
-  };
+  }, [handleSaveExpense]);
 
-  const handleRenderItem = (item, index) => {
-    return renderItem(
-      item,
-      index,
-      participants,
-      items,
-      setItems,
-      handleUpdateItem,
-      fees,
-      setFees,
-      styles,
-      false, // isReceipt = false for AddExpenseScreen
-      selectedPayers
+  // Unified item rendering component
+  const renderExpenseItem = useCallback((item, index) => {
+    const togglePayer = (participantIndex) => {
+      const newPayers = item.selectedPayers.includes(participantIndex)
+        ? item.selectedPayers.filter(i => i !== participantIndex)
+        : [...item.selectedPayers, participantIndex];
+      
+      const updatedItems = [...state.items];
+      updatedItems[index].selectedPayers = newPayers;
+      updateState({ items: updatedItems });
+    };
+
+    const toggleConsumer = (participantIndex) => {
+      const newConsumers = item.selectedConsumers.includes(participantIndex)
+        ? item.selectedConsumers.filter(i => i !== participantIndex)
+        : [...item.selectedConsumers, participantIndex];
+      
+      if (newConsumers.length > 0) {
+        actions.updateItem(index, 'selectedConsumers', newConsumers);
+      }
+    };
+
+    return (
+      <Card 
+        key={item.id} 
+        variant="default" 
+        padding="large" 
+        margin="none"
+        style={{ 
+          marginBottom: 16,
+          backgroundColor: Colors.surfaceLight
+        }}
+      >
+        {/* Item Header with Delete Button */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <View style={{ flex: 1 }}>
+            <View style={itemStyles.itemHeader}>
+              <View style={itemStyles.itemNameContainer}>
+                <Text style={itemStyles.itemNameLabel}>Item Name</Text>
+                <TextInput
+                  style={itemStyles.itemNameInput}
+                  placeholder="Enter item name"
+                  placeholderTextColor={Colors.textSecondary}
+                  value={item.name}
+                  onChangeText={(text) => actions.updateItem(index, 'name', text)}
+                />
+              </View>
+            </View>
+          </View>
+          {state.items.length > 1 && (
+            <DeleteButton
+              onPress={() => {
+                const updatedItems = state.items.filter((_, i) => i !== index);
+                updateState({ items: updatedItems });
+              }}
+              size="small"
+              variant="subtle"
+              style={{ marginLeft: 8 }}
+            />
+          )}
+        </View>
+
+        {/* Price Section */}
+        <View style={priceStyles.priceSection}>
+          <Text style={priceStyles.priceLabel}>Price</Text>
+          <View style={priceStyles.priceInputContainer}>
+            <PriceInput
+              value={item.amount}
+              onChangeText={(amount) => actions.updateItem(index, 'amount', amount)}
+              placeholder="0.00"
+              style={priceStyles.amountInput}
+              showCurrency={true}
+            />
+          </View>
+          
+          {/* Who Paid Section */}
+          <View style={priceStyles.whoPaidSection}>
+            <Text style={priceStyles.whoPaidLabel}>Payers</Text>        
+            <View style={priceStyles.payerChips}>
+              {state.participants.map((participant, pIndex) => (
+                <TouchableOpacity
+                  key={pIndex}
+                  style={[
+                    priceStyles.payerChip,
+                    item.selectedPayers.includes(pIndex) && priceStyles.payerChipActive
+                  ]}
+                  onPress={() => togglePayer(pIndex)}
+                  activeOpacity={0.7}
+                >
+                  <View style={priceStyles.payerChipContent}>
+                    {item.selectedPayers.includes(pIndex) && (
+                      <View style={priceStyles.checkmarkContainer}>
+                        <Ionicons name="checkmark" size={12} color={Colors.surface} />
+                      </View>
+                    )}
+                    <Text style={[
+                      priceStyles.payerChipText,
+                      item.selectedPayers.includes(pIndex) && priceStyles.payerChipTextActive
+                    ]}>
+                      {participant.name || `Person ${pIndex + 1}`}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {item.selectedPayers.length > 0 && (
+              <View style={priceStyles.payerSummary}>
+                <Text style={priceStyles.payerSummaryText}>
+                  {item.selectedPayers.length} {item.selectedPayers.length === 1 ? 'person' : 'people'} paying
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Split Section */}
+        <View style={splitStyles.container}>
+          <Text style={splitStyles.label}>Split</Text>
+          
+          <View style={splitStyles.splitCard}>
+            {item.selectedConsumers.length > 0 && (
+              <View style={splitStyles.consumerInfo}>
+                <Text style={splitStyles.consumerCount}>
+                  {item.selectedConsumers.length} {item.selectedConsumers.length === 1 ? 'person' : 'people'} selected
+                </Text>
+              </View>
+            )}
+
+            <SmartSplitInput
+              participants={state.participants}
+              total={parseFloat(item.amount) || 0}
+              initialSplits={item.splits || []}
+              onSplitsChange={(newSplits) => {
+                const updatedItems = [...state.items];
+                updatedItems[index].splits = newSplits;
+                updateState({ items: updatedItems });
+              }}
+              selectedConsumers={item.selectedConsumers}
+              renderRow={(participant, pIndex, splitState, handlers) => {
+                const isSelected = item.selectedConsumers.includes(pIndex);
+                
+                return (
+                  <View key={pIndex} style={pIndex === 0 ? splitStyles.splitRowFirst : splitStyles.splitRow}>
+                    <TouchableOpacity
+                      style={[
+                        splitStyles.checkbox,
+                        isSelected && splitStyles.checkboxSelected
+                      ]}
+                      onPress={() => toggleConsumer(pIndex)}
+                    >
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={16} color="white" />
+                      )}
+                    </TouchableOpacity>
+
+                    <View style={splitStyles.participantInfo}>
+                      <View style={splitStyles.participantTextContainer}>
+                        <Text 
+                          style={[
+                            splitStyles.participantName,
+                            !isSelected && splitStyles.participantNameDisabled
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {participant.name || `Person ${pIndex + 1}`}
+                        </Text>
+                        {participant.username && (
+                          <Text 
+                            style={[
+                              splitStyles.participantUsername,
+                              !isSelected && splitStyles.participantUsernameDisabled
+                            ]}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            @{participant.username}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+
+                    <View style={splitStyles.inputContainer}>
+                      <PriceInput
+                        value={isSelected ? splitState.amount : 0}
+                        onChangeText={handlers.onAmountChange}
+                        onBlur={handlers.onBlur}
+                        placeholder="0.00"
+                        style={[
+                          splitStyles.amountInput,
+                          !isSelected && splitStyles.disabledAmountInput
+                        ]}
+                        editable={isSelected}
+                        showCurrency={true}
+                        selected={isSelected}
+                      />
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        splitStyles.lockButton,
+                        splitState.locked && splitStyles.lockButtonLocked,
+                        isSelected ? splitStyles.lockButtonSelected : splitStyles.lockButtonUnselected
+                      ]}
+                      onPress={handlers.onToggleLock}
+                      disabled={!isSelected}
+                    >
+                      <Ionicons 
+                        name={splitState.locked ? "lock-closed" : "lock-open"} 
+                        size={18} 
+                        color={splitState.locked ? Colors.accent : Colors.textSecondary} 
+                      />
+                    </TouchableOpacity>
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Card>
     );
-  };
+  }, [state, actions, updateState]);
 
 
   return (
-            <View style={styles.container}>
-        <BlurView intensity={30} tint="light" style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isEditing ? 'Edit Expense' : 'Add Expense'}
-          </Text>
-          <TouchableOpacity 
-            style={styles.settingsButton}
-            onPress={() => navigation.navigate('ExpenseSettings', { expense: { 
-              id: expense?.id,
-              title,
-              participants,
-              items,
-              fees,
-              createdBy: getCurrentUser()?.uid,
-              join: { enabled: joinEnabled }
-            }})}
-          >
-            <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
-          </TouchableOpacity>
-        </BlurView>
+    <View style={styles.container}>
+      <ExpenseHeader
+        title={isEditing ? 'Edit Expense' : 'Add Expense'}
+        onBackPress={() => navigation.goBack()}
+        onSettingsPress={() => navigation.navigate('ExpenseSettings', { expense: { 
+          id: expense?.id,
+          title: state.title,
+          participants: state.participants,
+          items: state.items,
+          fees: state.fees,
+          createdBy: getCurrentUser()?.uid,
+          join: { enabled: state.joinEnabled }
+        }})}
+        isEditing={isEditing}
+      />
         
         <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
@@ -503,8 +848,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
             <Text style={styles.sectionTitle}>Expense Title</Text>
             <TextInput
               style={styles.titleInput}
-              value={title}
-              onChangeText={setTitle}
+              value={state.title}
+              onChangeText={(text) => updateState({ title: text })}
               placeholder="Enter expense title..."
               placeholderTextColor={Colors.textSecondary}
             />
@@ -515,207 +860,68 @@ const AddExpenseScreen = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Participants</Text>
               <View style={styles.participantsCount}>
                 <Text style={styles.participantsCountText}>
-                  {participants.length} {participants.length === 1 ? 'person' : 'people'}
+                  {state.participants.length} {state.participants.length === 1 ? 'person' : 'people'}
                 </Text>
               </View>
             </View>
             
-
-            
-            {/* Participants Compact Grid Layout */}
-            <FlatList
-              data={[
-                // Add button always first
-                { id: 'add-button', type: 'add-button' },
-                // Then participants in order: Me → real friends
-                ...(participantsExpanded ? participants : participants.slice(0, 5))
-              ]}
-              numColumns={3}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item, index }) => {
-                if (item.type === 'add-button') {
-                  return (
-                    <TouchableOpacity 
-                      style={styles.addParticipantGridButton}
-                      onPress={() => {
-                        if (friendSelectorRef.current) {
-                          friendSelectorRef.current.openModal();
-                        }
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.addParticipantGridIcon}>
-                        <Ionicons name="add" size={24} color={Colors.accent} />
-                      </View>
-                      <Text style={styles.addParticipantGridText}>Add</Text>
-                    </TouchableOpacity>
-                  );
+            <ParticipantsGrid
+              participants={state.participants}
+              selectedFriends={state.selectedFriends}
+              onFriendsChange={(friends) => updateState({ selectedFriends: friends })}
+              onParticipantPress={(participant, index) => {
+                if (participant.userId && participant.userId !== getCurrentUser()?.uid) {
+                  navigation.navigate('FriendProfile', { friendId: participant.userId });
                 }
-
-                const participant = item;
-                return (
-                  <TouchableOpacity 
-                    key={participant.id}
-                    style={styles.participantGridItem}
-                    onPress={() => {
-                      if (participant.userId && participant.userId !== getCurrentUser()?.uid) {
-                        navigation.navigate('FriendProfile', { friendId: participant.userId });
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.participantGridAvatarContainer}>
-                      {participant.profilePhoto ? (
-                        <Image source={{ uri: participant.profilePhoto }} style={styles.participantGridAvatar} />
-                      ) : (
-                        <View style={[
-                          styles.participantGridAvatarPlaceholder,
-                          participant.name === 'Me' && styles.currentUserAvatar
-                        ]}>
-                          <Text style={[
-                            styles.participantGridAvatarInitials,
-                            participant.name === 'Me' && styles.currentUserInitials
-                          ]}>
-                            {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.participantGridName} numberOfLines={1}>
-                      {participant.name}
-                    </Text>
-                    {participant.username && (
-                      <Text style={styles.participantGridUsername} numberOfLines={1}>
-                        @{participant.username}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                );
               }}
-              contentContainerStyle={styles.participantsGridContainer}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-            />
-            
-            {/* Show More/Less toggle button */}
-            {participants.length > 5 && (
-              <TouchableOpacity 
-                style={styles.toggleParticipantsButton}
-                onPress={() => setParticipantsExpanded(!participantsExpanded)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.toggleParticipantsIcon}>
-                  <Ionicons 
-                    name={participantsExpanded ? "chevron-up" : "chevron-down"} 
-                    size={16} 
-                    color={Colors.surface} 
-                  />
-                </View>
-                <Text style={styles.toggleParticipantsText}>
-                  {participantsExpanded ? "Show Less" : `Show ${participants.length - 5} More`}
-                </Text>
-              </TouchableOpacity>
-            )}
-            
-            {/* Group Management Row */}
-            <View style={styles.groupManagementRow}>
-              <View style={styles.groupInfo}>
-                <Text style={styles.groupInfoText}>
-                  {participants.length} {participants.length === 1 ? 'person' : 'people'} in this expense
-                </Text>
-                {participants.length > 5 && (
-                  <Text style={styles.pendingInvitesText}>
-                    Tap "More" to see all participants
-                  </Text>
-                )}
-              </View>
-              <TouchableOpacity 
-                style={styles.manageGroupButton}
-                onPress={() => {
-                  if (friendSelectorRef.current) {
-                    friendSelectorRef.current.openModal();
-                  }
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="people-outline" size={16} color={Colors.surface} />
-                <Text style={styles.manageGroupButtonText}>Manage</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <FriendSelector
-              ref={friendSelectorRef}
-              selectedFriends={selectedFriends}
-              onFriendsChange={setSelectedFriends}
-              placeholder="Add friends to split with..."
+              participantsExpanded={state.participantsExpanded}
+              onToggleExpanded={() => updateState({ participantsExpanded: !state.participantsExpanded })}
               expenseId={expense?.id}
-              showAddButton={false}
+              currentUserId={getCurrentUser()?.uid}
             />
-
           </View>
 
           {/* Items Section */}
           <Text style={styles.sectionTitle}>Items</Text>
           
-          {items.map((item, index) => handleRenderItem(item, index))}
+          {state.items.map((item, index) => renderExpenseItem(item, index))}
           
           {/* Add Item Button - Below the item cards */}
           <TouchableOpacity
             style={styles.addItemButton}
             onPress={() => {
-              addItem(items, setItems, participants);
-              // Scroll to bottom after adding item
+              actions.addItem();
               setTimeout(() => {
                 scrollViewRef.current?.scrollToEnd({ animated: true });
               }, 100);
             }}
             activeOpacity={0.8}
           >
-            <View style={styles.addItemIcon}>
-              <Ionicons name="add" size={20} color={Colors.white} />
-            </View>
+            <Ionicons name="add" size={20} color={Colors.accent} />
             <Text style={styles.addItemText}>Add Item</Text>
           </TouchableOpacity>
         </ScrollView>
 
-        <BlurView intensity={30} tint="light" style={[styles.footer, { paddingBottom: insets.bottom}]}>
-          <View style={styles.footerButtons}>
-            <TouchableOpacity
-              style={[styles.settleLaterButton, loading && styles.buttonDisabled]}
-              onPress={handleSettleLater}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.settleLaterButtonText}>
-                {loading ? 'Saving...' : (isEditing ? 'Update Expense' : 'Settle Later')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.settleNowButton, loading && styles.buttonDisabled]}
-              onPress={handleSettleNow}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.settleNowButtonText}>
-                {isEditing ? 'Update & Settle' : 'Settle Now'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </BlurView>
+        <ExpenseFooter
+          isEditing={isEditing}
+          loading={state.loading}
+          onSavePress={handleSettleLater}
+          onSettlePress={handleSettleNow}
+        />
       </KeyboardAvoidingView>
 
       {/* All Participants Modal */}
       <Modal
-        visible={showAllParticipants}
+        visible={state.showAllParticipants}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setShowAllParticipants(false)}
+        onRequestClose={() => updateState({ showAllParticipants: false })}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowAllParticipants(false)}
+              onPress={() => updateState({ showAllParticipants: false })}
             >
               <Ionicons name="close" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
@@ -725,7 +931,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             <View style={styles.allParticipantsList}>
-              {participants.map((participant, index) => (
+              {state.participants.map((participant, index) => (
                 <View key={participant.id} style={styles.allParticipantItem}>
                   <View style={styles.allParticipantContent}>
                     <View style={styles.allParticipantAvatarContainer}>
@@ -760,8 +966,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
                       <TouchableOpacity 
                         style={styles.removeParticipantButton}
                         onPress={() => {
-                          setShowAllParticipants(false);
-                          handleRemoveParticipant(index);
+                          updateState({ showAllParticipants: false });
+                          actions.removeParticipant(index);
                         }}
                         activeOpacity={0.8}
                       >
@@ -778,16 +984,16 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
       {/* Group Members Modal */}
       <Modal
-        visible={showGroupMembers}
+        visible={state.showGroupMembers}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setShowGroupMembers(false)}
+        onRequestClose={() => updateState({ showGroupMembers: false })}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowGroupMembers(false)}
+              onPress={() => updateState({ showGroupMembers: false })}
             >
               <Ionicons name="close" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
@@ -800,8 +1006,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
             <View style={styles.modalSection}>
               <Text style={styles.modalSectionTitle}>Add/Remove Participants</Text>
               <FriendSelector
-                selectedFriends={selectedFriends}
-                onFriendsChange={setSelectedFriends}
+                selectedFriends={state.selectedFriends}
+                onFriendsChange={(friends) => updateState({ selectedFriends: friends })}
                 placeholder="Add friends to split with..."
                 expenseId={expense?.id}
                 showAddButton={false}
@@ -812,7 +1018,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
             <View style={styles.modalSection}>
               <Text style={styles.modalSectionTitle}>Current Participants</Text>
               <View style={styles.currentParticipantsList}>
-                {participants.map((participant, index) => (
+                {state.participants.map((participant, index) => (
                   <View key={participant.id} style={styles.currentParticipantItem}>
                     <View style={styles.currentParticipantContent}>
                       <View style={styles.currentParticipantAvatarContainer}>
@@ -847,8 +1053,8 @@ const AddExpenseScreen = ({ route, navigation }) => {
                         <TouchableOpacity 
                           style={styles.removeParticipantButton}
                           onPress={() => {
-                            setShowGroupMembers(false);
-                            handleRemoveParticipant(index);
+                            updateState({ showGroupMembers: false });
+                            actions.removeParticipant(index);
                           }}
                           activeOpacity={0.8}
                         >
@@ -873,50 +1079,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  headerTitle: {
-    ...Typography.h2,
-    color: Colors.textPrimary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-    height: 40,
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -987,181 +1149,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  footerButtons: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  settleLaterButton: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    padding: Spacing.lg,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  settleLaterButtonText: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  settleNowButton: {
-    flex: 1,
-    backgroundColor: Colors.accent,
-    padding: Spacing.lg,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  settleNowButtonText: {
-    ...Typography.title,
-    color: Colors.surface,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    backgroundColor: Colors.textSecondary,
-  },
 
-  participantsGridContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  participantGridItem: {
-    alignItems: 'center',
-    width: '33.33%', // Exactly one-third width for 3 columns
-    marginBottom: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    minHeight: 100,
-  },
-  participantGridAvatarContainer: {
-    position: 'relative',
-    width: 72,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  participantGridAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    borderColor: Colors.surface,
-    ...Shadows.avatar,
-  },
-  participantGridAvatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.accent,
-    borderWidth: 2,
-    borderColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.avatar,
-  },
-  participantGridAvatarInitials: {
-    color: Colors.white,
-    fontSize: 24,
-    fontFamily: Typography.familySemiBold,
-  },
-  participantGridName: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  participantGridUsername: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    fontSize: 9,
-  },
-  addParticipantGridButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '33.33%', // Exactly one-third width for 3 columns
-    marginBottom: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    minHeight: 100,
-  },
-  addParticipantGridIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.surfaceLight,
-    borderWidth: 2,
-    borderColor: Colors.divider,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  addParticipantGridText: {
-    ...Typography.label,
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 11,
-  },
-
-  groupManagementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-  },
-  groupInfo: {
-    flex: 1,
-  },
-  groupInfoText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  pendingInvitesText: {
-    ...Typography.caption,
-    color: Colors.accent,
-    fontSize: 11,
-    marginTop: Spacing.xs,
-    fontWeight: '500',
-  },
-  manageGroupButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.pill,
-    ...Shadows.button,
-    elevation: 2,
-  },
-  manageGroupButtonText: {
-    ...Typography.label,
-    color: Colors.surface,
-    fontWeight: '600',
-    fontSize: 12,
-  },
   participantsCount: {
     backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.md,
@@ -1175,17 +1163,6 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     fontWeight: '600',
     fontSize: 11,
-  },
-
-  currentUserAvatar: {
-    borderColor: Colors.accent,
-    borderWidth: 3,
-    backgroundColor: Colors.accent,
-  },
-  currentUserInitials: {
-    color: Colors.white,
-    fontWeight: '600',
-    fontSize: 24,
   },
 
   allParticipantsList: {
@@ -1357,62 +1334,29 @@ const styles = StyleSheet.create({
 
 
 
-  toggleParticipantsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Radius.pill,
-    ...Shadows.button,
-    elevation: 2,
-  },
-  toggleParticipantsIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.xs,
-  },
-  toggleParticipantsText: {
-    ...Typography.label,
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 12,
-  },
 
   addItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.accent,
+    backgroundColor: 'transparent',
     borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,
     alignSelf: 'center',
-    ...Shadows.button,
-    elevation: 2,
-  },
-  addItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.xs,
+    borderWidth: 2,
+    borderColor: Colors.accent,
+    borderStyle: 'dashed',
+    minWidth: 160,
+    gap: Spacing.sm,
   },
   addItemText: {
     ...Typography.label,
-    color: Colors.white,
+    color: Colors.accent,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 16,
   },
 
   titleInput: {
@@ -1426,6 +1370,254 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
+});
+
+// Style definitions for unified components
+const itemStyles = StyleSheet.create({
+  itemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  itemNameContainer: {
+    flex: 1,
+    marginRight: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  itemNameLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  itemNameInput: {
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
+    ...Typography.body,
+    backgroundColor: Colors.surface,
+    color: Colors.textPrimary,
+    fontSize: 16,
+    minHeight: 48,
+  },
+});
+
+const priceStyles = StyleSheet.create({
+  priceSection: {
+    marginBottom: Spacing.sm,
+  },
+  priceLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  priceInputContainer: {
+    flex: 1,
+    marginRight: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  amountInput: {
+    marginBottom: Spacing.sm,
+    minHeight: 48,
+  },
+  whoPaidSection: {
+    marginBottom: Spacing.sm,
+  },
+  whoPaidLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: Spacing.xs,
+    letterSpacing: 0.5,
+  },
+  payerChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  payerChip: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    minWidth: 70,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 1,
+  },
+  payerChipActive: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+    ...Shadows.button,
+    elevation: 2,
+  },
+  payerChipContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  payerChipText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+    fontSize: 12,
+  },
+  payerChipTextActive: {
+    color: Colors.surface,
+    fontWeight: '600',
+  },
+  checkmarkContainer: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  payerSummary: {
+    alignItems: 'center',
+    paddingTop: Spacing.xs,
+  },
+  payerSummaryText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+    fontSize: 11,
+  },
+});
+
+const splitStyles = StyleSheet.create({
+  container: {
+    marginBottom: Spacing.sm,
+  },
+  label: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  splitCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+    marginVertical: Spacing.sm,
+    borderColor: Colors.border,
+    borderWidth: 1,
+  },
+  splitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  splitRowFirst: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderTopWidth: 1,
+    borderBottomColor: Colors.border,
+    borderTopColor: Colors.border,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.sm,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
+  participantInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  participantTextContainer: {
+    flexDirection: 'column',
+  },
+  participantName: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '500',
+    fontSize: 15,
+  },
+  participantNameDisabled: {
+    color: Colors.textSecondary,
+    opacity: 0.6,
+  },
+  participantUsername: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+  },
+  participantUsernameDisabled: {
+    opacity: 0.6,
+  },
+  inputContainer: {
+    width: 90,
+    marginRight: Spacing.sm,
+  },
+  amountInput: {
+    flex: 1,
+    textAlign: 'right',
+    ...Typography.body,
+    color: Colors.textPrimary,
+  },
+  disabledAmountInput: {
+    color: Colors.textSecondary,
+    opacity: 0.6,
+  },
+  lockButton: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderColor: Colors.border,
+  },
+  lockButtonSelected: {
+    borderColor: Colors.accent,
+  },
+  lockButtonUnselected: {
+    borderColor: Colors.border,
+    opacity: 0.6,
+  },
+  lockButtonLocked: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + '20',
+  },
+  consumerInfo: {
+    alignItems: 'center',
+  },
+  consumerCount: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+  },
 });
 
 export default AddExpenseScreen;

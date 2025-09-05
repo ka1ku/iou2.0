@@ -17,7 +17,7 @@ import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { calculateSettlement, calculateHubSettlement, getSettlementSummary } from '../utils/settlementCalculator';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
-import { saveExpenseWithSettlement } from './AddExpenseScreenFunctions';
+import { createExpense } from '../services/expenseService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const AVATAR_SIZE = 48;
@@ -53,16 +53,33 @@ const SettleUpScreen = ({ route, navigation }) => {
   const handleAccept = async () => {
     setLoading(true);
     try {
-      await saveExpenseWithSettlement(
-        expense,
-        getCurrentUser(),
-        settlements,
-        settlementType,
-        navigation,
-        () => {} // resetChanges function - not needed here
+      // Save expense with settlement data inline
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        throw new Error('No user signed in');
+      }
+
+      const expenseWithSettlement = {
+        ...expense,
+        settlement: {
+          type: settlementType,
+          settlements: settlements,
+          createdAt: new Date().toISOString(),
+          accepted: true
+        }
+      };
+
+      await createExpense(expenseWithSettlement, currentUser.uid);
+      
+      Alert.alert(
+        'Success', 
+        `Expense created successfully with ${settlements.length} settlement${settlements.length !== 1 ? 's' : ''} proposed.`
       );
+
+      navigation.goBack();
     } catch (error) {
       console.error('Error saving expense with settlement:', error);
+      Alert.alert('Error', 'Failed to save expense: ' + error.message);
     } finally {
       setLoading(false);
     }

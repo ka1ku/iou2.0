@@ -16,8 +16,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Shadows, Typography, Spacing, Radius } from '../design/tokens';
-import ProfilePicture from '../components/VenmoProfilePicture';
-import DeleteButton from '../components/DeleteButton';
 import * as Contacts from 'expo-contacts';
 import algoliasearch from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';

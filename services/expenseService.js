@@ -5,7 +5,6 @@ import {
   getDocs, 
   doc, 
   updateDoc, 
-  deleteDoc, 
   query, 
   where, 
   orderBy, 
@@ -142,20 +141,6 @@ export const updateExpense = async (expenseId, updateData, userId) => {
   }
 };
 
-export const deleteExpense = async (expenseId, userId) => {
-  try {
-    console.log('Deleting expense from Firestore:', expenseId);
-    
-    const firestoreInstance = getFirestore(getApp());
-    await deleteDoc(doc(firestoreInstance, 'expenses', expenseId));
-    
-    console.log('Expense deleted successfully');
-  } catch (error) {
-    console.error('Error deleting expense from Firestore:', error);
-    throw error;
-  }
-};
-
 // ---------------- Expense Invites & Join Flow ----------------
 
 // Generate a random token and a longer, more unique code
@@ -202,24 +187,6 @@ export const getExpenseJoinInfo = async (expenseId, { initializeIfMissing = fals
     return expenseData.join || null;
   } catch (error) {
     console.error('Error getting expense join info:', error);
-    throw error;
-  }
-};
-
-// Regenerate join info (new room code and token)
-export const regenerateExpenseJoinInfo = async (expenseId) => {
-  try {
-    if (!expenseId) throw new Error('Missing expenseId');
-
-    const firestoreInstance = getFirestore(getApp());
-    const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
-    
-    await updateDoc(expenseRef, { 'join.code': generateJoinCode(), 'join.token': generateInviteToken(), updatedAt: serverTimestamp() });
-    
-    // Return the updated join info
-    return await getExpenseJoinInfo(expenseId);
-  } catch (error) {
-    console.error('Error regenerating expense join info:', error);
     throw error;
   }
 };
