@@ -67,6 +67,10 @@ const ProfileStack = () => (
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
     <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="AddReceipt" component={AddReceiptScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="SettleUp" component={SettleUpScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ExpenseSettings" component={ExpenseSettingsScreen} options={{ headerShown: false }} />
   </Stack.Navigator>
 );
 
@@ -118,8 +122,8 @@ const MainTabs = () => {
 
   const getTabBarStyle = (route) => {
     const routeName = getFocusedRouteNameFromRoute(route);
-    const hiddenRoutes = ['AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings'];
-    
+    const hiddenRoutes = ['AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 'NotificationSettings', 'VenmoTest', 'FriendProfile'];
+
     return {
       backgroundColor: Colors.surface,
       borderTopWidth: 0,
