@@ -30,9 +30,9 @@
     },
     "icon": "./assets/appstore.png",
     "splash": {
-      "image": "./assets/appstore.png",
+      "image": "./assets/splashscreen.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#e6a21c"
     },
     "assetBundlePatterns": [
       "**/*"

@@ -26,11 +26,13 @@ import deepLinkService from './services/deepLinkService';
 // Screen imports
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import SetupExpenseScreen from './screens/SetupExpenseScreen';
 import AddExpenseScreen from './screens/AddExpenseScreen';
 import AddReceiptScreen from './screens/AddReceiptScreen';
 import SettleUpScreen from './screens/SettleUpScreen';
 import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
-import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
+import NotificationSettingsScreen from './screens/settings/NotificationSettingsScreen';
+import VenmoTestScreen from './screens/settings/VenmoTest';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 
 // Auth screens
@@ -50,6 +52,7 @@ const Stack = createStackNavigator();
 const HomeStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="SetupExpense" component={SetupExpenseScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AddReceipt" component={AddReceiptScreen} options={{ headerShown: false }} />
     <Stack.Screen name="SettleUp" component={SettleUpScreen} options={{ headerShown: false }} />
@@ -62,6 +65,7 @@ const ProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
     <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
   </Stack.Navigator>
 );
@@ -114,7 +118,7 @@ const MainTabs = () => {
 
   const getTabBarStyle = (route) => {
     const routeName = getFocusedRouteNameFromRoute(route);
-    const hiddenRoutes = ['AddExpense', 'AddReceipt', 'SettleUp'];
+    const hiddenRoutes = ['AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings'];
     
     return {
       backgroundColor: Colors.surface,

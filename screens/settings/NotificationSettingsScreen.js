@@ -7,8 +7,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { Card, Header } from '../components';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import { Card, Header } from '../../components';
 
 const NotificationSettingsScreen = ({ navigation }) => {
   useEffect(() => {

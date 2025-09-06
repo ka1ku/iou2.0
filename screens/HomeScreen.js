@@ -139,7 +139,8 @@ const HomeScreen = ({ navigation }) => {
                 stopScanningAnimation();
               },
               (receiptData) => {
-                navigation.navigate('AddReceipt', { 
+                navigation.navigate('SetupExpense', { 
+                  expenseType: 'receipt',
                   scannedReceipt: receiptData,
                   fromReceiptScan: true 
                 });
@@ -162,7 +163,8 @@ const HomeScreen = ({ navigation }) => {
                 stopScanningAnimation();
               },
               (receiptData) => {
-                navigation.navigate('AddReceipt', { 
+                navigation.navigate('SetupExpense', { 
+                  expenseType: 'receipt',
                   scannedReceipt: receiptData,
                   fromReceiptScan: true 
                 });
@@ -345,7 +347,7 @@ const HomeScreen = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addButton}
-            onPress={() => navigation.navigate('AddExpense')}
+            onPress={() => navigation.navigate('SetupExpense', { expenseType: 'expense' })}
           >
             <Ionicons name="add" size={26} color="white" />
           </TouchableOpacity>
