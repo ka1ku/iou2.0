@@ -86,23 +86,61 @@ export const getUserExpenses = async (userId) => {
     
     const firestoreInstance = getFirestore(getApp());
     
-    // Query expenses where user is a participant (including creator)
-    // Use Firestore's native ordering for better performance
-    const expensesQuery = query(
-      collection(firestoreInstance, 'expenses'),
-      where(`participantsMap.${userId}`, '==', true),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const snapshot = await getDocs(expensesQuery);
-    
-    const expenses = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    
-    console.log('Fetched', expenses.length, 'expenses from Firestore where user is participant');
-    return expenses;
+    // Try to use the optimized participantsMap query first
+    try {
+      const expensesQuery = query(
+        collection(firestoreInstance, 'expenses'),
+        where(`participantsMap.${userId}`, '==', true),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(expensesQuery);
+      const expenses = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      console.log('Fetched', expenses.length, 'expenses from Firestore using participantsMap');
+      return expenses;
+    } catch (mapError) {
+      console.log('participantsMap query failed, falling back to client-side filtering:', mapError.message);
+      
+      // Fallback: Get all expenses and filter client-side
+      const expensesQuery = query(
+        collection(firestoreInstance, 'expenses'),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(expensesQuery);
+      
+      // Filter expenses where user is a participant
+      const allExpenses = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      const userExpenses = allExpenses.filter(expense => {
+        // Check if user is the creator
+        if (expense.createdBy === userId) {
+          return true;
+        }
+        
+        // Check if user is in participants array
+        if (expense.participants && Array.isArray(expense.participants)) {
+          return expense.participants.some(participant => participant.userId === userId);
+        }
+        
+        // Check if user is in participantsMap (for newer expenses)
+        if (expense.participantsMap && expense.participantsMap[userId]) {
+          return true;
+        }
+        
+        return false;
+      });
+      
+      console.log('Fetched', userExpenses.length, 'expenses from Firestore using client-side filtering');
+      return userExpenses;
+    }
   } catch (error) {
     console.error('Error getting expenses from Firestore:', error);
     return [];
@@ -380,6 +418,61 @@ export const updateExpenseParticipants = async (expenseId, participants, userId)
   } catch (error) {
     console.error('Error updating expense participants:', error);
     throw error;
+  }
+};
+
+// Migration function to add participantsMap to existing expenses
+export const migrateExpensesWithParticipantsMap = async () => {
+  try {
+    console.log('Starting migration to add participantsMap to existing expenses...');
+    
+    const firestoreInstance = getFirestore(getApp());
+    const expensesQuery = query(collection(firestoreInstance, 'expenses'));
+    const snapshot = await getDocs(expensesQuery);
+    
+    let migratedCount = 0;
+    const batch = [];
+    
+    for (const docSnapshot of snapshot.docs) {
+      const expenseData = docSnapshot.data();
+      
+      // Skip if participantsMap already exists
+      if (expenseData.participantsMap) {
+        continue;
+      }
+      
+      // Create participantsMap from participants array
+      const participantsMap = {};
+      if (expenseData.participants && Array.isArray(expenseData.participants)) {
+        expenseData.participants.forEach((participant) => {
+          if (participant.userId) {
+            participantsMap[participant.userId] = true;
+          }
+        });
+      }
+      
+      // Add to batch update
+      batch.push(updateDoc(docSnapshot.ref, { participantsMap }));
+      migratedCount++;
+      
+      // Process in batches of 500 (Firestore limit)
+      if (batch.length >= 500) {
+        await Promise.all(batch);
+        batch.length = 0;
+        console.log(`Migrated ${migratedCount} expenses so far...`);
+      }
+    }
+    
+    // Process remaining batch
+    if (batch.length > 0) {
+      await Promise.all(batch);
+    }
+    
+    console.log(`Migration completed. Updated ${migratedCount} expenses with participantsMap.`);
+    return { success: true, migratedCount };
+  } catch (error) {
+    console.error('Error during migration:', error);
+    return { success: false, error: error.message };
   }
 };
 

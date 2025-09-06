@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Image,
   Linking,
   Alert,
+  AppState,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -17,7 +20,7 @@ import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { calculateSettlement, calculateHubSettlement, getSettlementSummary } from '../utils/settlementCalculator';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
-import { createExpense } from '../services/expenseService';
+import { createExpense, updateExpense } from '../services/expenseService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const AVATAR_SIZE = 48;
@@ -28,6 +31,10 @@ const SettleUpScreen = ({ route, navigation }) => {
   const { expense, participants } = route.params;
   const [settlementType, setSettlementType] = useState('optimal'); // 'optimal' or 'hub'
   const [loading, setLoading] = useState(false);
+  const [requestSentStates, setRequestSentStates] = useState({}); // Track which requests have been sent
+  const [isVenmoAppActive, setIsVenmoAppActive] = useState(false);
+  const [settledStates, setSettledStates] = useState({}); // Track which settlements are marked as paid
+  const [animationStates, setAnimationStates] = useState({}); // Track animation states for each settlement
   console.log('settlupexpense', expense);
   console.log('settleupparticipants', participants);
   if (!expense) {
@@ -36,6 +43,94 @@ const SettleUpScreen = ({ route, navigation }) => {
   }
 
   const name = participants[0].name;
+  
+  // Animation function for settled up state
+  const animateSettledUp = useCallback((settlementId) => {
+    // Create animation values for this specific settlement
+    const checkmarkScale = new Animated.Value(0);
+    const checkmarkOpacity = new Animated.Value(0);
+    const settledTextOpacity = new Animated.Value(0);
+    const buttonCombinationScale = new Animated.Value(1);
+
+    // Store animation values for this settlement
+    setAnimationStates(prev => ({
+      ...prev,
+      [settlementId]: {
+        checkmarkScale,
+        checkmarkOpacity,
+        settledTextOpacity,
+        buttonCombinationScale,
+      }
+    }));
+
+    // First, combine the buttons with a scale animation
+    Animated.sequence([
+      Animated.timing(buttonCombinationScale, {
+        toValue: 0.95,
+        duration: 150,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonCombinationScale, {
+        toValue: 1,
+        duration: 150,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Then animate the checkmark and text
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(checkmarkScale, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(checkmarkOpacity, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(settledTextOpacity, {
+          toValue: 1,
+          duration: 400,
+          delay: 200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 200);
+  }, []);
+  
+  // AppState listener to detect when user returns from Venmo
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'active' && isVenmoAppActive) {
+        // User returned from Venmo app, mark the last request as sent
+        setIsVenmoAppActive(false);
+        
+        // Find the most recent request that hasn't been marked as sent yet
+        setRequestSentStates(prev => {
+          const updated = { ...prev };
+          // Find the first false value and mark it as true
+          for (const [key, value] of Object.entries(updated)) {
+            if (value === false) {
+              updated[key] = true;
+              break;
+            }
+          }
+          return updated;
+        });
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [isVenmoAppActive]);
+
   // Calculate settlements based on current type
   const optimalSettlement = calculateSettlement(expense);
   console.log('optimalSettlement', optimalSettlement);
@@ -122,6 +217,174 @@ const SettleUpScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleMarkAsPaid = useCallback((settlement) => {
+    const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+    
+    // Mark as settled
+    setSettledStates(prev => ({
+      ...prev,
+      [settlementId]: true
+    }));
+    
+    // Trigger the animation
+    animateSettledUp(settlementId);
+    
+    console.log('Marked as paid:', settlement);
+  }, [animateSettledUp]);
+
+  const handleUndoMarkAsPaid = useCallback((settlement) => {
+    const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+    
+    // Create animation values for the undo transition
+    const undoScale = new Animated.Value(1);
+    const settledUpOpacity = new Animated.Value(1);
+    const buttonsOpacity = new Animated.Value(0);
+    const buttonsScale = new Animated.Value(0.8);
+    
+    // Store animation values for this settlement
+    setAnimationStates(prev => ({
+      ...prev,
+      [settlementId]: {
+        ...prev[settlementId],
+        undoScale,
+        settledUpOpacity,
+        buttonsOpacity,
+        buttonsScale,
+      }
+    }));
+    
+    // Start the undo animation sequence
+    Animated.sequence([
+      // First: Scale down the undo button for feedback
+      Animated.timing(undoScale, {
+        toValue: 0.8,
+        duration: 100,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(undoScale, {
+        toValue: 1,
+        duration: 100,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+      // Then: Fade out settled up button and fade in original buttons
+      Animated.parallel([
+        Animated.timing(settledUpOpacity, {
+          toValue: 0,
+          duration: 200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonsOpacity, {
+          toValue: 1,
+          duration: 200,
+          delay: 100,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonsScale, {
+          toValue: 1,
+          duration: 200,
+          delay: 100,
+          easing: Easing.out(Easing.back(1.2)),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+    
+    // Remove from settled states after animation completes
+    setTimeout(() => {
+      setSettledStates(prev => {
+        const newState = { ...prev };
+        delete newState[settlementId];
+        return newState;
+      });
+      
+      // Remove animation state
+      setAnimationStates(prev => {
+        const newState = { ...prev };
+        delete newState[settlementId];
+        return newState;
+      });
+    }, 500);
+    
+    console.log('Undid mark as paid:', settlement);
+  }, []);
+
+  const saveSettlement = useCallback(async () => {
+    try {
+      console.log('Saving settlement for expense:', expense.id);
+      
+      // Validate expense ID
+      if (!expense.id) {
+        throw new Error('Expense ID is missing');
+      }
+      
+      // Get settlement summary data
+      const summary = getSettlementSummary(settlements);
+      
+      // Create settleUps array from settlements with status mapping
+      const settleUps = (settlements || []).map(settlement => {
+        const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+        const isSettled = settledStates[settlementId] === true;
+        const hasRequestBeenSent = requestSentStates[settlementId] === true;
+        
+        // Determine status based on user actions
+        let status = 'awaitingAction';
+        if (isSettled) {
+          status = 'markedAsPaid';
+        } else if (hasRequestBeenSent) {
+          status = 'paymentRequested';
+        }
+        // Note: 'paymentSent' would be set when user actually sends payment via Venmo
+        
+        return {
+          debtor: settlement.from || 'Unknown',
+          creditor: settlement.to || 'Unknown',
+          amount: settlement.amount || 0,
+          status: status
+        };
+      });
+      
+      // Create settlement data structure with fallback values
+      const settlementData = {
+        settlementMethod: settlementType || 'optimal',
+        totalTransactions: summary.totalTransactions || 0,
+        amountTransacted: summary.amountTransacted || 0,
+        peopleInvolved: summary.peopleInvolved || 0,
+        settleUps: settleUps || []
+      };
+      
+      // Debug logging to identify undefined fields
+      console.log('Settlement data to save:', settlementData);
+      console.log('Settlement method:', settlementType, typeof settlementType);
+      console.log('Total transactions:', summary.totalTransactions, typeof summary.totalTransactions);
+      console.log('Amount transacted:', summary.amountTransacted, typeof summary.amountTransacted);
+      console.log('People involved:', summary.peopleInvolved, typeof summary.peopleInvolved);
+      console.log('Settle ups:', settleUps);
+      console.log('Settle ups length:', settleUps.length);
+      
+      // Check each settleUp for undefined values
+      settleUps.forEach((settleUp, index) => {
+        console.log(`SettleUp ${index}:`, settleUp);
+        console.log(`  - debtor: ${settleUp.debtor} (${typeof settleUp.debtor})`);
+        console.log(`  - creditor: ${settleUp.creditor} (${typeof settleUp.creditor})`);
+        console.log(`  - amount: ${settleUp.amount} (${typeof settleUp.amount})`);
+        console.log(`  - status: ${settleUp.status} (${typeof settleUp.status})`);
+      });
+      
+      // Update the expense with settlement data
+      await updateExpense(expense.id, { settlement: settlementData }, getCurrentUser()?.uid);
+      
+      console.log('Settlement saved successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('Error saving settlement:', error);
+      return { success: false, error: error.message };
+    }
+  }, [expense, settlements, settlementType, settledStates, requestSentStates]);
+
   const handleRequestPayment = async (settlement) => {
     try {
       // Find the participant who should make the payment
@@ -148,6 +411,18 @@ const SettleUpScreen = ({ route, navigation }) => {
       // Open the deeplink
       const supported = await Linking.canOpenURL(deeplink);
       if (supported) {
+        // Mark that Venmo app is being opened
+        setIsVenmoAppActive(true);
+        
+        // Create a unique identifier for this request
+        const requestId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+        
+        // Store the request ID for tracking
+        setRequestSentStates(prev => ({
+          ...prev,
+          [requestId]: false // Initially false, will be set to true when user returns
+        }));
+        
         await Linking.openURL(deeplink);
       } else {
         Alert.alert('Error', 'Venmo is not installed on this device');
@@ -161,6 +436,42 @@ const SettleUpScreen = ({ route, navigation }) => {
   const renderSettlementItem = (settlement, index) => {
     const fromParticipant = participants.find(p => p.name === settlement.from);
     const toParticipant = participants.find(p => p.name === settlement.to);
+    
+    // Check if a request has been sent for this settlement
+    const requestId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+    const hasRequestBeenSent = requestSentStates[requestId] === true;
+    
+    // Check if this settlement is marked as paid/settled
+    const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+    const isSettled = settledStates[settlementId] === true;
+    const animationState = animationStates[settlementId];
+    
+    // Determine button text and styling
+    const getButtonText = () => {
+      if (settlement.from === name) {
+        return 'Make Payment';
+      } else if (settlement.to === name) {
+        return hasRequestBeenSent ? 'Request Sent' : 'Request Payment';
+      } else {
+        return 'Send Reminder';
+      }
+    };
+    
+    const getButtonStyle = () => {
+      const baseStyle = styles.requestPaymentButton;
+      if (settlement.to === name && hasRequestBeenSent) {
+        return [baseStyle, styles.requestSentButton];
+      }
+      return baseStyle;
+    };
+    
+    const getButtonTextStyle = () => {
+      const baseStyle = styles.requestPaymentButtonText;
+      if (settlement.to === name && hasRequestBeenSent) {
+        return [baseStyle, styles.requestSentButtonText];
+      }
+      return baseStyle;
+    };
 
     return (
       <View key={index} style={styles.settlementItem}>
@@ -289,39 +600,130 @@ const SettleUpScreen = ({ route, navigation }) => {
         
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
-        <TouchableOpacity
-            style={styles.markAsPaidButton}
-            onPress={() => {
-              // TODO: Add mark as paid functionality
-              console.log('Mark as paid for:', settlement);
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.requestPaymentButton}
-            onPress={() => {
-              if (settlement.from === name) {
-                handleMakePayment(settlement);
-              } else if (settlement.to === name) {
-                handleRequestPayment(settlement);
-              } else {
-                // TODO: Add send reminder functionality
-                console.log('Send reminder for:', settlement);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.requestPaymentButtonText}>
-              {settlement.from === name 
-                ? 'Make Payment' 
-                : settlement.to === name 
-                ? 'Request Payment' 
-                : 'Send Reminder'
-              }
-            </Text>
-          </TouchableOpacity>
+          {isSettled ? (
+            // Settled Up State - Combined Button with Animation
+            <Animated.View 
+              style={[
+                styles.settledUpContainer,
+                animationState ? { transform: [{ scale: animationState.buttonCombinationScale }] } : {}
+              ]}
+            >
+              <Animated.View 
+                style={[
+                  styles.settledUpButton,
+                  animationState?.settledUpOpacity ? { opacity: animationState.settledUpOpacity } : {}
+                ]}
+              >
+                <View style={styles.settledUpCenter}>
+                  <Animated.View
+                    style={[
+                      styles.checkmarkContainer,
+                      animationState ? {
+                        opacity: animationState.checkmarkOpacity,
+                        transform: [{ scale: animationState.checkmarkScale }]
+                      } : {}
+                    ]}
+                  >
+                    <Ionicons name="checkmark" size={16} color={Colors.surface} />
+                  </Animated.View>
+                  <Animated.Text
+                    style={[
+                      styles.settledUpText,
+                      animationState ? { opacity: animationState.settledTextOpacity } : {}
+                    ]}
+                  >
+                    Settled Up
+                  </Animated.Text>
+                </View>
+                <Animated.View
+                  style={animationState?.undoScale ? { transform: [{ scale: animationState.undoScale }] } : {}}
+                >
+                  <TouchableOpacity
+                    style={styles.undoButton}
+                    onPress={() => handleUndoMarkAsPaid(settlement)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="arrow-undo" size={16} color={Colors.surface} />
+                  </TouchableOpacity>
+                </Animated.View>
+              </Animated.View>
+              
+              {/* Original buttons that fade in during undo */}
+              <Animated.View
+                style={[
+                  styles.originalButtonsContainer,
+                  animationState?.buttonsOpacity ? {
+                    opacity: animationState.buttonsOpacity,
+                    transform: [{ scale: animationState.buttonsScale }]
+                  } : { opacity: 0 }
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.markAsPaidButton}
+                  onPress={() => handleMarkAsPaid(settlement)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={getButtonStyle()}
+                  onPress={() => {
+                    if (settlement.from === name) {
+                      handleMakePayment(settlement);
+                    } else if (settlement.to === name && !hasRequestBeenSent) {
+                      handleRequestPayment(settlement);
+                    } else if (settlement.to === name && hasRequestBeenSent) {
+                      // Request already sent, maybe show a message or do nothing
+                      console.log('Request already sent for:', settlement);
+                    } else {
+                      // TODO: Add send reminder functionality
+                      console.log('Send reminder for:', settlement);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  disabled={settlement.to === name && hasRequestBeenSent}
+                >
+                  <Text style={getButtonTextStyle()}>
+                    {getButtonText()}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </Animated.View>
+          ) : (
+            // Normal Button State
+            <>
+              <TouchableOpacity
+                style={styles.markAsPaidButton}
+                onPress={() => handleMarkAsPaid(settlement)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={getButtonStyle()}
+                onPress={() => {
+                  if (settlement.from === name) {
+                    handleMakePayment(settlement);
+                  } else if (settlement.to === name && !hasRequestBeenSent) {
+                    handleRequestPayment(settlement);
+                  } else if (settlement.to === name && hasRequestBeenSent) {
+                    // Request already sent, maybe show a message or do nothing
+                    console.log('Request already sent for:', settlement);
+                  } else {
+                    // TODO: Add send reminder functionality
+                    console.log('Send reminder for:', settlement);
+                  }
+                }}
+                activeOpacity={0.8}
+                disabled={settlement.to === name && hasRequestBeenSent}
+              >
+                <Text style={getButtonTextStyle()}>
+                  {getButtonText()}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
     );
@@ -445,9 +847,21 @@ const SettleUpScreen = ({ route, navigation }) => {
       <View style={styles.bottomButtonContainer}>
         <TouchableOpacity
           style={styles.returnHomeButton}
-          onPress={() => {
-            // Navigate back to home screen
-            navigation.navigate('HomeMain');
+          onPress={async () => {
+            try {
+              // Save settlement data before navigating home
+              const result = await saveSettlement();
+              if (result.success) {
+                console.log('Settlement saved successfully, navigating home');
+                navigation.navigate('HomeMain');
+              } else {
+                console.error('Failed to save settlement:', result.error);
+                Alert.alert('Error', 'Failed to save settlement. Please try again.');
+              }
+            } catch (error) {
+              console.error('Error in return home handler:', error);
+              Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+            }
           }}
           activeOpacity={0.8}
         >
@@ -732,13 +1146,80 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     ...Shadows.button,
+    minHeight: 44,
   },
   requestPaymentButtonText: {
     ...Typography.label,
     color: Colors.surface,
     fontWeight: '600',
     fontSize: 14,
+  },
+  requestSentButton: {
+    backgroundColor: Colors.success,
+    opacity: 0.8,
+  },
+  requestSentButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  settledUpContainer: {
+    flex: 1,
+    marginHorizontal: Spacing.xs,
+  },
+  settledUpButton: {
+    backgroundColor: Colors.success,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    ...Shadows.button,
+    minHeight: 44,
+  },
+  settledUpCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  originalButtonsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  checkmarkContainer: {
+    marginRight: Spacing.xs,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settledUpText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  undoButton: {
+    padding: Spacing.xs,
+    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 28,
+    minHeight: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   markAsPaidButton: {
     flex: 1,
@@ -747,7 +1228,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
+    justifyContent: 'center',
     ...Shadows.button,
+    minHeight: 44,
   },
   markAsPaidButtonText: {
     ...Typography.label,
