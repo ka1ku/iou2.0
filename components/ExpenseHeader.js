@@ -9,7 +9,8 @@ const ExpenseHeader = ({
   title, 
   onBackPress, 
   onSettingsPress, 
-  isEditing = false 
+  isEditing = false,
+  hideSettings = false 
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -22,16 +23,18 @@ const ExpenseHeader = ({
         <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
       </TouchableOpacity>
       
-      <Text style={styles.headerTitle}>
+      <Text style={[styles.headerTitle, hideSettings && styles.headerTitleCentered]}>
         {title || (isEditing ? 'Edit' : 'Add')}
       </Text>
       
-      <TouchableOpacity 
-        style={styles.settingsButton}
-        onPress={onSettingsPress}
-      >
-        <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
-      </TouchableOpacity>
+      {!hideSettings && (
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={onSettingsPress}
+        >
+          <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+      )}
     </BlurView>
   );
 };
@@ -66,6 +69,9 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     flex: 1,
     textAlign: 'center',
+  },
+  headerTitleCentered: {
+    marginRight: 40, // Balance the back button width to truly center the title
   },
   settingsButton: {
     width: 40,

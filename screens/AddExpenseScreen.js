@@ -819,7 +819,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <ExpenseHeader
-        title={isEditing ? 'Edit Expense' : 'Add Expense'}
+        title={state.title || (isEditing ? 'Edit Expense' : 'Add Expense')}
         onBackPress={() => navigation.goBack()}
         onSettingsPress={() => navigation.navigate('ExpenseSettings', { expense: { 
           id: expense?.id,
@@ -843,18 +843,6 @@ const AddExpenseScreen = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: insets.top + 100, paddingBottom: 120 }}
         >
-          {/* Expense Title Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Expense Title</Text>
-            <TextInput
-              style={styles.titleInput}
-              value={state.title}
-              onChangeText={(text) => updateState({ title: text })}
-              placeholder="Enter expense title..."
-              placeholderTextColor={Colors.textSecondary}
-            />
-          </View>
-
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Participants</Text>
@@ -1359,16 +1347,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  titleInput: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    fontSize: 16,
-  },
 
 });
 

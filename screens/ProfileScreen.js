@@ -499,6 +499,16 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.settingText}>Notifications</Text>
             <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.settingItem}
+            onPress={() => navigation.navigate('Profile', {
+              screen: 'VenmoTest'
+            })}
+          >
+            <Ionicons name="card-outline" size={24} color={Colors.textSecondary} />
+            <Text style={styles.settingText}>Venmo Test</Text>
+            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.settingItem}>
             <Ionicons name="language-outline" size={24} color={Colors.textSecondary} />
             <Text style={styles.settingText}>Language</Text>
