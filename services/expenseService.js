@@ -30,6 +30,14 @@ import { getUserProfile } from './friendService';
 //     splitType: 'even' | 'custom',
 //     splits: [{ participantIndex: number, amount: number, percentage?: number }]
 //   }],
+//   settlements: [{
+//     debtor: string,
+//     creditor: string,
+//     amount: number,
+//     updatedAt: string (ISO timestamp),
+//     associatedItems: array,
+//     status: 'markedAsPaid' | 'paymentRequested' | 'paymentMade' | 'noAction'
+//   }],
 //   createdBy: string (user ID),
 //   createdAt: timestamp,
 //   updatedAt: timestamp
@@ -164,7 +172,6 @@ export const updateExpense = async (expenseId, updateData, userId) => {
       finalUpdateData.participantsMap = participantsMap;
     }
     
-
     
     const firestoreInstance = getFirestore(getApp());
     await updateDoc(doc(firestoreInstance, 'expenses', expenseId), {
@@ -394,6 +401,7 @@ const calculateExpenseTotal = (expense) => {
   return itemsTotal + feesTotal;
 };
 
+
 // Helper function to add/remove participants and update participantsMap
 export const updateExpenseParticipants = async (expenseId, participants, userId) => {
   try {
@@ -476,86 +484,74 @@ export const migrateExpensesWithParticipantsMap = async () => {
   }
 };
 
-// Helper function to calculate balances for profile screen
+// Helper function to calculate balances for profile screen based on settlements
 export const calculateUserBalances = (expenses, userId) => {
-  const currentUserIndex = 0; // By convention, user is always index 0
   const participantBalances = {}; // { participantName: netAmount }
-  let totalPaidByUser = 0;
-  let totalOwedByUser = 0;
+  let totalOwedToUser = 0;
+  let totalUserOwes = 0;
+
+  console.log('Calculating user balances from settlements for', expenses.length, 'expenses');
 
   expenses.forEach(expense => {
-    const paidByIndices = Array.isArray(expense.selectedPayers) ? expense.selectedPayers : [];
+    const settlements = Array.isArray(expense.settlements) ? expense.settlements : [];
     const participants = Array.isArray(expense.participants) ? expense.participants : [];
-    const items = Array.isArray(expense.items) ? expense.items : [];
-
-    // --- Calculate how much the current user paid for this expense ---
-    let paidByUser = 0;
-    if (paidByIndices.includes(currentUserIndex) && paidByIndices.length > 0) {
-      paidByUser = Math.abs(calculateExpenseTotal(expense) / paidByIndices.length);
+    
+    // Get current user's name from participants (assuming user is always first participant)
+    const currentUserName = participants[0]?.name;
+    if (!currentUserName) {
+      console.log('No current user name found for expense:', expense.title);
+      return;
     }
 
-    // --- Calculate how much the current user owes for this expense ---
-    let owedByUser = 0;
-    items.forEach(item => {
-      const itemConsumers = Array.isArray(item.selectedConsumers) ? item.selectedConsumers : [];
-      const itemSplits = Array.isArray(item.splits) ? item.splits : [];
-      // Find the split for the current user
-      const userSplitIndex = itemConsumers.indexOf(currentUserIndex);
-      if (userSplitIndex !== -1 && itemSplits[userSplitIndex]) {
-        owedByUser += parseFloat(itemSplits[userSplitIndex].amount) || 0;
-      }
-    });
+    console.log(`Processing expense "${expense.title}" with ${settlements.length} settlements`);
 
-    const netBalance = paidByUser - owedByUser;
-    if (netBalance > 0) {
-      totalPaidByUser += netBalance;
-    } else if (netBalance < 0) {
-      totalOwedByUser += Math.abs(netBalance);
-    }
-
-    // --- Calculate net amounts for each participant in this expense ---
-    participants.forEach((participant, participantIndex) => {
-      if (participantIndex === currentUserIndex || !participant?.name) return;
-
-      // How much this participant paid
-      let participantPaid = 0;
-      if (paidByIndices.includes(participantIndex) && paidByIndices.length > 0) {
-        participantPaid = Math.abs(calculateExpenseTotal(expense) / paidByIndices.length);
+    settlements.forEach(settlement => {
+      // Skip settlements that are marked as paid
+      if (settlement.status === 'markedAsPaid') {
+        console.log(`Skipping markedAsPaid settlement: ${settlement.debtor} -> ${settlement.creditor} $${settlement.amount}`);
+        return;
       }
 
-      // How much this participant owes
-      let participantOwed = 0;
-      items.forEach(item => {
-        const itemConsumers = Array.isArray(item.selectedConsumers) ? item.selectedConsumers : [];
-        const itemSplits = Array.isArray(item.splits) ? item.splits : [];
-        const splitIdx = itemConsumers.indexOf(participantIndex);
-        if (splitIdx !== -1 && itemSplits[splitIdx]) {
-          participantOwed += parseFloat(itemSplits[splitIdx].amount) || 0;
+      const debtor = settlement.debtor;
+      const creditor = settlement.creditor;
+      const amount = parseFloat(settlement.amount) || 0;
+
+      console.log(`Processing settlement: ${debtor} owes ${creditor} $${amount} (status: ${settlement.status})`);
+
+      // If current user is the creditor (someone owes them)
+      if (creditor === currentUserName) {
+        totalOwedToUser += amount;
+        
+        // Update debt breakdown for this debtor
+        if (debtor !== currentUserName) {
+          participantBalances[debtor] = (participantBalances[debtor] || 0) + amount;
         }
-      });
-
-      // Net for this participant: positive means they owe money, negative means they are owed money
-      const participantNet = participantOwed - participantPaid;
-
-      participantBalances[participant.name] = (participantBalances[participant.name] || 0) + participantNet
+        console.log(`User is creditor: +$${amount} owed to user by ${debtor}`);
+      }
+      // If current user is the debtor (they owe someone)
+      else if (debtor === currentUserName) {
+        totalUserOwes += amount;
+        
+        // Update debt breakdown for this creditor
+        if (creditor !== currentUserName) {
+          participantBalances[creditor] = (participantBalances[creditor] || 0) - amount;
+        }
+        console.log(`User is debtor: +$${amount} user owes to ${creditor}`);
+      }
     });
   });
 
-  // Calculate totals from the participant balances
-  let totalOwed = 0;
-  let totalOwes = 0;
-  Object.values(participantBalances).forEach(balance => {
-    if (balance > 0) {
-      totalOwed += balance;
-    } else {
-      totalOwes += Math.abs(balance);
-    }
+  console.log('Final balances:', {
+    totalOwedToUser,
+    totalUserOwes,
+    netBalance: totalOwedToUser - totalUserOwes,
+    debtBreakdown: participantBalances
   });
 
   return {
-    totalOwed: totalPaidByUser,
-    totalOwes: totalOwedByUser,
-    netBalance: totalPaidByUser - totalOwedByUser,
+    totalOwed: totalOwedToUser,
+    totalOwes: totalUserOwes,
+    netBalance: totalOwedToUser - totalUserOwes,
     debtBreakdown: participantBalances,
   };
 };

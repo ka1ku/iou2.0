@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import { calculateSettlement, calculateHubSettlement, getSettlementSummary } from '../utils/settlementCalculator';
+import { calculateSettlement, getSettlementSummary } from '../utils/settlementCalculator';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 import { createExpense, updateExpense } from '../services/expenseService';
@@ -28,21 +28,26 @@ const AVATAR_MARGIN = 6;
 const BUBBLE_WIDTH = 60;
 
 const SettleUpScreen = ({ route, navigation }) => {
-  const { expense, participants } = route.params;
-  const [settlementType, setSettlementType] = useState('optimal'); // 'optimal' or 'hub'
+  const { expense } = route.params;
+  const participants = expense.participants;
   const [loading, setLoading] = useState(false);
   const [requestSentStates, setRequestSentStates] = useState({}); // Track which requests have been sent
   const [isVenmoAppActive, setIsVenmoAppActive] = useState(false);
   const [settledStates, setSettledStates] = useState({}); // Track which settlements are marked as paid
+  const [paymentMadeStates, setPaymentMadeStates] = useState({}); // Track which settlements have payments made
   const [animationStates, setAnimationStates] = useState({}); // Track animation states for each settlement
-  console.log('settlupexpense', expense);
-  console.log('settleupparticipants', participants);
+  
   if (!expense) {
     navigation.goBack();
     return null;
   }
-
-  const name = participants[0].name;
+  
+  if (!participants || participants.length === 0) {
+    navigation.goBack();
+    return null;
+  }
+  
+  const name = participants[0]?.name || 'Unknown';
   
   // Animation function for settled up state
   const animateSettledUp = useCallback((settlementId) => {
@@ -105,6 +110,45 @@ const SettleUpScreen = ({ route, navigation }) => {
     }, 200);
   }, []);
   
+  // Initialize settlement states from existing settlements and save settlements if they don't exist
+  useEffect(() => {
+    console.log('expense', expense)
+    if (expense.settlements && expense.settlements != []) {
+        console.log('settlements field exists')
+      const initialSettledStates = {};
+      const initialRequestSentStates = {};
+      const initialPaymentMadeStates = {};
+      console.log('expense.settlements', expense.settlements);
+      expense.settlements.forEach(settlement => {
+        const settlementId = `${settlement.debtor}-${settlement.creditor}-${settlement.amount}`;
+        
+        if (settlement.status === 'markedAsPaid') {
+          initialSettledStates[settlementId] = true;
+        }
+        if (settlement.status === 'paymentRequested') {
+          initialRequestSentStates[settlementId] = true;
+        }
+        if (settlement.status === 'paymentMade') {
+          initialPaymentMadeStates[settlementId] = true;
+        }
+      });
+      
+      setSettledStates(initialSettledStates);
+      setRequestSentStates(initialRequestSentStates);
+      setPaymentMadeStates(initialPaymentMadeStates);
+    } else {
+      // If no settlements exist, save the calculated ones
+      const saveInitialSettlements = async () => {
+        try {
+          await saveSettlement();
+        } catch (error) {
+          console.error('Error saving initial settlements:', error);
+        }
+      };
+      saveInitialSettlements();
+    }
+  }, [expense.settlements, saveSettlement]);
+
   // AppState listener to detect when user returns from Venmo
   useEffect(() => {
     const handleAppStateChange = (nextAppState) => {
@@ -131,19 +175,24 @@ const SettleUpScreen = ({ route, navigation }) => {
     return () => subscription?.remove();
   }, [isVenmoAppActive]);
 
-  // Calculate settlements based on current type
-  const optimalSettlement = calculateSettlement(expense);
-  console.log('optimalSettlement', optimalSettlement);
-  const settlements = settlementType === 'optimal' 
-    ? optimalSettlement.settlements
-    : calculateHubSettlement(optimalSettlement.balances || []);
+  // Use settlements from expense data if available, otherwise calculate them
+  const settlements = expense.settlements && expense.settlements.length > 0 
+    ? expense.settlements.map(s => ({
+        from: s.debtor,
+        to: s.creditor,
+        amount: s.amount,
+        status: s.status || 'noAction'
+      }))
+    : (() => {
+        const optimalSettlement = calculateSettlement(expense);
+        return optimalSettlement.settlements.map(s => ({
+          ...s,
+          status: 'noAction'
+        }));
+      })();
   
   const summary = getSettlementSummary(settlements);
   
-  // Find the hub participant for hub settlements
-  const hubParticipant = settlementType === 'hub' && settlements.length > 0 
-    ? settlements[0].to // The hub is always the receiver in hub settlements
-    : null;
 
   const handleAccept = async () => {
     setLoading(true);
@@ -157,7 +206,7 @@ const SettleUpScreen = ({ route, navigation }) => {
       const expenseWithSettlement = {
         ...expense,
         settlement: {
-          type: settlementType,
+          type: 'optimal',
           settlements: settlements,
           createdAt: new Date().toISOString(),
           accepted: true
@@ -200,6 +249,14 @@ const SettleUpScreen = ({ route, navigation }) => {
         return;
       }
       console.log('recipientProfile', recipientProfile);
+      
+      // Mark that payment is being made
+      const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+      setPaymentMadeStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      
       // Create Venmo deeplink
       const amount = settlement.amount.toFixed(2);
       const note = `IOU Payment - ${expense.title || 'Expense'}`;
@@ -231,6 +288,37 @@ const SettleUpScreen = ({ route, navigation }) => {
     
     console.log('Marked as paid:', settlement);
   }, [animateSettledUp]);
+
+  const updateSettlementStatus = useCallback(async (settlement, status) => {
+    try {
+      if (!expense.id) {
+        throw new Error('Expense ID is missing');
+      }
+
+      // Get current settlements from the expense
+      const currentSettlements = expense.settlements || [];
+      
+      // Find and update the specific settlement
+      const updatedSettlements = currentSettlements.map(s => {
+        if (s.debtor === settlement.from && s.creditor === settlement.to && s.amount === settlement.amount) {
+          return {
+            ...s,
+            status: status,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return s;
+      });
+
+      // Update the expense with the new settlements
+      await updateExpense(expense.id, { settlements: updatedSettlements }, getCurrentUser()?.uid);
+      
+      console.log(`Updated settlement status to ${status} for ${settlement.from} -> ${settlement.to}`);
+    } catch (error) {
+      console.error('Error updating settlement status:', error);
+      throw error;
+    }
+  }, [expense, getCurrentUser]);
 
   const handleUndoMarkAsPaid = useCallback((settlement) => {
     const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
@@ -314,76 +402,53 @@ const SettleUpScreen = ({ route, navigation }) => {
 
   const saveSettlement = useCallback(async () => {
     try {
-      console.log('Saving settlement for expense:', expense.id);
+      console.log('Saving settlement data for expense:', expense.id);
       
       // Validate expense ID
       if (!expense.id) {
         throw new Error('Expense ID is missing');
       }
       
-      // Get settlement summary data
-      const summary = getSettlementSummary(settlements);
-      
-      // Create settleUps array from settlements with status mapping
-      const settleUps = (settlements || []).map(settlement => {
+      // Create settlements array from the current settlements (which are working correctly)
+      const settlementsData = (settlements || []).map(settlement => {
         const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
         const isSettled = settledStates[settlementId] === true;
         const hasRequestBeenSent = requestSentStates[settlementId] === true;
+        const hasPaymentBeenMade = paymentMadeStates[settlementId] === true;
         
-        // Determine status based on user actions
-        let status = 'awaitingAction';
+        // Determine status based on user actions, but preserve existing status if no new actions
+        let status = settlement.status || 'noAction';
         if (isSettled) {
           status = 'markedAsPaid';
+        } else if (hasPaymentBeenMade) {
+          status = 'paymentMade';
         } else if (hasRequestBeenSent) {
           status = 'paymentRequested';
         }
-        // Note: 'paymentSent' would be set when user actually sends payment via Venmo
         
         return {
           debtor: settlement.from || 'Unknown',
           creditor: settlement.to || 'Unknown',
           amount: settlement.amount || 0,
+          updatedAt: new Date().toISOString(),
+          associatedItems: [], // TODO: Map to specific items if needed
           status: status
         };
       });
       
-      // Create settlement data structure with fallback values
-      const settlementData = {
-        settlementMethod: settlementType || 'optimal',
-        totalTransactions: summary.totalTransactions || 0,
-        amountTransacted: summary.amountTransacted || 0,
-        peopleInvolved: summary.peopleInvolved || 0,
-        settleUps: settleUps || []
-      };
+      // Debug logging
+      console.log('Settlements data to save:', settlementsData);
       
-      // Debug logging to identify undefined fields
-      console.log('Settlement data to save:', settlementData);
-      console.log('Settlement method:', settlementType, typeof settlementType);
-      console.log('Total transactions:', summary.totalTransactions, typeof summary.totalTransactions);
-      console.log('Amount transacted:', summary.amountTransacted, typeof summary.amountTransacted);
-      console.log('People involved:', summary.peopleInvolved, typeof summary.peopleInvolved);
-      console.log('Settle ups:', settleUps);
-      console.log('Settle ups length:', settleUps.length);
+      // Update the expense with settlements data
+      await updateExpense(expense.id, { settlements: settlementsData }, getCurrentUser()?.uid);
       
-      // Check each settleUp for undefined values
-      settleUps.forEach((settleUp, index) => {
-        console.log(`SettleUp ${index}:`, settleUp);
-        console.log(`  - debtor: ${settleUp.debtor} (${typeof settleUp.debtor})`);
-        console.log(`  - creditor: ${settleUp.creditor} (${typeof settleUp.creditor})`);
-        console.log(`  - amount: ${settleUp.amount} (${typeof settleUp.amount})`);
-        console.log(`  - status: ${settleUp.status} (${typeof settleUp.status})`);
-      });
-      
-      // Update the expense with settlement data
-      await updateExpense(expense.id, { settlement: settlementData }, getCurrentUser()?.uid);
-      
-      console.log('Settlement saved successfully');
+      console.log('Settlement data saved successfully');
       return { success: true };
     } catch (error) {
-      console.error('Error saving settlement:', error);
+      console.error('Error saving settlement data:', error);
       return { success: false, error: error.message };
     }
-  }, [expense, settlements, settlementType, settledStates, requestSentStates]);
+  }, [expense, settlements, settledStates, requestSentStates, paymentMadeStates]);
 
   const handleRequestPayment = async (settlement) => {
     try {
@@ -439,12 +504,12 @@ const SettleUpScreen = ({ route, navigation }) => {
     
     // Check if a request has been sent for this settlement
     const requestId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
-    const hasRequestBeenSent = requestSentStates[requestId] === true;
+    const hasRequestBeenSent = requestSentStates[requestId] === true || settlement.status === 'paymentRequested';
     
     // Check if this settlement is marked as paid/settled
     const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
-    const isSettled = settledStates[settlementId] === true;
-    const animationState = animationStates[settlementId];
+    const isSettled = settledStates[settlementId] === true || settlement.status === 'markedAsPaid';
+    const animationState = animationStates[settlementId] || null;
     
     // Determine button text and styling
     const getButtonText = () => {
@@ -605,7 +670,7 @@ const SettleUpScreen = ({ route, navigation }) => {
             <Animated.View 
               style={[
                 styles.settledUpContainer,
-                animationState ? { transform: [{ scale: animationState.buttonCombinationScale }] } : {}
+                animationState?.buttonCombinationScale ? { transform: [{ scale: animationState.buttonCombinationScale }] } : {}
               ]}
             >
               <Animated.View 
@@ -618,7 +683,7 @@ const SettleUpScreen = ({ route, navigation }) => {
                   <Animated.View
                     style={[
                       styles.checkmarkContainer,
-                      animationState ? {
+                      animationState?.checkmarkOpacity && animationState?.checkmarkScale ? {
                         opacity: animationState.checkmarkOpacity,
                         transform: [{ scale: animationState.checkmarkScale }]
                       } : {}
@@ -629,7 +694,7 @@ const SettleUpScreen = ({ route, navigation }) => {
                   <Animated.Text
                     style={[
                       styles.settledUpText,
-                      animationState ? { opacity: animationState.settledTextOpacity } : {}
+                      animationState?.settledTextOpacity ? { opacity: animationState.settledTextOpacity } : {}
                     ]}
                   >
                     Settled Up
@@ -653,7 +718,7 @@ const SettleUpScreen = ({ route, navigation }) => {
               <Animated.View
                 style={[
                   styles.originalButtonsContainer,
-                  animationState?.buttonsOpacity ? {
+                  animationState?.buttonsOpacity && animationState?.buttonsScale ? {
                     opacity: animationState.buttonsOpacity,
                     transform: [{ scale: animationState.buttonsScale }]
                   } : { opacity: 0 }
@@ -729,61 +794,6 @@ const SettleUpScreen = ({ route, navigation }) => {
     );
   };
 
-  const renderSettlementTypeSelector = () => (
-    <View style={styles.typeSelector}>
-      <Text style={styles.typeSelectorLabel}>Settlement Method:</Text>
-      <View style={styles.typeButtons}>
-        <TouchableOpacity
-          style={[
-            styles.typeButton,
-            settlementType === 'optimal' && styles.typeButtonActive
-          ]}
-          onPress={() => setSettlementType('optimal')}
-        >
-          <Text style={[
-            styles.typeButtonText,
-            settlementType === 'optimal' && styles.typeButtonTextActive
-          ]}>
-            Optimal
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.typeButton,
-            settlementType === 'hub' && styles.typeButtonActive
-          ]}
-          onPress={() => setSettlementType('hub')}
-        >
-          <Text style={[
-            styles.typeButtonText,
-            settlementType === 'hub' && styles.typeButtonTextActive
-          ]}>
-            Hub
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderSummary = () => (
-    <View style={styles.summaryContainer}>
-      <View style={styles.summaryRow}>
-        <Text style={styles.summaryLabel}>Total Transactions:</Text>
-        <Text style={styles.summaryValue}>{summary.totalTransactions}</Text>
-      </View>
-      <View style={styles.summaryRow}>
-        <Text style={styles.summaryLabel}>Total Amount:</Text>
-        <Text style={styles.summaryValue}>${summary.totalAmount.toFixed(2)}</Text>
-      </View>
-      <View style={styles.summaryRow}>
-        <Text style={styles.summaryLabel}>People Involved:</Text>
-        <Text style={styles.summaryValue}>
-          {summary.uniquePeople} people
-        </Text>
-      </View>
-    </View>
-  );
-
   return (
     <View style={styles.container}>
       <BlurView intensity={30} tint="light" style={styles.header}>
@@ -802,27 +812,13 @@ const SettleUpScreen = ({ route, navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-        {/* Settlement Type Selector */}
-        {renderSettlementTypeSelector()}
 
-        {/* Summary */}
-        {renderSummary()}
+
 
         {/* Settlements List */}
         <View style={styles.settlementsSection}>
           <Text style={styles.sectionTitle}>
-            {settlementType === 'optimal' ? 'Optimal Settlements' : 'Hub Settlements'}
-            {settlementType === 'hub' && hubParticipant && (
-              <Text style={styles.hubTitleIndicator}>
-                {' '}(Hub: {hubParticipant === name ? 'Me' : hubParticipant})
-              </Text>
-            )}
-          </Text>
-          <Text style={styles.sectionSubtitle}>
-            {settlementType === 'optimal' 
-              ? 'Minimizes total number of transactions'
-              : 'One person acts as the central hub for all payments'
-            }
+            Optimal Settlements
           </Text>
           
           {settlements.length > 0 ? (
@@ -921,43 +917,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingBottom: 120,
   },
-  typeSelector: {
-    marginBottom: Spacing.lg,
-  },
-  typeSelectorLabel: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-    fontWeight: '600',
-  },
-  typeButtons: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.sm,
-    padding: Spacing.xxs,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    ...Shadows.card,
-  },
-  typeButton: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: Radius.sm,
-    alignItems: 'center',
-  },
-  typeButtonActive: {
-    backgroundColor: Colors.accent,
-  },
-  typeButtonText: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  typeButtonTextActive: {
-    color: Colors.surface,
-    fontWeight: '600',
-  },
   summaryContainer: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
@@ -990,11 +949,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
     fontWeight: '600',
-  },
-  hubTitleIndicator: {
-    ...Typography.body2,
-    color: Colors.accent,
-    fontWeight: '500',
   },
   sectionSubtitle: {
     ...Typography.body2,

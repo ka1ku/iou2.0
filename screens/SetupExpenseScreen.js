@@ -232,10 +232,14 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       if (expenseType === 'receipt') {
         navigation.replace('AddReceipt', { 
           expense: createdExpense,
+          isNewExpense: true, // Flag to indicate this is a new expense creation
           ...(scannedReceipt && fromReceiptScan ? { scannedReceipt, fromReceiptScan } : {})
         });
       } else {
-        navigation.replace('AddExpense', { expense: createdExpense });
+        navigation.replace('AddExpense', { 
+          expense: createdExpense,
+          isNewExpense: true // Flag to indicate this is a new expense creation
+        });
       }
 
     } catch (error) {

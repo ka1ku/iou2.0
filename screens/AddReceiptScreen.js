@@ -29,8 +29,8 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 
 const AddReceiptScreen = ({ route, navigation }) => {
-  const { expense, scannedReceipt, fromReceiptScan } = route.params || {};
-  const isEditing = !!expense;
+  const { expense, scannedReceipt, fromReceiptScan, isNewExpense = false } = route.params || {};
+  const isEditing = !!expense && !isNewExpense;
   const insets = useSafeAreaInsets();
   const currentUserId = getCurrentUser()?.uid || null;
 
@@ -305,9 +305,9 @@ const AddReceiptScreen = ({ route, navigation }) => {
     }
   }, [scannedReceipt, fromReceiptScan]);
 
-  // Initialize selectedFriends when editing an existing expense
+  // Initialize selectedFriends when editing an existing expense or completing a new expense
   useEffect(() => {
-    if (expense && isEditing) {
+    if (expense && (isEditing || isNewExpense)) {
       const existingFriends = expense.participants
         .filter(p => p.name !== 'Me' && !p.placeholder && p.userId && p.userId !== currentUserId)
         .map(p => ({
@@ -344,7 +344,7 @@ const AddReceiptScreen = ({ route, navigation }) => {
       }
       if (expense.selectedPayers) setSelectedPayers(expense.selectedPayers);
     }
-  }, [expense, isEditing]);
+  }, [expense, isEditing, isNewExpense]);
 
   // Update participants when friends are selected
   useEffect(() => {
@@ -441,13 +441,15 @@ const AddReceiptScreen = ({ route, navigation }) => {
         join: { enabled: true }
       };
       
-      if (isEditing) {
+      if (isEditing || isNewExpense) {
+        // For both editing existing receipts and completing new receipts, we update the existing expense
         await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
         const { participants, ...otherFields } = expenseData;
         await updateExpense(expense.id, otherFields, currentUser.uid);
-        Alert.alert('Success', 'Receipt updated successfully');
+        Alert.alert('Success', isNewExpense ? 'Receipt created successfully' : 'Receipt updated successfully');
         resetChanges();
       } else {
+        // This case should not happen in the current flow, but keeping for safety
         await createExpense(expenseData, currentUser.uid);
         Alert.alert('Success', 'Receipt created successfully');
       }

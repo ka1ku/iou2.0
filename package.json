@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "@expo-google-fonts/poppins": "^0.4.0",
-    "@react-native-async-storage/async-storage": "^2.1.2",
+    "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/blur": "^4.4.1",
     "@react-native-firebase/ai": "^23.1.0",
     "@react-native-firebase/app": "^23.1.1",
@@ -37,8 +37,8 @@
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
-    "react-native-svg": "^15.12.1",
-    "react-native-webview": "13.13.5",
+    "react-native-svg": "15.11.2",
+    "react-native-webview": "^13.13.5",
     "vector-icons": "^0.1.0"
   },
   "name": "IOU-2.0",

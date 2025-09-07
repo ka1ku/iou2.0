@@ -363,7 +363,7 @@ const ProfileScreen = ({ navigation }) => {
       {/* Debt Breakdown Section */}
       {memoizedBalances.debtBreakdown && Object.keys(memoizedBalances.debtBreakdown).length > 0 && (
         <View style={styles.debtSection}>
-          <Text style={styles.sectionTitle}>Debt Breakdown</Text>
+          <Text style={styles.sectionTitle}> Balance Breakdown</Text>
           {expensesLoading ? (
             <SkeletonLoader />
           ) : (

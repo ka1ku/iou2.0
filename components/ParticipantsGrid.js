@@ -16,15 +16,7 @@ const ParticipantsGrid = ({
   currentUserId = null
 }) => {
   const friendSelectorRef = useRef(null);
-
-  const handleManagePress = () => {
-    if (onManagePress) {
-      onManagePress();
-    } else if (friendSelectorRef.current) {
-      friendSelectorRef.current.openModal();
-    }
-  };
-
+  
   const renderParticipantItem = ({ item, index }) => {
     if (item.type === 'add-button') {
       return (
@@ -34,9 +26,10 @@ const ParticipantsGrid = ({
           activeOpacity={0.7}
         >
           <View style={styles.addParticipantGridIcon}>
-            <Ionicons name="add" size={24} color={Colors.accent} />
+            <Ionicons name="create" size={24} color={Colors.accent} />
           </View>
-          <Text style={styles.addParticipantGridText}>Add</Text>
+          <Text style={styles.addParticipantGridText}>Edit</Text>
+          <Text style={styles.addParticipantGridPlaceholder}></Text>
         </TouchableOpacity>
       );
     }
@@ -119,27 +112,6 @@ const ParticipantsGrid = ({
         </TouchableOpacity>
       )}
       
-      {/* Group Management Row */}
-      <View style={styles.groupManagementRow}>
-        <View style={styles.groupInfo}>
-          <Text style={styles.groupInfoText}>
-            {participants.length} {participants.length === 1 ? 'person' : 'people'} in this expense
-          </Text>
-          {participants.length > 5 && (
-            <Text style={styles.pendingInvitesText}>
-              Tap "More" to see all participants
-            </Text>
-          )}
-        </View>
-        <TouchableOpacity 
-          style={styles.manageGroupButton}
-          onPress={handleManagePress}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="people-outline" size={16} color={Colors.surface} />
-          <Text style={styles.manageGroupButtonText}>Manage</Text>
-        </TouchableOpacity>
-      </View>
       
       <FriendSelector
         ref={friendSelectorRef}
@@ -159,13 +131,11 @@ const styles = StyleSheet.create({
   },
   participantsGridContainer: {
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    marginBottom: Spacing.sm,
+    paddingTop: Spacing.md,
   },
   participantGridItem: {
     alignItems: 'center',
     width: '33.33%', // Exactly one-third width for 3 columns
-    marginBottom: Spacing.sm,
     paddingVertical: Spacing.xs,
     minHeight: 100,
   },
@@ -239,6 +209,13 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: '600',
     fontSize: 11,
+  },
+  addParticipantGridPlaceholder: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 9,
+    height: 12, // Match the height of username text
   },
   groupManagementRow: {
     flexDirection: 'row',

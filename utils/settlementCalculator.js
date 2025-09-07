@@ -24,6 +24,7 @@ export const calculateSettlement = (expense) => {
   const balances = calculateParticipantBalances(participants, items, fees, total);
   console.log('balances', balances);
   const settlements = generateSettlementProposal(balances);
+  console.log('settlements', settlements);
   return {
     settlements,
     balances,

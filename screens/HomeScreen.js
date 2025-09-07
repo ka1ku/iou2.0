@@ -110,6 +110,22 @@ const HomeScreen = ({ navigation }) => {
     return { youOwe, youPaid };
   };
 
+  // Determine settlement status for an expense
+  const getSettlementStatus = (expense) => {
+    // If no settlements exist, check if there's a balance
+    if (!expense.settlements || expense.settlements.length === 0) {
+      const balance = calculateExpenseBalance(expense);
+      return balance.youOwe === 0 ? 'settled' : 'needsSettlement';
+    }
+
+    // Check if all settlements are marked as paid
+    const allSettled = expense.settlements.every(settlement => 
+      settlement.status === 'markedAsPaid'
+    );
+
+    return allSettled ? 'settled' : 'needsSettlement';
+  };
+
 
   const handleReceiptScan = async () => {
     try {
@@ -199,8 +215,7 @@ const HomeScreen = ({ navigation }) => {
     // Determine if this is a receipt or expense
     const isReceipt = item.expenseType === 'receipt' || 
                      item.fromReceiptScan || 
-                     (item.title && item.title.toLowerCase().includes('receipt')) ||
-                     (item.items && item.items.length > 1); // Multiple items often indicate a receipt
+                     (item.title && item.title.toLowerCase().includes('receipt'));
     const isExpense = item.expenseType === 'expense' || !isReceipt;
     
     // Calculate payment summary for selected payers
@@ -257,22 +272,42 @@ const HomeScreen = ({ navigation }) => {
               </Text>
             </View>
             <View style={styles.expenseBalance}>
-              {expenseBalance.youOwe > 0 ? (
-                <View style={styles.oweContainer}>
-                  <Ionicons name="arrow-up-circle" size={16} color={Colors.danger} />
-                  <Text style={styles.oweText}>You owe ${expenseBalance.youOwe.toFixed(2)}</Text>
-                </View>
-              ) : expenseBalance.youOwe < 0 ? (
-                <View style={styles.owedContainer}>
-                  <Ionicons name="arrow-down-circle" size={16} color={Colors.success} />
-                  <Text style={styles.owedText}>You're owed ${Math.abs(expenseBalance.youOwe).toFixed(2)}</Text>
-                </View>
-              ) : (
-                <View style={styles.evenContainer}>
-                  <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-                  <Text style={styles.evenText}>Settled up</Text>
-                </View>
-              )}
+              {(() => {
+                const settlementStatus = getSettlementStatus(item);
+                
+                if (settlementStatus === 'settled') {
+                  return (
+                    <View style={styles.evenContainer}>
+                      <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                      <Text style={styles.evenText}>Settled up</Text>
+                    </View>
+                  );
+                } else {
+                  // Show balance information when not settled
+                  if (expenseBalance.youOwe > 0) {
+                    return (
+                      <View style={styles.oweContainer}>
+                        <Ionicons name="arrow-up-circle" size={16} color={Colors.danger} />
+                        <Text style={styles.oweText}>You owe ${expenseBalance.youOwe.toFixed(2)}</Text>
+                      </View>
+                    );
+                  } else if (expenseBalance.youOwe < 0) {
+                    return (
+                      <View style={styles.owedContainer}>
+                        <Ionicons name="arrow-down-circle" size={16} color={Colors.success} />
+                        <Text style={styles.owedText}>You're owed ${Math.abs(expenseBalance.youOwe).toFixed(2)}</Text>
+                      </View>
+                    );
+                  } else {
+                    return (
+                      <View style={styles.needsSettlementContainer}>
+                        <Ionicons name="time-outline" size={16} color={Colors.warning} />
+                        <Text style={styles.needsSettlementText}>Needs settlement</Text>
+                      </View>
+                    );
+                  }
+                }
+              })()}
             </View>
           </View>
         </View>
@@ -554,6 +589,22 @@ const styles = StyleSheet.create({
   evenText: {
     ...Typography.label,
     color: Colors.success,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  needsSettlementContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.warning + '15',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.warning + '30',
+  },
+  needsSettlementText: {
+    ...Typography.label,
+    color: Colors.warning,
     fontWeight: '600',
     marginLeft: 4,
   },

@@ -20,6 +20,7 @@ import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 import { createExpense, updateExpense, updateExpenseParticipants } from '../services/expenseService';
+import { calculateSettlement } from '../utils/settlementCalculator';
 import { 
   FriendSelector, 
   Card, 
@@ -89,8 +90,8 @@ const useExpenseState = (initialExpense = null) => {
 };
 
 const AddExpenseScreen = ({ route, navigation }) => {
-  const { expense } = route.params || {};
-  const isEditing = !!expense;
+  const { expense, isNewExpense = false } = route.params || {};
+  const isEditing = !!expense && !isNewExpense;
   const insets = useSafeAreaInsets();
   const { state, updateState, total, createMeParticipant } = useExpenseState(expense);
   const friendSelectorRef = useRef(null);
@@ -104,6 +105,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (!initialStateRef.current) {
       initialStateRef.current = isEditing && expense ? {
+        
         title: expense.title || '',
         participantCount: expense.participants?.length || 1,
         itemCount: expense.items?.length || 1,
@@ -114,6 +116,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         itemCount: 1,
         feeCount: 0
       };
+      console.log('expense', expense);
     }
   }, [isEditing, expense]);
 
@@ -286,9 +289,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
 
 
-  // Initialize selectedFriends when editing an existing expense
+  // Initialize selectedFriends when editing an existing expense or completing a new expense
   useEffect(() => {
-    if (expense && isEditing) {
+    if (expense && (isEditing || isNewExpense)) {
       const currentUserId = getCurrentUser()?.uid;
       const existingFriends = expense.participants
         .filter(p => p.name !== 'Me' && !p.placeholder && p.userId && p.userId !== currentUserId)
@@ -329,7 +332,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         selectedPayers: expense.selectedPayers || [0]
       });
     }
-  }, [expense, isEditing, createMeParticipant, updateState]);
+  }, [expense, isEditing, isNewExpense, createMeParticipant, updateState]);
 
   // Form change tracking is now handled above with simpler logic
 
@@ -358,7 +361,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
   
   // Update initial item to include all participants as consumers when participants change (only for new expenses)
   useEffect(() => {
-    if (state.participants.length > 0 && state.items.length > 0 && !isEditing) {
+    if (state.participants.length > 0 && state.items.length > 0 && (!isEditing || isNewExpense)) {
       const allParticipantIndices = state.participants.map((_, index) => index);
       const updatedItems = [...state.items];
       if (updatedItems[0] && !updatedItems[0].name && updatedItems[0].amount === 0) {
@@ -375,7 +378,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
         }
       }
     }
-  }, [state.participants.length, isEditing, updateState]);
+  }, [state.participants.length, isEditing, isNewExpense, updateState]);
   
   // Save functions
   const handleSaveExpense = useCallback(async () => {
@@ -471,13 +474,15 @@ const AddExpenseScreen = ({ route, navigation }) => {
         join: { enabled: state.joinEnabled || false }
       };
       
-      if (isEditing) {
+      if (isEditing || isNewExpense) {
+        // For both editing existing expenses and completing new expenses, we update the existing expense
         await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
         const { participants, ...otherFields } = expenseData;
         await updateExpense(expense.id, otherFields, currentUser.uid);
-        Alert.alert('Success', 'Expense updated successfully');
+        Alert.alert('Success', isNewExpense ? 'Expense created successfully' : 'Expense updated successfully');
         resetChanges();
       } else {
+        // This case should not happen in the current flow, but keeping for safety
         await createExpense(expenseData, currentUser.uid);
         Alert.alert('Success', 'Expense created successfully');
       }
@@ -489,7 +494,7 @@ const AddExpenseScreen = ({ route, navigation }) => {
     } finally {
       updateState({ loading: false });
     }
-  }, [state, total, isEditing, expense, navigation, resetChanges, updateState]);
+  }, [state, total, isEditing, isNewExpense, expense, navigation, resetChanges, updateState]);
 
   const saveExpenseSilently = useCallback(async () => {
     const finalTitle = state.title.trim() || 'Expense';
@@ -542,9 +547,9 @@ const AddExpenseScreen = ({ route, navigation }) => {
       createdAt: expense?.createdAt || new Date()
     };
 
-    if (isEditing && expense?.id) expenseData.id = expense.id;
+    if ((isEditing || isNewExpense) && expense?.id) expenseData.id = expense.id;
 
-    if (isEditing) {
+    if (isEditing || isNewExpense) {
       await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
       const { participants, ...otherFields } = expenseData;
       await updateExpense(expense.id, otherFields, currentUser.uid);
@@ -553,39 +558,133 @@ const AddExpenseScreen = ({ route, navigation }) => {
     }
 
     resetChanges();
-  }, [state, total, isEditing, expense, resetChanges]);
+  }, [state, total, isEditing, isNewExpense, expense, resetChanges]);
+
+  // Calculate settlements for the current expense state
+  const calculateExpenseSettlements = useCallback(async () => {
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return [];
+
+      const userProfile = await getUserProfile(currentUser.uid);
+      if (!userProfile) return [];
+
+    const mappedParticipants = state.participants.map((p) => {
+      if (p.name === 'Me') {
+        return {
+          ...p,
+          name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+          userId: p.userId || currentUser.uid,
+          placeholder: false,
+          phoneNumber: userProfile.phoneNumber,
+          username: userProfile.username,
+          profilePhoto: userProfile.profilePhoto
+        };
+      }
+      return {
+        ...p,
+        name: p.name.trim(),
+        userId: p.userId || null,
+        placeholder: p.placeholder || false,
+        phoneNumber: p.phoneNumber || null,
+        username: p.username || null,
+        profilePhoto: p.profilePhoto || null
+      };
+    });
+
+    const expenseForSettlement = {
+      participants: mappedParticipants,
+      items: state.items.map(item => ({
+        id: item.id,
+        name: item.name.trim(),
+        amount: item.amount === null || item.amount === undefined || item.amount === '' ? 0 : parseFloat(item.amount) || 0,
+        selectedConsumers: item.selectedConsumers || [0],
+        splits: item.splits || [],
+        selectedPayers: item.selectedPayers || [0]
+      })),
+      fees: state.fees.map(fee => ({
+        id: fee.id,
+        name: fee.name.trim(),
+        amount: fee.amount === null || fee.amount === undefined || fee.amount === '' ? 0 : parseFloat(fee.amount) || 0,
+        type: fee.type || 'fixed',
+        percentage: fee.percentage || null,
+        splitType: fee.splitType || 'proportional',
+        splits: fee.splits || []
+      }))
+    };
+
+    const settlementResult = calculateSettlement(expenseForSettlement);
+    return settlementResult.settlements || [];
+    } catch (error) {
+      console.error('Error calculating settlements:', error);
+      return [];
+    }
+  }, [state]);
 
   const handleSettleNow = useCallback(async () => {
     try {
       await saveExpenseSilently();
+      
+      // Calculate settlements for the current expense state
+      const settlements = await calculateExpenseSettlements();
+      
+      // Create expense object with settlements included
+      const expenseWithSettlements = {
+        ...expense,
+        settlements: settlements.map(settlement => {
+          // Check if this settlement already exists in the expense with a status
+          const existingSettlement = expense.settlements?.find(s => 
+            s.debtor === settlement.from && 
+            s.creditor === settlement.to && 
+            s.amount === settlement.amount
+          );
+          
+          return {
+            debtor: settlement.from,
+            creditor: settlement.to,
+            amount: settlement.amount,
+            status: existingSettlement?.status || 'noAction',
+            updatedAt: existingSettlement?.updatedAt || new Date().toISOString(),
+            associatedItems: existingSettlement?.associatedItems || []
+          };
+        })
+      };
+      
       navigation.navigate('SettleUp', {
-        expense: {
-          title: state.title,
-          participants: state.participants,
-          items: state.items,
-          fees: state.fees,
-          selectedPayers: state.selectedPayers,
-          joinEnabled: state.joinEnabled,
-          ...(isEditing && expense ? { id: expense.id } : {})
-        },
-        participants: state.participants
+        expense: expenseWithSettlements
       });
     } catch (error) {
       console.error('Error saving expense before settlement:', error);
+      
+      // Calculate settlements even if save failed
+      const settlements = await calculateExpenseSettlements();
+      
+      const expenseWithSettlements = {
+        ...expense,
+        settlements: settlements.map(settlement => {
+          // Check if this settlement already exists in the expense with a status
+          const existingSettlement = expense.settlements?.find(s => 
+            s.debtor === settlement.from && 
+            s.creditor === settlement.to && 
+            s.amount === settlement.amount
+          );
+          
+          return {
+            debtor: settlement.from,
+            creditor: settlement.to,
+            amount: settlement.amount,
+            status: existingSettlement?.status || 'noAction',
+            updatedAt: existingSettlement?.updatedAt || new Date().toISOString(),
+            associatedItems: existingSettlement?.associatedItems || []
+          };
+        })
+      };
+      
       navigation.navigate('SettleUp', {
-        expense: {
-          title: state.title,
-          participants: state.participants,
-          items: state.items,
-          fees: state.fees,
-          selectedPayers: state.selectedPayers,
-          joinEnabled: state.joinEnabled,
-          ...(isEditing && expense ? { id: expense.id } : {})
-        },
-        participants: state.participants
+        expense: expenseWithSettlements
       });
     }
-  }, [saveExpenseSilently, navigation, state, isEditing, expense]);
+  }, [saveExpenseSilently, navigation, calculateExpenseSettlements, expense]);
 
   const handleSettleLater = useCallback(async () => {
     await handleSaveExpense();
