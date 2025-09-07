@@ -211,7 +211,14 @@ const SetupExpenseScreen = ({ route, navigation }) => {
         total: 0, // Will be updated when items are added
         expenseType: expenseType,
         participants: mappedParticipants,
-        items: [],
+        items: [{
+          id: Date.now().toString(),
+          name: '',
+          amount: 0,
+          selectedConsumers: [0],
+          splits: [],
+          selectedPayers: [0]
+        }],
         fees: [],
         selectedPayers: [0], // Default to first participant (Me)
         join: { enabled: true },

@@ -253,10 +253,7 @@ const ProfileScreen = ({ navigation }) => {
       <TouchableOpacity
         key={expense.id}
         style={styles.expenseSummaryCard}
-        onPress={() => navigation.navigate('Home', {
-            screen: screenName,
-            params: { expense }
-          })}
+        onPress={() => navigation.navigate(screenName, { expense })}
       >
         <View style={styles.expenseSummaryHeader}>
           <View style={styles.expenseSummaryLeft}>
@@ -435,9 +432,7 @@ const ProfileScreen = ({ navigation }) => {
             <Text style={styles.emptyStateText}>No expenses yet</Text>
             <TouchableOpacity
               style={styles.createExpenseButton}
-              onPress={() => navigation.navigate('Home', {
-                screen: 'AddExpense'
-              })}
+              onPress={() => navigation.navigate('AddExpense')}
             >
               <Text style={styles.createExpenseButtonText}>Create Your First Expense</Text>
             </TouchableOpacity>
