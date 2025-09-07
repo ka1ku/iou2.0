@@ -120,7 +120,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       setHasUnsavedChanges(true);
     }
   }, [selectedFriends, createMeParticipant]);
-
   // Track changes for navigation warning
   useEffect(() => {
     if (title.trim() !== '') {
@@ -242,11 +241,11 @@ const SetupExpenseScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      <ExpenseHeader
+      {/* <ExpenseHeader
         title={expenseType === 'receipt' ? 'Setup Receipt' : 'Setup Expense'}
         onBackPress={() => navigation.goBack()}
         hideSettings={true}
-      />
+      /> */}
         
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
@@ -256,7 +255,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
           style={styles.content} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ 
-            paddingTop: insets.top + 120, 
+            paddingTop: insets.top,
             paddingBottom: 140,
             paddingHorizontal: 0
           }}
@@ -324,11 +323,11 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                             </Text>
                           </View>
                         )}
-                        {participant.name === 'Me' && (
+                        {/* {participant.name === 'Me' && (
                           <View style={styles.currentUserBadge}>
                             <Text style={styles.currentUserBadgeText}>You</Text>
                           </View>
-                        )}
+                        )} */}
                       </View>
                       <Text style={styles.participantName} numberOfLines={1}>
                         {participant.name === 'Me' ? 'You' : participant.name}
