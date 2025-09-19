@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
-import { Card, Header } from '../../components';
+import Card from '../../components/Card';
 
 const NotificationSettingsScreen = ({ navigation }) => {
   useEffect(() => {
@@ -27,11 +27,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <Header
-          title="Notification Preferences"
-          subtitle="Push notifications are not currently implemented"
-          style={styles.header}
-        />
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Notification Preferences</Text>
+          <Text style={styles.headerSubtitle}>Push notifications are not currently implemented</Text>
+        </View>
 
         <Card variant="elevated" margin="large" padding="large">
           <View style={styles.infoContainer}>
@@ -86,7 +85,20 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
     borderRadius: Radius.lg,
     margin: Spacing.lg,
+    padding: Spacing.lg,
     ...Shadows.card,
+  },
+  headerTitle: {
+    ...Typography.h2,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   infoContainer: {
     alignItems: 'center',

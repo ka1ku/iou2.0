@@ -42,7 +42,7 @@ import SignUpScreen from './screens/auth/SignUpScreen';
 import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
 
 // Components
-import ExpenseJoinHandler from './components/ExpenseJoinHandler';
+import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
 
 // Navigation constants
 const Tab = createBottomTabNavigator();

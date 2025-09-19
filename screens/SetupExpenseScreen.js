@@ -14,15 +14,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
+import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 import { createExpense } from '../services/expenseService';
-import { 
-  ExpenseHeader,
-  ParticipantsGrid,
-  FriendSelector
-} from '../components';
+import ExpenseHeader from '../components/expenses/ExpenseHeader';
+import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
 
 const SetupExpenseScreen = ({ route, navigation }) => {
   const { expenseType = 'expense', scannedReceipt, fromReceiptScan } = route.params || {};
@@ -46,7 +43,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [titleInputFocused, setTitleInputFocused] = useState(false);
-  const friendSelectorRef = useRef(null);
+  const participantsGridRef = useRef(null);
 
   // Set title from scanned receipt if available
   useEffect(() => {
@@ -304,7 +301,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                   {/* Add People Button - First Item */}
                   <TouchableOpacity 
                     style={styles.addPersonButton}
-                    onPress={() => friendSelectorRef.current?.openModal()}
+                    onPress={() => participantsGridRef.current?.openModal()}
                     activeOpacity={0.7}
                   >
                     <View style={styles.addPersonIcon}>
@@ -386,15 +383,17 @@ const SetupExpenseScreen = ({ route, navigation }) => {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Hidden FriendSelector for modal functionality */}
+      {/* Hidden ParticipantsGrid for modal functionality */}
       <View style={{ position: 'absolute', left: -9999 }}>
-        <FriendSelector
-          ref={friendSelectorRef}
+        <ParticipantsGrid
+          ref={participantsGridRef}
+          participants={participants}
           selectedFriends={selectedFriends}
           onFriendsChange={setSelectedFriends}
-          placeholder="Add friends to split with..."
+          participantsExpanded={false}
+          onToggleExpanded={() => {}}
           expenseId={null}
-          showAddButton={false}
+          currentUserId={currentUserId}
         />
       </View>
     </View>

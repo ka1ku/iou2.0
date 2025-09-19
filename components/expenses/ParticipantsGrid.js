@@ -9,18 +9,17 @@ import {
   Modal,
   Image,
   ScrollView,
-  Share,
   Alert,
   Linking,
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Shadows, Typography, Spacing, Radius } from '../design/tokens';
+import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import * as Contacts from 'expo-contacts';
 import algoliasearch from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
-import { getCurrentUser } from '../services/authService';
-import { generateExpenseJoinLink, getExpenseJoinInfo } from '../services/expenseService';
+import { getCurrentUser } from '../../services/authService';
+import { generateExpenseJoinLink, getExpenseJoinInfo } from '../../services/expenseService';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
 
@@ -165,7 +164,7 @@ const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
   </View>
 ));
 
-// Move SearchPane outside to prevent recreation on every render
+// Search components
 const SearchPane = React.memo(({ 
   debouncedQuery, 
   selectedFriends, 
@@ -179,7 +178,6 @@ const SearchPane = React.memo(({
   const { hits } = useInfiniteHits();
   const { refine } = useSearchBox();
   
-  // Add 200ms delay for Algolia queries to prevent API calls while typing
   const debouncedRefine = useRef(null);
   
   useEffect(() => {
@@ -198,16 +196,13 @@ const SearchPane = React.memo(({
     };
   }, [debouncedQuery, refine]);
 
-  // Get current user to filter out from results
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.uid;
 
-  // Filter out current user from Algolia search results
   const filteredHits = useMemo(() => {
     return currentUserId ? hits.filter(friend => friend && friend.objectID && friend.objectID !== currentUserId) : hits;
   }, [hits, currentUserId]);
 
-  // Memoize render functions to prevent recreation
   const renderFriendItem = useCallback(({ item }) => {
     const isSelected = selectedFriends.some(f => f.id === item.objectID);
     return (
@@ -258,7 +253,6 @@ const SearchPane = React.memo(({
   );
 });
 
-// Memoized search input to prevent re-renders
 const MemoizedSearchInput = React.memo(({ value, onChangeText }) => (
   <View style={styles.searchContainer}>
     <View style={styles.searchBar}>
@@ -275,7 +269,6 @@ const MemoizedSearchInput = React.memo(({ value, onChangeText }) => (
   </View>
 ));
 
-// Memoized search results wrapper to prevent unnecessary re-renders
 const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
   <View style={styles.resultsContainer}>
     <InstantSearch 
@@ -292,20 +285,21 @@ const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
   </View>
 ));
 
-const FriendSelector = forwardRef(({ 
-  selectedFriends, 
+const ParticipantsGrid = forwardRef(({ 
+  participants = [], 
+  selectedFriends = [], 
   onFriendsChange, 
-  showAddButton = true,
-  placeholder = "Select friends to split with...",
-  onClose,
-  expenseId
+  onParticipantPress, 
+  participantsExpanded = false,
+  onToggleExpanded,
+  expenseId = null,
+  currentUserId = null
 }, ref) => {
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
-  const [invitedContacts, setInvitedContacts] = useState([]); // Track invited contacts
+  const [invitedContacts, setInvitedContacts] = useState([]);
   
-  // Use deferred value to prevent UI flicker
   const deferredQuery = useDeferredValue(localQuery);
 
   useEffect(() => {
@@ -345,23 +339,19 @@ const FriendSelector = forwardRef(({
   }, [selectedFriends, onFriendsChange]);
 
   const inviteContact = useCallback(async (contact) => {
-    // Check if already added as a friend
     const isAlreadyAdded = selectedFriends.some(friend => 
       friend.phoneNumber === contact.phoneNumbers?.[0]?.number ||
       friend.name.toLowerCase() === ((contact.firstName && contact.lastName) ? `${contact.firstName} ${contact.lastName}` : (contact.name || '')).toLowerCase()
     );
     
     if (isAlreadyAdded) {
-      // Already added, don't add again
       return;
     }
     
-    // Create a simple contact object for SMS invitation
     const name = (contact.firstName && contact.lastName)
       ? `${contact.firstName} ${contact.lastName}`
       : (contact.name || 'Unknown');
     
-    // Add to invited contacts list so they appear in "Recent people"
     const invitedContact = {
       id: `invited-${Date.now()}-${Math.random()}`,
       name,
@@ -372,7 +362,6 @@ const FriendSelector = forwardRef(({
     };
     
     setInvitedContacts(prev => {
-      // Check if already invited
       const alreadyInvited = prev.some(ic => 
         ic.phoneNumber === invitedContact.phoneNumber ||
         ic.name.toLowerCase() === invitedContact.name.toLowerCase()
@@ -381,28 +370,23 @@ const FriendSelector = forwardRef(({
       return [...prev, invitedContact];
     });
     
-    // Open SMS to invite them to download the app
     handleSMSInvite(contact);
   }, [selectedFriends, onFriendsChange]);
 
   const handleSMSInvite = useCallback((contact) => {
-    // Handle both regular contacts and invited contacts
     const phoneNumber = contact.phoneNumbers?.[0]?.number || contact.phoneNumber;
     if (!phoneNumber) {
       Alert.alert('No Phone Number', 'This contact doesn\'t have a phone number.');
       return;
     }
 
-    // Create a simple invite message immediately
     const contactName = (contact.firstName && contact.lastName)
       ? `${contact.firstName} ${contact.lastName}`
       : (contact.name || 'Unknown');
     
     let message = `Hi ${contactName}! I'd like to invite you to join IOU App so we can split expenses together. Download it from the App Store!`;
     
-    // If we have an expenseId, try to add a deep link (non-blocking)
     if (expenseId) {
-      // Fire and forget - don't block the UI
       getExpenseJoinInfo(expenseId, { initializeIfMissing: true })
         .then(joinInfo => {
           if (joinInfo && joinInfo.code) {
@@ -413,19 +397,16 @@ const FriendSelector = forwardRef(({
             });
             message = `Hi ${contactName}! Join me on IOU App to split expenses: ${deepLink}`;
             
-            // Open SMS with updated message
             const body = encodeURIComponent(message);
             const separator = Platform.OS === 'ios' ? '&' : '?';
             const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
             Linking.openURL(smsUrl).catch(() => {
-              // Fallback to basic SMS
               Linking.openURL(`sms:${phoneNumber}`);
             });
           }
         })
         .catch(error => {
           console.log('Could not generate deep link, using fallback message');
-          // Use fallback message and open SMS immediately
           const body = encodeURIComponent(message);
           const separator = Platform.OS === 'ios' ? '&' : '?';
           const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
@@ -434,7 +415,6 @@ const FriendSelector = forwardRef(({
           });
         });
     } else {
-      // No expenseId, open SMS immediately with fallback message
       const body = encodeURIComponent(message);
       const separator = Platform.OS === 'ios' ? '&' : '?';
       const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
@@ -449,7 +429,6 @@ const FriendSelector = forwardRef(({
     onFriendsChange(updated);
   }, [selectedFriends, onFriendsChange]);
 
-  // Memoize current user data to prevent recreation
   const currentUserData = useMemo(() => {
     const currentUser = getCurrentUser();
     return {
@@ -460,10 +439,8 @@ const FriendSelector = forwardRef(({
     };
   }, []);
 
-  // Memoize all members array
   const allMembers = useMemo(() => [currentUserData, ...selectedFriends], [currentUserData, selectedFriends]);
 
-  // Memoize filtered contacts based on debounced query
   const filteredContacts = useMemo(() => {
     const q = (deferredQuery || '').trim().toLowerCase();
     if (q.length === 0) return contacts;
@@ -475,7 +452,6 @@ const FriendSelector = forwardRef(({
     });
   }, [contacts, deferredQuery]);
 
-  // Memoize filtered invited contacts based on query
   const filteredInvitedContacts = useMemo(() => {
     const q = (deferredQuery || '').trim().toLowerCase();
     if (q.length === 0) return invitedContacts;
@@ -487,60 +463,121 @@ const FriendSelector = forwardRef(({
     });
   }, [invitedContacts, deferredQuery]);
 
-  // Memoize key extractors for FlatList
-  const memberKeyExtractor = useCallback((item) => item.id, []);
-  const friendKeyExtractor = useCallback((item) => item.objectID, []);
-  const contactKeyExtractor = useCallback((item, index) => `contact-${index}`, []);
 
-  // Memoize render functions for FlatList
   const renderMemberItem = useCallback(({ item }) => (
     <MemoizedMemberItem item={item} onRemoveFriend={removeFriend} />
   ), [removeFriend]);
 
-  const handleModalClose = useCallback(() => {
-    if (onClose) {
-      onClose(selectedFriends);
-    }
-    setShowModal(false);
-  }, [onClose, selectedFriends]);
 
-  // Memoize the search pane props to prevent unnecessary re-renders
-  const searchPaneProps = useMemo(() => ({
-    debouncedQuery: deferredQuery,
-    selectedFriends,
-    toggleSelectUser,
-    inviteContact,
-    handleSMSInvite,
-    filteredContacts,
-    invitedContacts,
-    filteredInvitedContacts
-  }), [deferredQuery, selectedFriends, toggleSelectUser, inviteContact, handleSMSInvite, filteredContacts, invitedContacts, filteredInvitedContacts]);
 
-  // Expose methods to parent component
   useImperativeHandle(ref, () => ({
     openModal: () => setShowModal(true),
     closeModal: () => setShowModal(false)
   }));
+  
+  const renderParticipantItem = ({ item, index }) => {
+    if (item.type === 'add-button') {
+      return (
+        <TouchableOpacity 
+          style={styles.addParticipantGridButton}
+          onPress={() => setShowModal(true)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.addParticipantGridIcon}>
+            <Ionicons name="create" size={24} color={Colors.accent} />
+          </View>
+          <Text style={styles.addParticipantGridText}>Edit</Text>
+          <Text style={styles.addParticipantGridPlaceholder}></Text>
+        </TouchableOpacity>
+      );
+    }
+
+    const participant = item;
+    return (
+      <TouchableOpacity 
+        key={participant.id}
+        style={styles.participantGridItem}
+        onPress={() => {
+          if (onParticipantPress) {
+            onParticipantPress(participant, index);
+          } else if (participant.userId && participant.userId !== currentUserId) {
+            // Default navigation behavior - can be overridden
+          }
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={styles.participantGridAvatarContainer}>
+          {participant.profilePhoto ? (
+            <Image source={{ uri: participant.profilePhoto }} style={styles.participantGridAvatar} />
+          ) : (
+            <View style={[
+              styles.participantGridAvatarPlaceholder,
+              participant.name === 'You' && styles.currentUserAvatar
+            ]}>
+              <Text style={[
+                styles.participantGridAvatarInitials,
+                participant.name === 'You' && styles.currentUserInitials
+              ]}>
+                {participant.name === 'You' ? 'Y' : (participant.name?.[0] || 'U').toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.participantGridName} numberOfLines={1}>
+          {participant.name}
+        </Text>
+        {participant.username && (
+          <Text style={styles.participantGridUsername} numberOfLines={1}>
+            @{participant.username}
+          </Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
-      {showAddButton && (
-        <TouchableOpacity style={styles.selectButton} onPress={() => setShowModal(true)}>
-          <Ionicons name="people-outline" size={20} color={Colors.accent} />
-          <Text style={styles.selectButtonText}>
-            {selectedFriends.length === 0 ? placeholder : `Add/Remove Friends (${selectedFriends.length})`}
+      <FlatList
+        data={[
+          { id: 'add-button', type: 'add-button' },
+          ...(participantsExpanded ? participants : participants.slice(0, 5))
+        ]}
+        numColumns={3}
+        keyExtractor={(item) => item.id}
+        renderItem={renderParticipantItem}
+        contentContainerStyle={styles.participantsGridContainer}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+      />
+      
+      {/* Show More/Less toggle button */}
+      {participants.length > 5 && (
+        <TouchableOpacity 
+          style={styles.toggleParticipantsButton}
+          onPress={onToggleExpanded}
+          activeOpacity={0.7}
+        >
+          <View style={styles.toggleParticipantsIcon}>
+            <Ionicons 
+              name={participantsExpanded ? "chevron-up" : "chevron-down"} 
+              size={16} 
+              color={Colors.surface} 
+            />
+          </View>
+          <Text style={styles.toggleParticipantsText}>
+            {participantsExpanded ? "Show Less" : `Show ${participants.length - 5} More`}
           </Text>
-          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
       )}
-
+      
+      {/* Friend Selection Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={handleModalClose}
+              onPress={() => setShowModal(false)}
             >
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
@@ -555,22 +592,10 @@ const FriendSelector = forwardRef(({
               <FlatList
                 data={allMembers}
                 horizontal
-                keyExtractor={memberKeyExtractor}
+                keyExtractor={(item) => item.id}
                 renderItem={renderMemberItem}
                 contentContainerStyle={styles.membersList}
                 showsHorizontalScrollIndicator={false}
-                scrollEnabled={true}
-                bounces={true}
-                decelerationRate="normal"
-                removeClippedSubviews={true}
-                initialNumToRender={5}
-                maxToRenderPerBatch={5}
-                windowSize={5}
-                getItemLayout={(data, index) => ({
-                  length: 88, // 80 + Spacing.lg margin
-                  offset: 88 * index,
-                  index,
-                })}
               />
             </View>
 
@@ -578,7 +603,18 @@ const FriendSelector = forwardRef(({
             <MemoizedSearchInput value={localQuery} onChangeText={setLocalQuery} />
 
             {/* Search Results */}
-            <MemoizedSearchResults searchPaneProps={searchPaneProps} />
+            <MemoizedSearchResults 
+              searchPaneProps={{
+                debouncedQuery: deferredQuery,
+                selectedFriends,
+                toggleSelectUser,
+                inviteContact,
+                handleSMSInvite,
+                filteredContacts,
+                invitedContacts,
+                filteredInvitedContacts
+              }} 
+            />
           </ScrollView>
         </View>
       </Modal>
@@ -586,38 +622,143 @@ const FriendSelector = forwardRef(({
   );
 });
 
+ParticipantsGrid.displayName = 'ParticipantsGrid';
+
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    marginBottom: Spacing.sm,
   },
-  
-  // Main button
-  selectButton: {
+  participantsGridContainer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+  },
+  participantGridItem: {
+    alignItems: 'center',
+    width: '33.33%', // Exactly one-third width for 3 columns
+    paddingVertical: Spacing.xs,
+    minHeight: 100,
+  },
+  participantGridAvatarContainer: {
+    position: 'relative',
+    width: 72,
+    height: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  participantGridAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.avatar,
+  },
+  participantGridAvatarPlaceholder: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.accent,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.avatar,
+  },
+  participantGridAvatarInitials: {
+    color: Colors.white,
+    fontSize: 24,
+    fontFamily: Typography.familySemiBold,
+  },
+  participantGridName: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  participantGridUsername: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 9,
+  },
+  addParticipantGridButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '33.33%', // Exactly one-third width for 3 columns
+    marginBottom: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    minHeight: 100,
+  },
+  addParticipantGridIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 2,
+    borderColor: Colors.divider,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  addParticipantGridText: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 11,
+  },
+  addParticipantGridPlaceholder: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontSize: 9,
+    height: 12, // Match the height of username text
+  },
+  toggleParticipantsButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    borderRadius: Radius.sm,
-    padding: Spacing.lg,
-    marginTop: Spacing.lg,
-    ...Shadows.card,
+    justifyContent: 'center',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: Radius.pill,
+    ...Shadows.button,
+    elevation: 2,
   },
-  selectButtonText: {
-    flex: 1,
-    marginLeft: Spacing.md,
-    ...Typography.body1,
-    color: Colors.textPrimary,
+  toggleParticipantsIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.xs,
+  },
+  toggleParticipantsText: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  currentUserAvatar: {
+    borderColor: Colors.accent,
+    borderWidth: 3,
+    backgroundColor: Colors.accent,
+  },
+  currentUserInitials: {
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: 24,
   },
 
-  // Modal
+  // FriendSelector Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: Colors.surface,
-
   },
-
-  // Header
   modalHeader: {
     backgroundColor: Colors.surface,
     paddingTop: 60,
@@ -638,13 +779,6 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
-  headerSubtitle: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    lineHeight: 22,
-  },
-
-  // Members section
   membersContainer: {
     backgroundColor: Colors.surface,
     paddingVertical: Spacing.sm,
@@ -719,8 +853,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
   },
-
-  // Search
   searchContainer: {
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.xl,
@@ -746,14 +878,12 @@ const styles = StyleSheet.create({
     ...Typography.body1,
     color: Colors.textPrimary,
   },
-
-  // Results
   resultsContainer: {
     backgroundColor: Colors.surface,
-    paddingBottom: Spacing.xxl, // Add bottom padding for scroll space
+    paddingBottom: Spacing.xxl,
   },
   searchContent: {
-    flex: 1, // Take remaining space
+    flex: 1,
   },
   section: {
     marginBottom: Spacing.lg,
@@ -844,10 +974,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.xs,
   },
-  inviteButtonSent: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
   inviteButtonText: {
     ...Typography.body2,
     fontFamily: Typography.familySemiBold,
@@ -857,45 +983,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingBottom: Spacing.xxl,
   },
-  contactActions: {
-    flexDirection: 'row',
-    marginLeft: Spacing.md,
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  smsInviteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.blue,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.pill,
-    minWidth: 60,
-    justifyContent: 'center',
-  },
-  smsInviteButtonPressed: {
-    backgroundColor: Colors.success,
-    opacity: 0.8,
-  },
-  smsInviteButtonText: {
-    ...Typography.body2,
-    fontFamily: Typography.familySemiBold,
-    color: Colors.white,
-    marginLeft: Spacing.xs,
-    fontSize: 12,
-  },
-  invitedTag: {
-    ...Typography.caption,
-    color: Colors.white,
-    marginTop: Spacing.xs,
-    fontWeight: '600',
-    fontSize: 11,
-    backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Radius.pill,
-    alignSelf: 'flex-start',
-  },
 });
 
-export default FriendSelector;
+export default ParticipantsGrid;

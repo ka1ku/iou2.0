@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, StyleSheet, Platform } from 'react-native';
-import { Colors, Typography, Spacing, Radius } from '../design/tokens';
+import { Colors, Typography, Spacing, Radius } from '../../design/tokens';
 
 const PriceInput = ({
   value,

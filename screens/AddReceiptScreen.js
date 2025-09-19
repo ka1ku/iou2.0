@@ -19,13 +19,10 @@ import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 import { createExpense, updateExpense, updateExpenseParticipants } from '../services/expenseService';
-import { 
-  FriendSelector, 
-  PriceInput,
-  ExpenseHeader,
-  ExpenseFooter,
-  ParticipantsGrid
-} from '../components';
+import PriceInput from '../components/expenses/PriceInput';
+import ExpenseHeader from '../components/expenses/ExpenseHeader';
+import ExpenseFooter from '../components/expenses/ExpenseFooter';
+import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
 import { useFocusEffect } from '@react-navigation/native';
 
 const AddReceiptScreen = ({ route, navigation }) => {

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, Share, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import deepLinkService from '../services/deepLinkService';
-import { getCurrentUser } from '../services/authService';
-import { joinExpenseByCode } from '../services/expenseService';
+import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
+import deepLinkService from '../../services/deepLinkService';
+import { getCurrentUser } from '../../services/authService';
+import { joinExpenseByCode } from '../../services/expenseService';
 
 const ExpenseJoinHandler = () => {
   const [joinData, setJoinData] = useState(null);
