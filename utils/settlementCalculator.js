@@ -21,10 +21,8 @@ export const calculateSettlement = (expense) => {
   const total = itemsTotal + feesTotal;
 
   // Calculate net balance for each participant
-  const balances = calculateParticipantBalances(participants, items, fees, total);
-  console.log('balances', balances);
+  const balances = calculateParticipantBalances(expense, participants, items, fees, total);
   const settlements = generateSettlementProposal(balances);
-  console.log('settlements', settlements);
   return {
     settlements,
     balances,
@@ -35,35 +33,37 @@ export const calculateSettlement = (expense) => {
 
 /**
  * Calculate the net balance for each participant
+ * @param {Object} expense - The expense object with selectedPayers
  * @param {Array} participants - Array of participant objects
  * @param {Array} items - Array of item objects with splits and selectedPayers
  * @param {Array} fees - Array of fee objects with splits
  * @param {number} total - Total expense amount
  * @returns {Array} Array of balance objects { name, balance, index }
  */
-const calculateParticipantBalances = (participants, items, fees, total) => {
+const calculateParticipantBalances = (expense, participants, items, fees, total) => {
   const balances = participants.map((participant, index) => ({
     name: participant.name,
     index,
     balance: 0 // Positive = owes money, Negative = is owed money
   }));
-  console.log('total', total);
   
   // Calculate how much each participant paid for each item
   items.forEach(item => {
     const itemAmount = parseFloat(item.amount) || 0;
     const itemPayers = item.selectedPayers || [];
     
-    if (itemPayers.length > 0) {
-      const amountPerPayer = itemAmount / itemPayers.length;
-      itemPayers.forEach(payerIndex => {
+    // If no item-specific payers, fall back to expense-level selectedPayers
+    const payersToUse = itemPayers.length > 0 ? itemPayers : (expense.selectedPayers || [0]);
+    
+    if (payersToUse.length > 0) {
+      const amountPerPayer = itemAmount / payersToUse.length;
+      payersToUse.forEach(payerIndex => {
         if (payerIndex < balances.length) {
           balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
         }
       });
     }
   });
-  console.log('balances after payers', balances);
   
   // Calculate how much each participant owes based on item splits
   items.forEach(item => {
@@ -71,8 +71,11 @@ const calculateParticipantBalances = (participants, items, fees, total) => {
     const itemSplits = item.splits || [];
     
     itemConsumers.forEach((consumerIndex, splitIndex) => {
-      if (itemSplits[splitIndex]) {
-        const splitAmount = parseFloat(itemSplits[splitIndex].amount) || 0;
+      if (itemSplits[splitIndex] !== undefined && itemSplits[splitIndex] !== null) {
+        // Handle both array of numbers and array of objects with amount property
+        const splitAmount = typeof itemSplits[splitIndex] === 'object' 
+          ? parseFloat(itemSplits[splitIndex].amount) || 0
+          : parseFloat(itemSplits[splitIndex]) || 0;
         balances[consumerIndex].balance += splitAmount; // Positive because they owe
       }
     });
@@ -194,6 +197,71 @@ export const calculateHubSettlement = (balances) => {
   });
 
   return settlements;
+};
+
+/**
+ * Calculate settlement with partial settlements preserved
+ * This function recalculates settlements while preserving any that have been marked as paid
+ * @param {Object} expense - The expense object with participants, items, and fees
+ * @param {Array} existingSettlements - Array of existing settlement objects with status
+ * @returns {Object} Settlement result with preserved and new settlements
+ */
+export const calculateSettlementWithPartialSettlements = (expense, existingSettlements = []) => {
+  const { participants, items, fees } = expense;
+  if (!participants || !items) {
+    return { settlements: [], totalSettlements: 0, paidSettlements: 0, newSettlements: 0 };
+  }
+
+  // Separate paid settlements from unpaid ones
+  const paidSettlements = existingSettlements.filter(s => s.status === 'markedAsPaid');
+  const unpaidSettlements = existingSettlements.filter(s => s.status !== 'markedAsPaid');
+
+  // Calculate current balances
+  const currentBalances = calculateParticipantBalances(expense, participants, items, fees, 
+    items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) + 
+    (fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0)
+  );
+
+  // Adjust balances for paid settlements
+  const adjustedBalances = [...currentBalances];
+  paidSettlements.forEach(settlement => {
+    const debtorIndex = adjustedBalances.findIndex(b => b.name === settlement.debtor);
+    const creditorIndex = adjustedBalances.findIndex(b => b.name === settlement.creditor);
+    
+    if (debtorIndex !== -1 && creditorIndex !== -1) {
+      // Remove the paid settlement from the balance calculation
+      adjustedBalances[debtorIndex].balance -= settlement.amount; // Reduce what debtor owes
+      adjustedBalances[creditorIndex].balance += settlement.amount; // Reduce what creditor is owed
+    }
+  });
+
+  // Generate new settlements based on adjusted balances
+  const newSettlements = generateSettlementProposal(adjustedBalances);
+
+  // Combine paid settlements with new settlements
+  const allSettlements = [
+    ...paidSettlements.map(s => ({
+      from: s.debtor,
+      to: s.creditor,
+      amount: s.amount,
+      status: s.status,
+      preserved: true
+    })),
+    ...newSettlements.map(s => ({
+      ...s,
+      status: 'noAction',
+      preserved: false
+    }))
+  ];
+
+  return {
+    settlements: allSettlements,
+    balances: currentBalances,
+    totalSettlements: allSettlements.length,
+    totalAmount: allSettlements.reduce((sum, s) => sum + s.amount, 0),
+    paidSettlements: paidSettlements.length,
+    newSettlements: newSettlements.length
+  };
 };
 
 /**

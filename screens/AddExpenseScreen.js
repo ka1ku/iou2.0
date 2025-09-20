@@ -120,6 +120,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         name: item.name.trim(),
         amount: parseFloat(item.amount) || 0,
         selectedConsumers: item.selectedConsumers || [0],
+        selectedPayers: item.selectedPayers || [0],
         splits: item.splits || [],
       })),
       fees: state.fees.map((fee) => ({

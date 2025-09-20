@@ -8,7 +8,8 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
-  Linking
+  Linking,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -72,42 +73,45 @@ const HomeScreen = ({ navigation }) => {
   // Calculate how much you owe for a specific expense
   const calculateExpenseBalance = (expense) => {
     const currentUserIndex = 0; // Assuming current user is always first participant
-    let youOwe = 0;
     let youPaid = 0;
+    let youOwe = 0;
     
     expense.items?.forEach(item => {
-      const paidByIndex = item.paidBy || 0;
       const itemAmount = parseFloat(item.amount) || 0;
+      const itemPayers = item.selectedPayers || expense.selectedPayers || [0];
+      const itemConsumers = item.selectedConsumers || [0];
+      const itemSplits = item.splits || [];
       
-      if (item.splitType === 'even') {
-        const splitAmount = itemAmount / expense.participants.length;
-        
-        if (paidByIndex === currentUserIndex) {
-          // You paid for this item
-          youPaid += itemAmount;
-          // Others owe you their share
-          youOwe -= (expense.participants.length - 1) * splitAmount;
-        } else {
-          // Someone else paid, you owe your share
-          youOwe += splitAmount;
-        }
-      } else if (item.splitType === 'custom') {
-        const yourSplit = item.splits?.find(split => split.participantIndex === currentUserIndex);
-        const yourAmount = yourSplit ? parseFloat(yourSplit.amount) || 0 : 0;
-        
-        if (paidByIndex === currentUserIndex) {
-          // You paid for this item
-          youPaid += itemAmount;
-          // You owe the difference between what you paid and your share
-          youOwe -= (itemAmount - yourAmount);
-        } else {
-          // Someone else paid, you owe your share
-          youOwe += yourAmount;
-        }
+      // Calculate how much you paid for this item
+      if (itemPayers.includes(currentUserIndex)) {
+        const amountPerPayer = itemAmount / itemPayers.length;
+        youPaid += amountPerPayer;
+      }
+      
+      // Calculate how much you owe for this item
+      const yourConsumerIndex = itemConsumers.indexOf(currentUserIndex);
+      if (yourConsumerIndex !== -1 && itemSplits[yourConsumerIndex]) {
+        const yourAmount = parseFloat(itemSplits[yourConsumerIndex]) || 0;
+        youOwe += yourAmount;
       }
     });
     
-    return { youOwe, youPaid };
+    // Calculate fees
+    expense.fees?.forEach(fee => {
+      const feeAmount = parseFloat(fee.amount) || 0;
+      const feeSplits = fee.splits || [];
+      
+      // Find your split for this fee
+      const yourFeeSplit = feeSplits.find(split => split.participantIndex === currentUserIndex);
+      if (yourFeeSplit) {
+        const yourFeeAmount = parseFloat(yourFeeSplit.amount) || 0;
+        youOwe += yourFeeAmount;
+      }
+    });
+    
+    // Return net balance: positive means you owe, negative means you're owed
+    const netBalance = youOwe - youPaid;
+    return { youOwe: netBalance, youPaid };
   };
 
   // Determine settlement status for an expense
@@ -115,7 +119,7 @@ const HomeScreen = ({ navigation }) => {
     // If no settlements exist, check if there's a balance
     if (!expense.settlements || expense.settlements.length === 0) {
       const balance = calculateExpenseBalance(expense);
-      return balance.youOwe === 0 ? 'settled' : 'needsSettlement';
+      return Math.abs(balance.youOwe) < 0.01 ? 'settled' : 'needsSettlement';
     }
 
     // Check if all settlements are marked as paid
@@ -220,7 +224,6 @@ const HomeScreen = ({ navigation }) => {
     
     // Calculate payment summary for selected payers
     const paymentSummary = {};
-    console.log(item);
 
     // Ensure selectedPayers is an array of indices
     const paidByIndices = Array.isArray(item.selectedPayers)
@@ -334,9 +337,57 @@ const HomeScreen = ({ navigation }) => {
         {item.participants && item.participants.length > 0 && (
           <View style={styles.participantsContainer}>
             <Text style={styles.participantsLabel}>Participants:</Text>
-            <Text style={styles.participantsList}>
-              {item.participants.map(p => p.name).join(', ')}
-            </Text>
+            <View style={styles.participantsAvatars}>
+              {item.participants.slice(0, 5).map((participant, index) => {
+                // Check if this participant paid for any items
+                const paidForItems = item.items?.some(item => 
+                  item.selectedPayers?.includes(index)
+                ) || false;
+                
+                // If this is the 5th participant and there are more than 5 total, show count
+                const isOverflowIndicator = index === 4 && item.participants.length > 5;
+                const remainingCount = item.participants.length - 5;
+                
+                return (
+                  <View key={index} style={styles.participantAvatarContainer}>
+                    <View style={styles.avatarWrapper}>
+                      {isOverflowIndicator ? (
+                        <View style={styles.overflowAvatar}>
+                          <Text style={styles.overflowText}>+{remainingCount}</Text>
+                        </View>
+                      ) : participant.profilePhoto ? (
+                        <Image 
+                          source={{ uri: participant.profilePhoto }} 
+                          style={styles.participantAvatar} 
+                        />
+                      ) : (
+                        <View style={[
+                          styles.participantAvatarPlaceholder,
+                          participant.name === 'Me' && styles.currentUserAvatar
+                        ]}>
+                          <Text style={[
+                            styles.participantAvatarInitials,
+                            participant.name === 'Me' && styles.currentUserInitials
+                          ]}>
+                            {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
+                      
+                      {/* Payment indicator - only show for actual participants, not overflow indicator */}
+                      {!isOverflowIndicator && paidForItems && (
+                        <View style={styles.paymentIndicator}>
+                          <Ionicons name="logo-usd" size={12} color={Colors.surface} />
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.participantName} numberOfLines={1}>
+                      {isOverflowIndicator ? 'More' : participant.name}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
         )}
       </TouchableOpacity>
@@ -696,6 +747,93 @@ const styles = StyleSheet.create({
     padding: Spacing.xxs,
     borderWidth: 1,
     borderColor: Colors.blue + '30',
+  },
+  participantsAvatars: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  participantAvatarContainer: {
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: Spacing.xs,
+  },
+  participantAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.avatar,
+  },
+  participantAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.accent,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.avatar,
+  },
+  participantAvatarInitials: {
+    color: Colors.surface,
+    fontSize: 16,
+    fontFamily: Typography.familySemiBold,
+    fontWeight: '600',
+  },
+  currentUserAvatar: {
+    borderColor: Colors.accent,
+    borderWidth: 3,
+    backgroundColor: Colors.accent,
+  },
+  currentUserInitials: {
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  paymentIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.success,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+    elevation: 2,
+  },
+  participantName: {
+    ...Typography.caption,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    fontSize: 11,
+    maxWidth: 60,
+  },
+  overflowAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.textSecondary,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.avatar,
+  },
+  overflowText: {
+    color: Colors.surface,
+    fontSize: 12,
+    fontFamily: Typography.familySemiBold,
+    fontWeight: '600',
   },
 
 });

@@ -114,13 +114,10 @@ const SettleUpScreen = ({ route, navigation }) => {
   
   // Initialize settlement states from existing settlements and save settlements if they don't exist
   useEffect(() => {
-    console.log('expense', expense)
-    if (expense.settlements && expense.settlements != []) {
-        console.log('settlements field exists')
+    if (expense.settlements && expense.settlements.length > 0) {
       const initialSettledStates = {};
       const initialRequestSentStates = {};
       const initialPaymentMadeStates = {};
-      console.log('expense.settlements', expense.settlements);
       expense.settlements.forEach(settlement => {
         const settlementId = `${settlement.debtor}-${settlement.creditor}-${settlement.amount}`;
         
@@ -136,7 +133,6 @@ const SettleUpScreen = ({ route, navigation }) => {
       });
       
       setSettledStates(initialSettledStates);
-      console.log('SettledStates', settledStates);
       setRequestSentStates(initialRequestSentStates);
       setPaymentMadeStates(initialPaymentMadeStates);
     } else {
@@ -472,8 +468,6 @@ const SettleUpScreen = ({ route, navigation }) => {
 
   const saveSettlement = useCallback(async () => {
     try {
-      console.log('Saving settlement data for expense:', expense.id);
-      
       // Validate expense ID
       if (!expense.id) {
         throw new Error('Expense ID is missing');
@@ -510,13 +504,9 @@ const SettleUpScreen = ({ route, navigation }) => {
         };
       });
       
-      // Debug logging
-      console.log('Settlements data to save:', settlementsData);
-      
       // Update the expense with settlements data
       await updateExpense(expense.id, { settlements: settlementsData }, getCurrentUser()?.uid);
       
-      console.log('Settlement data saved successfully');
       return { success: true };
     } catch (error) {
       console.error('Error saving settlement data:', error);
