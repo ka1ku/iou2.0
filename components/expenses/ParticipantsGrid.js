@@ -20,6 +20,7 @@ import algoliasearch from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
 import { getCurrentUser } from '../../services/authService';
 import { generateExpenseJoinLink, getExpenseJoinInfo } from '../../services/expenseService';
+import { useExpense } from '../../contexts/ExpenseContext';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
 
@@ -286,15 +287,14 @@ const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
 ));
 
 const ParticipantsGrid = forwardRef(({ 
-  participants = [], 
-  selectedFriends = [], 
-  onFriendsChange, 
-  onParticipantPress, 
-  participantsExpanded = false,
-  onToggleExpanded,
+  onParticipantPress,
   expenseId = null,
   currentUserId = null
 }, ref) => {
+  // Use context instead of props
+  const { state, actions } = useExpense();
+  const { participants, selectedFriends, participantsExpanded } = state;
+
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
@@ -332,11 +332,11 @@ const ParticipantsGrid = forwardRef(({
     const isSelected = selectedFriends.some(f => f.id === user.id);
     if (isSelected) {
       const updated = selectedFriends.filter(f => f.id !== user.id);
-      onFriendsChange(updated);
+      actions.setSelectedFriends(updated);
     } else {
-      onFriendsChange([...selectedFriends, user]);
+      actions.setSelectedFriends([...selectedFriends, user]);
     }
-  }, [selectedFriends, onFriendsChange]);
+  }, [selectedFriends, actions]);
 
   const inviteContact = useCallback(async (contact) => {
     const isAlreadyAdded = selectedFriends.some(friend => 
@@ -371,7 +371,7 @@ const ParticipantsGrid = forwardRef(({
     });
     
     handleSMSInvite(contact);
-  }, [selectedFriends, onFriendsChange]);
+  }, [selectedFriends, actions]);
 
   const handleSMSInvite = useCallback((contact) => {
     const phoneNumber = contact.phoneNumbers?.[0]?.number || contact.phoneNumber;
@@ -427,7 +427,7 @@ const ParticipantsGrid = forwardRef(({
   const removeFriend = useCallback((friendId) => {
     const updated = selectedFriends.filter(f => f.id !== friendId);
     onFriendsChange(updated);
-  }, [selectedFriends, onFriendsChange]);
+  }, [selectedFriends, actions]);
 
   const currentUserData = useMemo(() => {
     const currentUser = getCurrentUser();
@@ -554,7 +554,7 @@ const ParticipantsGrid = forwardRef(({
       {participants.length > 5 && (
         <TouchableOpacity 
           style={styles.toggleParticipantsButton}
-          onPress={onToggleExpanded}
+          onPress={() => actions.setParticipantsExpanded(!participantsExpanded)}
           activeOpacity={0.7}
         >
           <View style={styles.toggleParticipantsIcon}>

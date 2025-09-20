@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,244 +8,162 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius } from '../design/tokens';
-import { getCurrentUser } from '../services/authService';
-import { getUserProfile } from '../services/friendService';
-import { createExpense, updateExpense, updateExpenseParticipants } from '../services/expenseService';
-import { calculateSettlement } from '../utils/settlementCalculator';
-import ExpenseHeader from '../components/expenses/ExpenseHeader';
-import ExpenseFooter from '../components/expenses/ExpenseFooter';
-import ExpenseItemCard from '../components/expenses/ExpenseItemCard';
-import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Colors, Spacing, Radius } from "../design/tokens";
+import { getCurrentUser } from "../services/authService";
+import { getUserProfile } from "../services/friendService";
+import {
+  createExpense,
+  updateExpense,
+  updateExpenseParticipants,
+} from "../services/expenseService";
+import { calculateSettlement } from "../utils/settlementCalculator";
+import { ExpenseProvider, useExpense } from "../contexts/ExpenseContext";
+import ExpenseHeader from "../components/expenses/ExpenseHeader";
+import ExpenseFooter from "../components/expenses/ExpenseFooter";
+import ExpenseItemCard from "../components/expenses/ExpenseItemCard";
+import ParticipantsGrid from "../components/expenses/ParticipantsGrid";
 
-
-const AddExpenseScreen = ({ route, navigation }) => {
+// Internal component that uses the context
+const AddExpenseScreenContent = ({ route, navigation }) => {
   const { expense, isNewExpense = false } = route.params || {};
   const isEditing = !!expense && !isNewExpense;
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef(null);
 
-  // Simplified state management
-  const [state, setState] = useState(() => {
-    const currentUserId = getCurrentUser()?.uid;
-    return {
-      title: expense?.title || '',
-      participants: [{
-        name: 'Me',
-        id: 'me-participant',
-        userId: currentUserId,
-        placeholder: false,
-        phoneNumber: null,
-        username: null,
-        profilePhoto: null
-      }],
-      selectedFriends: [],
-      items: [{
-        id: Date.now().toString(),
-        name: '',
-        amount: 0,
-        selectedConsumers: [0],
-        splits: [],
-        selectedPayers: [0]
-      }],
-      fees: [],
-      selectedPayers: [0],
-      joinEnabled: expense?.join?.enabled ?? true,
-      loading: false,
-      participantsExpanded: false
-    };
-  });
-
-  const updateState = (updates) => {
-    setState(prev => ({ ...prev, ...updates }));
-  };
-
-  // Calculate total
-  const total = state.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) +
-                state.fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-
-
-  // Simple action handlers
-  const addItem = () => {
-    const lastItem = state.items[state.items.length - 1];
-    const payersToUse = lastItem?.selectedPayers || [0];
-    const newItem = {
-      id: Date.now().toString(),
-      name: '',
-      amount: 0,
-      selectedConsumers: [],
-      splits: [],
-      selectedPayers: payersToUse
-    };
-    updateState({ items: [...state.items, newItem] });
-  };
-
+  // Use context instead of local state
+  const { state, actions, total } = useExpense();
 
   // Initialize screen and load expense data
   useEffect(() => {
     navigation.setOptions({
-      title: isEditing ? 'Edit Expense' : 'Add Expense',
-      tabBarStyle: { display: 'none' },
+      title: isEditing ? "Edit Expense" : "Add Expense",
+      tabBarStyle: { display: "none" },
     });
 
     // Load expense data if editing
     if (expense && (isEditing || isNewExpense)) {
-      const currentUserId = getCurrentUser()?.uid;
-      const existingFriends = expense.participants
-        .filter(p => p.name !== 'Me' && !p.placeholder && p.userId && p.userId !== currentUserId)
-        .map(p => ({
-          id: p.userId,
-          name: p.name,
-          phoneNumber: p.phoneNumber,
-          username: p.username,
-          profilePhoto: p.profilePhoto
-        }));
-      
-      const newParticipants = [
-        {
-          name: 'Me',
-          id: 'me-participant',
-          userId: currentUserId,
-          placeholder: false,
-          phoneNumber: null,
-          username: null,
-          profilePhoto: null
-        },
-        ...existingFriends.map((friend, index) => ({ 
-          name: friend.name || '', 
-          id: `friend-${friend.id || index}`,
-          userId: friend.id || null,
-          phoneNumber: friend.phoneNumber || null,
-          username: friend.username || null,
-          profilePhoto: friend.profilePhoto || null,
-          placeholder: false
-        }))
-      ];
-      
-      const itemsWithPayers = expense.items?.map(item => ({
-        ...item,
-        selectedPayers: item.selectedPayers || [0],
-        selectedConsumers: item.selectedConsumers || [0]
-      })) || [];
-      
-      updateState({
-        selectedFriends: existingFriends,
-        participants: newParticipants,
-        title: expense.title || '',
-        joinEnabled: expense.join?.enabled ?? true,
-        fees: expense.fees || [],
-        items: itemsWithPayers,
-        selectedPayers: expense.selectedPayers || [0]
-      });
+      actions.initializeFromExpense(expense, isEditing, isNewExpense);
     }
-  }, [expense, isEditing, isNewExpense, navigation]);
+  }, [expense, isEditing, isNewExpense, navigation, actions]);
 
   // Update participants when friends are selected
   useEffect(() => {
-    const meParticipant = state.participants.find(p => p.name === 'Me');
+    const meParticipant = state.participants.find((p) => p.name === "Me");
     const allParticipants = [
       meParticipant || {
-        name: 'Me',
-        id: 'me-participant',
+        name: "Me",
+        id: "me-participant",
         userId: getCurrentUser()?.uid,
         placeholder: false,
         phoneNumber: null,
         username: null,
-        profilePhoto: null
+        profilePhoto: null,
       },
-      ...state.selectedFriends.map((friend, index) => ({ 
-        name: friend.name || '', 
+      ...state.selectedFriends.map((friend, index) => ({
+        name: friend.name || "",
         id: `friend-${friend.id || index}`,
         userId: friend.id || null,
         phoneNumber: friend.phoneNumber || null,
         username: friend.username || null,
         profilePhoto: friend.profilePhoto || null,
-        placeholder: false
-      }))
+        placeholder: false,
+      })),
     ];
-    
+
     // Only update if participants actually changed
-    const participantsChanged = JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
+    const participantsChanged =
+      JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
     if (participantsChanged) {
-      updateState({ participants: allParticipants });
+      actions.setParticipants(allParticipants);
     }
-  }, [state.selectedFriends, state.participants]);
-  
+  }, [state.selectedFriends, state.participants, actions]);
+
   // Helper function to prepare expense data
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
-    if (!currentUser) throw new Error('No user signed in');
+    if (!currentUser) throw new Error("No user signed in");
 
     const userProfile = await getUserProfile(currentUser.uid);
-    if (!userProfile) throw new Error('Failed to get user profile');
+    if (!userProfile) throw new Error("Failed to get user profile");
 
-    const finalTitle = state.title.trim() || (state.items[0]?.name.trim()) || 'Expense';
-    
-    const mappedParticipants = state.participants.map(p => {
-      if (p.name === 'Me') {
+    const finalTitle =
+      state.title.trim() || state.items[0]?.name.trim() || "Expense";
+
+    const mappedParticipants = state.participants.map((p) => {
+      if (p.name === "Me") {
         return {
           ...p,
           name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
           userId: currentUser.uid,
           phoneNumber: userProfile.phoneNumber,
           username: userProfile.username,
-          profilePhoto: userProfile.profilePhoto
+          profilePhoto: userProfile.profilePhoto,
         };
       }
       return {
         ...p,
         name: p.name.trim(),
-        userId: p.userId || null
+        userId: p.userId || null,
       };
     });
 
     return {
       title: finalTitle,
       total: total,
-      expenseType: 'expense',
+      expenseType: "expense",
       participants: mappedParticipants,
-      items: state.items.map(item => ({
+      items: state.items.map((item) => ({
         id: item.id,
         name: item.name.trim(),
         amount: parseFloat(item.amount) || 0,
         selectedConsumers: item.selectedConsumers || [0],
-        splits: item.splits || []
+        splits: item.splits || [],
       })),
-      fees: state.fees.map(fee => ({
+      fees: state.fees.map((fee) => ({
         id: fee.id,
         name: fee.name.trim(),
         amount: parseFloat(fee.amount) || 0,
-        type: fee.type || 'fixed',
-        splits: fee.splits || []
+        type: fee.type || "fixed",
+        splits: fee.splits || [],
       })),
       selectedPayers: state.selectedPayers || [0],
-      join: { enabled: state.joinEnabled }
+      join: { enabled: state.joinEnabled },
     };
   };
 
   // Simplified validation
   const validateExpense = () => {
-    if (state.participants.some(p => !p.name.trim())) {
-      Alert.alert('Error', 'Please enter names for all participants');
+    if (state.participants.some((p) => !p.name.trim())) {
+      Alert.alert("Error", "Please enter names for all participants");
       return false;
     }
     if (state.items.length === 0) {
-      Alert.alert('Error', 'Please add at least one item');
+      Alert.alert("Error", "Please add at least one item");
       return false;
     }
-    if (state.items.some(item => !item.name.trim() || parseFloat(item.amount) < 0)) {
-      Alert.alert('Error', 'Please fill in all item names and ensure amounts are valid');
+    if (
+      state.items.some(
+        (item) => !item.name.trim() || parseFloat(item.amount) < 0
+      )
+    ) {
+      Alert.alert(
+        "Error",
+        "Please fill in all item names and ensure amounts are valid"
+      );
       return false;
     }
-    if (state.fees.some(fee => !fee.name.trim())) {
-      Alert.alert('Error', 'Please fill in all fee names');
+    if (state.fees.some((fee) => !fee.name.trim())) {
+      Alert.alert("Error", "Please fill in all fee names");
       return false;
     }
     if (!state.selectedPayers?.length) {
-      Alert.alert('Error', 'Please select at least one person who paid for this expense');
+      Alert.alert(
+        "Error",
+        "Please select at least one person who paid for this expense"
+      );
       return false;
     }
     return true;
@@ -255,29 +173,37 @@ const AddExpenseScreen = ({ route, navigation }) => {
   const handleSaveExpense = async () => {
     if (!validateExpense()) return;
 
-    updateState({ loading: true });
+    actions.setLoading(true);
     try {
       const expenseData = await prepareExpenseData();
       const currentUser = getCurrentUser();
-      
+
       if (isEditing || isNewExpense) {
-        await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
+        await updateExpenseParticipants(
+          expense.id,
+          expenseData.participants,
+          currentUser.uid
+        );
         const { participants, ...otherFields } = expenseData;
         await updateExpense(expense.id, otherFields, currentUser.uid);
-        Alert.alert('Success', isNewExpense ? 'Expense created successfully' : 'Expense updated successfully');
+        Alert.alert(
+          "Success",
+          isNewExpense
+            ? "Expense created successfully"
+            : "Expense updated successfully"
+        );
       } else {
         await createExpense(expenseData, currentUser.uid);
-        Alert.alert('Success', 'Expense created successfully');
+        Alert.alert("Success", "Expense created successfully");
       }
       navigation.goBack();
     } catch (error) {
-      console.error('Error saving expense:', error);
-      Alert.alert('Error', 'Failed to save expense: ' + error.message);
+      console.error("Error saving expense:", error);
+      Alert.alert("Error", "Failed to save expense: " + error.message);
     } finally {
-      updateState({ loading: false });
+      actions.setLoading(false);
     }
   };
-
 
   // Calculate settlements
   const calculateSettlements = async () => {
@@ -286,50 +212,54 @@ const AddExpenseScreen = ({ route, navigation }) => {
       const settlementResult = calculateSettlement(expenseData);
       return settlementResult.settlements || [];
     } catch (error) {
-      console.error('Error calculating settlements:', error);
+      console.error("Error calculating settlements:", error);
       return [];
     }
   };
 
   const handleSettleNow = async () => {
     if (!validateExpense()) return;
-    
-    updateState({ loading: true });
+
+    actions.setLoading(true);
     try {
       // Save expense first
       const expenseData = await prepareExpenseData();
       const currentUser = getCurrentUser();
-      
+
       if (isEditing || isNewExpense) {
-        await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
+        await updateExpenseParticipants(
+          expense.id,
+          expenseData.participants,
+          currentUser.uid
+        );
         const { participants, ...otherFields } = expenseData;
         await updateExpense(expense.id, otherFields, currentUser.uid);
       } else {
         await createExpense(expenseData, currentUser.uid);
       }
-      
+
       // Calculate settlements
       const settlements = await calculateSettlements();
-      
+
       // Navigate to settlement screen
-      navigation.navigate('SettleUp', {
+      navigation.navigate("SettleUp", {
         expense: {
           ...expense,
-          settlements: settlements.map(settlement => ({
+          settlements: settlements.map((settlement) => ({
             debtor: settlement.from,
             creditor: settlement.to,
             amount: settlement.amount,
-            status: 'noAction',
+            status: "noAction",
             updatedAt: new Date().toISOString(),
-            associatedItems: []
-          }))
-        }
+            associatedItems: [],
+          })),
+        },
       });
     } catch (error) {
-      console.error('Error saving expense before settlement:', error);
-      Alert.alert('Error', 'Failed to save expense: ' + error.message);
+      console.error("Error saving expense before settlement:", error);
+      Alert.alert("Error", "Failed to save expense: " + error.message);
     } finally {
-      updateState({ loading: false });
+      actions.setLoading(false);
     }
   };
 
@@ -338,51 +268,59 @@ const AddExpenseScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <ExpenseHeader
-        title={state.title || (isEditing ? 'Edit Expense' : 'Add Expense')}
+        title={state.title || (isEditing ? "Edit Expense" : "Add Expense")}
         onBackPress={() => navigation.goBack()}
-        onSettingsPress={() => navigation.navigate('ExpenseSettings', { expense: { 
-          id: expense?.id,
-          title: state.title,
-          participants: state.participants,
-          items: state.items,
-          fees: state.fees,
-          createdBy: getCurrentUser()?.uid,
-          join: { enabled: state.joinEnabled }
-        }})}
+        onSettingsPress={() =>
+          navigation.navigate("ExpenseSettings", {
+            expense: {
+              id: expense?.id,
+              title: state.title,
+              participants: state.participants,
+              items: state.items,
+              fees: state.fees,
+              createdBy: getCurrentUser()?.uid,
+              join: { enabled: state.joinEnabled },
+            },
+          })
+        }
         isEditing={isEditing}
       />
-        
-        <KeyboardAvoidingView 
+
+      <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <ScrollView 
+        <ScrollView
           ref={scrollViewRef}
-          style={styles.content} 
+          style={styles.content}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: insets.top + 100, paddingBottom: 120 }}
+          contentContainerStyle={{
+            paddingTop: insets.top + 100,
+            paddingBottom: 120,
+          }}
         >
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Participants</Text>
               <View style={styles.participantsCount}>
                 <Text style={styles.participantsCountText}>
-                  {state.participants.length} {state.participants.length === 1 ? 'person' : 'people'}
+                  {state.participants.length}{" "}
+                  {state.participants.length === 1 ? "person" : "people"}
                 </Text>
               </View>
             </View>
-            
+
             <ParticipantsGrid
-              participants={state.participants}
-              selectedFriends={state.selectedFriends}
-              onFriendsChange={(friends) => updateState({ selectedFriends: friends })}
               onParticipantPress={(participant, index) => {
-                if (participant.userId && participant.userId !== getCurrentUser()?.uid) {
-                  navigation.navigate('FriendProfile', { friendId: participant.userId });
+                if (
+                  participant.userId &&
+                  participant.userId !== getCurrentUser()?.uid
+                ) {
+                  navigation.navigate("FriendProfile", {
+                    friendId: participant.userId,
+                  });
                 }
               }}
-              participantsExpanded={state.participantsExpanded}
-              onToggleExpanded={() => updateState({ participantsExpanded: !state.participantsExpanded })}
               expenseId={expense?.id}
               currentUserId={getCurrentUser()?.uid}
             />
@@ -390,28 +328,21 @@ const AddExpenseScreen = ({ route, navigation }) => {
 
           {/* Items Section */}
           <Text style={styles.sectionTitle}>Items</Text>
-          
+
           {state.items.map((item, index) => (
             <ExpenseItemCard
               key={item.id}
               item={item}
               index={index}
-              participants={state.participants}
-              items={state.items}
-              onUpdateItem={updateState}
-              onRemoveItem={(index) => {
-                const updatedItems = state.items.filter((_, i) => i !== index);
-                updateState({ items: updatedItems });
-              }}
               canDelete={state.items.length > 1}
             />
           ))}
-          
+
           {/* Add Item Button - Below the item cards */}
-            <TouchableOpacity
+          <TouchableOpacity
             style={styles.addItemButton}
             onPress={() => {
-              addItem();
+              actions.addItem();
               setTimeout(() => {
                 scrollViewRef.current?.scrollToEnd({ animated: true });
               }, 100);
@@ -454,22 +385,17 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.md,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
-
-
-
-
-
 
   participantsCount: {
     backgroundColor: Colors.accent,
@@ -479,36 +405,35 @@ const styles = StyleSheet.create({
   },
   participantsCountText: {
     color: Colors.surface,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 12,
   },
 
-
-
-
-
-
   addItemButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     marginVertical: Spacing.lg,
-    alignSelf: 'center',
+    alignSelf: "center",
     borderWidth: 1,
     borderColor: Colors.accent,
   },
   addItemText: {
     color: Colors.accent,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: Spacing.sm,
   },
-
-
 });
 
+// Wrapper component with provider
+const AddExpenseScreen = (props) => (
+  <ExpenseProvider>
+    <AddExpenseScreenContent {...props} />
+  </ExpenseProvider>
+);
 
 export default AddExpenseScreen;

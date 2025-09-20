@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
+import { useExpense } from '../../contexts/ExpenseContext';
 import Card from '../Card';
 import DeleteButton from '../DeleteButton';
 import PriceInput from './PriceInput';
@@ -52,12 +53,11 @@ const smartRoundSplit = (total, count) => {
 const ExpenseItemCard = ({
   item,
   index,
-  participants,
-  items,
-  onUpdateItem,
-  onRemoveItem,
   canDelete = true,
 }) => {
+  // Use context instead of props
+  const { state, actions } = useExpense();
+  const { participants, items } = state;
   // State for split management
   const [participantStates, setParticipantStates] = useState([]);
   const [error, setError] = useState(null);
@@ -89,12 +89,8 @@ const ExpenseItemCard = ({
     setError(null);
     
     // Update the item with the new splits
-    onUpdateItem({ 
-      items: items.map((itm, i) => 
-        i === index ? { ...itm, splits: newStates.map(state => ({ amount: state.amount })) } : itm
-      )
-    });
-  }, [participants, item.amount, item.selectedConsumers, onUpdateItem, items, index]);
+    actions.updateItem(index, { splits: newStates.map(state => ({ amount: state.amount })) });
+  }, [participants, item.amount, item.selectedConsumers, actions, index]);
 
   // Calculate remaining balance to distribute among unlocked users
   const calculateRemainingBalance = useCallback((states) => {
@@ -166,22 +162,14 @@ const ExpenseItemCard = ({
       const updatedStates = distributeRemainingBalance(newStates);
       setParticipantStates(updatedStates);
       
-      onUpdateItem({ 
-        items: items.map((itm, i) => 
-          i === index ? { ...itm, splits: updatedStates.map(state => ({ amount: state.amount })) } : itm
-        )
-      });
+      actions.updateItem(index, { splits: updatedStates.map(state => ({ amount: state.amount })) });
       return;
     }
     
     setParticipantStates(newStates);
     
-    onUpdateItem({ 
-      items: items.map((itm, i) => 
-        i === index ? { ...itm, splits: newStates.map(state => ({ amount: state.amount })) } : itm
-      )
-    });
-  }, [participantStates, item.amount, item.selectedConsumers, distributeRemainingBalance, onUpdateItem, items, index]);
+    actions.updateItem(index, { splits: newStates.map(state => ({ amount: state.amount })) });
+  }, [participantStates, item.amount, item.selectedConsumers, distributeRemainingBalance, actions, index]);
 
   // Toggle lock status for a participant
   const toggleLock = useCallback((pIndex) => {
@@ -201,11 +189,7 @@ const ExpenseItemCard = ({
       setParticipantStates(updatedStates);
       setError(null);
       
-      onUpdateItem({ 
-        items: items.map((itm, i) => 
-          i === index ? { ...itm, splits: updatedStates.map(state => ({ amount: state.amount })) } : itm
-        )
-      });
+      actions.updateItem(index, { splits: updatedStates.map(state => ({ amount: state.amount })) });
     } else {
       // Lock: keep current amount and mark as locked
       newStates[pIndex] = {
@@ -218,13 +202,9 @@ const ExpenseItemCard = ({
       setParticipantStates(updatedStates);
       setError(null);
       
-      onUpdateItem({ 
-        items: items.map((itm, i) => 
-          i === index ? { ...itm, splits: updatedStates.map(state => ({ amount: state.amount })) } : itm
-        )
-      });
+      actions.updateItem(index, { splits: updatedStates.map(state => ({ amount: state.amount })) });
     }
-  }, [participantStates, distributeRemainingBalance, onUpdateItem, items, index]);
+  }, [participantStates, distributeRemainingBalance, actions, index]);
 
   // Handle blur to format amounts
   const handleBlur = useCallback((pIndex) => {
@@ -238,11 +218,7 @@ const ExpenseItemCard = ({
       const updatedStates = distributeRemainingBalance(newStates);
       setParticipantStates(updatedStates);
       
-      onUpdateItem({ 
-        items: items.map((itm, i) => 
-          i === index ? { ...itm, splits: updatedStates.map(state => ({ amount: state.amount })) } : itm
-        )
-      });
+      actions.updateItem(index, { splits: updatedStates.map(state => ({ amount: state.amount })) });
       return;
     }
     
@@ -259,16 +235,14 @@ const ExpenseItemCard = ({
         )
       });
     }
-  }, [participantStates, distributeRemainingBalance, onUpdateItem, items, index]);
+  }, [participantStates, distributeRemainingBalance, actions, index]);
 
   const togglePayer = (participantIndex) => {
     const newPayers = item.selectedPayers.includes(participantIndex)
       ? item.selectedPayers.filter(i => i !== participantIndex)
       : [...item.selectedPayers, participantIndex];
     
-    const updatedItems = [...items];
-    updatedItems[index].selectedPayers = newPayers;
-    onUpdateItem({ items: updatedItems });
+    actions.updateItem(index, { selectedPayers: newPayers });
   };
 
   const toggleConsumer = (participantIndex) => {
@@ -277,13 +251,7 @@ const ExpenseItemCard = ({
       : [...item.selectedConsumers, participantIndex];
     
     if (newConsumers.length > 0) {
-      onUpdateItem({ 
-        items: items.map((itm, i) => 
-          i === index 
-            ? { ...itm, selectedConsumers: newConsumers }
-            : itm
-        )
-      });
+      actions.updateItem(index, { selectedConsumers: newConsumers });
       
       // Recalculate splits when consumers change
       const total = parseFloat(item.amount) || 0;
@@ -320,18 +288,14 @@ const ExpenseItemCard = ({
                 placeholder="Enter item name"
                 placeholderTextColor={Colors.textSecondary}
                 value={item.name}
-                onChangeText={(text) => onUpdateItem({ 
-                  items: items.map((itm, i) => 
-                    i === index ? { ...itm, name: text } : itm
-                  )
-                })}
+                onChangeText={(text) => actions.updateItem(index, { name: text })}
               />
             </View>
           </View>
         </View>
         {canDelete && (
           <DeleteButton
-            onPress={() => onRemoveItem(index)}
+            onPress={() => actions.removeItem(index)}
             size="small"
             variant="subtle"
             style={{ marginLeft: 8 }}
@@ -345,11 +309,7 @@ const ExpenseItemCard = ({
         <View style={styles.priceInputContainer}>
           <PriceInput
             value={item.amount}
-            onChangeText={(amount) => onUpdateItem({ 
-              items: items.map((itm, i) => 
-                i === index ? { ...itm, amount } : itm
-              )
-            })}
+            onChangeText={(amount) => actions.updateItem(index, { amount })}
             placeholder="0.00"
             style={styles.amountInput}
             showCurrency={true}
