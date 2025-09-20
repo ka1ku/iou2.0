@@ -44,6 +44,20 @@ const ExpenseItemCard = ({ item, index, canDelete = true }) => {
   // NEW: State to track the currently focused input for a smoother editing experience.
   const [activeInput, setActiveInput] = useState(null); // e.g., { index: 1, value: '12.' }
 
+  // Initialize manualSplits with existing item.splits data when component mounts
+  useEffect(() => {
+    if (item.splits && Array.isArray(item.splits) && item.selectedConsumers) {
+      const initialManualSplits = {};
+      item.selectedConsumers.forEach((consumerIndex, i) => {
+        const splitAmount = item.splits[i];
+        if (splitAmount !== undefined && splitAmount !== null && !isNaN(splitAmount)) {
+          initialManualSplits[consumerIndex] = parseFloat(splitAmount);
+        }
+      });
+      setManualSplits(initialManualSplits);
+    }
+  }, []); // Only run once when component mounts
+
   const derivedSplits = useMemo(() => {
     const total = parseFloat(item.amount) || 0;
     const consumers = item.selectedConsumers || [];

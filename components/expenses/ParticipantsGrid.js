@@ -371,7 +371,7 @@ const ParticipantsGrid = forwardRef(({
     });
     
     handleSMSInvite(contact);
-  }, [selectedFriends, actions]);
+  }, [selectedFriends]);
 
   const handleSMSInvite = useCallback((contact) => {
     const phoneNumber = contact.phoneNumbers?.[0]?.number || contact.phoneNumber;
@@ -426,7 +426,7 @@ const ParticipantsGrid = forwardRef(({
 
   const removeFriend = useCallback((friendId) => {
     const updated = selectedFriends.filter(f => f.id !== friendId);
-    onFriendsChange(updated);
+    actions.setSelectedFriends(updated);
   }, [selectedFriends, actions]);
 
   const currentUserData = useMemo(() => {

@@ -20,11 +20,20 @@ import { getUserProfile } from '../services/friendService';
 import { createExpense } from '../services/expenseService';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
+import { useExpense } from '../contexts/ExpenseContext';
 
 const SetupExpenseScreen = ({ route, navigation }) => {
   const { expenseType = 'expense', scannedReceipt, fromReceiptScan } = route.params || {};
   const insets = useSafeAreaInsets();
   const currentUserId = getCurrentUser()?.uid;
+
+  // Use expense context
+  const { state, actions } = useExpense();
+  const { title, participants, selectedFriends, participantsExpanded, loading } = state;
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [titleInputFocused, setTitleInputFocused] = useState(false);
+  const participantsGridRef = useRef(null);
 
   const createMeParticipant = useCallback(() => ({
     name: 'Me',
@@ -36,21 +45,12 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     profilePhoto: null
   }), [currentUserId]);
 
-  const [title, setTitle] = useState('');
-  const [participants, setParticipants] = useState([createMeParticipant()]);
-  const [selectedFriends, setSelectedFriends] = useState([]);
-  const [participantsExpanded, setParticipantsExpanded] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [titleInputFocused, setTitleInputFocused] = useState(false);
-  const participantsGridRef = useRef(null);
-
   // Set title from scanned receipt if available
   useEffect(() => {
     if (scannedReceipt?.title) {
-      setTitle(scannedReceipt.title);
+      actions.setTitle(scannedReceipt.title);
     }
-  }, [scannedReceipt]);
+  }, [scannedReceipt, actions]);
 
   // Initialize "Me" participant with current user's profile data
   useEffect(() => {
@@ -60,21 +60,19 @@ const SetupExpenseScreen = ({ route, navigation }) => {
         if (currentUser) {
           const userProfile = await getUserProfile(currentUser.uid);
           if (userProfile) {
-            setParticipants(prev => {
-              const updated = [...prev];
-              if (updated.length > 0 && updated[0].name === 'Me') {
-                updated[0] = {
-                  ...updated[0],
-                  name: 'Me',
-                  userId: currentUser.uid,
-                  placeholder: false,
-                  phoneNumber: userProfile.phoneNumber,
-                  username: userProfile.username,
-                  profilePhoto: userProfile.profilePhoto
-                };
-              }
-              return updated;
-            });
+            const updatedParticipants = [...participants];
+            if (updatedParticipants.length > 0 && updatedParticipants[0].name === 'Me') {
+              updatedParticipants[0] = {
+                ...updatedParticipants[0],
+                name: 'Me',
+                userId: currentUser.uid,
+                placeholder: false,
+                phoneNumber: userProfile.phoneNumber,
+                username: userProfile.username,
+                profilePhoto: userProfile.profilePhoto
+              };
+              actions.setParticipants(updatedParticipants);
+            }
           }
         }
       } catch (error) {
@@ -83,16 +81,16 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     };
 
     initializeMeParticipant();
-  }, []);
+  }, [participants, actions]);
 
   // Handle scanned receipt data
   useEffect(() => {
     if (scannedReceipt && fromReceiptScan) {
       if (scannedReceipt.participants && scannedReceipt.participants.length > 0) {
-        setParticipants(scannedReceipt.participants);
+        actions.setParticipants(scannedReceipt.participants);
       }
     }
-  }, [scannedReceipt, fromReceiptScan]);
+  }, [scannedReceipt, fromReceiptScan, actions]);
 
   // Update participants when friends are selected
   useEffect(() => {
@@ -113,10 +111,10 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     // Only update if participants actually changed
     const participantsChanged = JSON.stringify(allParticipants) !== JSON.stringify(participants);
     if (participantsChanged) {
-      setParticipants(allParticipants);
+      actions.setParticipants(allParticipants);
       setHasUnsavedChanges(true);
     }
-  }, [selectedFriends, createMeParticipant]);
+  }, [selectedFriends, createMeParticipant, participants, actions]);
   // Track changes for navigation warning
   useEffect(() => {
     if (title.trim() !== '') {
@@ -171,7 +169,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       return;
     }
 
-    setLoading(true);
+    actions.setLoading(true);
     try {
       const currentUser = getCurrentUser();
       if (!currentUser) throw new Error('No user signed in');
@@ -243,7 +241,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       console.error('Error creating basic expense:', error);
       Alert.alert('Error', 'Failed to create ' + expenseType + ': ' + error.message);
     } finally {
-      setLoading(false);
+      actions.setLoading(false);
     }
   };
 
@@ -281,7 +279,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                   titleInputFocused && styles.titleInputFocused
                 ]}
                 value={title}
-                onChangeText={setTitle}
+                onChangeText={actions.setTitle}
                 placeholder={`Enter ${expenseType} name...`}
                 placeholderTextColor={Colors.textSecondary}
                 autoFocus={!scannedReceipt}
@@ -387,11 +385,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       <View style={{ position: 'absolute', left: -9999 }}>
         <ParticipantsGrid
           ref={participantsGridRef}
-          participants={participants}
-          selectedFriends={selectedFriends}
-          onFriendsChange={setSelectedFriends}
-          participantsExpanded={false}
-          onToggleExpanded={() => {}}
           expenseId={null}
           currentUserId={currentUserId}
         />

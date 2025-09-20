@@ -44,17 +44,39 @@ import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
 // Components
 import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
 
+// Contexts
+import { ExpenseProvider } from './contexts/ExpenseContext';
+
 // Navigation constants
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+// Wrapper components for screens that need ExpenseProvider
+const SetupExpenseScreenWithProvider = (props) => (
+  <ExpenseProvider>
+    <SetupExpenseScreen {...props} />
+  </ExpenseProvider>
+);
+
+const AddExpenseScreenWithProvider = (props) => (
+  <ExpenseProvider>
+    <AddExpenseScreen {...props} />
+  </ExpenseProvider>
+);
+
+const AddReceiptScreenWithProvider = (props) => (
+  <ExpenseProvider>
+    <AddReceiptScreen {...props} />
+  </ExpenseProvider>
+);
 
 // Stack navigator for Home tab
 const HomeStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="SetupExpense" component={SetupExpenseScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="AddReceipt" component={AddReceiptScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="SetupExpense" component={SetupExpenseScreenWithProvider} options={{ headerShown: false }} />
+    <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} options={{ headerShown: false }} />
+    <Stack.Screen name="AddReceipt" component={AddReceiptScreenWithProvider} options={{ headerShown: false }} />
     <Stack.Screen name="SettleUp" component={SettleUpScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ExpenseSettings" component={ExpenseSettingsScreen} options={{ headerShown: false }} />
   </Stack.Navigator>
@@ -67,8 +89,8 @@ const ProfileStack = () => (
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
     <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="AddExpense" component={AddExpenseScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="AddReceipt" component={AddReceiptScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} options={{ headerShown: false }} />
+    <Stack.Screen name="AddReceipt" component={AddReceiptScreenWithProvider} options={{ headerShown: false }} />
     <Stack.Screen name="SettleUp" component={SettleUpScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ExpenseSettings" component={ExpenseSettingsScreen} options={{ headerShown: false }} />
   </Stack.Navigator>
