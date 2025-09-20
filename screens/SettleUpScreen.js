@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import { calculateSettlement, getSettlementSummary } from '../utils/settlementCalculator';
+import { calculateSettlement, calculateSettlementWithPartialSettlements, getSettlementSummary } from '../utils/settlementCalculator';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 import { createExpense, updateExpense } from '../services/expenseService';
@@ -36,6 +36,8 @@ const SettleUpScreen = ({ route, navigation }) => {
   const [settledStates, setSettledStates] = useState({}); // Track which settlements are marked as paid
   const [paymentMadeStates, setPaymentMadeStates] = useState({}); // Track which settlements have payments made
   const [animationStates, setAnimationStates] = useState({}); // Track animation states for each settlement
+  const [settlementRecalculated, setSettlementRecalculated] = useState(false); // Track if settlements were recalculated
+  const [recalculationInfo, setRecalculationInfo] = useState(null); // Info about recalculation
   
   if (!expense) {
     navigation.goBack();
@@ -134,6 +136,7 @@ const SettleUpScreen = ({ route, navigation }) => {
       });
       
       setSettledStates(initialSettledStates);
+      console.log('SettledStates', settledStates);
       setRequestSentStates(initialRequestSentStates);
       setPaymentMadeStates(initialPaymentMadeStates);
     } else {
@@ -175,6 +178,49 @@ const SettleUpScreen = ({ route, navigation }) => {
     return () => subscription?.remove();
   }, [isVenmoAppActive]);
 
+  // Check if settlements need to be recalculated due to expense changes
+  useEffect(() => {
+    const checkSettlementRecalculation = async () => {
+      if (!expense.settlements || expense.settlements.length === 0) return;
+      
+      try {
+        // Calculate what settlements should be based on current expense data
+        const currentSettlements = calculateSettlementWithPartialSettlements(expense, expense.settlements);
+        const expectedSettlements = currentSettlements.settlements;
+        
+        // Compare with existing settlements (ignoring status and timestamps)
+        const existingSettlementsNormalized = expense.settlements.map(s => ({
+          from: s.debtor,
+          to: s.creditor,
+          amount: s.amount
+        }));
+        
+        const expectedSettlementsNormalized = expectedSettlements.map(s => ({
+          from: s.from,
+          to: s.to,
+          amount: s.amount
+        }));
+        
+        // Check if settlements have changed
+        const settlementsChanged = JSON.stringify(existingSettlementsNormalized.sort()) !== 
+                                 JSON.stringify(expectedSettlementsNormalized.sort());
+        
+        if (settlementsChanged) {
+          setSettlementRecalculated(true);
+          setRecalculationInfo({
+            paidSettlements: currentSettlements.paidSettlements,
+            newSettlements: currentSettlements.newSettlements,
+            totalSettlements: expectedSettlements.length
+          });
+        }
+      } catch (error) {
+        console.error('Error checking settlement recalculation:', error);
+      }
+    };
+    
+    checkSettlementRecalculation();
+  }, [expense]);
+
   // Use settlements from expense data if available, otherwise calculate them
   const settlements = expense.settlements && expense.settlements.length > 0 
     ? expense.settlements.map(s => ({
@@ -190,9 +236,35 @@ const SettleUpScreen = ({ route, navigation }) => {
           status: 'noAction'
         }));
       })();
-  
-  const summary = getSettlementSummary(settlements);
-  
+    
+  // Function to recalculate settlements and update the expense
+  const recalculateSettlements = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Calculate new settlements preserving paid ones
+      const newSettlementResult = calculateSettlementWithPartialSettlements(expense, expense.settlements);
+      const newSettlements = newSettlementResult.settlements;
+      
+      // Update the expense with new settlements
+      await updateExpense(expense.id, { settlements: newSettlements }, getCurrentUser()?.uid);
+      
+      // Update local state
+      setSettlementRecalculated(false);
+      setRecalculationInfo(null);
+      
+      // Refresh the screen with updated data
+      navigation.replace('SettleUp', { 
+        expense: { ...expense, settlements: newSettlements } 
+      });
+      
+    } catch (error) {
+      console.error('Error recalculating settlements:', error);
+      Alert.alert('Error', 'Failed to recalculate settlements. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [expense, navigation]);
 
   const handleAccept = async () => {
     setLoading(true);
@@ -282,7 +354,6 @@ const SettleUpScreen = ({ route, navigation }) => {
       ...prev,
       [settlementId]: true
     }));
-    
     // Trigger the animation
     animateSettledUp(settlementId);
     
@@ -322,13 +393,16 @@ const SettleUpScreen = ({ route, navigation }) => {
 
   const handleUndoMarkAsPaid = useCallback((settlement) => {
     const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
-    
     // Create animation values for the undo transition
     const undoScale = new Animated.Value(1);
     const settledUpOpacity = new Animated.Value(1);
     const buttonsOpacity = new Animated.Value(0);
     const buttonsScale = new Animated.Value(0.8);
-    
+    setSettledStates(prev => ({
+        ...prev,
+        [settlementId]: false
+    }));
+    console.log('settledStates', settledStates);
     // Store animation values for this settlement
     setAnimationStates(prev => ({
       ...prev,
@@ -383,11 +457,7 @@ const SettleUpScreen = ({ route, navigation }) => {
     
     // Remove from settled states after animation completes
     setTimeout(() => {
-      setSettledStates(prev => {
-        const newState = { ...prev };
-        delete newState[settlementId];
-        return newState;
-      });
+      
       
       // Remove animation state
       setAnimationStates(prev => {
@@ -418,9 +488,13 @@ const SettleUpScreen = ({ route, navigation }) => {
         
         // Determine status based on user actions, but preserve existing status if no new actions
         let status = settlement.status || 'noAction';
-        if (isSettled) {
+        if (isSettled == true) {
           status = 'markedAsPaid';
-        } else if (hasPaymentBeenMade) {
+        }
+        if (isSettled == false) {
+          status = 'noAction';
+        } 
+        else if (hasPaymentBeenMade) {
           status = 'paymentMade';
         } else if (hasRequestBeenSent) {
           status = 'paymentRequested';
@@ -812,8 +886,31 @@ const SettleUpScreen = ({ route, navigation }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
       >
-
-
+        {/* Settlement Recalculation Notification */}
+        {settlementRecalculated && recalculationInfo && recalculationInfo.newSettlements > 0 && (
+          <View style={styles.recalculationBanner}>
+            <View style={styles.recalculationContent}>
+              <Ionicons name="information-circle" size={20} color={Colors.accent} />
+              <View style={styles.recalculationTextContainer}>
+                <Text style={styles.recalculationText}>
+                  Settlements have been updated based on expense changes.
+                </Text>
+                <Text style={styles.recalculationSubtext}>
+                  {recalculationInfo.paidSettlements} paid settlement{recalculationInfo.paidSettlements !== 1 ? 's' : ''} preserved, {recalculationInfo.newSettlements} new settlement{recalculationInfo.newSettlements !== 1 ? 's' : ''} added.
+                </Text>
+              </View>
+              <View style={styles.recalculationActions}>
+                <TouchableOpacity
+                  style={styles.dismissButton}
+                  onPress={() => setSettlementRecalculated(false)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close" size={16} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Settlements List */}
         <View style={styles.settlementsSection}>
@@ -1222,6 +1319,58 @@ const styles = StyleSheet.create({
     color: Colors.surface,
     fontWeight: '600',
     fontSize: 16,
+  },
+  recalculationBanner: {
+    backgroundColor: Colors.accent + '10',
+    borderWidth: 1,
+    borderColor: Colors.accent + '30',
+    borderRadius: Radius.md,
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+  },
+  recalculationContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
+  recalculationTextContainer: {
+    flex: 1,
+  },
+  recalculationText: {
+    ...Typography.body2,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  recalculationSubtext: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+  },
+  recalculationActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  updateButton: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+    ...Shadows.button,
+  },
+  updateButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  dismissButton: {
+    padding: Spacing.xs,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
 });
 
