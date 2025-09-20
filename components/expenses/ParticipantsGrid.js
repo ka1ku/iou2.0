@@ -475,101 +475,58 @@ const ParticipantsGrid = forwardRef(({
     closeModal: () => setShowModal(false)
   }));
   
-  const renderParticipantItem = ({ item, index }) => {
-    if (item.type === 'add-button') {
-      return (
-        <TouchableOpacity 
-          style={styles.addParticipantGridButton}
-          onPress={() => setShowModal(true)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.addParticipantGridIcon}>
-            <Ionicons name="create" size={24} color={Colors.accent} />
-          </View>
-          <Text style={styles.addParticipantGridText}>Edit</Text>
-          <Text style={styles.addParticipantGridPlaceholder}></Text>
-        </TouchableOpacity>
-      );
-    }
-
-    const participant = item;
-    return (
-      <TouchableOpacity 
-        key={participant.id}
-        style={styles.participantGridItem}
-        onPress={() => {
-          if (onParticipantPress) {
-            onParticipantPress(participant, index);
-          } else if (participant.userId && participant.userId !== currentUserId) {
-            // Default navigation behavior - can be overridden
-          }
-        }}
-        activeOpacity={0.7}
-      >
-        <View style={styles.participantGridAvatarContainer}>
-          {participant.profilePhoto ? (
-            <Image source={{ uri: participant.profilePhoto }} style={styles.participantGridAvatar} />
-          ) : (
-            <View style={[
-              styles.participantGridAvatarPlaceholder,
-              participant.name === 'You' && styles.currentUserAvatar
-            ]}>
-              <Text style={[
-                styles.participantGridAvatarInitials,
-                participant.name === 'You' && styles.currentUserInitials
-              ]}>
-                {participant.name === 'You' ? 'Y' : (participant.name?.[0] || 'U').toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.participantGridName} numberOfLines={1}>
-          {participant.name}
-        </Text>
-        {participant.username && (
-          <Text style={styles.participantGridUsername} numberOfLines={1}>
-            @{participant.username}
-          </Text>
-        )}
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={[
-          { id: 'add-button', type: 'add-button' },
-          ...(participantsExpanded ? participants : participants.slice(0, 5))
-        ]}
-        numColumns={3}
-        keyExtractor={(item) => item.id}
-        renderItem={renderParticipantItem}
-        contentContainerStyle={styles.participantsGridContainer}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={false}
-      />
-      
-      {/* Show More/Less toggle button */}
-      {participants.length > 5 && (
-        <TouchableOpacity 
-          style={styles.toggleParticipantsButton}
-          onPress={() => actions.setParticipantsExpanded(!participantsExpanded)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.toggleParticipantsIcon}>
-            <Ionicons 
-              name={participantsExpanded ? "chevron-up" : "chevron-down"} 
-              size={16} 
-              color={Colors.surface} 
-            />
-          </View>
-          <Text style={styles.toggleParticipantsText}>
-            {participantsExpanded ? "Show Less" : `Show ${participants.length - 5} More`}
-          </Text>
-        </TouchableOpacity>
-      )}
-      
+      {/* Participant Snapshot Section */}
+      <TouchableOpacity
+        style={styles.participantSnapshotContainer}
+        onPress={() => setShowModal(true)}
+        activeOpacity={0.8}
+      >
+        {/* Avatar Stack */}
+        <View style={styles.avatarStackContainer}>
+          {participants.slice(0, 4).map((participant, index) => (
+            <View
+              key={participant.id}
+              style={[
+                styles.avatarStackItem,
+                { zIndex: participants.length - index }
+              ]}
+            >
+              {participant.profilePhoto ? (
+                <Image source={{ uri: participant.profilePhoto }} style={styles.avatarStackImage} />
+              ) : (
+                <View style={[
+                  styles.avatarStackPlaceholder,
+                  participant.name === 'You' && styles.currentUserAvatarStack
+                ]}>
+                  <Text style={[
+                    styles.avatarStackInitials,
+                    participant.name === 'You' && styles.currentUserInitials
+                  ]}>
+                    {participant.name === 'You' ? 'Y' : (participant.name?.[0] || 'U').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+
+          {/* Overflow Indicator */}
+          {participants.length > 4 && (
+            <View style={styles.overflowContainer}>
+              <Text style={styles.overflowText}>+{participants.length - 4}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Action Text */}
+        <View style={styles.actionContainer}>
+          <Text style={styles.actionText}>Manage group</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+        </View>
+      </TouchableOpacity>
+
       {/* Friend Selection Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
@@ -628,122 +585,83 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: Spacing.sm,
   },
-  participantsGridContainer: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-  },
-  participantGridItem: {
-    alignItems: 'center',
-    width: '33.33%', // Exactly one-third width for 3 columns
-    paddingVertical: Spacing.xs,
-    minHeight: 100,
-  },
-  participantGridAvatarContainer: {
-    position: 'relative',
-    width: 72,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  participantGridAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    borderColor: Colors.surface,
-    ...Shadows.avatar,
-  },
-  participantGridAvatarPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.accent,
-    borderWidth: 2,
-    borderColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Shadows.avatar,
-  },
-  participantGridAvatarInitials: {
-    color: Colors.white,
-    fontSize: 24,
-    fontFamily: Typography.familySemiBold,
-  },
-  participantGridName: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  participantGridUsername: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    fontSize: 9,
-  },
-  addParticipantGridButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '33.33%', // Exactly one-third width for 3 columns
-    marginBottom: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    minHeight: 100,
-  },
-  addParticipantGridIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.surfaceLight,
-    borderWidth: 2,
-    borderColor: Colors.divider,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.sm,
-  },
-  addParticipantGridText: {
-    ...Typography.label,
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 11,
-  },
-  addParticipantGridPlaceholder: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    fontSize: 9,
-    height: 12, // Match the height of username text
-  },
-  toggleParticipantsButton: {
+  // Participant Snapshot Styles
+  participantSnapshotContainer: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Radius.pill,
-    ...Shadows.button,
-    elevation: 2,
+    justifyContent: 'space-between',
+    position: 'relative',
+    ...Shadows.card,
   },
-  toggleParticipantsIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
-    justifyContent: 'center',
+  avatarStackContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginRight: Spacing.lg,
+  },
+  avatarStackItem: {
+    width: 40,
+    height: 40,
+    marginLeft: -6,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.button,
+  },
+  avatarStackImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  avatarStackPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarStackInitials: {
+    color: Colors.white,
+    fontSize: 14,
+    fontFamily: Typography.familySemiBold,
+  },
+  overflowContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceLight,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: -8,
+    ...Shadows.button,
+  },
+  overflowText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  actionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: Spacing.sm,
+    flexShrink: 0,
+  },
+  actionText: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
     marginRight: Spacing.xs,
   },
-  toggleParticipantsText: {
-    ...Typography.label,
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 12,
-  },
-  currentUserAvatar: {
+  currentUserAvatarStack: {
     borderColor: Colors.accent,
     borderWidth: 3,
     backgroundColor: Colors.accent,
@@ -751,7 +669,7 @@ const styles = StyleSheet.create({
   currentUserInitials: {
     color: Colors.white,
     fontWeight: '600',
-    fontSize: 24,
+    fontSize: 14,
   },
 
   // FriendSelector Modal Styles

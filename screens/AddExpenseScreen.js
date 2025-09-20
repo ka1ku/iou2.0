@@ -296,17 +296,15 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           style={styles.content}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: insets.top + 100,
+            paddingTop: insets.top + 80,
             paddingBottom: 120,
           }}
         >
-          <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Participants</Text>
-              <View style={styles.participantsCount}>
-                <Text style={styles.participantsCountText}>
-                  {state.participants.length}{" "}
-                  {state.participants.length === 1 ? "person" : "people"}
+              <View style={styles.memberCountBadge}>
+                <Text style={styles.memberCountText}>
+                  {state.participants.length} {state.participants.length === 1 ? 'member' : 'members'}
                 </Text>
               </View>
             </View>
@@ -325,7 +323,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
               expenseId={expense?.id}
               currentUserId={getCurrentUser()?.uid}
             />
-          </View>
 
           {/* Items Section */}
           <Text style={styles.sectionTitle}>Items</Text>
@@ -396,19 +393,26 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: Spacing.sm,
+    marginTop: Spacing.md,
   },
-
-  participantsCount: {
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  memberCountBadge: {
     backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.pill,
   },
-  participantsCountText: {
+  memberCountText: {
     color: Colors.surface,
     fontWeight: "600",
     fontSize: 12,
   },
+
 
   addItemButton: {
     flexDirection: "row",
