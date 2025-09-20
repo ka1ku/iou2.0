@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -80,6 +81,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       actions.setParticipants(allParticipants);
     }
   }, [state.selectedFriends, state.participants, actions]);
+
 
   // Helper function to prepare expense data
   const prepareExpenseData = async () => {
@@ -337,19 +339,21 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           ))}
 
           {/* Add Item Button - Below the item cards */}
-          <TouchableOpacity
-            style={styles.addItemButton}
-            onPress={() => {
-              actions.addItem();
-              setTimeout(() => {
-                scrollViewRef.current?.scrollToEnd({ animated: true });
-              }, 100);
-            }}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={18} color={Colors.accent} />
-            <Text style={styles.addItemText}>Add Item</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity
+              style={styles.addItemButton}
+              onPress={() => {
+                actions.addItem();
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={18} color={Colors.accent} />
+              <Text style={styles.addItemText}>Add Item</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
 
         <ExpenseFooter
@@ -414,6 +418,12 @@ const styles = StyleSheet.create({
   },
 
 
+  actionButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: Spacing.lg,
+  },
   addItemButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -422,10 +432,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    marginVertical: Spacing.lg,
-    alignSelf: "center",
     borderWidth: 1,
     borderColor: Colors.accent,
+    minWidth: 140,
   },
   addItemText: {
     color: Colors.accent,

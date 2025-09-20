@@ -214,13 +214,45 @@ Important guidelines:
               total: 0,
               items: [],
               fees: [],
-              participants: [{ name: 'You', paidBy: true }],
+              participants: [{
+                name: 'You',
+                id: 'me-participant',
+                userId: null,
+                placeholder: false,
+                phoneNumber: null,
+                username: null,
+                profilePhoto: null,
+                paidBy: true
+              }],
               notes: 'Minimal receipt data extracted'
             };
             return minimalReceipt;
           }
           throw new Error('Could not extract any usable information from this image. Please ensure it\'s a clear receipt.');
         }
+
+        // Ensure participants array exists and has proper structure
+        const normalizedParticipants = Array.isArray(receiptData.participants)
+          ? receiptData.participants.map((p, index) => ({
+              name: p.name || `Person ${index + 1}`,
+              id: p.id || `participant-${index}`,
+              userId: p.userId || null,
+              placeholder: p.placeholder || false,
+              phoneNumber: p.phoneNumber || null,
+              username: p.username || null,
+              profilePhoto: p.profilePhoto || null,
+              paidBy: p.paidBy || false
+            }))
+          : [{
+              name: 'You',
+              id: 'me-participant',
+              userId: null,
+              placeholder: false,
+              phoneNumber: null,
+              username: null,
+              profilePhoto: null,
+              paidBy: true
+            }];
 
         const finalReceiptData = {
           ...receiptData,
@@ -230,6 +262,7 @@ Important guidelines:
           subtotal: normalizedSubtotal,
           fees: normalizedFees,
           total: normalizedTotal,
+          participants: normalizedParticipants,
         };
 
         console.log('Processed receipt data:', finalReceiptData);

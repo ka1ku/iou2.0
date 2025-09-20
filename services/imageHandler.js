@@ -172,22 +172,20 @@ export const handlePickImage = async (onImageSelected, onError, onStateChange) =
  */
 export const imageToBase64 = async (uri) => {
   try {
-    // For React Native, let's try a simpler approach
-    // First, try to use expo-file-system with proper import
-    const FileSystem = await import('expo-file-system');
-    
+    const FileSystem = require('expo-file-system');
+
     // Convert the URI to a file path if it's a file:// URI
     let filePath = uri;
     if (uri.startsWith('file://')) {
       filePath = uri.replace('file://', '');
     }
-    
+
     // Read the file as base64 using expo-file-system
     const base64 = await FileSystem.readAsStringAsync(filePath, {
       encoding: FileSystem.EncodingType.Base64
     });
     return base64;
-    
+
   } catch (error) {
     console.error('Error converting image to base64:', error);
     throw new Error('Failed to convert image to base64. Please try a different image format or restart the app.');
