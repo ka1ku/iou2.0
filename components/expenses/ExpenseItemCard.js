@@ -35,7 +35,7 @@ const smartRoundSplit = (total, count) => {
   return amounts;
 };
 
-const ExpenseItemCard = ({ item, index, canDelete = true }) => {
+const ExpenseItemCard = ({ item, index, canDelete = true, onCancelEdit }) => {
   const { state, actions } = useExpense();
   const { participants } = state;
 
@@ -192,14 +192,25 @@ const ExpenseItemCard = ({ item, index, canDelete = true }) => {
             onChangeText={(text) => actions.updateItem(index, { name: text })}
           />
         </View>
-        {canDelete && (
-          <DeleteButton
-            onPress={() => actions.removeItem(index)}
-            size="small"
-            variant="subtle"
-            style={{ marginLeft: 8 }}
-          />
-        )}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {onCancelEdit && (
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={onCancelEdit}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.cancelButtonText}>Done</Text>
+            </TouchableOpacity>
+          )}
+          {canDelete && (
+            <DeleteButton
+              onPress={() => actions.removeItem(index)}
+              size="small"
+              variant="subtle"
+              style={{ marginLeft: 8 }}
+            />
+          )}
+        </View>
       </View>
 
       {/* Price Section */}
@@ -483,6 +494,20 @@ const styles = StyleSheet.create({
   },
   errorText: { ...Typography.body2, color: Colors.danger, fontWeight: "600" },
   autoAmountInput: { fontStyle: "italic", color: Colors.textSecondary },
+  cancelButton: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent,
+    marginRight: Spacing.xs,
+  },
+  cancelButtonText: {
+    color: Colors.surface,
+    fontWeight: "600",
+    fontSize: 14,
+  },
 });
 
 export default ExpenseItemCard;

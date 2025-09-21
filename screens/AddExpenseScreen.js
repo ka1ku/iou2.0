@@ -25,6 +25,7 @@ import { ExpenseProvider, useExpense } from "../contexts/ExpenseContext";
 import ExpenseHeader from "../components/expenses/ExpenseHeader";
 import ExpenseFooter from "../components/expenses/ExpenseFooter";
 import ExpenseItemCard from "../components/expenses/ExpenseItemCard";
+import ExpenseViewCard from "../components/expenses/ExpenseViewCard";
 import ParticipantsGrid from "../components/expenses/ParticipantsGrid";
 
 // Internal component that uses the context
@@ -36,6 +37,9 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
   // Use context instead of local state
   const { state, actions, total } = useExpense();
+
+  // Track which items are in edit mode
+  const [editingItems, setEditingItems] = useState(new Set());
 
   // Initialize screen and load expense data
   useEffect(() => {
@@ -268,6 +272,34 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
   const handleSettleLater = handleSaveExpense;
 
+  // Handle edit mode for an item
+  const handleEditItem = (index) => {
+    setEditingItems(prev => new Set([...prev, index]));
+  };
+
+  // Handle delete for an item
+  const handleDeleteItem = (index) => {
+    Alert.alert(
+      "Delete Item",
+      "Are you sure you want to delete this item? This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            actions.removeItem(index);
+            setEditingItems(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(index);
+              return newSet;
+            });
+          }
+        }
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <ExpenseHeader
@@ -329,14 +361,37 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           {/* Items Section */}
           <Text style={styles.sectionTitle}>Items</Text>
 
-          {state.items.map((item, index) => (
-            <ExpenseItemCard
-              key={item.id}
-              item={item}
-              index={index}
-              canDelete={state.items.length > 1}
-            />
-          ))}
+          {state.items.map((item, index) => {
+            const isEditing = editingItems.has(index);
+
+            if (isEditing) {
+              return (
+                <ExpenseItemCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  canDelete={state.items.length > 1}
+                  onCancelEdit={() => {
+                    setEditingItems(prev => {
+                      const newSet = new Set(prev);
+                      newSet.delete(index);
+                      return newSet;
+                    });
+                  }}
+                />
+              );
+            } else {
+              return (
+                <ExpenseViewCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  onEdit={() => handleEditItem(index)}
+                  onDelete={() => handleDeleteItem(index)}
+                />
+              );
+            }
+          })}
 
           {/* Add Item Button - Below the item cards */}
           <View style={styles.actionButtonsContainer}>
