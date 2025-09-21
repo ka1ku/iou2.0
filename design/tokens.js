@@ -19,7 +19,8 @@ export const Colors = {
   border: '#E8E0D5', // Border color for inputs
   tabActive: '#2C2C2C',
   tabInactive: '#B8935F',
-};
+  green: '#4CAF50',
+  red: '#ff4444',};
 
 export const Spacing = {
   xs: 4,
