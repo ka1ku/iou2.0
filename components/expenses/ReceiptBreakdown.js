@@ -37,6 +37,7 @@ const ReceiptBreakdown = ({
   const [editingItem, setEditingItem] = useState(null);
   const [editingFee, setEditingFee] = useState(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [newlyAddedFee, setNewlyAddedFee] = useState(null);
   const scrollViewRef = useRef(null);
 
   const itemsSubtotal = useMemo(
@@ -73,15 +74,26 @@ const ReceiptBreakdown = ({
   const handleQuickAddTip = (percentage) => {
     const tipAmount = (itemsSubtotal * percentage).toFixed(2);
     const newFee = {
-      id: Date.now().toString(),
       name: `${(percentage * 100).toFixed(0)}% Tip`,
       amount: parseFloat(tipAmount),
-      type: 'fixed',
+      type: 'percentage',
       percentage: percentage,
       splitType: 'proportional',
       splits: []
     };
+    
+    // Add animation feedback
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     onAddFee(newFee);
+    
+    // Highlight the newly added fee
+    setNewlyAddedFee(newFee.id);
+    setTimeout(() => setNewlyAddedFee(null), 2000);
+    
+    // Scroll to the fees section to show the added tip
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
   const handleClickOutside = () => {
@@ -130,7 +142,7 @@ const ReceiptBreakdown = ({
                   )}
                   <Text style={styles.fillerDots} numberOfLines={1}>..................................................................................................</Text>
                   {isEditingAmount ? (
-                    <PriceInput style={[styles.itemAmount, styles.inputField, styles.amountInput]} defaultValue={(item.amount || 0).toString()} onBlur={(e) => handleUpdate('item', index, 'amount', e.nativeEvent.text)} autoFocus />
+                    <PriceInput style={[styles.itemAmount, styles.inputField, styles.amountInput]} value={item.amount || 0} onChangeText={(value) => handleUpdate('item', index, 'amount', value)} autoFocus />
                   ) : (
                     <Text style={styles.itemAmount} onPress={() => setEditingItem({ index, field: 'amount' })}>${(parseFloat(item.amount) || 0).toFixed(2)}</Text>
                   )}
@@ -187,56 +199,130 @@ const ReceiptBreakdown = ({
 
           <DashedSeparator />
 
-          {fees.map((fee, index) => (
-            <View key={fee.id} style={styles.lineItem}>
-              <TextInput style={[styles.feeName]} placeholder="Fee/Tip Name" placeholderTextColor={Colors.textSecondary} defaultValue={fee.name} onBlur={(e) => handleUpdate('fee', index, 'name', e.nativeEvent.text)} />
-              <Text style={styles.fillerDots} numberOfLines={1}>..................................................................................................</Text>
-              <PriceInput style={[styles.feeAmount]} placeholder="$0.00" placeholderTextColor={Colors.textSecondary} defaultValue={(fee.amount || '').toString()} onBlur={(e) => handleUpdate('fee', index, 'amount', e.nativeEvent.text)} />
-              <TouchableOpacity onPress={() => onRemoveFee(index)} style={{marginLeft: Spacing.sm}}>
-                <Ionicons name="close-circle-outline" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
+          {/* Add Tips & Fees Section */}
+          <View style={styles.addFeesSection}>
+            <Text style={styles.addFeesTitle}>Add Tips & Fees</Text>
+            
+            {/* Quick Tips */}
+            <View style={styles.quickTipsContainer}>
+              <Text style={styles.sectionLabel}>Quick Tips</Text>
+              <View style={styles.tipButtonsGrid}>
+                {[
+                  { percentage: 0.15, label: '15%' },
+                  { percentage: 0.18, label: '18%' },
+                  { percentage: 0.20, label: '20%' }
+                ].map((tip) => (
+                  <TouchableOpacity 
+                    key={tip.percentage}
+                    style={styles.tipButton} 
+                    onPress={() => handleQuickAddTip(tip.percentage)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.tipButtonContent}>
+                      <Text style={styles.tipPercentage}>{tip.label}</Text>
+                      <Text style={styles.tipAmount}>${(itemsSubtotal * tip.percentage).toFixed(2)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          ))}
 
-          {/* --- Enhanced Quick Add Section --- */}
-          {/* Tip Buttons */}
-          <View style={styles.feeCategoryContainer}>
-            <Text style={styles.feeCategoryLabel}>Quick Tips</Text>
-            <View style={styles.feeButtonRow}>
-              <TouchableOpacity style={[styles.feeButton, styles.tipButton]} onPress={() => handleQuickAddTip(0.15)}>
-                <Text style={styles.feeButtonText}>15%</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.feeButton, styles.tipButton]} onPress={() => handleQuickAddTip(0.18)}>
-                <Text style={styles.feeButtonText}>18%</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.feeButton, styles.tipButton]} onPress={() => handleQuickAddTip(0.20)}>
-                <Text style={styles.feeButtonText}>20%</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.feeButton, styles.customTipButton]} onPress={() => onAddFee({ name: 'Custom Tip', amount: '' })}>
-                <Ionicons name="add-circle-outline" size={16} color={Colors.accentDark} />
-                <Text style={styles.feeButtonText}>Custom</Text>
-              </TouchableOpacity>
+            {/* Other Fees */}
+            <View style={styles.otherFeesContainer}>
+              <Text style={styles.sectionLabel}>Other Fees</Text>
+              <View style={styles.feeButtonsGrid}>
+                <TouchableOpacity 
+                  style={styles.feeButton} 
+                  onPress={() => {
+                    const newFee = { name: 'Tax', amount: 0, type: 'fixed', splitType: 'proportional' };
+                    onAddFee(newFee);
+                    setNewlyAddedFee(newFee.id);
+                    setTimeout(() => setNewlyAddedFee(null), 2000);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="receipt-outline" size={18} color={Colors.accent} />
+                  <Text style={styles.feeButtonText}>Tax</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.feeButton} 
+                  onPress={() => {
+                    const newFee = { name: 'Service Fee', amount: 0, type: 'fixed', splitType: 'proportional' };
+                    onAddFee(newFee);
+                    setNewlyAddedFee(newFee.id);
+                    setTimeout(() => setNewlyAddedFee(null), 2000);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="card-outline" size={18} color={Colors.accent} />
+                  <Text style={styles.feeButtonText}>Service</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.feeButton} 
+                  onPress={() => {
+                    const newFee = { name: 'Custom Fee', amount: 0, type: 'fixed', splitType: 'proportional' };
+                    onAddFee(newFee);
+                    setNewlyAddedFee(newFee.id);
+                    setTimeout(() => setNewlyAddedFee(null), 2000);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="add-circle-outline" size={18} color={Colors.accent} />
+                  <Text style={styles.feeButtonText}>Custom</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
 
-          {/* Other Fees */}
-          <View style={styles.feeCategoryContainer}>
-            <Text style={styles.feeCategoryLabel}>Other Fees</Text>
-            <View style={styles.feeButtonRow}>
-              <TouchableOpacity style={[styles.feeButton, styles.feeTypeButton]} onPress={() => onAddFee({ name: 'Tax', amount: '' })}>
-                <Ionicons name="receipt-outline" size={16} color={Colors.accentDark} />
-                <Text style={styles.feeButtonText}>Tax</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.feeButton, styles.feeTypeButton]} onPress={() => onAddFee({ name: 'Service Fee', amount: '' })}>
-                <Ionicons name="card-outline" size={16} color={Colors.accentDark} />
-                <Text style={styles.feeButtonText}>Service</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.feeButton, styles.customButton]} onPress={onAddFee}>
-                <Ionicons name="add-circle-outline" size={16} color={Colors.white} />
-                <Text style={[styles.feeButtonText, styles.customButtonText]}>Custom</Text>
-              </TouchableOpacity>
+          {/* Added Fees - Compact List */}
+          {fees.length > 0 && (
+            <View style={styles.addedFeesSection}>
+              <Text style={styles.addedFeesTitle}>Added Fees</Text>
+              {fees.map((fee, index) => (
+                <View key={fee.id} style={[
+                  styles.compactFeeItem,
+                  newlyAddedFee === fee.id && styles.compactFeeItemHighlighted
+                ]}>
+                  <View style={styles.compactFeeLeft}>
+                    <Ionicons 
+                      name={fee.type === 'percentage' ? 'cash-outline' : 'receipt-outline'} 
+                      size={16} 
+                      color={fee.type === 'percentage' ? Colors.accent : Colors.textSecondary} 
+                    />
+                    {fee.name === 'Custom Fee' ? (
+                      <TextInput 
+                        style={styles.compactFeeName} 
+                        placeholder="Fee name" 
+                        placeholderTextColor={Colors.textSecondary} 
+                        defaultValue={fee.name} 
+                        onBlur={(e) => handleUpdate('fee', index, 'name', e.nativeEvent.text)} 
+                      />
+                    ) : (
+                      <Text style={styles.compactFeeNameFixed}>{fee.name}</Text>
+                    )}
+                  </View>
+                  <View style={styles.compactFeeRight}>
+                    <PriceInput 
+                      style={styles.compactFeeAmount} 
+                      placeholder="$0.00" 
+                      placeholderTextColor={Colors.textSecondary} 
+                      value={fee.amount || 0} 
+                      onChangeText={(value) => handleUpdate('fee', index, 'amount', value)} 
+                    />
+                     <TouchableOpacity 
+                       onPress={() => onRemoveFee(index)} 
+                       style={styles.compactFeeRemove}
+                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                     >
+                       <Ionicons name="close-circle-outline" size={20} color={Colors.textSecondary} />
+                     </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
             </View>
-          </View>
+          )}
           
           <View style={styles.totalsContainer}>
             <View style={styles.lineItem}>
@@ -316,15 +402,17 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   amountInput: {
-    minWidth: 100,
-    maxWidth: 120,
+    minWidth: 120,
+    maxWidth: 180,
     textAlign: 'right',
+    flexShrink: 0,
   },
   fillerDots: {
     ...Typography.body1,
     color: Colors.divider,
     flex: 1,
     textAlign: 'right',
+    marginHorizontal: Spacing.sm,
   },
   inputField: {
     backgroundColor: Colors.surfaceLight,
@@ -409,71 +497,6 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     marginVertical: Spacing.md,
   },
-  feeCategoryContainer: {
-    marginBottom: Spacing.md,
-  },
-  feeCategoryLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.sm,
-    fontFamily: Typography.familyMedium,
-  },
-  feeButtonRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  feeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.sm,
-    minWidth: 70,
-    gap: Spacing.xs,
-  },
-  tipButton: {
-    backgroundColor: `${Colors.accent}15`,
-    borderWidth: 1,
-    borderColor: `${Colors.accent}40`,
-  },
-  customTipButton: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  feeTypeButton: {
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  customButton: {
-    backgroundColor: Colors.accent,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-  },
-  feeButtonText: {
-    ...Typography.label,
-    fontFamily: Typography.familySemiBold,
-    color: Colors.accentDark,
-  },
-  customButtonText: {
-    color: Colors.white,
-  },
-  feeName: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    flexShrink: 1,
-    marginRight: Spacing.sm,
-  },
-  feeAmount: {
-    ...Typography.body1,
-    color: Colors.textSecondary,
-    marginLeft: Spacing.sm,
-    minWidth: 70,
-    textAlign: 'right',
-  },
   removeButton: {
     marginLeft: Spacing.sm,
     padding: Spacing.xs,
@@ -530,6 +553,158 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     // shadowColor: 'transparent',
     // elevation: 0,
+  },
+  
+  // Added Fees Section
+  addedFeesSection: {
+    marginBottom: Spacing.lg,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  addedFeesTitle: {
+    ...Typography.h4,
+    color: Colors.textPrimary,
+    fontFamily: Typography.familyBold,
+    marginBottom: Spacing.md,
+  },
+  
+  // Compact Fee Item Styles
+  compactFeeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  compactFeeItemHighlighted: {
+    borderColor: Colors.accent,
+    backgroundColor: `${Colors.accent}05`,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  compactFeeLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  compactFeeName: {
+    ...Typography.body1,
+    color: Colors.textPrimary,
+    flex: 1,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    padding: 0,
+    fontFamily: Typography.familyMedium,
+  },
+  compactFeeNameFixed: {
+    ...Typography.body1,
+    color: Colors.textPrimary,
+    flex: 1,
+    fontFamily: Typography.familySemiBold,
+  },
+  compactFeeRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  compactFeeAmount: {
+    minWidth: 80,
+    maxWidth: 120,
+  },
+  compactFeeRemove: {
+    marginLeft: Spacing.sm,
+    padding: Spacing.xs,
+    flexShrink: 0,
+  },
+  
+  // Add Fees Section Styles
+  addFeesSection: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  addFeesTitle: {
+    ...Typography.h4,
+    color: Colors.textPrimary,
+    fontFamily: Typography.familyBold,
+    marginBottom: Spacing.md,
+  },
+  sectionLabel: {
+    ...Typography.label,
+    color: Colors.textPrimary,
+    fontFamily: Typography.familySemiBold,
+    marginBottom: Spacing.sm,
+  },
+  
+  // Quick Tips Styles
+  quickTipsContainer: {
+    marginBottom: Spacing.lg,
+  },
+  tipButtonsGrid: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  tipButton: {
+    flex: 1,
+    backgroundColor: `${Colors.accent}10`,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: `${Colors.accent}30`,
+    padding: Spacing.sm,
+    alignItems: 'center',
+  },
+  tipButtonContent: {
+    alignItems: 'center',
+  },
+  tipPercentage: {
+    ...Typography.title,
+    color: Colors.accent,
+    fontFamily: Typography.familyBold,
+    marginBottom: Spacing.xs,
+  },
+  tipAmount: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontFamily: Typography.familyMedium,
+  },
+  
+  // Other Fees Styles
+  otherFeesContainer: {
+    marginBottom: Spacing.sm,
+  },
+  feeButtonsGrid: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  feeButton: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    padding: Spacing.sm,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  feeButtonText: {
+    ...Typography.label,
+    color: Colors.textPrimary,
+    fontFamily: Typography.familySemiBold,
   },
 });
 
