@@ -363,14 +363,16 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
           {state.items.map((item, index) => {
             const isEditing = editingItems.has(index);
+            const isNewItem = !item.name || item.name.trim() === "" || parseFloat(item.amount) <= 0;
 
-            if (isEditing) {
+            if (isEditing || isNewItem) {
               return (
                 <ExpenseItemCard
                   key={item.id}
                   item={item}
                   index={index}
-                  canDelete={state.items.length > 1}
+                  expenseId={expense?.id}
+                  isEditing={isEditing}
                   onCancelEdit={() => {
                     setEditingItems(prev => {
                       const newSet = new Set(prev);

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -15,6 +16,8 @@ import {
   Typography,
 } from "../../design/tokens";
 import { useExpense } from "../../contexts/ExpenseContext";
+import { updateExpense, updateExpenseParticipants } from "../../services/expenseService";
+import { getCurrentUser } from "../../services/authService";
 import Card from "../Card";
 import DeleteButton from "../DeleteButton";
 import PriceInput from "./PriceInput";
@@ -35,11 +38,12 @@ const smartRoundSplit = (total, count) => {
   return amounts;
 };
 
-const ExpenseItemCard = ({ item, index, canDelete = true, onCancelEdit }) => {
+const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = false }) => {
   const { state, actions } = useExpense();
   const { participants } = state;
 
   const [manualSplits, setManualSplits] = useState({});
+  const [saving, setSaving] = useState(false);
 
   // NEW: State to track the currently focused input for a smoother editing experience.
   const [activeInput, setActiveInput] = useState(null); // e.g., { index: 1, value: '12.' }
@@ -150,6 +154,62 @@ const ExpenseItemCard = ({ item, index, canDelete = true, onCancelEdit }) => {
     actions.updateItem(index, { selectedPayers: newPayers });
   };
 
+  // Save expense to Firestore when Done is pressed
+  const handleDonePress = async () => {
+    // If not editing an existing expense, just call onCancelEdit
+    if (!isEditing) {
+      onCancelEdit && onCancelEdit();
+      return;
+    }
+
+    // If editing but no expenseId, just call onCancelEdit
+    if (!expenseId) {
+      onCancelEdit && onCancelEdit();
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        Alert.alert("Error", "User not authenticated");
+        return;
+      }
+
+      // Prepare expense data
+      const expenseData = {
+        title: state.title,
+        items: state.items,
+        fees: state.fees,
+        selectedPayers: state.selectedPayers,
+        participants: state.participants,
+        joinEnabled: state.joinEnabled,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Update participants first
+      await updateExpenseParticipants(
+        expenseId,
+        expenseData.participants,
+        currentUser.uid
+      );
+
+      // Update the expense
+      const { participants, ...otherFields } = expenseData;
+      await updateExpense(expenseId, otherFields, currentUser.uid);
+
+      // Exit edit mode
+      onCancelEdit && onCancelEdit();
+      
+      Alert.alert("Success", "Expense updated successfully");
+    } catch (error) {
+      console.error("Error saving expense:", error);
+      Alert.alert("Error", "Failed to save expense: " + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const totalAllocated = derivedSplits.reduce(
     (sum, split) => sum + (split.amount || 0),
     0
@@ -173,45 +233,33 @@ const ExpenseItemCard = ({ item, index, canDelete = true, onCancelEdit }) => {
       margin="none"
       style={{ marginBottom: 16, backgroundColor: Colors.surfaceLight }}
     >
-      {/* Item Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 16,
-        }}
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={styles.itemNameLabel}>Item Name</Text>
-          <TextInput
-            style={styles.itemNameInput}
-            placeholder="Enter item name"
-            placeholderTextColor={Colors.textSecondary}
-            value={item.name}
-            onChangeText={(text) => actions.updateItem(index, { name: text })}
-          />
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {/* Item Header */}
+        <View style={styles.itemHeader}>
+          <View style={styles.itemNameSection}>
+            <Text style={styles.itemNameLabel}>Item Name</Text>
+            <TextInput
+              style={styles.itemNameInput}
+              placeholder="Enter item name"
+              placeholderTextColor={Colors.textSecondary}
+              value={item.name}
+              onChangeText={(text) => actions.updateItem(index, { name: text })}
+            />
+          </View>
           {onCancelEdit && (
             <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onCancelEdit}
+              style={[styles.doneButton, saving && styles.buttonDisabled]}
+              onPress={handleDonePress}
+              disabled={saving}
               activeOpacity={0.7}
             >
-              <Text style={styles.cancelButtonText}>Done</Text>
+              <Ionicons 
+                name="checkmark" 
+                size={20} 
+                color={saving ? Colors.textSecondary : Colors.white} 
+              />
             </TouchableOpacity>
           )}
-          {canDelete && (
-            <DeleteButton
-              onPress={() => actions.removeItem(index)}
-              size="small"
-              variant="subtle"
-              style={{ marginLeft: 8 }}
-            />
-          )}
         </View>
-      </View>
 
       {/* Price Section */}
       <View style={styles.priceSection}>
@@ -354,8 +402,12 @@ const ExpenseItemCard = ({ item, index, canDelete = true, onCancelEdit }) => {
 const styles = StyleSheet.create({
   itemHeader: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.sm,
+    alignItems: "flex-start",
+    marginBottom: Spacing.md,
+    gap: Spacing.lg,
+  },
+  itemNameSection: {
+    flex: 1,
   },
   itemNameLabel: {
     ...Typography.label,
@@ -375,6 +427,16 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 16,
     minHeight: 48,
+  },
+  doneButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20, // Align with input field
+    ...Shadows.button,
   },
   priceSection: { marginBottom: Spacing.md },
   priceLabel: {
@@ -494,19 +556,9 @@ const styles = StyleSheet.create({
   },
   errorText: { ...Typography.body2, color: Colors.danger, fontWeight: "600" },
   autoAmountInput: { fontStyle: "italic", color: Colors.textSecondary },
-  cancelButton: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent,
-    marginRight: Spacing.xs,
-  },
-  cancelButtonText: {
-    color: Colors.surface,
-    fontWeight: "600",
-    fontSize: 14,
+  buttonDisabled: {
+    backgroundColor: Colors.textSecondary,
+    borderColor: Colors.textSecondary,
   },
 });
 

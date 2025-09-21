@@ -28,26 +28,28 @@ const ExpenseFooter = ({
   return (
     <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
       <View style={styles.footerButtons}>
-        <TouchableOpacity
-          style={[styles.saveButton, loading && styles.buttonDisabled]}
-          onPress={onSavePress}
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          <View style={styles.buttonContent}>
-            <Ionicons 
-              name={isEditing ? "checkmark-circle" : "add-circle"} 
-              size={22} 
-              color={Colors.textSecondary} 
-            />
-            <Text style={styles.saveButtonText}>
-              {getSaveButtonText()}
-            </Text>
-          </View>
-        </TouchableOpacity>
+        {!isEditing && (
+          <TouchableOpacity
+            style={[styles.saveButton, loading && styles.buttonDisabled]}
+            onPress={onSavePress}
+            disabled={loading}
+            activeOpacity={0.7}
+          >
+            <View style={styles.buttonContent}>
+              <Ionicons 
+                name="add-circle" 
+                size={22} 
+                color={Colors.textSecondary} 
+              />
+              <Text style={styles.saveButtonText}>
+                {getSaveButtonText()}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
         
         <TouchableOpacity
-          style={[styles.settleButton, loading && styles.buttonDisabled]}
+          style={[styles.settleButton, loading && styles.buttonDisabled, isEditing && styles.settleButtonFullWidth]}
           onPress={onSettlePress}
           disabled={loading}
           activeOpacity={0.7}
@@ -122,6 +124,9 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     backgroundColor: Colors.textSecondary,
     borderColor: Colors.textSecondary,
+  },
+  settleButtonFullWidth: {
+    flex: 1,
   },
 });
 
