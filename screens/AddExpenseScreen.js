@@ -363,7 +363,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
           {state.items.map((item, index) => {
             const isEditing = editingItems.has(index);
-            const isNewItem = !item.name || item.name.trim() === "" || parseFloat(item.amount) <= 0;
+            const isNewItem = !item.name || item.name.trim() === "";
 
             if (isEditing || isNewItem) {
               return (
