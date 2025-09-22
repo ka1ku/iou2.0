@@ -89,8 +89,14 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
   }, [item.amount, item.selectedConsumers, manualSplits, participants]);
 
   useEffect(() => {
-    actions.updateItem(index, { splits: derivedSplits.map((s) => s.amount) });
-  }, [derivedSplits]);
+    const splitsForSelectedConsumers = (item.selectedConsumers || []).map(
+      (consumerIndex) => {
+        const split = derivedSplits[consumerIndex];
+        return split && typeof split.amount === "number" ? split.amount : 0;
+      }
+    );
+    actions.updateItem(index, { splits: splitsForSelectedConsumers });
+  }, [derivedSplits, item.selectedConsumers]);
 
   // Handler for updating the core logic based on input.
   const handleAmountChange = (pIndex, value) => {
