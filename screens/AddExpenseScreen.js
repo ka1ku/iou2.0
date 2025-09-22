@@ -363,9 +363,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
           {state.items.map((item, index) => {
             const isEditing = editingItems.has(index);
-            const isNewItem = !item.name || item.name.trim() === "";
 
-            if (isEditing || isNewItem) {
+            if (isEditing) {
               return (
                 <ExpenseItemCard
                   key={item.id}
@@ -400,7 +399,9 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
             <TouchableOpacity
               style={styles.addItemButton}
               onPress={() => {
+                const newIndex = state.items.length; // new item will be appended
                 actions.addItem();
+                setEditingItems(prev => new Set([...prev, newIndex]));
                 setTimeout(() => {
                   scrollViewRef.current?.scrollToEnd({ animated: true });
                 }, 100);

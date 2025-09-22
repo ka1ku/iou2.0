@@ -243,12 +243,19 @@ export const parseExpenseJoinLink = (url) => {
       return null;
     }
 
-    // Extract expense ID and token from the URL
+    // Extract expense ID and token from the path
     const match = url.match(/expense\/([^\/]+)\/([^\/\?]+)/);
+    // Extract optional query params (e.g., ?code=...&phone=...)
+    const queryIndex = url.indexOf('?');
+    const queryString = queryIndex !== -1 ? url.slice(queryIndex + 1) : '';
+    const params = new URLSearchParams(queryString);
+
     if (match) {
       return {
         expenseId: match[1],
-        token: match[2]
+        token: match[2],
+        code: params.get('code') || null,
+        phone: params.get('phone') || null,
       };
     }
 
@@ -261,8 +268,14 @@ export const parseExpenseJoinLink = (url) => {
 
 // Generate expense join link
 export const generateExpenseJoinLink = ({ expenseId, token, code, phone }) => {
-  // For now, return a simple format. In production, this would be your app's domain
-  return `https://iou-app.com/expense/${expenseId}/${token}`;
+  // Generate app deep link using the app scheme instead of http(s)
+  const base = 'com.kailee.iou20://';
+  const path = `expense/${expenseId}/${token}`;
+  const params = new URLSearchParams();
+  if (code) params.set('code', code);
+  if (phone) params.set('phone', phone);
+  const query = params.toString();
+  return query ? `${base}${path}?${query}` : `${base}${path}`;
 };
 
 // Join expense by room code or invite link
@@ -294,31 +307,14 @@ export const joinExpenseByCode = async (code, userId, userPhone) => {
       throw new Error('Join by room code is disabled for this expense');
     }
     
-    // Validate token if provided
-    if (token && expenseData.join.token !== token) {
-      throw new Error('Invalid join link');
-    }
+    // Note: token validation is only performed in joinExpenseByInvite
     
     // Validate room code
     if (expenseData.join.code !== code) {
       throw new Error('Invalid room code');
     }
     
-    // If phone number is provided, validate that the user's phone matches the invited phone
-    if (phone && userPhone) {
-      const normalizedUserPhone = userPhone.replace(/\D/g, '');
-      const normalizedInvitedPhone = phone.replace(/\D/g, '');
-      console.log('🔍 Validating phone number match. Invited phone:', normalizedInvitedPhone);
-      
-      if (normalizedUserPhone && normalizedInvitedPhone) {
-        const userPhoneMatches = normalizedUserPhone === normalizedInvitedPhone;
-        console.log('📱 User phone:', normalizedUserPhone, 'Invited phone:', normalizedInvitedPhone, 'Match:', userPhoneMatches);
-        
-        if (!userPhoneMatches) {
-          throw new Error('Phone number mismatch. You can only join expenses you were specifically invited to.');
-        }
-      }
-    }
+    // No phone validation when joining by room code
     
     // Check if user is already a participant
     const isAlreadyParticipant = expenseData.participants?.some(p => p.userId === userId);
@@ -332,35 +328,7 @@ export const joinExpenseByCode = async (code, userId, userPhone) => {
       throw new Error('User profile not found');
     }
     
-    // Check if there's a placeholder participant with matching phone number
-    let matchedParticipant = null;
-    if (phone) {
-      // Check existing participants for phone match
-      expenseData.participants?.forEach(participant => {
-        const participantPhone = participant.phoneNumber?.replace(/\D/g, '');
-        const normalizedInvitedPhone = phone.replace(/\D/g, '');
-        const matches = participantPhone === normalizedInvitedPhone;
-        
-        if (matches && participant.placeholder) {
-          matchedParticipant = participant;
-        }
-      });
-      
-      // Check placeholder participants for phone match
-      expenseData.placeholderParticipants?.forEach(participant => {
-        const placeholderPhone = participant.phoneNumber?.replace(/\D/g, '');
-        const normalizedInvitedPhone = phone.replace(/\D/g, '');
-        const matches = placeholderPhone === normalizedInvitedPhone;
-        
-        if (matches && participant.placeholder) {
-          matchedParticipant = participant;
-        }
-      });
-    }
-    
-    if (matchedParticipant) {
-      console.log('✅ Successfully identified user as invited participant:', matchedParticipant.name);
-    }
+    // Note: placeholder participant matching is not used currently
     
     // Add user as participant
     const newParticipant = {
@@ -391,6 +359,99 @@ export const joinExpenseByCode = async (code, userId, userPhone) => {
   } catch (error) {
     console.error('Error joining expense:', error);
     throw error;
+  }
+};
+
+// Join expense by deep link (validates token and optional room code)
+export const joinExpenseByInvite = async ({ expenseId, token, code, userId, userPhone }) => {
+  try {
+    if (!expenseId || !token || !userId) {
+      throw new Error('Missing required join parameters');
+    }
+
+    const firestoreInstance = getFirestore(getApp());
+    const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
+    const expenseSnap = await getDoc(expenseRef);
+    if (!expenseSnap.exists()) {
+      throw new Error('Expense not found');
+    }
+    const expenseData = expenseSnap.data();
+
+    // Check if join is enabled
+    if (!expenseData.join?.enabled) {
+      throw new Error('Joining is disabled for this expense');
+    }
+
+    // Validate token
+    if (expenseData.join.token !== token) {
+      throw new Error('Invalid join link');
+    }
+
+    // If code provided, validate it as well
+    if (code && expenseData.join.code !== code) {
+      throw new Error('Invalid room code');
+    }
+
+    // Optional phone validation (if link specified a target phone)
+    const invitedPhone = null; // We currently do not enforce phone via invite link
+    if (invitedPhone && userPhone) {
+      const normalizedUserPhone = userPhone.replace(/\D/g, '');
+      const normalizedInvitedPhone = invitedPhone.replace(/\D/g, '');
+      if (normalizedUserPhone && normalizedInvitedPhone && normalizedUserPhone !== normalizedInvitedPhone) {
+        throw new Error('Phone number mismatch. You can only join expenses you were specifically invited to.');
+      }
+    }
+
+    // Already participant
+    const isAlreadyParticipant = expenseData.participants?.some(p => p.userId === userId);
+    if (isAlreadyParticipant) {
+      return { success: true, message: 'Already a participant' };
+    }
+
+    // Find the user's profile to get their name
+    const userProfile = await getUserProfile(userId);
+    if (!userProfile) {
+      throw new Error('User profile not found');
+    }
+
+    const newParticipant = {
+      name: userProfile.firstName && userProfile.lastName 
+        ? `${userProfile.firstName} ${userProfile.lastName}`.trim()
+        : (userProfile.username ? `@${userProfile.username}` : 'Friend'),
+      userId: userId,
+      phoneNumber: userProfile.phoneNumber,
+      username: userProfile.username,
+      profilePhoto: userProfile.profilePhoto,
+      placeholder: false
+    };
+
+    const updatedParticipants = [...(expenseData.participants || []), newParticipant];
+    const participantsMap = { ...(expenseData.participantsMap || {}) };
+    participantsMap[userId] = true;
+
+    await updateDoc(expenseRef, {
+      participants: updatedParticipants,
+      participantsMap,
+      updatedAt: serverTimestamp()
+    });
+
+    return { success: true, message: 'Successfully joined expense' };
+  } catch (error) {
+    console.error('Error joining expense by invite:', error);
+    throw error;
+  }
+};
+
+export const getExpenseById = async (expenseId) => {
+  try {
+    const firestoreInstance = getFirestore(getApp());
+    const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
+    const snap = await getDoc(expenseRef);
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() };
+  } catch (error) {
+    console.error('Error fetching expense by id:', error);
+    return null;
   }
 };
 

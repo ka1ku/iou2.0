@@ -64,13 +64,15 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
     }
   }, [expense?.id]);
 
-  const loadJoinInfo = async () => {
+  const loadJoinInfo = async (options = { initializeIfMissing: true }) => {
     try {
-      const info = await getExpenseJoinInfo(expense.id);
+      const info = await getExpenseJoinInfo(expense.id, options);
 
       setJoinInfo(info);
+      return info;
     } catch (error) {
       console.error("Error loading join info:", error);
+      return null;
     }
   };
 
@@ -98,17 +100,18 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
   const handleShareInviteLink = async () => {
     try {
-      if (!joinInfo) {
-        await loadJoinInfo();
+      let info = joinInfo;
+      if (!info) {
+        info = await loadJoinInfo({ initializeIfMissing: true });
       }
 
-      if (joinInfo && joinEnabled) {
+      if (info && joinEnabled && info.token && info.code) {
         const inviteLink = generateExpenseJoinLink({
           expenseId: expense.id,
 
-          token: joinInfo.token,
+          token: info.token,
 
-          code: joinInfo.code,
+          code: info.code,
         });
 
         await Share.share({
@@ -118,6 +121,8 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
           url: inviteLink,
         });
+      } else if (joinEnabled) {
+        Alert.alert("Error", "Unable to generate invite link. Please try again.");
       }
     } catch (error) {
       console.error("Error sharing invite link:", error);
@@ -128,22 +133,25 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
   const handleCopyInviteLink = async () => {
     try {
-      if (!joinInfo) {
-        await loadJoinInfo();
+      let info = joinInfo;
+      if (!info) {
+        info = await loadJoinInfo({ initializeIfMissing: true });
       }
 
-      if (joinInfo && joinEnabled) {
+      if (info && joinEnabled && info.token && info.code) {
         const inviteLink = generateExpenseJoinLink({
           expenseId: expense.id,
 
-          token: joinInfo.token,
+          token: info.token,
 
-          code: joinInfo.code,
+          code: info.code,
         });
 
         await Clipboard.setString(inviteLink);
 
         Alert.alert("Copied!", "Invite link copied to clipboard");
+      } else if (joinEnabled) {
+        Alert.alert("Error", "Unable to generate invite link. Please try again.");
       }
     } catch (error) {
       console.error("Error copying invite link:", error);
@@ -199,6 +207,40 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
   };
 
   const handleLeaveExpense = () => {
+    try {
+      const currentUserIndex = expense.participants?.findIndex(
+        (p) => p.userId === currentUser?.uid
+      );
+
+      if (currentUserIndex === -1) {
+        Alert.alert("Error", "User not found in expense participants");
+        return;
+      }
+
+      // Check if user is part of any items (selectedConsumers, splits, or paidBy)
+      const isInAnyItem = (expense.items || []).some((item) => {
+        if (!item) return false;
+        const inSelectedConsumers = Array.isArray(item.selectedConsumers)
+          ? item.selectedConsumers.includes(currentUserIndex)
+          : false;
+        const inSplits = Array.isArray(item.splits)
+          ? item.splits.some((s) => s?.participantIndex === currentUserIndex)
+          : false;
+        const isPayer = typeof item.paidBy === "number" && item.paidBy === currentUserIndex;
+        return inSelectedConsumers || inSplits || isPayer;
+      });
+
+      if (isInAnyItem) {
+        Alert.alert(
+          "Cannot Leave",
+          "You can only leave this expense if you are not part of any items. Remove yourself from all items first."
+        );
+        return;
+      }
+    } catch (e) {
+      console.error("Error validating leave condition:", e);
+    }
+
     Alert.alert(
       "Leave Expense",
 
@@ -553,8 +595,10 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
       <Modal
         visible={showNameModal}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
+        presentationStyle="overFullScreen"
+        statusBarTranslucent={true}
         onRequestClose={() => setShowNameModal(false)}
       >
         <View style={styles.modalOverlay}>

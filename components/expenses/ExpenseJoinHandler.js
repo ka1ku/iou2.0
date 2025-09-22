@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, Share, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import deepLinkService from '../../services/deepLinkService';
 import { getCurrentUser } from '../../services/authService';
-import { joinExpenseByCode } from '../../services/expenseService';
+import { joinExpenseByCode, joinExpenseByInvite, getExpenseById } from '../../services/expenseService';
 
 const ExpenseJoinHandler = () => {
   const [joinData, setJoinData] = useState(null);
@@ -36,9 +36,23 @@ const ExpenseJoinHandler = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = deepLinkService.addListener('expenseJoin', (data) => {
-      setJoinData(data);
-      setShowModal(true);
+    const unsubscribe = deepLinkService.addListener('expenseJoin', async (data) => {
+      try {
+        // Enrich data with expense details and pre-check membership
+        const user = getCurrentUser();
+        let alreadyInRoom = false;
+        if (data?.expenseId) {
+          const expense = await getExpenseById(data.expenseId);
+          if (expense && user?.uid) {
+            alreadyInRoom = !!expense.participants?.some(p => p.userId === user.uid);
+          }
+        }
+        setJoinData({ ...data, alreadyInRoom });
+        setShowModal(true);
+      } catch (e) {
+        setJoinData(data);
+        setShowModal(true);
+      }
     });
 
     const initialURL = deepLinkService.getInitialURL();
@@ -59,8 +73,31 @@ const ExpenseJoinHandler = () => {
         Alert.alert('Sign in required', 'Please sign in to join this expense.');
         return;
       }
-      await joinExpenseByCode(joinData.code, user.uid, user.phoneNumber);
-      Alert.alert('Joined', 'You have joined the expense.');
+      // Prefer invite join if expenseId+token available
+      if (joinData.expenseId && joinData.token) {
+        const result = await joinExpenseByInvite({
+          expenseId: joinData.expenseId,
+          token: joinData.token,
+          code: joinData.code,
+          userId: user.uid,
+          userPhone: user.phoneNumber,
+        });
+        if (result?.message === 'Already a participant') {
+          Alert.alert('Already in this room', 'You are already a participant in this expense.');
+        } else {
+          Alert.alert('Joined', 'You have joined the expense.');
+        }
+      } else if (joinData.code) {
+        const result = await joinExpenseByCode(joinData.code, user.uid, user.phoneNumber);
+        if (result?.message === 'Already a participant') {
+          Alert.alert('Already in this room', 'You are already a participant in this expense.');
+        } else {
+          Alert.alert('Joined', 'You have joined the expense.');
+        }
+      } else {
+        Alert.alert('Invalid link', 'This join link appears to be missing required details.');
+        return;
+      }
       setShowModal(false);
       setJoinData(null);
     } catch (error) {
@@ -87,7 +124,7 @@ const ExpenseJoinHandler = () => {
   return (
     <Modal
       visible={showModal}
-      animationType="slide"
+      animationType="fade"
       transparent={true}
       onRequestClose={() => setShowModal(false)}
     >
@@ -97,8 +134,12 @@ const ExpenseJoinHandler = () => {
             <View style={styles.iconCircle}>
               <Ionicons name="people" size={28} color={Colors.accent} />
             </View>
-            <Text style={styles.modalTitle}>Join Expense</Text>
-            <Text style={styles.modalSubtitle}>Tap join to start splitting expenses</Text>
+            <Text style={styles.modalTitle}>
+              {joinData.alreadyInRoom ? 'Already in this room' : 'Would you like to join this room as...'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {joinData.alreadyInRoom ? 'You are already a participant in this room.' : 'Tap join to start splitting expenses'}
+            </Text>
           </View>
 
           <View style={styles.detailsBox}>
@@ -127,9 +168,11 @@ const ExpenseJoinHandler = () => {
             <TouchableOpacity style={[styles.actionButton, styles.declineButton]} onPress={() => setShowModal(false)} disabled={processing}>
               <Text style={styles.declineText}>Dismiss</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.joinButton]} onPress={handleJoin} disabled={processing}>
-              <Text style={styles.joinText}>{processing ? 'Joining...' : 'Join expense'}</Text>
-            </TouchableOpacity>
+            {!joinData.alreadyInRoom && (
+              <TouchableOpacity style={[styles.actionButton, styles.joinButton]} onPress={handleJoin} disabled={processing}>
+                <Text style={styles.joinText}>{processing ? 'Joining...' : 'Join expense'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

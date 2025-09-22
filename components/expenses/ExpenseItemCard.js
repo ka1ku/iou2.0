@@ -206,8 +206,6 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
 
       // Exit edit mode
       onCancelEdit && onCancelEdit();
-      
-      Alert.alert("Success", "Expense updated successfully");
     } catch (error) {
       console.error("Error saving expense:", error);
       Alert.alert("Error", "Failed to save expense: " + error.message);
@@ -248,7 +246,9 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
               placeholder="Enter item name"
               placeholderTextColor={Colors.textSecondary}
               value={item.name}
-              onChangeText={(text) => actions.updateItem(index, { name: text })}
+              onChangeText={(text) => {
+                actions.updateItem(index, { name: text });
+              }}
             />
           </View>
           {onCancelEdit && (

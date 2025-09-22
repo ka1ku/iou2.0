@@ -19,7 +19,7 @@ import * as Contacts from 'expo-contacts';
 import algoliasearch from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
 import { getCurrentUser } from '../../services/authService';
-import { generateExpenseJoinLink, getExpenseJoinInfo } from '../../services/expenseService';
+import { generateExpenseJoinLink, getExpenseJoinInfo, updateExpenseParticipants } from '../../services/expenseService';
 import { useExpense } from '../../contexts/ExpenseContext';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
@@ -534,7 +534,36 @@ const ParticipantsGrid = forwardRef(({
           <View style={styles.modalHeader}>
             <TouchableOpacity 
               style={styles.backButton}
-              onPress={() => setShowModal(false)}
+              onPress={async () => {
+                try {
+                  // Build participants list: current user + selected friends
+                  const authUser = getCurrentUser();
+                  if (expenseId && authUser?.uid) {
+                    const participantsToSave = allMembers.map((member) => {
+                      if (member.isCurrentUser) {
+                        return {
+                          name: member.name,
+                          userId: authUser.uid,
+                          profilePhoto: authUser.profilePhoto || member.profilePhoto || null,
+                          username: authUser.username || null,
+                        };
+                      }
+                      return {
+                        name: member.name,
+                        userId: member.id,
+                        profilePhoto: member.profilePhoto || null,
+                        username: member.username || null,
+                      };
+                    });
+                    await updateExpenseParticipants(expenseId, participantsToSave, authUser.uid);
+                  }
+                } catch (e) {
+                  console.error('Failed to save participants:', e);
+                  Alert.alert('Error', 'Could not save group members.');
+                } finally {
+                  setShowModal(false);
+                }
+              }}
             >
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
