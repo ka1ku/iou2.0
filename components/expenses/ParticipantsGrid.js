@@ -133,7 +133,7 @@ const MemoizedInvitedContactItem = React.memo(({ item, onSMSInvite }) => {
   );
 });
 
-const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
+const MemoizedMemberItem = React.memo(({ item, onRemoveFriend, removable = true }) => (
   <View style={styles.memberItem}>
     <View style={styles.memberAvatarContainer}>
       {item.profilePhoto ? (
@@ -145,7 +145,7 @@ const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
           </Text>
         </View>
       )}
-      {!item.isCurrentUser && (
+      {!item.isCurrentUser && removable && (
         <TouchableOpacity 
           style={styles.removeButton}
           onPress={() => onRemoveFriend(item.id)}
@@ -331,12 +331,26 @@ const ParticipantsGrid = forwardRef(({
   const toggleSelectUser = useCallback((user) => {
     const isSelected = selectedFriends.some(f => f.id === user.id);
     if (isSelected) {
+      // Prevent unselect if user appears in any item as consumer or payer
+      const friendIndex = selectedFriends.findIndex(f => f.id === user.id);
+      if (friendIndex !== -1) {
+        const participantIndex = 1 + friendIndex; // current user at 0
+        const usedInItems = Array.isArray(state.items) && state.items.some((it) => {
+          const inConsumers = Array.isArray(it.selectedConsumers) && it.selectedConsumers.includes(participantIndex);
+          const inPayers = Array.isArray(it.selectedPayers) && it.selectedPayers.includes(participantIndex);
+          return inConsumers || inPayers;
+        });
+        if (usedInItems) {
+          Alert.alert('Cannot remove member', 'This person is used in one or more items. Remove them from those items first.');
+          return;
+        }
+      }
       const updated = selectedFriends.filter(f => f.id !== user.id);
       actions.setSelectedFriends(updated);
     } else {
       actions.setSelectedFriends([...selectedFriends, user]);
     }
-  }, [selectedFriends, actions]);
+  }, [selectedFriends, actions, state.items]);
 
   const inviteContact = useCallback(async (contact) => {
     const isAlreadyAdded = selectedFriends.some(friend => 
@@ -425,9 +439,23 @@ const ParticipantsGrid = forwardRef(({
   }, [expenseId]);
 
   const removeFriend = useCallback((friendId) => {
+    // Determine participant index for this friend (participants: [currentUser, ...selectedFriends])
+    const friendIndex = selectedFriends.findIndex(f => f.id === friendId);
+    if (friendIndex !== -1) {
+      const participantIndex = 1 + friendIndex;
+      const usedInItems = Array.isArray(state.items) && state.items.some((it) => {
+        const inConsumers = Array.isArray(it.selectedConsumers) && it.selectedConsumers.includes(participantIndex);
+        const inPayers = Array.isArray(it.selectedPayers) && it.selectedPayers.includes(participantIndex);
+        return inConsumers || inPayers;
+      });
+      if (usedInItems) {
+        Alert.alert('Cannot remove member', 'This person is used in one or more items. Remove them from those items first.');
+        return;
+      }
+    }
     const updated = selectedFriends.filter(f => f.id !== friendId);
     actions.setSelectedFriends(updated);
-  }, [selectedFriends, actions]);
+  }, [selectedFriends, actions, state.items]);
 
   const currentUserData = useMemo(() => {
     const currentUser = getCurrentUser();
@@ -464,9 +492,25 @@ const ParticipantsGrid = forwardRef(({
   }, [invitedContacts, deferredQuery]);
 
 
-  const renderMemberItem = useCallback(({ item }) => (
-    <MemoizedMemberItem item={item} onRemoveFriend={removeFriend} />
-  ), [removeFriend]);
+  const renderMemberItem = useCallback(({ item }) => {
+    // Compute if removable: not used in any items as consumer or payer
+    let removable = true;
+    if (!item.isCurrentUser) {
+      const friendIndex = selectedFriends.findIndex(f => f.id === item.id);
+      if (friendIndex !== -1) {
+        const participantIndex = 1 + friendIndex;
+        const usedInItems = Array.isArray(state.items) && state.items.some((it) => {
+          const inConsumers = Array.isArray(it.selectedConsumers) && it.selectedConsumers.includes(participantIndex);
+          const inPayers = Array.isArray(it.selectedPayers) && it.selectedPayers.includes(participantIndex);
+          return inConsumers || inPayers;
+        });
+        removable = !usedInItems;
+      }
+    }
+    return (
+      <MemoizedMemberItem item={item} onRemoveFriend={removeFriend} removable={removable} />
+    );
+  }, [removeFriend, selectedFriends, state.items]);
 
 
 
