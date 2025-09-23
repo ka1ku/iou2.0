@@ -43,28 +43,16 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     actions.removeItem(index);
   };
 
-  const handleAddFee = () => {
-    const newFee = {
-      id: Date.now().toString(),
-      name: '',
-      amount: 0,
-      type: 'percentage',
-      percentage: 15,
-      splitType: 'proportional',
-      splits: []
-    };
-    actions.setFees([...state.fees, newFee]);
+  const handleAddFee = (feeData) => {
+    actions.addFee(feeData);
   };
 
   const handleUpdateFee = (index, field, value) => {
-    const updated = [...state.fees];
-    updated[index] = { ...updated[index], [field]: value };
-    actions.setFees(updated);
+    actions.updateFee(index, { [field]: value });
   };
 
   const handleRemoveFee = (index) => {
-    const updatedFees = state.fees.filter((_, i) => i !== index);
-    actions.setFees(updatedFees);
+    actions.removeFee(index);
   };
 
   // Initialize screen and load expense data

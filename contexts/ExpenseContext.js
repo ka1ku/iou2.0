@@ -11,6 +11,9 @@ export const EXPENSE_ACTIONS = {
   UPDATE_ITEM: 'UPDATE_ITEM',
   REMOVE_ITEM: 'REMOVE_ITEM',
   SET_FEES: 'SET_FEES',
+  ADD_FEE: 'ADD_FEE',
+  UPDATE_FEE: 'UPDATE_FEE',
+  REMOVE_FEE: 'REMOVE_FEE',
   SET_SELECTED_PAYERS: 'SET_SELECTED_PAYERS',
   SET_JOIN_ENABLED: 'SET_JOIN_ENABLED',
   SET_LOADING: 'SET_LOADING',
@@ -98,6 +101,33 @@ const expenseReducer = (state, action) => {
 
     case EXPENSE_ACTIONS.SET_FEES:
       return { ...state, fees: action.payload };
+
+    case EXPENSE_ACTIONS.ADD_FEE:
+      const newFee = {
+        id: Date.now().toString(),
+        name: action.payload.name || '',
+        amount: parseFloat(action.payload.amount) || 0,
+        type: action.payload.type || 'fixed',
+        percentage: action.payload.percentage || null,
+        splitType: action.payload.splitType || 'proportional',
+        splits: action.payload.splits || [],
+        ...action.payload
+      };
+      return { ...state, fees: [...state.fees, newFee] };
+
+    case EXPENSE_ACTIONS.UPDATE_FEE:
+      return {
+        ...state,
+        fees: state.fees.map((fee, index) =>
+          index === action.payload.index ? { ...fee, ...action.payload.updates } : fee
+        ),
+      };
+
+    case EXPENSE_ACTIONS.REMOVE_FEE:
+      return {
+        ...state,
+        fees: state.fees.filter((_, index) => index !== action.payload),
+      };
 
     case EXPENSE_ACTIONS.SET_SELECTED_PAYERS:
       return { ...state, selectedPayers: action.payload };
@@ -217,6 +247,14 @@ export const ExpenseProvider = ({ children }) => {
       dispatch({ type: EXPENSE_ACTIONS.REMOVE_ITEM, payload: index }),
     
     setFees: (fees) => dispatch({ type: EXPENSE_ACTIONS.SET_FEES, payload: fees }),
+    
+    addFee: (fee) => dispatch({ type: EXPENSE_ACTIONS.ADD_FEE, payload: fee }),
+    
+    updateFee: (index, updates) => 
+      dispatch({ type: EXPENSE_ACTIONS.UPDATE_FEE, payload: { index, updates } }),
+    
+    removeFee: (index) => 
+      dispatch({ type: EXPENSE_ACTIONS.REMOVE_FEE, payload: index }),
     
     setSelectedPayers: (payers) => 
       dispatch({ type: EXPENSE_ACTIONS.SET_SELECTED_PAYERS, payload: payers }),
