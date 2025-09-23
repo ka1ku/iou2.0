@@ -319,21 +319,6 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.expenseTotal}>${calculateExpenseTotal(item).toFixed(2)}</Text>
         </View>
 
-        {/* Payment Summary */}
-        {Object.keys(paymentSummary).length > 0 && (
-          <View style={styles.paymentSummaryContainer}>
-            <Text style={styles.paymentSummaryLabel}>Paid by:</Text>
-            <View style={styles.paymentSummaryList}>
-              {Object.entries(paymentSummary).map(([name, amount]) => (
-                <View key={name} style={styles.paymentSummaryItem}>
-                  <Text style={styles.paymentSummaryName}>{name}</Text>
-                  <Text style={styles.paymentSummaryAmount}>${(amount || 0).toFixed(2)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
         {item.participants && item.participants.length > 0 && (
           <View style={styles.participantsContainer}>
             <Text style={styles.participantsLabel}>Participants:</Text>

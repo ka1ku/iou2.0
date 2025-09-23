@@ -48,13 +48,22 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
     balance: 0 // Positive = owes money, Negative = is owed money
   }));
   
+  console.log('=== PROCESSING ITEMS ===');
+  console.log('Total items:', items.length);
+  
   // Calculate how much each participant paid for each item
-  items.forEach(item => {
+  items.forEach((item, itemIndex) => {
     const itemAmount = parseFloat(item.amount) || 0;
     const itemPayers = item.selectedPayers || [];
     
+    console.log(`Item ${itemIndex + 1}: "${item.name}" ($${itemAmount})`);
+    console.log(`  - Item-specific payers:`, itemPayers);
+    console.log(`  - Expense-level payers:`, expense.selectedPayers);
+    
     // If no item-specific payers, fall back to expense-level selectedPayers
     const payersToUse = itemPayers.length > 0 ? itemPayers : (expense.selectedPayers || [0]);
+    
+    console.log(`  - Using payers:`, payersToUse);
     
     if (payersToUse.length > 0) {
       const amountPerPayer = Math.round((itemAmount / payersToUse.length) * 100) / 100;
@@ -68,10 +77,16 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
     }
   });
   
+  console.log('=== PROCESSING ITEM CONSUMPTION ===');
+  
   // Calculate how much each participant owes based on item splits
-  items.forEach(item => {
+  items.forEach((item, itemIndex) => {
     const itemConsumers = item.selectedConsumers || [];
     const itemSplits = item.splits || [];
+    
+    console.log(`Item ${itemIndex + 1}: "${item.name}"`);
+    console.log(`  - Consumers:`, itemConsumers);
+    console.log(`  - Splits:`, itemSplits);
     
     itemConsumers.forEach((consumerIndex, splitIndex) => {
       if (itemSplits[splitIndex] !== undefined && itemSplits[splitIndex] !== null) {
@@ -81,6 +96,14 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
           : parseFloat(itemSplits[splitIndex]) || 0;
         const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
         balances[consumerIndex].balance += roundedSplitAmount; // Positive because they owe
+        console.log(`  - Consumer ${consumerIndex} (${balances[consumerIndex].name}) owes: $${roundedSplitAmount}`);
+      } else {
+        console.log(`  - Consumer ${consumerIndex} (${balances[consumerIndex].name}) - no split amount, dividing evenly`);
+        // If no specific split, divide evenly among consumers
+        const itemAmount = parseFloat(item.amount) || 0;
+        const amountPerConsumer = Math.round((itemAmount / itemConsumers.length) * 100) / 100;
+        balances[consumerIndex].balance += amountPerConsumer;
+        console.log(`  - Consumer ${consumerIndex} (${balances[consumerIndex].name}) owes: $${amountPerConsumer} (even split)`);
       }
     });
   });
