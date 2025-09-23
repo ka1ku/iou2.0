@@ -13,6 +13,7 @@ import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 import { createExpense, updateExpense, updateExpenseParticipants } from '../services/expenseService';
+import { calculateSettlement } from '../utils/settlementCalculator';
 import { ExpenseProvider, useExpense } from '../contexts/ExpenseContext';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import ExpenseFooter from '../components/expenses/ExpenseFooter';
@@ -54,6 +55,296 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   const handleRemoveFee = (index) => {
     actions.removeFee(index);
   };
+
+  // Helper function to prepare expense data
+  const prepareExpenseData = async () => {
+    const currentUser = getCurrentUser();
+    if (!currentUser) throw new Error("No user signed in");
+
+    const userProfile = await getUserProfile(currentUser.uid);
+    if (!userProfile) throw new Error("Failed to get user profile");
+
+    const finalTitle =
+      state.title.trim() || state.items[0]?.name.trim() || "Receipt";
+
+    const mappedParticipants = state.participants.map((p) => {
+      if (p.name === "Me") {
+        return {
+          ...p,
+          name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+          userId: currentUser.uid,
+          phoneNumber: userProfile.phoneNumber,
+          username: userProfile.username,
+          profilePhoto: userProfile.profilePhoto,
+        };
+      }
+      return {
+        ...p,
+        name: p.name.trim(),
+        userId: p.userId || null,
+      };
+    });
+
+    return {
+      title: finalTitle,
+      total: total,
+      expenseType: "receipt",
+      participants: mappedParticipants,
+      items: state.items.map((item) => ({
+        id: item.id,
+        name: item.name.trim(),
+        amount: parseFloat(item.amount) || 0,
+        selectedConsumers: item.selectedConsumers || [0],
+        selectedPayers: item.selectedPayers || [0],
+        splits: item.splits || [],
+      })),
+      fees: state.fees.map((fee) => ({
+        id: fee.id,
+        name: fee.name.trim(),
+        amount: parseFloat(fee.amount) || 0,
+        type: fee.type || "fixed",
+        splits: fee.splits || [],
+      })),
+      selectedPayers: state.selectedPayers || [0],
+      join: { enabled: state.joinEnabled },
+    };
+  };
+
+  // Simplified validation
+  const validateExpense = () => {
+    if (state.participants.some((p) => !p.name.trim())) {
+      Alert.alert("Error", "Please enter names for all participants");
+      return false;
+    }
+    if (state.items.length === 0) {
+      Alert.alert("Error", "Please add at least one item");
+      return false;
+    }
+    if (
+      state.items.some(
+        (item) => !item.name.trim() || parseFloat(item.amount) < 0
+      )
+    ) {
+      Alert.alert(
+        "Error",
+        "Please fill in all item names and ensure amounts are valid"
+      );
+      return false;
+    }
+    if (state.fees.some((fee) => !fee.name.trim())) {
+      Alert.alert("Error", "Please fill in all fee names");
+      return false;
+    }
+    if (!state.selectedPayers?.length) {
+      Alert.alert(
+        "Error",
+        "Please select at least one person who paid for this receipt"
+      );
+      return false;
+    }
+    return true;
+  };
+
+  // Calculate participant proportions based on their item consumption
+  const calculateParticipantProportions = (items, participants, fees = []) => {
+    const totalItemAmount = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const participantAmounts = participants.map((participant, index) => {
+      let participantTotal = 0;
+      
+      // Calculate how much this participant owes for items they consumed
+      items.forEach(item => {
+        const itemAmount = parseFloat(item.amount) || 0;
+        const itemConsumers = item.selectedConsumers || [];
+        const itemSplits = item.splits || [];
+        
+        // If this participant consumed this item
+        if (itemConsumers.includes(index)) {
+          const consumerIndex = itemConsumers.indexOf(index);
+          if (itemSplits[consumerIndex] !== undefined && itemSplits[consumerIndex] !== null) {
+            // Use the specific split amount if available
+            const splitAmount = typeof itemSplits[consumerIndex] === 'object' 
+              ? parseFloat(itemSplits[consumerIndex].amount) || 0
+              : parseFloat(itemSplits[consumerIndex]) || 0;
+            participantTotal += splitAmount;
+          } else {
+            // If no specific split, divide evenly among consumers
+            const amountPerConsumer = itemAmount / itemConsumers.length;
+            participantTotal += amountPerConsumer;
+          }
+        }
+      });
+      
+      return {
+        participant,
+        index,
+        amount: participantTotal,
+        proportion: totalItemAmount > 0 ? participantTotal / totalItemAmount : 0
+      };
+    });
+    
+    console.log('=== PARTICIPANT PROPORTION CALCULATION ===');
+    console.log('Total item amount:', totalItemAmount);
+    console.log('Participant breakdown:');
+    participantAmounts.forEach(({ participant, amount, proportion }) => {
+      console.log(`- ${participant.name}: $${amount.toFixed(2)} (${(proportion * 100).toFixed(1)}%)`);
+    });
+    
+    // Show what fees will be split proportionally
+    const totalFees = fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
+    console.log('Fees to be split proportionally:', totalFees);
+    if (totalFees > 0) {
+      console.log('Fee breakdown:');
+      fees.forEach(fee => {
+        console.log(`- ${fee.name}: $${(parseFloat(fee.amount) || 0).toFixed(2)}`);
+      });
+    }
+    console.log('==========================================');
+    
+    return participantAmounts;
+  };
+
+  // Apply proportional fee splits to the expense data
+  const applyProportionalFeeSplits = (expenseData, participantProportions) => {
+    const totalFees = expenseData.fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
+    
+    if (totalFees === 0) {
+      console.log('No fees to split proportionally');
+      return expenseData;
+    }
+
+    console.log('=== APPLYING PROPORTIONAL FEE SPLITS ===');
+    console.log('Total fees to split:', totalFees);
+    
+    // Create updated fees with proportional splits
+    const updatedFees = expenseData.fees.map(fee => {
+      const feeAmount = parseFloat(fee.amount) || 0;
+      const proportionalSplits = participantProportions.map(({ index, proportion }) => ({
+        participantIndex: index,
+        amount: feeAmount * proportion
+      }));
+
+      console.log(`Fee "${fee.name}" ($${feeAmount.toFixed(2)}) splits:`);
+      proportionalSplits.forEach(({ participantIndex, amount }) => {
+        const participant = expenseData.participants[participantIndex];
+        console.log(`  - ${participant.name}: $${amount.toFixed(2)}`);
+      });
+
+      return {
+        ...fee,
+        splits: proportionalSplits
+      };
+    });
+
+    console.log('==========================================');
+
+    // Show final participant amounts after fee additions
+    console.log('=== FINAL PARTICIPANT AMOUNTS (Items + Fees) ===');
+    participantProportions.forEach(({ participant, amount: itemAmount, proportion, index }) => {
+      const totalFeeAmount = updatedFees.reduce((sum, fee) => {
+        const feeSplit = fee.splits.find(split => split.participantIndex === index);
+        return sum + (feeSplit ? feeSplit.amount : 0);
+      }, 0);
+      
+      const finalAmount = itemAmount + totalFeeAmount;
+      console.log(`${participant.name}:`);
+      console.log(`  - Items: $${itemAmount.toFixed(2)}`);
+      console.log(`  - Fees:  $${totalFeeAmount.toFixed(2)}`);
+      console.log(`  - Total: $${finalAmount.toFixed(2)}`);
+    });
+    console.log('===============================================');
+
+    return {
+      ...expenseData,
+      fees: updatedFees
+    };
+  };
+
+  // Calculate settlements
+  const calculateSettlements = async () => {
+    try {
+      const expenseData = await prepareExpenseData();
+      
+      // Calculate participant proportions for proportional fee splitting
+      const participantProportions = calculateParticipantProportions(expenseData.items, expenseData.participants, expenseData.fees);
+      
+      // Apply proportional fee splitting to the expense data
+      const expenseDataWithFeeSplits = applyProportionalFeeSplits(expenseData, participantProportions);
+      
+      console.log('=== SETTLEMENT CALCULATION DEBUG ===');
+      console.log('Expense data with fee splits:');
+      console.log('- Items:', expenseDataWithFeeSplits.items.length);
+      console.log('- Fees:', expenseDataWithFeeSplits.fees.length);
+      console.log('- Participants:', expenseDataWithFeeSplits.participants.length);
+      
+      // Log fee splits being passed to settlement calculator
+      expenseDataWithFeeSplits.fees.forEach((fee, index) => {
+        console.log(`Fee ${index + 1} (${fee.name}):`, fee.splits);
+      });
+      
+      const settlementResult = calculateSettlement(expenseDataWithFeeSplits);
+      console.log('Settlement result:', settlementResult);
+      console.log('=====================================');
+      
+      return settlementResult.settlements || [];
+    } catch (error) {
+      console.error("Error calculating settlements:", error);
+      return [];
+    }
+  };
+
+  const handleSettleNow = async () => {
+    if (!validateExpense()) return;
+
+    actions.setLoading(true);
+    try {
+      // Save expense first
+      const expenseData = await prepareExpenseData();
+      const currentUser = getCurrentUser();
+
+      // Calculate participant proportions for proportional fee splitting
+      const participantProportions = calculateParticipantProportions(expenseData.items, expenseData.participants, expenseData.fees);
+
+      // Apply proportional fee splitting to the expense data
+      const expenseDataWithFeeSplits = applyProportionalFeeSplits(expenseData, participantProportions);
+
+      if (isEditing || isNewExpense) {
+        await updateExpenseParticipants(
+          expense.id,
+          expenseDataWithFeeSplits.participants,
+          currentUser.uid
+        );
+        const { participants, ...otherFields } = expenseDataWithFeeSplits;
+        await updateExpense(expense.id, otherFields, currentUser.uid);
+      } else {
+        await createExpense(expenseDataWithFeeSplits, currentUser.uid);
+      }
+
+      // Calculate settlements
+      const settlements = await calculateSettlements();
+
+      // Navigate to settlement screen
+      navigation.navigate("SettleUp", {
+        expense: {
+          ...expense,
+          settlements: settlements.map((settlement) => ({
+            debtor: settlement.from,
+            creditor: settlement.to,
+            amount: settlement.amount,
+            status: "noAction",
+            updatedAt: new Date().toISOString(),
+            associatedItems: [],
+          })),
+        },
+      });
+    } catch (error) {
+      console.error("Error saving expense before settlement:", error);
+      Alert.alert("Error", "Failed to save expense: " + error.message);
+    } finally {
+      actions.setLoading(false);
+    }
+  };
+
+  const handleSettleLater = handleSaveExpense;
 
   // Initialize screen and load expense data
   useEffect(() => {
@@ -191,95 +482,42 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   }, [scannedReceipt, fromReceiptScan, actions]);
 
   const handleSaveExpense = async () => {
-    const finalTitle = state.title.trim() || (state.items.length > 0 && state.items[0].name.trim()) || 'Receipt';
-
-    if (state.participants.some(p => !p.name.trim())) {
-      Alert.alert('Error', 'Please enter names for all participants');
-      return;
-    }
-
-    if (state.items.length === 0) {
-      Alert.alert('Error', 'Please add at least one item');
-      return;
-    }
-
-    if (!state.selectedPayers || state.selectedPayers.length === 0) {
-      Alert.alert('Error', 'Please select at least one person who paid for this receipt');
-      return;
-    }
+    if (!validateExpense()) return;
 
     actions.setLoading(true);
     try {
-      const currentUser = getCurrentUser();
-      if (!currentUser) throw new Error('No user signed in');
-
-      const userProfile = await getUserProfile(currentUser.uid);
-      if (!userProfile) throw new Error('Failed to get user profile');
-
-      const mappedParticipants = state.participants.map((p) => {
-        if (p.name === 'Me') {
-          return {
-            ...p,
-            name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-            userId: p.userId || currentUser.uid,
-            placeholder: false,
-            phoneNumber: userProfile.phoneNumber,
-            username: userProfile.username,
-            profilePhoto: userProfile.profilePhoto
-          };
-        }
-        return {
-          ...p,
-          name: p.name.trim(),
-          userId: p.userId || null,
-          placeholder: p.placeholder || false,
-          phoneNumber: p.phoneNumber || null,
-          username: p.username || null,
-          profilePhoto: p.profilePhoto || null
-        };
-      });
-
-      const expenseData = {
-        title: finalTitle,
-        total: total,
-        expenseType: 'receipt',
-        participants: mappedParticipants,
-        items: state.items.map(item => ({
-          id: item.id,
-          name: item.name.trim(),
-          amount: parseFloat(item.amount) || 0,
-          selectedConsumers: item.selectedConsumers || [],
-          splits: item.splits || []
-        })),
-        fees: state.fees.map(fee => ({
-          id: fee.id,
-          name: fee.name.trim(),
-          amount: parseFloat(fee.amount) || 0,
-          type: fee.type || 'fixed',
-          percentage: fee.percentage || null,
-          splitType: fee.splitType || 'proportional',
-          splits: fee.splits || []
-        })),
-        selectedPayers: state.selectedPayers || [0],
-        join: { enabled: state.joinEnabled }
-      };
+      const expenseData = await prepareExpenseData();
       
-      if (isEditing || isNewExpense) {
-        // For both editing existing receipts and completing new receipts, we update the existing expense
-        await updateExpenseParticipants(expense.id, expenseData.participants, currentUser.uid);
-        const { participants, ...otherFields } = expenseData;
-        await updateExpense(expense.id, otherFields, currentUser.uid);
-        Alert.alert('Success', isNewExpense ? 'Receipt created successfully' : 'Receipt updated successfully');
-      } else {
-        // This case should not happen in the current flow, but keeping for safety
-        await createExpense(expenseData, currentUser.uid);
-        Alert.alert('Success', 'Receipt created successfully');
-      }
+      // Calculate participant proportions for debugging
+      const participantProportions = calculateParticipantProportions(expenseData.items, expenseData.participants, expenseData.fees);
+      
+      // Apply proportional fee splitting to the expense data
+      const expenseDataWithFeeSplits = applyProportionalFeeSplits(expenseData, participantProportions);
+      
+      const currentUser = getCurrentUser();
 
+      if (isEditing || isNewExpense) {
+        await updateExpenseParticipants(
+          expense.id,
+          expenseDataWithFeeSplits.participants,
+          currentUser.uid
+        );
+        const { participants, ...otherFields } = expenseDataWithFeeSplits;
+        await updateExpense(expense.id, otherFields, currentUser.uid);
+        Alert.alert(
+          "Success",
+          isNewExpense
+            ? "Receipt created successfully"
+            : "Receipt updated successfully"
+        );
+      } else {
+        await createExpense(expenseDataWithFeeSplits, currentUser.uid);
+        Alert.alert("Success", "Receipt created successfully");
+      }
       navigation.goBack();
     } catch (error) {
-      console.error('Error saving receipt:', error);
-      Alert.alert('Error', 'Failed to save receipt: ' + error.message);
+      console.error("Error saving receipt:", error);
+      Alert.alert("Error", "Failed to save receipt: " + error.message);
     } finally {
       actions.setLoading(false);
     }
@@ -357,8 +595,8 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         <ExpenseFooter
           isEditing={isEditing}
           loading={state.loading}
-          onSavePress={handleSaveExpense}
-          onSettlePress={handleSaveExpense}
+          onSavePress={handleSettleLater}
+          onSettlePress={handleSettleNow}
           saveButtonText={isEditing ? 'Update Receipt' : 'Save Receipt'}
           settleButtonText={isEditing ? 'Update & Settle' : 'Settle Now'}
         />

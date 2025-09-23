@@ -22,6 +22,7 @@ export const calculateSettlement = (expense) => {
 
   // Calculate net balance for each participant
   const balances = calculateParticipantBalances(expense, participants, items, fees, total);
+  console.log('Calculated balances:', balances);
   const settlements = generateSettlementProposal(balances);
   return {
     settlements,
@@ -56,10 +57,12 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
     const payersToUse = itemPayers.length > 0 ? itemPayers : (expense.selectedPayers || [0]);
     
     if (payersToUse.length > 0) {
-      const amountPerPayer = itemAmount / payersToUse.length;
+      const amountPerPayer = Math.round((itemAmount / payersToUse.length) * 100) / 100;
+      console.log(`  - Item "${item.name}" ($${itemAmount}) split among ${payersToUse.length} payer(s): $${amountPerPayer} each`);
       payersToUse.forEach(payerIndex => {
         if (payerIndex < balances.length) {
           balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
+          console.log(`  - Payer ${balances[payerIndex].name} paid: $${amountPerPayer}`);
         }
       });
     }
@@ -76,7 +79,8 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
         const splitAmount = typeof itemSplits[splitIndex] === 'object' 
           ? parseFloat(itemSplits[splitIndex].amount) || 0
           : parseFloat(itemSplits[splitIndex]) || 0;
-        balances[consumerIndex].balance += splitAmount; // Positive because they owe
+        const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
+        balances[consumerIndex].balance += roundedSplitAmount; // Positive because they owe
       }
     });
   });
@@ -84,17 +88,59 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
   // Calculate how much each participant owes based on fee splits
   (fees || []).forEach(fee => {
     const feeSplits = fee.splits || [];
+    const totalFeeAmount = parseFloat(fee.amount) || 0;
+    console.log(`Processing fee "${fee.name}" ($${totalFeeAmount}) with splits:`, feeSplits);
     
+    // First, give credit to the payer(s) who paid for this fee
+    const feePayers = expense.selectedPayers || [0];
+    if (feePayers.length > 0) {
+      const amountPerPayer = Math.round((totalFeeAmount / feePayers.length) * 100) / 100;
+      console.log(`  - Fee split among ${feePayers.length} payer(s): $${amountPerPayer} each`);
+      feePayers.forEach(payerIndex => {
+        if (payerIndex < balances.length) {
+          balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
+          console.log(`  - Payer ${balances[payerIndex].name} paid: $${amountPerPayer}`);
+        }
+      });
+    }
+    
+    // Then, add the fee amounts to participants who owe them
     feeSplits.forEach(split => {
       const participantIndex = split.participantIndex;
       const splitAmount = parseFloat(split.amount) || 0;
+      const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
+      console.log(`  - Participant ${participantIndex} owes: $${roundedSplitAmount}`);
       if (participantIndex !== undefined && participantIndex < balances.length) {
-        balances[participantIndex].balance += splitAmount; // Positive because they owe
+        balances[participantIndex].balance += roundedSplitAmount; // Positive because they owe
+        console.log(`  - Updated balance for ${balances[participantIndex].name}: $${balances[participantIndex].balance}`);
       }
     });
   });
 
-  return balances;
+  // Round all balances to 2 decimal places to avoid floating point precision issues
+  const roundedBalances = balances.map(balance => ({
+    ...balance,
+    balance: Math.round(balance.balance * 100) / 100
+  }));
+  
+  console.log('Final participant balances (rounded):');
+  roundedBalances.forEach((balance, index) => {
+    console.log(`  - ${balance.name}: $${balance.balance.toFixed(2)}`);
+  });
+  
+  // Show summary of who paid what
+  const payers = expense.selectedPayers || [0];
+  console.log('=== PAYMENT SUMMARY ===');
+  payers.forEach(payerIndex => {
+    if (payerIndex < roundedBalances.length) {
+      const payer = roundedBalances[payerIndex];
+      const totalPaid = Math.abs(payer.balance); // Convert negative balance to positive amount paid
+      console.log(`${payer.name} paid: $${totalPaid.toFixed(2)}`);
+    }
+  });
+  console.log('========================');
+  
+  return roundedBalances;
 };
 
 /**
@@ -148,56 +194,6 @@ const generateSettlementProposal = (balances) => {
   return settlements;
 };
 
-/**
- * Alternative settlement algorithm that tries to minimize the number of people involved
- * This creates a "hub" approach where one person acts as the central payer
- * @param {Array} balances - Array of participant balances
- * @returns {Array} Array of settlement objects { from, to, amount }
- */
-export const calculateHubSettlement = (balances) => {
-  // Create a deep copy of balances to avoid modifying the original array
-  const balancesCopy = balances.map(b => ({ ...b }));
-  
-  const debtors = balancesCopy.filter(b => b.balance > 0.01);
-  const creditors = balancesCopy.filter(b => b.balance < -0.01);
-  if (debtors.length === 0 || creditors.length === 0) {
-    return [];
-  }
-
-  // Choose the person who is owed the most as the hub
-  const hub = creditors.reduce((max, creditor) => 
-    Math.abs(creditor.balance) > Math.abs(max.balance) ? creditor : max
-  );
-  const settlements = [];
-  
-  // All debtors pay the hub
-  debtors.forEach(debtor => {
-    if (debtor.balance > 0.01) {
-      settlements.push({
-        from: debtor.name,
-        fromIndex: debtor.index,
-        to: hub.name,
-        toIndex: hub.index,
-        amount: Math.round(debtor.balance * 100) / 100
-      });
-    }
-  });
-  
-  // Hub pays other creditors
-  creditors.forEach(creditor => {
-    if (creditor.index !== hub.index && Math.abs(creditor.balance) > 0.01) {
-      settlements.push({
-        from: hub.name,
-        fromIndex: hub.index,
-        to: creditor.name,
-        toIndex: creditor.index,
-        amount: Math.round(Math.abs(creditor.balance) * 100) / 100
-      });
-    }
-  });
-
-  return settlements;
-};
 
 /**
  * Calculate settlement with partial settlements preserved
