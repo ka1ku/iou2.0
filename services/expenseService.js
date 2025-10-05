@@ -14,6 +14,7 @@ import {
 } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
 import { getUserProfile } from './friendService';
+import { Linking, Platform } from 'react-native';
 
 // Firestore-based expense service
 // Data model structure:
@@ -267,9 +268,9 @@ export const parseExpenseJoinLink = (url) => {
 };
 
 // Generate expense join link
-export const generateExpenseJoinLink = ({ expenseId, token, code, phone }) => {
-  // Generate app deep link using the app scheme instead of http(s)
-  const base = 'com.kailee.iou20://';
+export const generateExpenseJoinLink = ({ expenseId, token, code, phone, preferUniversal = false }) => {
+  // Use universal link for share contexts (e.g., SMS) so it's tappable in Messages
+  const base = preferUniversal ? 'https://kailee.iou20.com/' : 'com.kailee.iou20://';
   const path = `expense/${expenseId}/${token}`;
   const params = new URLSearchParams();
   if (code) params.set('code', code);
@@ -442,6 +443,54 @@ export const joinExpenseByInvite = async ({ expenseId, token, code, userId, user
   }
 };
 
+// Unified join helper: prefer invite (token+expenseId), fallback to room code
+export const joinExpense = async ({ expenseId, token, code, userId, userPhone }) => {
+  if (!userId) {
+    throw new Error('Missing user ID');
+  }
+  if (expenseId && token) {
+    return joinExpenseByInvite({ expenseId, token, code, userId, userPhone });
+  }
+  if (code) {
+    return joinExpenseByCode(code, userId, userPhone);
+  }
+  throw new Error('Missing join parameters');
+};
+
+// ---------------- SMS Invite Helper ----------------
+export const sendExpenseInviteSMS = async ({ expenseId, phoneNumber, contactName, preferUniversal = false }) => {
+  const digitsOnly = (phoneNumber || '').replace(/\D/g, '');
+  if (!digitsOnly) {
+    throw new Error('Phone number required');
+  }
+
+  const nameForMessage = contactName || 'there';
+  let message = `Hi ${nameForMessage}! I'd like to invite you to join IOU App so we can split expenses together. Download it from the App Store!`;
+
+  if (expenseId) {
+    const joinInfo = await getExpenseJoinInfo(expenseId, { initializeIfMissing: true });
+    if (joinInfo?.code && joinInfo?.token) {
+      const deepLink = generateExpenseJoinLink({
+        expenseId,
+        token: joinInfo.token,
+        code: joinInfo.code,
+        phone: digitsOnly,
+        preferUniversal,
+      });
+      message = `Hi ${nameForMessage}! Join me on IOU App to split expenses: ${deepLink}`;
+    }
+  }
+
+  const body = encodeURIComponent(message);
+  const separator = Platform.OS === 'ios' ? '&' : '?';
+  const smsUrl = `sms:${digitsOnly}${separator}body=${body}`;
+  try {
+    await Linking.openURL(smsUrl);
+  } catch (e) {
+    await Linking.openURL(`sms:${digitsOnly}`);
+  }
+};
+
 export const getExpenseById = async (expenseId) => {
   try {
     const firestoreInstance = getFirestore(getApp());
@@ -542,6 +591,40 @@ export const migrateExpensesWithParticipantsMap = async () => {
   } catch (error) {
     console.error('Error during migration:', error);
     return { success: false, error: error.message };
+  }
+};
+
+// Delete an item from an expense
+export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
+  try {
+    console.log('Deleting item from expense:', expenseId, 'at index:', itemIndex);
+    
+    const firestoreInstance = getFirestore(getApp());
+    const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
+    
+    // Get the current expense data
+    const expenseSnap = await getDoc(expenseRef);
+    if (!expenseSnap.exists()) {
+      throw new Error('Expense not found');
+    }
+    
+    const expenseData = expenseSnap.data();
+    const currentItems = expenseData.items || [];
+    
+    // Remove the item at the specified index
+    const updatedItems = currentItems.filter((_, index) => index !== itemIndex);
+    
+    // Update the expense with the new items array
+    await updateDoc(expenseRef, {
+      items: updatedItems,
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log('Item deleted successfully from expense');
+    return true;
+  } catch (error) {
+    console.error('Error deleting item from expense:', error);
+    throw error;
   }
 };
 

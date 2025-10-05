@@ -7,16 +7,16 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import {
   Colors,
   Spacing,
   Radius,
   Shadows,
   Typography,
-} from "../../design/tokens"; // Assuming your design tokens are here
+} from "../../design/tokens";
 import { useExpense } from "../../contexts/ExpenseContext";
-import ProfilePicture from "../VenmoProfilePicture"; // Assuming this is your custom component
+import ProfilePicture from "../VenmoProfilePicture";
+import Card from "../Card";
 
 const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
   const { state } = useExpense();
@@ -76,41 +76,40 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
   };
 
   return (
-    <View style={styles.cardContainer}>
-      <LinearGradient
-        colors={[Colors.surfaceLight, Colors.surface]}
-        style={styles.card}
-      >
-        {/* Header Section */}
-        <View style={styles.header}>
-          <View style={styles.titleSection}>
-            <Text style={styles.itemName} numberOfLines={2}>
-              {item.name || "Untitled Item"}
-            </Text>
-            <Text style={styles.totalAmount}>${totalAmount.toFixed(2)}</Text>
-            <Text style={styles.paidByText} numberOfLines={1}>{paidByInfo}</Text>
-          </View>
-          <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
-            <Ionicons
-              name="ellipsis-horizontal"
-              size={20}
-              color={Colors.textSecondary}
-            />
-          </TouchableOpacity>
+    <Card 
+      variant="flat" 
+      padding="large" 
+      margin="none"
+      style={[styles.cardContainer, styles.noBorder]}
+    >
+      {/* Header Section */}
+      <View style={styles.header}>
+        <View style={styles.titleSection}>
+          <Text style={styles.itemName} numberOfLines={2}>
+            {item.name || "Untitled Item"}
+          </Text>
+          <Text style={styles.totalAmount}>${totalAmount.toFixed(2)}</Text>
+          <Text style={styles.paidByText} numberOfLines={1}>{paidByInfo}</Text>
         </View>
+        <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
+          <Ionicons
+            name="ellipsis-horizontal"
+            size={20}
+            color={Colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
 
-        {/* Divider */}
-        <View style={styles.divider} />
-
-        {/* Split Details */}
-        <View style={styles.splitSection}>
-          <Text style={styles.sectionTitle}>Split Details</Text>
+      {/* Split Details */}
+      <View style={styles.splitSection}>
+        <Text style={styles.sectionTitle}>Split Details</Text>
+        <View style={styles.splitList}>
           {splitInfo.map((split, index) => (
             <View key={index} style={styles.splitItem}>
               <View style={styles.participantInfo}>
                 <ProfilePicture
                   source={split.profilePhoto}
-                  size={32}
+                  size={28}
                   username={split.name}
                 />
                 <Text style={styles.participantName}>{split.name}</Text>
@@ -119,23 +118,19 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
             </View>
           ))}
         </View>
-      </LinearGradient>
-    </View>
+      </View>
+    </Card>
   );
 };
 
 const styles = StyleSheet.create({
   cardContainer: {
-    ...Shadows.card,
-    borderRadius: Radius.lg,
     marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.divider,
   },
-  card: {
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    overflow: "hidden",
+  noBorder: {
+    borderWidth: 0,
+    borderColor: 'transparent',
+    ...Shadows.card,
   },
 
   // Header Section
@@ -143,7 +138,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.xl,
   },
   titleSection: {
     flex: 1,
@@ -151,53 +146,63 @@ const styles = StyleSheet.create({
   },
   itemName: {
     ...Typography.h3,
-    fontWeight: "600",
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
+    lineHeight: 24,
   },
   totalAmount: {
     ...Typography.h2,
     color: Colors.accent,
-    fontWeight: "700",
     marginBottom: Spacing.xs,
+    lineHeight: 28,
   },
   paidByText: {
     ...Typography.body,
     color: Colors.textSecondary,
-    fontWeight: "500",
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   // Menu Button
   menuButton: {
-    padding: Spacing.xs,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.surface,
-  },
-
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: Colors.divider,
-    marginVertical: Spacing.md,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
 
   // Split Section
   splitSection: {
-    // No background needed, it's on the card directly
+    marginTop: Spacing.lg,
   },
   sectionTitle: {
-    ...Typography.title,
-    fontWeight: "600",
-    color: Colors.textPrimary,
+    ...Typography.label,
+    color: Colors.textSecondary,
     marginBottom: Spacing.md,
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  splitList: {
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    overflow: "hidden",
   },
   splitItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider + '40',
+    borderBottomColor: Colors.divider,
   },
   participantInfo: {
     flexDirection: "row",
@@ -205,15 +210,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   participantName: {
-    ...Typography.body1,
-    fontWeight: "500",
+    ...Typography.body,
     color: Colors.textPrimary,
-    marginLeft: Spacing.md,
+    marginLeft: Spacing.sm,
+    fontWeight: "500",
   },
   splitAmount: {
     ...Typography.body,
     color: Colors.accent,
     fontWeight: "600",
+    fontSize: 15,
   },
 });
 

@@ -19,7 +19,7 @@ import * as Contacts from 'expo-contacts';
 import algoliasearch from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
 import { getCurrentUser } from '../../services/authService';
-import { generateExpenseJoinLink, getExpenseJoinInfo, updateExpenseParticipants } from '../../services/expenseService';
+import { generateExpenseJoinLink, getExpenseJoinInfo, updateExpenseParticipants, sendExpenseInviteSMS } from '../../services/expenseService';
 import { useExpense } from '../../contexts/ExpenseContext';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
@@ -64,17 +64,6 @@ const MemoizedContactItem = React.memo(({ item, onInviteContact, onSMSInvite }) 
   const phone = item.phoneNumbers?.[0]?.number || '';
   
   const handleInvitePress = () => {
-    const contactName = (item.firstName && item.lastName)
-      ? `${item.firstName} ${item.lastName}`
-      : (item.name || 'Unknown Contact');
-    
-    Alert.alert(
-      'Contact Invited',
-      `${contactName} will automatically be added to the expense if they join with this phone number.`,
-      [{ text: 'OK' }]
-    );
-    
-    onSMSInvite(item);
     onInviteContact(item);
   };
   
@@ -293,7 +282,7 @@ const ParticipantsGrid = forwardRef(({
 }, ref) => {
   // Use context instead of props
   const { state, actions } = useExpense();
-  const { participants, selectedFriends, participantsExpanded } = state;
+  const { participants, selectedFriends } = state;
 
   const [showModal, setShowModal] = useState(false);
   const [contacts, setContacts] = useState([]);
@@ -370,58 +359,22 @@ const ParticipantsGrid = forwardRef(({
       return [...prev, invitedContact];
     });
     
-    handleSMSInvite(contact);
+    handleSMSInvite({
+      ...contact,
+      // Normalize phone before passing to SMS invite
+      phoneNumbers: [{ number: (contact.phoneNumbers?.[0]?.number || '').replace(/\D/g, '') }]
+    });
   }, [selectedFriends]);
 
   const handleSMSInvite = useCallback((contact) => {
-    const phoneNumber = contact.phoneNumbers?.[0]?.number || contact.phoneNumber;
-    if (!phoneNumber) {
-      Alert.alert('No Phone Number', 'This contact doesn\'t have a phone number.');
-      return;
-    }
-
+    const rawPhone = contact.phoneNumbers?.[0]?.number || contact.phoneNumber;
     const contactName = (contact.firstName && contact.lastName)
       ? `${contact.firstName} ${contact.lastName}`
       : (contact.name || 'Unknown');
-    
-    let message = `Hi ${contactName}! I'd like to invite you to join IOU App so we can split expenses together. Download it from the App Store!`;
-    
-    if (expenseId) {
-      getExpenseJoinInfo(expenseId, { initializeIfMissing: true })
-        .then(joinInfo => {
-          if (joinInfo && joinInfo.code) {
-            const deepLink = generateExpenseJoinLink({ 
-              expenseId, 
-              code: joinInfo.code,
-              phone: phoneNumber
-            });
-            message = `Hi ${contactName}! Join me on IOU App to split expenses: ${deepLink}`;
-            
-            const body = encodeURIComponent(message);
-            const separator = Platform.OS === 'ios' ? '&' : '?';
-            const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
-            Linking.openURL(smsUrl).catch(() => {
-              Linking.openURL(`sms:${phoneNumber}`);
-            });
-          }
-        })
-        .catch(error => {
-          console.log('Could not generate deep link, using fallback message');
-          const body = encodeURIComponent(message);
-          const separator = Platform.OS === 'ios' ? '&' : '?';
-          const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
-          Linking.openURL(smsUrl).catch(() => {
-            Linking.openURL(`sms:${phoneNumber}`);
-          });
-        });
-    } else {
-      const body = encodeURIComponent(message);
-      const separator = Platform.OS === 'ios' ? '&' : '?';
-      const smsUrl = `sms:${phoneNumber}${separator}body=${body}`;
-      Linking.openURL(smsUrl).catch(() => {
-        Linking.openURL(`sms:${phoneNumber}`);
+    sendExpenseInviteSMS({ expenseId, phoneNumber: rawPhone, contactName, preferUniversal: false })
+      .catch(() => {
+        Alert.alert('Invite failed', 'Could not open Messages.');
       });
-    }
   }, [expenseId]);
 
   const removeFriend = useCallback((friendId) => {
@@ -486,26 +439,20 @@ const ParticipantsGrid = forwardRef(({
       >
         {/* Avatar Stack */}
         <View style={styles.avatarStackContainer}>
-          {participants.slice(0, 4).map((participant, index) => (
+          {participants.filter(p => p.name !== 'Me').slice(0, 4).map((participant, index) => (
             <View
               key={participant.id}
               style={[
                 styles.avatarStackItem,
-                { zIndex: participants.length - index }
+                { zIndex: participants.filter(p => p.name !== 'Me').length - index }
               ]}
             >
               {participant.profilePhoto ? (
                 <Image source={{ uri: participant.profilePhoto }} style={styles.avatarStackImage} />
               ) : (
-                <View style={[
-                  styles.avatarStackPlaceholder,
-                  participant.name === 'You' && styles.currentUserAvatarStack
-                ]}>
-                  <Text style={[
-                    styles.avatarStackInitials,
-                    participant.name === 'You' && styles.currentUserInitials
-                  ]}>
-                    {participant.name === 'You' ? 'Y' : (participant.name?.[0] || 'U').toUpperCase()}
+                <View style={styles.avatarStackPlaceholder}>
+                  <Text style={styles.avatarStackInitials}>
+                    {(participant.name?.[0] || 'U').toUpperCase()}
                   </Text>
                 </View>
               )}
@@ -513,9 +460,9 @@ const ParticipantsGrid = forwardRef(({
           ))}
 
           {/* Overflow Indicator */}
-          {participants.length > 4 && (
+          {participants.filter(p => p.name !== 'Me').length > 4 && (
             <View style={styles.overflowContainer}>
-              <Text style={styles.overflowText}>+{participants.length - 4}</Text>
+              <Text style={styles.overflowText}>+{participants.filter(p => p.name !== 'Me').length - 4}</Text>
             </View>
           )}
         </View>
@@ -576,7 +523,7 @@ const ParticipantsGrid = forwardRef(({
             {/* Current Members */}
             <View style={styles.membersContainer}>
               <FlatList
-                data={allMembers}
+                data={allMembers.filter(member => !member.isCurrentUser)}
                 horizontal
                 keyExtractor={(item) => item.id}
                 renderItem={renderMemberItem}

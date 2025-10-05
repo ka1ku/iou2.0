@@ -33,6 +33,7 @@ import SettleUpScreen from './screens/SettleUpScreen';
 import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
 import NotificationSettingsScreen from './screens/settings/NotificationSettingsScreen';
 import VenmoTestScreen from './screens/settings/VenmoTest';
+import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 
 // Auth screens
@@ -86,6 +87,7 @@ const HomeStack = () => (
 const ProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
     <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import deepLinkService from '../../services/deepLinkService';
 import { getCurrentUser } from '../../services/authService';
-import { joinExpenseByCode, joinExpenseByInvite, getExpenseById } from '../../services/expenseService';
+import { joinExpense, getExpenseById } from '../../services/expenseService';
 
 const ExpenseJoinHandler = () => {
   const [joinData, setJoinData] = useState(null);
@@ -73,30 +73,17 @@ const ExpenseJoinHandler = () => {
         Alert.alert('Sign in required', 'Please sign in to join this expense.');
         return;
       }
-      // Prefer invite join if expenseId+token available
-      if (joinData.expenseId && joinData.token) {
-        const result = await joinExpenseByInvite({
-          expenseId: joinData.expenseId,
-          token: joinData.token,
-          code: joinData.code,
-          userId: user.uid,
-          userPhone: user.phoneNumber,
-        });
-        if (result?.message === 'Already a participant') {
-          Alert.alert('Already in this room', 'You are already a participant in this expense.');
-        } else {
-          Alert.alert('Joined', 'You have joined the expense.');
-        }
-      } else if (joinData.code) {
-        const result = await joinExpenseByCode(joinData.code, user.uid, user.phoneNumber);
-        if (result?.message === 'Already a participant') {
-          Alert.alert('Already in this room', 'You are already a participant in this expense.');
-        } else {
-          Alert.alert('Joined', 'You have joined the expense.');
-        }
+      const result = await joinExpense({
+        expenseId: joinData.expenseId,
+        token: joinData.token,
+        code: joinData.code,
+        userId: user.uid,
+        userPhone: user.phoneNumber,
+      });
+      if (result?.message === 'Already a participant') {
+        Alert.alert('Already in this room', 'You are already a participant in this expense.');
       } else {
-        Alert.alert('Invalid link', 'This join link appears to be missing required details.');
-        return;
+        Alert.alert('Joined', 'You have joined the expense.');
       }
       setShowModal(false);
       setJoinData(null);

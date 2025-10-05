@@ -5,63 +5,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 
 const ExpenseFooter = ({ 
-  isEditing = false,
   loading = false,
-  onSavePress,
   onSettlePress,
-  saveButtonText,
-  settleButtonText
+  settleButtonText = 'Settle Up'
 }) => {
   const insets = useSafeAreaInsets();
 
-  const getSaveButtonText = () => {
-    if (saveButtonText) return saveButtonText;
-    if (loading) return 'Saving...';
-    return isEditing ? 'Update' : 'Create';
-  };
-
-  const getSettleButtonText = () => {
-    if (settleButtonText) return settleButtonText;
-    return isEditing ? 'Update & Settle' : 'Settle Now';
-  };
-
   return (
-    <View style={[styles.footer, { paddingBottom: insets.bottom + Spacing.lg }]}>
-      <View style={styles.footerButtons}>
-        {!isEditing && (
-          <TouchableOpacity
-            style={[styles.saveButton, loading && styles.buttonDisabled]}
-            onPress={onSavePress}
-            disabled={loading}
-            activeOpacity={0.7}
-          >
-            <View style={styles.buttonContent}>
-              <Ionicons 
-                name="add-circle" 
-                size={22} 
-                color={Colors.textSecondary} 
-              />
-              <Text style={styles.saveButtonText}>
-                {getSaveButtonText()}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        
-        <TouchableOpacity
-          style={[styles.settleButton, loading && styles.buttonDisabled, isEditing && styles.settleButtonFullWidth]}
-          onPress={onSettlePress}
-          disabled={loading}
-          activeOpacity={0.7}
-        >
-          <View style={styles.buttonContent}>
-            <Ionicons name="card" size={22} color={Colors.white} />
-            <Text style={styles.settleButtonText}>
-              {getSettleButtonText()}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
+      <TouchableOpacity
+        style={[styles.settleButton, loading && styles.buttonDisabled]}
+        onPress={onSettlePress}
+        disabled={loading}
+        activeOpacity={0.7}
+      >
+        <View style={styles.buttonContent}>
+          <Ionicons name="card" size={22} color={Colors.white} />
+          <Text style={styles.settleButtonText}>
+            {loading ? 'Processing...' : settleButtonText}
+          </Text>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -80,22 +44,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
   },
-  footerButtons: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: Colors.surfaceLight,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
   settleButton: {
-    flex: 1,
     backgroundColor: Colors.accent,
     paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.lg,
@@ -109,12 +58,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
   },
-  saveButtonText: {
-    ...Typography.title,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 16,
-  },
   settleButtonText: {
     ...Typography.title,
     color: Colors.white,
@@ -124,9 +67,6 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     backgroundColor: Colors.textSecondary,
     borderColor: Colors.textSecondary,
-  },
-  settleButtonFullWidth: {
-    flex: 1,
   },
 });
 

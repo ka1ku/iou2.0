@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
-import { createExpense, updateExpense, updateExpenseParticipants } from '../services/expenseService';
+import { createExpense, updateExpense, updateExpenseParticipants, deleteItemFromExpense } from '../services/expenseService';
 import { calculateSettlement } from '../utils/settlementCalculator';
 import { ExpenseProvider, useExpense } from '../contexts/ExpenseContext';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
@@ -40,8 +40,25 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     actions.updateItem(index, { [field]: value });
   };
 
-  const handleRemoveItem = (index) => {
-    actions.removeItem(index);
+  const handleRemoveItem = async (index) => {
+    try {
+      // If editing an existing expense, update Firestore
+      if (isEditing && expense?.id) {
+        const currentUser = getCurrentUser();
+        if (!currentUser) {
+          Alert.alert("Error", "User not authenticated");
+          return;
+        }
+        
+        await deleteItemFromExpense(expense.id, index, currentUser.uid);
+      }
+      
+      // Update local state
+      actions.removeItem(index);
+    } catch (error) {
+      console.error("Error removing item:", error);
+      Alert.alert("Error", "Failed to remove item: " + error.message);
+    }
   };
 
   const handleAddFee = (feeData) => {
@@ -558,7 +575,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             <Text style={styles.sectionTitle}>Participants</Text>
             <View style={styles.memberCountBadge}>
               <Text style={styles.memberCountText}>
-                {state.participants.length} {state.participants.length === 1 ? 'member' : 'members'}
+                {state.participants.filter(p => p.name !== 'Me').length} {state.participants.filter(p => p.name !== 'Me').length === 1 ? 'other member' : 'other members'}
               </Text>
             </View>
           </View>

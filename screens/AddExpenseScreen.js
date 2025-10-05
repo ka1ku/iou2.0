@@ -19,6 +19,7 @@ import {
   createExpense,
   updateExpense,
   updateExpenseParticipants,
+  deleteItemFromExpense,
 } from "../services/expenseService";
 import { calculateSettlement } from "../utils/settlementCalculator";
 import { ExpenseProvider, useExpense } from "../contexts/ExpenseContext";
@@ -53,6 +54,19 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       actions.initializeFromExpense(expense, isEditing, isNewExpense);
     }
   }, [expense, isEditing, isNewExpense, navigation, actions]);
+
+  // Auto-edit the first item for new expenses
+  useEffect(() => {
+    if (!isEditing && state.items.length > 0) {
+      // Only set the first item to edit mode if no items are currently being edited
+      setEditingItems(prev => {
+        if (prev.size === 0) {
+          return new Set([0]); // First item (index 0) in edit mode
+        }
+        return prev;
+      });
+    }
+  }, [isEditing, state.items.length]);
 
   // Update participants when friends are selected
   useEffect(() => {
@@ -270,14 +284,11 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     }
   };
 
-  const handleSettleLater = handleSaveExpense;
 
-  // Handle edit mode for an item
   const handleEditItem = (index) => {
     setEditingItems(prev => new Set([...prev, index]));
   };
 
-  // Handle delete for an item
   const handleDeleteItem = (index) => {
     Alert.alert(
       "Delete Item",
@@ -287,13 +298,30 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            actions.removeItem(index);
-            setEditingItems(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(index);
-              return newSet;
-            });
+          onPress: async () => {
+            try {
+              // If editing an existing expense, update Firestore
+              if (isEditing && expense?.id) {
+                const currentUser = getCurrentUser();
+                if (!currentUser) {
+                  Alert.alert("Error", "User not authenticated");
+                  return;
+                }
+                
+                await deleteItemFromExpense(expense.id, index, currentUser.uid);
+              }
+              
+              // Update local state
+              actions.removeItem(index);
+              setEditingItems(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(index);
+                return newSet;
+              });
+            } catch (error) {
+              console.error("Error deleting item:", error);
+              Alert.alert("Error", "Failed to delete item: " + error.message);
+            }
           }
         }
       ]
@@ -338,7 +366,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Participants</Text>
               <View style={styles.memberCountBadge}>
                 <Text style={styles.memberCountText}>
-                  {state.participants.length} {state.participants.length === 1 ? 'member' : 'members'}
+                  {state.participants.filter(p => p.name !== 'Me').length} {state.participants.filter(p => p.name !== 'Me').length === 1 ? 'other member' : 'other members'}
                 </Text>
               </View>
             </View>
@@ -415,9 +443,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         </ScrollView>
 
         <ExpenseFooter
-          isEditing={isEditing}
           loading={state.loading}
-          onSavePress={handleSettleLater}
           onSettlePress={handleSettleNow}
         />
       </KeyboardAvoidingView>
