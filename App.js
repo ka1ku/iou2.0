@@ -47,6 +47,7 @@ import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
 
 // Contexts
 import { ExpenseProvider } from './contexts/ExpenseContext';
+import { ExpenseDataProvider } from './contexts/ExpenseDataContext';
 
 // Navigation constants
 const Tab = createBottomTabNavigator();
@@ -146,7 +147,7 @@ const MainTabs = () => {
 
   const getTabBarStyle = (route) => {
     const routeName = getFocusedRouteNameFromRoute(route);
-    const hiddenRoutes = ['AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 'NotificationSettings', 'VenmoTest', 'FriendProfile'];
+    const hiddenRoutes = ['AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 'NotificationSettings', 'VenmoTest', 'FriendProfile', 'Settings'];
 
     return {
       backgroundColor: Colors.surface,
@@ -311,10 +312,12 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer onReady={onLayoutRootView}>
         <StatusBar style="dark" />
-        <ReceiptScanningProvider>
-          {user ? <MainTabs /> : <AuthStack />}
-          <ExpenseJoinHandler />
-        </ReceiptScanningProvider>
+        <ExpenseDataProvider>
+          <ReceiptScanningProvider>
+            {user ? <MainTabs /> : <AuthStack />}
+            <ExpenseJoinHandler />
+          </ReceiptScanningProvider>
+        </ExpenseDataProvider>
       </NavigationContainer>
     </SafeAreaProvider>
   );

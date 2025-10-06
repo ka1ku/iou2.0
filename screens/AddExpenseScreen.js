@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -99,7 +98,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       actions.setParticipants(allParticipants);
     }
   }, [state.selectedFriends, state.participants, actions]);
-
 
   // Helper function to prepare expense data
   const prepareExpenseData = async () => {
@@ -284,7 +282,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     }
   };
 
-
   const handleEditItem = (index) => {
     setEditingItems(prev => new Set([...prev, index]));
   };
@@ -326,6 +323,16 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         }
       ]
     );
+  };
+
+  // Reusable function to add a new item and set it to edit mode
+  const handleAddItem = () => {
+    const newIndex = state.items.length;
+    actions.addItem();
+    setEditingItems(prev => new Set([...prev, newIndex]));
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
   return (
@@ -389,57 +396,74 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           {/* Items Section */}
           <Text style={styles.sectionTitle}>Items</Text>
 
-          {state.items.map((item, index) => {
-            const isEditing = editingItems.has(index);
+          {state.items.length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <View style={styles.emptyStateIconContainer}>
+                <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
+              </View>
+              <Text style={styles.emptyStateTitle}>No items yet</Text>
+              <Text style={styles.emptyStateDescription}>
+                Start by adding your first item to this expense
+              </Text>
+              
+              {/* Primary Add Button - Integrated in empty state */}
+              <TouchableOpacity
+                style={styles.emptyStateButton}
+                onPress={handleAddItem}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="add-circle" size={20} color={Colors.white} />
+                <Text style={styles.emptyStateButtonText}>Add Your First Item</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {state.items.map((item, index) => {
+                const isEditing = editingItems.has(index);
 
-            if (isEditing) {
-              return (
-                <ExpenseItemCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  expenseId={expense?.id}
-                  isEditing={isEditing}
-                  onCancelEdit={() => {
-                    setEditingItems(prev => {
-                      const newSet = new Set(prev);
-                      newSet.delete(index);
-                      return newSet;
-                    });
-                  }}
-                />
-              );
-            } else {
-              return (
-                <ExpenseViewCard
-                  key={item.id}
-                  item={item}
-                  index={index}
-                  onEdit={() => handleEditItem(index)}
-                  onDelete={() => handleDeleteItem(index)}
-                />
-              );
-            }
-          })}
+                if (isEditing) {
+                  return (
+                    <ExpenseItemCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      expenseId={expense?.id}
+                      isEditing={isEditing}
+                      onCancelEdit={() => {
+                        setEditingItems(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(index);
+                          return newSet;
+                        });
+                      }}
+                    />
+                  );
+                } else {
+                  return (
+                    <ExpenseViewCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      onEdit={() => handleEditItem(index)}
+                      onDelete={() => handleDeleteItem(index)}
+                    />
+                  );
+                }
+              })}
 
-          {/* Add Item Button - Below the item cards */}
-          <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity
-              style={styles.addItemButton}
-              onPress={() => {
-                const newIndex = state.items.length; // new item will be appended
-                actions.addItem();
-                setEditingItems(prev => new Set([...prev, newIndex]));
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="add" size={18} color={Colors.accent} />
-              <Text style={styles.addItemText}>Add Item</Text>
-            </TouchableOpacity>
-          </View>
+              {/* Subtle Add Item Button - When items exist */}
+              <TouchableOpacity
+                style={styles.addAnotherItemButton}
+                onPress={handleAddItem}
+                activeOpacity={0.7}
+              >
+                <View style={styles.addAnotherItemIcon}>
+                  <Ionicons name="add" size={20} color={Colors.accent} />
+                </View>
+                <Text style={styles.addAnotherItemText}>Add Another Item</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
 
         <ExpenseFooter
@@ -464,12 +488,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.lg,
   },
-  section: {
-    backgroundColor: Colors.card,
-    marginBottom: Spacing.lg,
-    padding: Spacing.lg,
-    borderRadius: Radius.lg,
-  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -483,12 +501,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     marginTop: Spacing.lg,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
   memberCountBadge: {
     backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.md,
@@ -500,30 +512,83 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 12,
   },
-
-
-  actionButtonsContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginVertical: Spacing.lg,
-  },
-  addItemButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
+  emptyStateContainer: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    minWidth: 140,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    marginVertical: Spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 260,
   },
-  addItemText: {
+  emptyStateIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: Spacing.lg,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textAlign: "center",
+  },
+  emptyStateDescription: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 22,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  emptyStateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md + 2,
+    alignSelf: "stretch",
+    marginHorizontal: Spacing.md,
+  },
+  emptyStateButtonText: {
+    color: Colors.white,
+    fontWeight: "600",
+    fontSize: 15,
+    marginLeft: Spacing.sm,
+  },
+  addAnotherItemButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.accent + "10",
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    borderStyle: "dashed",
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  addAnotherItemIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
+  addAnotherItemText: {
     color: Colors.accent,
     fontWeight: "600",
-    marginLeft: Spacing.sm,
+    fontSize: 16,
   },
 });
 

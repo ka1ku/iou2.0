@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
-  RefreshControl,
   ActivityIndicator,
   Linking,
   Image
@@ -14,104 +13,30 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import { useFocusEffect } from '@react-navigation/native';
-import { getCurrentUser, onAuthStateChange } from '../services/authService';
-import { getUserExpenses } from '../services/expenseService';
+import { getCurrentUser } from '../services/authService';
 import { handleTakePhoto, handlePickImage } from '../services/imageHandler';
 import { processReceiptImage } from '../services/receiptScanner';
 import { requestReceiptScanningAccess } from '../services/subscriptionService';
 import { useReceiptScanning } from '../App';
+import { calculateUserBalanceForExpense, calculateExpenseTotal } from '../utils/balanceCalculator';
+import { useExpenseData } from '../contexts/ExpenseDataContext';
 
 const HomeScreen = ({ navigation }) => {
-  const [expenses, setExpenses] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const { setIsReceiptScanning, startScanningAnimation, stopScanningAnimation } = useReceiptScanning();
+  
+  // Use shared expense data
+  const { expenses, loading } = useExpenseData();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChange((user) => {
-      if (user) {
-        loadExpenses();
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      loadExpenses();
-    }, [])
-  );
-
-  const loadExpenses = async () => {
-    try {
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        const userExpenses = await getUserExpenses(currentUser.uid);
-        setExpenses(userExpenses);
-        
-
-      }
-    } catch (error) {
-      console.error('Error loading expenses:', error);
-      Alert.alert('Error', 'Failed to load expenses: ' + error.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadExpenses();
-  };
-
-  // Calculate how much you owe for a specific expense
+  // Calculate how much you owe for a specific expense using universal calculator
   const calculateExpenseBalance = (expense) => {
-    const currentUserIndex = 0; // Assuming current user is always first participant
-    let youPaid = 0;
-    let youOwe = 0;
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      return { youOwe: 0, youPaid: 0 };
+    }
     
-    expense.items?.forEach(item => {
-      const itemAmount = parseFloat(item.amount) || 0;
-      const itemPayers = item.selectedPayers || expense.selectedPayers || [0];
-      const itemConsumers = item.selectedConsumers || [0];
-      const itemSplits = item.splits || [];
-      
-      // Calculate how much you paid for this item
-      if (itemPayers.includes(currentUserIndex)) {
-        const amountPerPayer = itemAmount / itemPayers.length;
-        youPaid += amountPerPayer;
-      }
-      
-      // Calculate how much you owe for this item
-      const yourConsumerIndex = itemConsumers.indexOf(currentUserIndex);
-      if (yourConsumerIndex !== -1 && itemSplits[yourConsumerIndex]) {
-        const yourAmount = parseFloat(itemSplits[yourConsumerIndex]) || 0;
-        youOwe += yourAmount;
-      }
-    });
-    
-    // Calculate fees
-    expense.fees?.forEach(fee => {
-      const feeAmount = parseFloat(fee.amount) || 0;
-      const feeSplits = fee.splits || [];
-      
-      // Find your split for this fee
-      const yourFeeSplit = feeSplits.find(split => split.participantIndex === currentUserIndex);
-      if (yourFeeSplit) {
-        const yourFeeAmount = parseFloat(yourFeeSplit.amount) || 0;
-        youOwe += yourFeeAmount;
-      }
-    });
-    
-    // Return net balance: positive means you owe, negative means you're owed
-    const netBalance = youOwe - youPaid;
-    return { youOwe: netBalance, youPaid };
+    const balance = calculateUserBalanceForExpense(expense, currentUser.uid);
+    return { youOwe: balance.netBalance, youPaid: balance.youPaid };
   };
 
   // Determine settlement status for an expense
@@ -129,7 +54,6 @@ const HomeScreen = ({ navigation }) => {
 
     return allSettled ? 'settled' : 'needsSettlement';
   };
-
 
   const handleReceiptScan = async () => {
     try {
@@ -202,13 +126,6 @@ const HomeScreen = ({ navigation }) => {
       console.error('Error starting receipt scan:', error);
       Alert.alert('Error', 'Failed to start receipt scanning');
     }
-  };
-
-
-  const calculateExpenseTotal = (expense) => {
-    const itemsTotal = (expense.items || []).reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const feesTotal = (expense.fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-    return itemsTotal + feesTotal;
   };
 
   const renderExpenseItem = ({ item }) => {
@@ -431,9 +348,6 @@ const HomeScreen = ({ navigation }) => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={expenses.length === 0 ? styles.emptyContainer : styles.listContainer}
         ListEmptyComponent={renderEmptyState}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
       />
 
     </View>

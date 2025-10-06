@@ -1,106 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
-  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { useFocusEffect } from '@react-navigation/native';
-import { getCurrentUser, onAuthStateChange } from '../services/authService';
-import { getUserExpenses, calculateUserBalances } from '../services/expenseService';
-import { getFirestore, doc, getDoc } from '@react-native-firebase/firestore';
-import { getApp } from '@react-native-firebase/app';
 import ProfilePicture from '../components/VenmoProfilePicture';
 import BalanceSummary from '../components/profiles/BalanceSummary';
 import RecentExpenses from '../components/profiles/RecentExpenses';
+import { useExpenseData } from '../contexts/ExpenseDataContext';
 
 const ProfileScreen = ({ navigation }) => {
-  const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [expenses, setExpenses] = useState([]);
-  const [balances, setBalances] = useState({
-    totalOwed: 0,
-    totalOwes: 0,
-    netBalance: 0,
-    debtBreakdown: {}
-  });
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [expensesLoading, setExpensesLoading] = useState(false);
   const [displayedExpensesCount, setDisplayedExpensesCount] = useState(3);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChange((user) => {
-      setUser(user);
-      if (user) {
-        loadData();
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return unsubscribe;
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      if (user) {
-        loadData();
-      }
-    }, [user])
-  );
-
-  const loadData = useCallback(async () => {
-    try {
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        setExpensesLoading(true);
-        
-        await loadUserProfile(currentUser.uid);
-        
-        const userExpenses = await getUserExpenses(currentUser.uid);
-        setExpenses(userExpenses);
-        
-        const calculatedBalances = calculateUserBalances(userExpenses, currentUser.uid);
-        setBalances(calculatedBalances);
-      }
-    } catch (error) {
-      console.error('Error loading profile data:', error);
-      Alert.alert('Error', 'Failed to load profile data: ' + error.message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setExpensesLoading(false);
-    }
-  }, []);
-
-  const loadUserProfile = async (userId) => {
-    try {
-      const firestoreInstance = getFirestore(getApp());
-      const userDoc = await getDoc(doc(firestoreInstance, 'users', userId));
-      
-      if (userDoc.exists()) {
-        setUserProfile(userDoc.data());
-      } else {
-        console.log('No user profile found for:', userId);
-        setUserProfile(null);
-      }
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-      setUserProfile(null);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadData();
-  };
+  
+  // Use shared expense data
+  const { expenses, balances, userProfile, loading } = useExpenseData();
 
   const loadMoreExpenses = useCallback(() => {
     if (displayedExpensesCount < expenses.length) {
@@ -128,9 +46,6 @@ const ProfileScreen = ({ navigation }) => {
     <ScrollView
       style={styles.scrollView}
       contentContainerStyle={styles.scrollContent}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
     >
       <View style={styles.container}>
         <View style={styles.header}>
@@ -161,12 +76,12 @@ const ProfileScreen = ({ navigation }) => {
 
         <BalanceSummary 
           balances={balances}
-          loading={expensesLoading}
+          loading={loading}
         />
 
         <RecentExpenses
           expenses={expenses}
-          loading={expensesLoading}
+          loading={loading}
           displayedExpensesCount={displayedExpensesCount}
           onLoadMore={loadMoreExpenses}
           onExpensePress={handleExpensePress}

@@ -40,7 +40,8 @@
     "react-native-svg": "15.11.2",
     "react-native-webview": "^13.13.5",
     "vector-icons": "^0.1.0",
-    "zustand": "^5.0.8"
+    "zustand": "^5.0.8",
+    "@shopify/react-native-skia": "v2.0.0-next.4"
   },
   "name": "IOU-2.0",
   "version": "1.0.0",

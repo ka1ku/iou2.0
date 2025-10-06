@@ -406,6 +406,7 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxl,
   },
   titleSection: {
     marginBottom: Spacing.xxl,

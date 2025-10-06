@@ -12,38 +12,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
 import ProfilePicture from '../components/VenmoProfilePicture';
 import { getCurrentUser } from '../services/authService';
-import { getUserExpenses } from '../services/expenseService';
+import { useExpenseData } from '../contexts/ExpenseDataContext';
 
 const FriendProfileScreen = ({ route, navigation }) => {
   const { friend } = route.params;
   const [friendProfile, setFriendProfile] = useState(null);
-  const [expenses, setExpenses] = useState([]);
-  const [balances, setBalances] = useState({
+  const [friendBalances, setFriendBalances] = useState({
     totalOwed: 0,
     totalOwes: 0,
     netBalance: 0,
     debtBreakdown: {}
   });
   const [loading, setLoading] = useState(true);
+  
+  // Use shared expense data
+  const { expenses } = useExpenseData();
 
   useEffect(() => {
     if (friend) {
       loadFriendData();
     }
-  }, [friend]);
+  }, [friend, expenses]);
 
   const loadFriendData = async () => {
     try {
       setLoading(true);
       const currentUser = getCurrentUser();
       if (currentUser) {
-        // Load user expenses to calculate balances
-        const userExpenses = await getUserExpenses(currentUser.uid);
-        setExpenses(userExpenses);
-        
-        // Calculate balances specifically for this friend
-        const calculatedBalances = calculateFriendBalances(userExpenses, currentUser.uid, friend.friendId);
-        setBalances(calculatedBalances);
+        // Calculate balances specifically for this friend using shared expenses
+        const calculatedBalances = calculateFriendBalances(expenses, currentUser.uid, friend.friendId);
+        setFriendBalances(calculatedBalances);
         
         // Set friend profile data
         setFriendProfile({
@@ -250,12 +248,12 @@ const FriendProfileScreen = ({ route, navigation }) => {
             <Text style={styles.netBalanceLabel}>Net Balance</Text>
             <Text style={[
               styles.netBalanceAmount,
-              { color: balances.netBalance >= 0 ? Colors.success : Colors.danger }
+              { color: friendBalances.netBalance >= 0 ? Colors.success : Colors.danger }
             ]}>
-              {balances.netBalance >= 0 ? '+' : ''}${balances.netBalance.toFixed(2)}
+              {friendBalances.netBalance >= 0 ? '+' : ''}${friendBalances.netBalance.toFixed(2)}
             </Text>
             <Text style={styles.netBalanceSubtext}>
-              {balances.netBalance >= 0 
+              {friendBalances.netBalance >= 0 
                 ? 'They owe you money overall' 
                 : 'You owe them money overall'
               }
@@ -265,13 +263,13 @@ const FriendProfileScreen = ({ route, navigation }) => {
           <View style={styles.balanceCardsContainer}>
             {renderBalanceCard(
               'They Owe You',
-              balances.totalOwed,
+              friendBalances.totalOwed,
               Colors.success,
               'arrow-down-circle'
             )}
             {renderBalanceCard(
               'You Owe Them',
-              balances.totalOwes,
+              friendBalances.totalOwes,
               Colors.danger,
               'arrow-up-circle'
             )}
@@ -311,7 +309,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Shared Expenses</Text>
           
-          {Object.keys(balances.debtBreakdown).length === 0 ? (
+          {Object.keys(friendBalances.debtBreakdown).length === 0 ? (
             <View style={styles.noExpensesContainer}>
               <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
               <Text style={styles.noExpensesText}>No shared expenses yet</Text>
@@ -327,7 +325,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
             </View>
           ) : (
             <View style={styles.expenseList}>
-              {Object.entries(balances.debtBreakdown)
+              {Object.entries(friendBalances.debtBreakdown)
                 .sort(([,a], [,b]) => (b.date || 0) - (a.date || 0))
                 .map(([expenseId, expenseData]) => renderExpenseItem(expenseId, expenseData))
               }

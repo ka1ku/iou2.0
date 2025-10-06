@@ -6,8 +6,53 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import { useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
+import DonutChart from '../charts/DonutChart';
 
 const BalanceSummary = ({ balances, loading }) => {
+  // Donut chart shared state (stable across re-focus without rerenders)
+  const segment1Value = useSharedValue(0);
+  const segment2Value = useSharedValue(0);
+  const totalValue = useSharedValue(0);
+
+  // Chart visuals
+  const radius = 100; // Increased from 80 to make chart bigger
+  const strokeWidth = 20; // Increased for thicker paths
+  const outerStrokeWidth = 24; // Increased for thicker outer ring
+  const gap = 0.01; // small gap between segments
+  const colors = [Colors.green, Colors.red];
+
+  // Shared value for net balance animation - start at 0 for animation
+  const netBalanceValue = useSharedValue(0);
+
+
+  // Trigger animation on screen/tab focus without causing React re-renders
+  useFocusEffect(
+    React.useCallback(() => {
+      const total = Math.max(0, (balances?.totalOwed || 0) + (balances?.totalOwes || 0));
+      const segments = [balances?.totalOwed || 0, balances?.totalOwes || 0];
+      const normalized = total > 0 ? segments.map((v) => v / total) : [0, 0];
+      const netBalance = balances?.netBalance || 0;
+
+      // Reset then animate to target so it re-plays on focus
+      segment1Value.value = 0;
+      segment2Value.value = 0;
+      totalValue.value = 0;
+      netBalanceValue.value = 0;
+
+      requestAnimationFrame(() => {
+        segment1Value.value = withTiming(normalized[0], { duration: 800 });
+        segment2Value.value = withTiming(normalized[1], { duration: 800 });
+        totalValue.value = withTiming(total, { duration: 800 });
+        netBalanceValue.value = withTiming(netBalance, { duration: 800 });
+      });
+
+      return () => {};
+    }, [balances]) // Only depend on balances, not the animated values
+  );
+
   const renderBalanceCard = (title, amount, color) => (
     <View style={[styles.balanceCard, { borderLeftColor: color }]}>
       <View style={styles.balanceHeader}>
@@ -38,32 +83,22 @@ const BalanceSummary = ({ balances, loading }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Balance Summary</Text>
-      
-      <View style={styles.netBalanceCard}>
-        <Text style={styles.netBalanceLabel}>Net Balance</Text>
-        <Text style={[
-          styles.netBalanceAmount,
-          { 
-            color: balances.netBalance === 0 
-              ? Colors.textSecondary 
-              : balances.netBalance > 0 
-                ? Colors.green 
-                : Colors.red
-          }
-        ]}>
-          {balances.netBalance === 0 
-            ? '$0.00' 
-            : `$${balances.netBalance >= 0 ? '+' : ''}${balances.netBalance.toFixed(2)}`
-          }
-        </Text>
-        <Text style={styles.netBalanceSubtext}>
-          {balances.netBalance === 0 
-            ? 'You are all even' 
-            : balances.netBalance > 0 
-              ? 'You are owed money overall' 
-              : 'You owe money overall'
-          }
-        </Text>
+      <View style={styles.chartCard}>
+        <View style={styles.chartContainer}>
+          <DonutChart
+            n={2}
+            gap={gap}
+            segment1Value={segment1Value}
+            segment2Value={segment2Value}
+            colors={colors}
+            totalValue={totalValue}
+            strokeWidth={strokeWidth}
+            outerStrokeWidth={outerStrokeWidth}
+            radius={radius}
+            centerTitle={'Net Balance'}
+            netBalanceValue={netBalanceValue}
+          />
+        </View>
       </View>
 
       <View style={styles.balanceCardsContainer}>
@@ -91,27 +126,18 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.lg,
   },
-  netBalanceCard: {
+  chartCard: {
     backgroundColor: Colors.card,
     borderRadius: Radius.lg,
-    paddingVertical: Spacing.lg,
-    alignItems: 'center',
+    padding: Spacing.lg,
     marginBottom: Spacing.lg,
     ...Shadows.card,
   },
-  netBalanceLabel: {
-    ...Typography.h2,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-  },
-  netBalanceAmount: {
-    fontSize: 32,
-    fontFamily: Typography.familyBold,
-    marginBottom: Spacing.xs,
-  },
-  netBalanceSubtext: {
-    ...Typography.body,
-    color: Colors.textSecondary,
+  chartContainer: {
+    height: 240, // Increased to accommodate larger chart
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   balanceCardsContainer: {
     flexDirection: 'row', 

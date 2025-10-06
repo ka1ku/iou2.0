@@ -7,7 +7,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
+import { calculateUserBalanceForExpense, getFormattedBalanceString, getBalanceColor, calculateExpenseTotal } from '../../utils/balanceCalculator';
 
 const RecentExpenses = ({ 
   expenses, 
@@ -28,94 +29,79 @@ const RecentExpenses = ({
     </View>
   ));
 
-  // Helper function to calculate user's balance for a specific expense
-  const calculateUserBalanceForExpense = useCallback((expense) => {
-    if (!expense.settlements || !Array.isArray(expense.settlements)) {
-      return { amount: 0, status: 'even' };
+  // Helper function to calculate user's balance for a specific expense using universal calculator
+  const getUserBalanceForExpense = useCallback((expense) => {
+    if (!userProfile || !userProfile.userId) {
+      return { netBalance: 0, status: 'even' };
     }
-
-    const currentUserName = userProfile ? `${userProfile.firstName} ${userProfile.lastName}`.trim() : 'Me';
-    let userBalance = 0;
-
-    // Calculate balance from settlements (excluding marked as paid)
-    expense.settlements.forEach(settlement => {
-      if (settlement.status === 'markedAsPaid') {
-        return; // Skip paid settlements
-      }
-
-      const amount = parseFloat(settlement.amount) || 0;
-      
-      // If user is the creditor (someone owes them)
-      if (settlement.creditor === currentUserName) {
-        userBalance += amount;
-      }
-      // If user is the debtor (they owe someone)
-      else if (settlement.debtor === currentUserName) {
-        userBalance -= amount;
-      }
-    });
-
-    // Determine status
-    if (Math.abs(userBalance) < 0.01) {
-      return { amount: 0, status: 'even' };
-    } else if (userBalance > 0) {
-      return { amount: userBalance, status: 'owed' };
-    } else {
-      return { amount: Math.abs(userBalance), status: 'owes' };
-    }
+    return calculateUserBalanceForExpense(expense, userProfile.userId);
   }, [userProfile]);
 
   const renderExpenseSummary = useCallback((expense) => {
     // Calculate user's balance for this expense
-    const userBalance = calculateUserBalanceForExpense(expense);
+    const userBalance = getUserBalanceForExpense(expense);
+    
+    // Calculate the expense total from items and fees
+    const calculatedTotal = calculateExpenseTotal(expense);
 
     // Determine if this is a receipt or individual expense
     const isReceipt = expense.expenseType === 'receipt';
     const screenName = isReceipt ? 'AddReceipt' : 'AddExpense';
     const iconName = isReceipt ? 'receipt-outline' : 'card-outline';
 
+    // Get balance color for status indicator
+    const balanceColor = getBalanceColor(userBalance, Colors);
+
     return (
       <TouchableOpacity
         key={expense.id}
         style={styles.expenseSummaryCard}
         onPress={() => onExpensePress(screenName, expense)}
+        activeOpacity={0.7}
       >
-        <View style={styles.expenseSummaryHeader}>
-          <View style={styles.expenseSummaryLeft}>
-            <Ionicons name={iconName} size={20} color={Colors.accent} style={styles.expenseTypeIcon} />
-            <Text style={styles.expenseSummaryTitle}>{expense.title}</Text>
+        <View style={[styles.statusIndicator, { backgroundColor: balanceColor }]} />
+        
+        <View style={styles.cardContent}>
+          <View style={styles.expenseSummaryHeader}>
+            <View style={styles.expenseSummaryLeft}>
+              <View style={[styles.iconContainer, { backgroundColor: `${Colors.accent}15` }]}>
+                <Ionicons name={iconName} size={18} color={Colors.accent} />
+              </View>
+              <View style={styles.titleContainer}>
+                <Text style={styles.expenseSummaryTitle} numberOfLines={1}>
+                  {expense.title}
+                </Text>
+                <View style={styles.participantsRow}>
+                  <Ionicons name="people-outline" size={12} color={Colors.textSecondary} />
+                  <Text style={styles.participantCount}>
+                    {expense.participants?.length || 0} participants
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.amountContainer}>
+              <Text style={styles.expenseSummaryTotal}>
+                ${calculateExpenseTotal(expense).toFixed(2)}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.expenseSummaryTotal}>
-            ${expense.total?.toFixed(2) || '0.00'}
-          </Text>
-        </View>
-        <View style={styles.expenseSummaryDetails}>
-          <View style={styles.expenseSummaryLeft}>
-            <Text style={[
-              styles.expenseSummaryInfo,
-              { 
-                color: userBalance.status === 'even' 
-                  ? Colors.textSecondary 
-                  : userBalance.status === 'owed' 
-                    ? Colors.green 
-                    : Colors.red
-              }
-            ]}>
-              {userBalance.status === 'even' 
-                ? 'You are even' 
-                : userBalance.status === 'owed' 
-                  ? `You are owed $${userBalance.amount.toFixed(2)}`
-                  : `You owe $${userBalance.amount.toFixed(2)}`
-              }
-            </Text>
+          
+          <View style={styles.expenseSummaryDetails}>
+            <View style={[styles.balancePill, { backgroundColor: `${balanceColor}15` }]}>
+              <Ionicons 
+                name={userBalance.status === 'owed' ? 'arrow-up-outline' : userBalance.status === 'owes' ? 'arrow-down-outline' : 'checkmark-outline'} 
+                size={14} 
+                color={balanceColor} 
+              />
+              <Text style={[styles.balanceText, { color: balanceColor }]}>
+                {getFormattedBalanceString(userBalance)}
+              </Text>
+            </View>
           </View>
-          <Text style={styles.expenseSummaryInfo}>
-            {expense.participants?.length || 0} participants
-          </Text>
         </View>
       </TouchableOpacity>
     );
-  }, [calculateUserBalanceForExpense, onExpensePress]);
+  }, [getUserBalanceForExpense, onExpensePress]);
 
   if (loading) {
     return (
@@ -135,19 +121,23 @@ const RecentExpenses = ({
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderLeft}>
           <Text style={styles.sectionTitle}>Recent Expenses</Text>
-          {!loading && (
+          {!loading && expenses.length > 0 && (
             <View style={styles.expenseTypeCounts}>
               <View style={styles.typeCount}>
-                <Ionicons name="card-outline" size={16} color={Colors.accent} />
-                <Text style={styles.typeCountText}>
-                  {expenses.filter(exp => exp.expenseType !== 'receipt').length}
-                </Text>
+                <View style={styles.typeCountBadge}>
+                  <Ionicons name="card-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.typeCountText}>
+                    {expenses.filter(exp => exp.expenseType !== 'receipt').length}
+                  </Text>
+                </View>
               </View>
               <View style={styles.typeCount}>
-                <Ionicons name="receipt-outline" size={16} color={Colors.accent} />
-                <Text style={styles.typeCountText}>
-                  {expenses.filter(exp => exp.expenseType === 'receipt').length}
-                </Text>
+                <View style={styles.typeCountBadge}>
+                  <Ionicons name="receipt-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.typeCountText}>
+                    {expenses.filter(exp => exp.expenseType === 'receipt').length}
+                  </Text>
+                </View>
               </View>
             </View>
           )}
@@ -156,12 +146,16 @@ const RecentExpenses = ({
 
       {expenses.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="receipt-outline" size={48} color="#ccc" />
-          <Text style={styles.emptyStateText}>No expenses yet</Text>
+          <View style={styles.emptyStateIconContainer}>
+            <Ionicons name="receipt-outline" size={48} color={Colors.accent} />
+          </View>
+          <Text style={styles.emptyStateTitle}>No expenses yet</Text>
+          <Text style={styles.emptyStateSubtitle}>Start tracking your shared expenses</Text>
           <TouchableOpacity
             style={styles.createExpenseButton}
             onPress={() => onExpensePress('AddExpense')}
           >
+            <Ionicons name="add-circle-outline" size={20} color="white" style={styles.createExpenseButtonIcon} />
             <Text style={styles.createExpenseButtonText}>Create Your First Expense</Text>
           </TouchableOpacity>
         </View>
@@ -175,7 +169,7 @@ const RecentExpenses = ({
               <Text style={styles.loadMoreText}>
                 Load More ({expenses.length - displayedExpensesCount} remaining)
               </Text>
-              <Ionicons name="chevron-down" size={16} color={Colors.accent} />
+              <Ionicons name="chevron-down" size={18} color={Colors.accent} />
             </TouchableOpacity>
           )}
         </>
@@ -191,7 +185,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: Spacing.lg,
   },
   sectionHeaderLeft: {
@@ -200,41 +194,74 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...Typography.h2,
     color: Colors.textPrimary,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
   expenseTypeCounts: {
     flexDirection: 'row',
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
+    gap: Spacing.sm,
   },
   typeCount: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: Spacing.lg,
+  },
+  typeCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
   typeCountText: {
     ...Typography.label,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
     marginLeft: Spacing.xs,
     fontSize: 12,
+    fontFamily: Typography.familyMedium,
   },
   emptyState: {
     backgroundColor: Colors.card,
     borderRadius: Radius.lg,
-    padding: Spacing.xl,
+    padding: Spacing.xxl,
     alignItems: 'center',
-    ...Shadows.card,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    borderStyle: 'dashed',
   },
-  emptyStateText: {
+  emptyStateIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${Colors.accent}10`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  emptyStateTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  emptyStateSubtitle: {
     ...Typography.body,
     color: Colors.textSecondary,
-    marginVertical: Spacing.md,
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
   },
   createExpenseButton: {
     backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
     borderRadius: Radius.lg,
     marginTop: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  createExpenseButtonIcon: {
+    marginRight: Spacing.xs,
   },
   createExpenseButtonText: {
     color: 'white',
@@ -244,45 +271,90 @@ const styles = StyleSheet.create({
   expensesList: {
     backgroundColor: Colors.card,
     borderRadius: Radius.lg,
-    ...Shadows.card,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
   expenseSummaryCard: {
-    padding: Spacing.md,
+    flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
+    overflow: 'hidden',
+    backgroundColor: Colors.card,
+  },
+  statusIndicator: {
+    width: 4,
+    alignSelf: 'stretch',
+  },
+  cardContent: {
+    flex: 1,
+    padding: Spacing.md,
   },
   expenseSummaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'flex-start',
+    marginBottom: Spacing.md,
   },
   expenseSummaryLeft: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flex: 1,
+    marginRight: Spacing.md,
   },
-  expenseTypeIcon: {
-    marginRight: Spacing.sm,
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  titleContainer: {
+    flex: 1,
+    justifyContent: 'center',
   },
   expenseSummaryTitle: {
     ...Typography.title,
     color: Colors.textPrimary,
-    flex: 1,
+    fontSize: 16,
+    marginBottom: Spacing.xs,
+  },
+  participantsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  participantCount: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    marginLeft: Spacing.xs,
+  },
+  amountContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   expenseSummaryTotal: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: Typography.familySemiBold,
-    color: Colors.accent,
+    color: Colors.textPrimary,
   },
   expenseSummaryDetails: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
-  expenseSummaryInfo: {
+  balancePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+  },
+  balanceText: {
     ...Typography.body,
-    color: Colors.textSecondary,
+    fontSize: 13,
+    fontFamily: Typography.familySemiBold,
+    marginLeft: Spacing.xs,
   },
   skeletonLoader: {
     backgroundColor: Colors.card,
@@ -291,7 +363,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: Spacing.md,
-    ...Shadows.card,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
   skeletonText: {
     ...Typography.body,
@@ -303,19 +376,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.accent,
-    ...Shadows.card,
   },
   loadMoreText: {
     ...Typography.body,
     color: Colors.accent,
     marginRight: Spacing.sm,
-    fontFamily: Typography.familyMedium,
+    fontFamily: Typography.familySemiBold,
   },
 });
 

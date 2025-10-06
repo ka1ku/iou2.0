@@ -244,8 +244,12 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
   // Adjust balances for paid settlements
   const adjustedBalances = [...currentBalances];
   paidSettlements.forEach(settlement => {
-    const debtorIndex = adjustedBalances.findIndex(b => b.name === settlement.debtor);
-    const creditorIndex = adjustedBalances.findIndex(b => b.name === settlement.creditor);
+    // Handle both old (from/to) and new (debtor/creditor) settlement structures
+    const debtor = settlement.debtor || settlement.from;
+    const creditor = settlement.creditor || settlement.to;
+    
+    const debtorIndex = adjustedBalances.findIndex(b => b.name === debtor);
+    const creditorIndex = adjustedBalances.findIndex(b => b.name === creditor);
     
     if (debtorIndex !== -1 && creditorIndex !== -1) {
       // Remove the paid settlement from the balance calculation
@@ -260,8 +264,8 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
   // Combine paid settlements with new settlements
   const allSettlements = [
     ...paidSettlements.map(s => ({
-      from: s.debtor,
-      to: s.creditor,
+      from: s.debtor || s.from,
+      to: s.creditor || s.to,
       amount: s.amount,
       status: s.status,
       preserved: true
