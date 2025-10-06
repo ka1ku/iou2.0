@@ -71,7 +71,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
       setJoinInfo(info);
       return info;
     } catch (error) {
-      console.error("Error loading join info:", error);
       return null;
     }
   };
@@ -90,7 +89,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
       setJoinEnabled(value);
     } catch (error) {
-      console.error("Error updating join setting:", error);
 
       Alert.alert("Error", "Failed to update join setting");
     } finally {
@@ -125,7 +123,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         Alert.alert("Error", "Unable to generate invite link. Please try again.");
       }
     } catch (error) {
-      console.error("Error sharing invite link:", error);
 
       Alert.alert("Error", "Failed to share invite link");
     }
@@ -154,7 +151,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         Alert.alert("Error", "Unable to generate invite link. Please try again.");
       }
     } catch (error) {
-      console.error("Error copying invite link:", error);
 
       Alert.alert("Error", "Failed to copy invite link");
     }
@@ -190,15 +186,12 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         currentUser?.uid
       );
 
-      // Update the expense object in the route params
-
       expense.title = newExpenseName.trim();
 
       setShowNameModal(false);
 
       Alert.alert("Success", "Expense name updated successfully");
     } catch (error) {
-      console.error("Error updating expense name:", error);
 
       Alert.alert("Error", "Failed to update expense name");
     } finally {
@@ -238,7 +231,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         return;
       }
     } catch (e) {
-      console.error("Error validating leave condition:", e);
     }
 
     Alert.alert(
@@ -268,8 +260,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
     try {
       setLoading(true);
 
-      // Find current user's participant index
-
       const currentUserIndex = expense.participants.findIndex(
         (p) => p.userId === currentUser?.uid
       );
@@ -280,20 +270,14 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         return;
       }
 
-      // Remove user from participants
-
       const updatedParticipants = expense.participants.filter(
         (_, index) => index !== currentUserIndex
       );
-
-      // Update items to remove user from splits and consumers
 
       const updatedItems =
         expense.items
           ?.map((item) => {
             if (!item || !item.name) return null;
-
-            // Filter out the current user from selected consumers and adjust indices
 
             const validSelectedConsumers =
               item.selectedConsumers
@@ -309,8 +293,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
                     : consumerIndex
                 )
                 .filter((index) => index >= 0) || [];
-
-            // Filter out splits for the current user and adjust indices
 
             const validSplits =
               item.splits
@@ -340,14 +322,10 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           })
           .filter(Boolean) || [];
 
-      // Update fees to remove user from splits
-
       const updatedFees =
         expense.fees
           ?.map((fee) => {
             if (!fee || !fee.name) return null;
-
-            // Filter out splits for the current user and adjust indices
 
             const validSplits =
               fee.splits
@@ -375,29 +353,21 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           })
           .filter(Boolean) || [];
 
-      // Ensure we have valid data before updating
-
       const updateData = {
         participants: updatedParticipants.filter(
           (p) => p && p.name && p.userId
-        ), // Filter out invalid participants
+        ),
 
         items: updatedItems.filter(
           (item) => item && item.name && typeof item.amount === "number"
-        ), // Filter out invalid items
+        ),
 
         fees: updatedFees.filter(
           (fee) => fee && fee.name && typeof fee.amount === "number"
-        ), // Filter out invalid fees
+        ),
       };
 
-      // Additional validation - ensure no undefined values exist
-
       const cleanUpdateData = JSON.parse(JSON.stringify(updateData));
-
-      console.log("Update data before sending:", cleanUpdateData);
-
-      // Update expense in Firestore with all changes at once
 
       await updateExpense(expense.id, cleanUpdateData, currentUser?.uid);
 
@@ -415,7 +385,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         ]
       );
     } catch (error) {
-      console.error("Error leaving expense:", error);
 
       Alert.alert("Error", "Failed to leave expense");
     } finally {
@@ -429,8 +398,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-
       <BlurView
         intensity={40}
         tint="light"
@@ -463,8 +430,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           paddingBottom: 120,
         }}
       >
-        {/* Expense Name Section */}
-
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Expense Name</Text>
@@ -495,8 +460,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
             />
           </TouchableOpacity>
         </View>
-
-        {/* Invite Link Section */}
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -560,8 +523,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           )}
         </View>
 
-        {/* Leave Expense Section */}
-
         {canLeaveExpense && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -590,8 +551,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           </View>
         )}
       </ScrollView>
-
-      {/* Change Expense Name Modal */}
 
       <Modal
         visible={showNameModal}

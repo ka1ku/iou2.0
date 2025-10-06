@@ -52,7 +52,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             setUserData(tempData);
           }
         } catch (error) {
-          console.error('Error loading temporary signup data:', error);
           setUserData(null);
         }
       }
@@ -66,12 +65,10 @@ const VerifyOTPScreen = ({ navigation, route }) => {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-verify when all digits are entered
     if (newOtp.every(digit => digit !== '') && newOtp.length === 6) {
       handleVerifyOTP(newOtp.join(''));
     }
@@ -91,8 +88,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
       return;
     }
 
-    // For React Native Firebase, verificationId might be null or 'rnfirebase-confirmation'
-    // but verification still works via globalPhoneAuthState
     if (!currentVerificationId && is2FA) {
       Alert.alert('Error', 'No verification session found. Please request a new code.');
       return;
@@ -103,16 +98,12 @@ const VerifyOTPScreen = ({ navigation, route }) => {
       
       let user;
       if (is2FA && resolver) {
-        // Handle 2FA challenge resolution
         user = await resolve2FAChallenge(currentVerificationId, code, resolver);
       } else {
-        // Handle initial phone authentication
         user = await verifyOTP(currentVerificationId, code);
         
-        // If this is a signup flow, ensure we have user data
         if (isSignUp) {
           if (!userData) {
-            console.error('No user data available for signup flow');
             Alert.alert(
               'Signup Data Missing',
               'Unable to create your profile. Please try signing up again.',
@@ -125,22 +116,17 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             setLoadingMessage('Creating your profile...');
             const createdUser = await createUserProfile(userData, phoneNumber);
             
-            // Clear temporary data after successful profile creation
             setLoadingMessage('Finalizing your account...');
             await clearTemporarySignupData();
             
-            // Add a loading buffer to ensure Firestore operation completes
             setLoadingMessage('Securing your data...');
             await new Promise(resolve => setTimeout(resolve, 2000));
             
-            // Navigate directly to main app without success alert
             setLoading(false);
             setLoadingMessage('');
             navigation.navigate('Home');
           } catch (profileError) {
-            console.error('Error creating user profile:', profileError);
             
-            // Reset loading state and message
             setLoadingMessage('');
             
             Alert.alert(
@@ -163,7 +149,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
   };
 
   const handleResendOTP = async () => {
-    // Don't allow resending for 2FA challenges
     if (is2FA) {
       Alert.alert('Info', 'Cannot resend 2FA verification codes. Please try entering the code again or sign in again.');
       return;
@@ -197,15 +182,12 @@ const VerifyOTPScreen = ({ navigation, route }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.content}>
-          {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => {
                 if (isSignUp) {
-                  // Clear temporary data when going back from verification
-                  clearTemporarySignupData();
-                  console.log('Temporary signup data cleared when going back');
+                clearTemporarySignupData();
                 }
                 navigation.goBack();
               }}
@@ -223,7 +205,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             </Text>
           </View>
 
-          {/* OTP Input */}
           <View style={styles.otpContainer}>
             {otp.map((digit, index) => (
               <TextInput
@@ -245,7 +226,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             ))}
           </View>
 
-          {/* Verify Button */}
           <TouchableOpacity
             style={[styles.verifyButton, loading && styles.verifyButtonDisabled]}
             onPress={() => handleVerifyOTP()}
@@ -257,7 +237,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
 
-          {/* Loading Message */}
           {loading && loadingMessage && (
             <View style={styles.loadingMessageContainer}>
               <Text style={styles.loadingMessageText}>
@@ -266,7 +245,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          {/* Resend Section - Hide for 2FA */}
           {!is2FA && (
             <View style={styles.resendContainer}>
               {canResend ? (
@@ -287,7 +265,6 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             </View>
           )}
 
-          {/* Info */}
           <View style={styles.infoContainer}>
             <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} />
             <Text style={styles.infoText}>

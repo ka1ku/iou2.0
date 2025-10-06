@@ -25,7 +25,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
   });
   const [loading, setLoading] = useState(true);
   
-  // Use shared expense data
   const { expenses } = useExpenseData();
 
   useEffect(() => {
@@ -39,18 +38,14 @@ const FriendProfileScreen = ({ route, navigation }) => {
       setLoading(true);
       const currentUser = getCurrentUser();
       if (currentUser) {
-        // Calculate balances specifically for this friend using shared expenses
         const calculatedBalances = calculateFriendBalances(expenses, currentUser.uid, friend.friendId);
         setFriendBalances(calculatedBalances);
         
-        // Set friend profile data
         setFriendProfile({
           ...friend,
-          // Add any additional profile data here
         });
       }
     } catch (error) {
-      console.error('Error loading friend data:', error);
       Alert.alert('Error', 'Failed to load friend data');
     } finally {
       setLoading(false);
@@ -64,18 +59,15 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
     userExpenses.forEach(expense => {
       if (expense.participants && expense.participants.some(p => p.id === friendId)) {
-        // Find the friend's participation in this expense
         const friendParticipant = expense.participants.find(p => p.id === friendId);
         const currentUserParticipant = expense.participants.find(p => p.id === currentUserId);
         
         if (friendParticipant && currentUserParticipant) {
-          // Calculate what each person owes
           let friendOwes = 0;
           let currentUserOwes = 0;
 
           expense.items?.forEach(item => {
             if (item.paidBy === friendParticipant.participantIndex) {
-              // Friend paid for this item
               if (item.splitType === 'even') {
                 const splitAmount = item.amount / expense.participants.length;
                 currentUserOwes += splitAmount;
@@ -90,7 +82,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
                 }
               }
             } else if (item.paidBy === currentUserParticipant.participantIndex) {
-              // Current user paid for this item
               if (item.splitType === 'even') {
                 const splitAmount = item.amount / expense.participants.length;
                 friendOwes += splitAmount;
@@ -107,7 +98,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
             }
           });
 
-          // Add fees
           expense.fees?.forEach(fee => {
             if (fee.splitType === 'equal') {
               const splitAmount = fee.amount / expense.participants.length;
@@ -121,14 +111,12 @@ const FriendProfileScreen = ({ route, navigation }) => {
             }
           });
 
-          // Update totals
           if (friendOwes > 0) {
             totalOwed += friendOwes;
           } else {
             totalOwes += Math.abs(friendOwes);
           }
 
-          // Store breakdown by expense
           debtBreakdown[expense.id] = {
             title: expense.title,
             amount: friendOwes,
@@ -218,7 +206,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Friend Info Section */}
         <View style={styles.section}>
           <View style={styles.friendInfo}>
             <ProfilePicture
@@ -240,7 +227,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Balance Summary Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Balance Summary</Text>
           
@@ -276,7 +262,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Payment Methods Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Methods</Text>
           
@@ -305,7 +290,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
 
 
-        {/* Shared Expenses Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Shared Expenses</Text>
           

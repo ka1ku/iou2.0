@@ -38,17 +38,22 @@ const smartRoundSplit = (total, count) => {
   return amounts;
 };
 
-const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = false }) => {
+const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEditing = false }) => {
   const { state, actions } = useExpense();
   const { participants } = state;
 
   const [manualSplits, setManualSplits] = useState({});
   const [saving, setSaving] = useState(false);
 
-  // NEW: State to track the currently focused input for a smoother editing experience.
-  const [activeInput, setActiveInput] = useState(null); // e.g., { index: 1, value: '12.' }
+  const [activeInput, setActiveInput] = useState(null);
+  
+  const [validationErrors, setValidationErrors] = useState({
+    name: false,
+    amount: false,
+    payers: false,
+    consumers: false,
+  });
 
-  // Initialize manualSplits with existing item.splits data when component mounts
   useEffect(() => {
     if (item.splits && Array.isArray(item.splits) && item.selectedConsumers) {
       const initialManualSplits = {};
@@ -60,7 +65,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
       });
       setManualSplits(initialManualSplits);
     }
-  }, []); // Only run once when component mounts
+  }, []);
 
   const derivedSplits = useMemo(() => {
     const total = parseFloat(item.amount) || 0;
@@ -98,7 +103,6 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
     actions.updateItem(index, { splits: splitsForSelectedConsumers });
   }, [derivedSplits, item.selectedConsumers]);
 
-  // Handler for updating the core logic based on input.
   const handleAmountChange = (pIndex, value) => {
     if (value === "" || value === null || value === undefined) {
       setManualSplits((prev) => {
@@ -120,7 +124,6 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
     setManualSplits((prev) => ({ ...prev, [pIndex]: numValue }));
   };
 
-  // NEW: Handler for when a user taps into an input box.
   const handleFocus = (pIndex) => {
     const initialValue = derivedSplits[pIndex]?.amount;
     setActiveInput({
@@ -129,12 +132,10 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
     });
   };
 
-  // NEW: Handler for when a user taps away from an input box.
   const handleBlur = () => {
     setActiveInput(null);
   };
 
-  // NEW: A combined handler for live text changes.
   const handleLiveTextChange = (pIndex, text) => {
     setActiveInput({ index: pIndex, value: text });
     handleAmountChange(pIndex, text);
@@ -151,6 +152,9 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
       : [...item.selectedConsumers, pIndex];
     if (newConsumers.length > 0)
       actions.updateItem(index, { selectedConsumers: newConsumers });
+    if (validationErrors.consumers && newConsumers.length > 0) {
+      setValidationErrors(prev => ({ ...prev, consumers: false }));
+    }
   };
 
   const togglePayer = (participantIndex) => {
@@ -158,17 +162,65 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
       ? item.selectedPayers.filter((i) => i !== participantIndex)
       : [...item.selectedPayers, participantIndex];
     actions.updateItem(index, { selectedPayers: newPayers });
+    if (validationErrors.payers && newPayers.length > 0) {
+      setValidationErrors(prev => ({ ...prev, payers: false }));
+    }
   };
 
-  // Save expense to Firestore when Done is pressed
+  const handleCancelPress = () => {
+    if (onDelete) {
+      onDelete();
+    } else {
+      onCancelEdit && onCancelEdit();
+    }
+  };
+
+  const validateItem = () => {
+    const errors = {
+      name: !item.name || item.name.trim() === "",
+      amount: !item.amount || parseFloat(item.amount) <= 0 || isNaN(parseFloat(item.amount)),
+      payers: !item.selectedPayers || item.selectedPayers.length === 0,
+      consumers: !item.selectedConsumers || item.selectedConsumers.length === 0,
+    };
+
+    setValidationErrors(errors);
+
+    const hasErrors = Object.values(errors).some(error => error);
+    
+    if (hasErrors) {
+      const missingFields = [];
+      if (errors.name) missingFields.push("item name");
+      if (errors.amount) missingFields.push("price");
+      if (errors.payers) missingFields.push("at least one payer");
+      if (errors.consumers) missingFields.push("at least one person in the split");
+      
+      Alert.alert(
+        "Missing Information",
+        `Please provide: ${missingFields.join(", ")}`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   const handleDonePress = async () => {
-    // If not editing an existing expense, just call onCancelEdit
+    if (!validateItem()) {
+      return;
+    }
+
+    setValidationErrors({
+      name: false,
+      amount: false,
+      payers: false,
+      consumers: false,
+    });
+
     if (!isEditing) {
       onCancelEdit && onCancelEdit();
       return;
     }
 
-    // If editing but no expenseId, just call onCancelEdit
     if (!expenseId) {
       onCancelEdit && onCancelEdit();
       return;
@@ -182,7 +234,6 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
         return;
       }
 
-      // Prepare expense data
       const expenseData = {
         title: state.title,
         items: state.items,
@@ -193,21 +244,17 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
         updatedAt: new Date().toISOString(),
       };
 
-      // Update participants first
       await updateExpenseParticipants(
         expenseId,
         expenseData.participants,
         currentUser.uid
       );
 
-      // Update the expense
       const { participants, ...otherFields } = expenseData;
       await updateExpense(expenseId, otherFields, currentUser.uid);
 
-      // Exit edit mode
       onCancelEdit && onCancelEdit();
     } catch (error) {
-      console.error("Error saving expense:", error);
       Alert.alert("Error", "Failed to save expense: " + error.message);
     } finally {
       setSaving(false);
@@ -237,54 +284,86 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
       margin="none"
       style={{ marginBottom: 16, backgroundColor: Colors.surfaceLight }}
     >
-        {/* Item Header */}
         <View style={styles.itemHeader}>
           <View style={styles.itemNameSection}>
-            <Text style={styles.itemNameLabel}>Item Name</Text>
+            <Text style={[styles.itemNameLabel, validationErrors.name && styles.errorLabel]}>
+              Item Name{validationErrors.name && " *"}
+            </Text>
             <TextInput
-              style={styles.itemNameInput}
+              style={[
+                styles.itemNameInput,
+                validationErrors.name && styles.inputError
+              ]}
               placeholder="Enter item name"
               placeholderTextColor={Colors.textSecondary}
               value={item.name}
               onChangeText={(text) => {
                 actions.updateItem(index, { name: text });
+                if (validationErrors.name) {
+                  setValidationErrors(prev => ({ ...prev, name: false }));
+                }
               }}
             />
           </View>
           {onCancelEdit && (
-            <TouchableOpacity
-              style={[styles.doneButton, saving && styles.buttonDisabled]}
-              onPress={handleDonePress}
-              disabled={saving}
-              activeOpacity={0.7}
-            >
-              <Ionicons 
-                name="checkmark" 
-                size={20} 
-                color={saving ? Colors.textSecondary : Colors.white} 
-              />
-            </TouchableOpacity>
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={[styles.cancelButton, saving && styles.buttonDisabled]}
+                onPress={handleCancelPress}
+                disabled={saving}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name="close" 
+                  size={20} 
+                  color={saving ? Colors.textSecondary : Colors.textPrimary} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.doneButton, saving && styles.buttonDisabled]}
+                onPress={handleDonePress}
+                disabled={saving}
+                activeOpacity={0.7}
+              >
+                <Ionicons 
+                  name="checkmark" 
+                  size={20} 
+                  color={saving ? Colors.textSecondary : Colors.white} 
+                />
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
-      {/* Price Section */}
       <View style={styles.priceSection}>
-        <Text style={styles.priceLabel}>Price</Text>
+        <Text style={[styles.priceLabel, validationErrors.amount && styles.errorLabel]}>
+          Price{validationErrors.amount && " *"}
+        </Text>
         <PriceInput
           value={item.amount}
           onChangeText={(amount) => {
             setManualSplits({});
             actions.updateItem(index, { amount });
+            if (validationErrors.amount) {
+              setValidationErrors(prev => ({ ...prev, amount: false }));
+            }
           }}
           placeholder="0.00"
-          style={styles.amountInput}
+          style={[
+            styles.amountInput,
+            validationErrors.amount && styles.inputError
+          ]}
           showCurrency={true}
         />
 
-        {/* Payers Section */}
         <View style={styles.whoPaidSection}>
-          <Text style={styles.whoPaidLabel}>Payers</Text>
-          <View style={styles.payerChips}>
+          <Text style={[styles.whoPaidLabel, validationErrors.payers && styles.errorLabel]}>
+            Payers{validationErrors.payers && " *"}
+          </Text>
+          <View style={[
+            styles.payerChips,
+            validationErrors.payers && styles.sectionError
+          ]}>
             {participants.map((participant, pIndex) => (
               <TouchableOpacity
                 key={pIndex}
@@ -322,10 +401,14 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, expenseId, isEditing = fal
         </View>
       </View>
 
-      {/* Split Section */}
       <View style={styles.splitContainer}>
-        <Text style={styles.splitLabel}>Split</Text>
-        <View style={styles.splitCard}>
+        <Text style={[styles.splitLabel, validationErrors.consumers && styles.errorLabel]}>
+          Split{validationErrors.consumers && " *"}
+        </Text>
+        <View style={[
+          styles.splitCard,
+          validationErrors.consumers && styles.sectionError
+        ]}>
           <View style={styles.header}>
             {errorMessage ? (
               <Text
@@ -434,14 +517,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 48,
   },
+  actionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: 20,
+  },
+  cancelButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   doneButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 20, // Align with input field
     ...Shadows.button,
   },
   priceSection: { marginBottom: Spacing.md },
@@ -518,8 +616,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   splitRowLast: { borderBottomWidth: 0 },
   checkbox: {
@@ -531,6 +627,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.md,
+    flexShrink: 0,
   },
   checkboxSelected: {
     backgroundColor: Colors.accent,
@@ -565,6 +662,19 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     backgroundColor: Colors.textSecondary,
     borderColor: Colors.textSecondary,
+  },
+  inputError: {
+    borderColor: Colors.danger,
+    borderWidth: 2,
+  },
+  errorLabel: {
+    color: Colors.danger,
+  },
+  sectionError: {
+    borderColor: Colors.danger,
+    borderWidth: 2,
+    borderRadius: Radius.sm,
+    padding: Spacing.xs,
   },
 });
 

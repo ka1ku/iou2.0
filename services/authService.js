@@ -34,25 +34,18 @@ export const validateAndOptimizeProfilePicture = async (imageUrl, fallbackName =
       const contentType = response.headers.get('content-type');
       // Verify it's actually an image
       if (contentType && contentType.startsWith('image/')) {
-        console.log('Profile picture validation successful:', imageUrl);
-        console.log('Content-Type:', contentType);
-        console.log('Content-Length:', response.headers.get('content-length'));
         
         // For Venmo profile pictures, return the real image URL
         // This will be used as the background image instead of UI avatar
         return imageUrl;
       } else {
-        console.log('Invalid content type for profile picture:', contentType);
       }
     } else {
-      console.log('Profile picture validation failed with status:', response.status);
     }
   } catch (error) {
-    console.log('Error validating profile picture:', error.message);
   }
 
   // Fallback to generated avatar only if validation completely fails
-  console.log('Using fallback avatar for:', fallbackName);
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(fallbackName)}&size=200&background=3d95ce&color=fff&bold=true`;
 };
 
@@ -92,11 +85,9 @@ export const checkUsernameExists = async (username) => {
     
     return !querySnapshot.empty;
   } catch (error) {
-    console.error('Error checking username existence:', error);
     // If there's an error checking, we'll allow the flow to continue
     // This prevents blocking legitimate users due to Firestore issues
     // However, we should log this for monitoring purposes
-    console.warn('Username existence check failed, allowing signup to proceed');
     return false;
   }
 };
@@ -113,11 +104,9 @@ export const checkPhoneNumberExists = async (phoneNumber) => {
     
     return !querySnapshot.empty;
   } catch (error) {
-    console.error('Error checking phone number existence:', error);
     // If there's an error checking, we'll allow the flow to continue
     // This prevents blocking legitimate users due to Firestore issues
     // However, we should log this for monitoring purposes
-    console.warn('Phone number existence check failed, allowing signup to proceed');
     return false;
   }
 };
@@ -128,7 +117,6 @@ export const checkPhoneNumberExistsInAuth = async (phoneNumber) => {
     // First check Firestore users collection
     const existsInFirestore = await checkPhoneNumberExists(phoneNumber);
     if (existsInFirestore) {
-      console.log('Phone number found in Firestore:', phoneNumber);
       return true;
     }
     
@@ -136,12 +124,9 @@ export const checkPhoneNumberExistsInAuth = async (phoneNumber) => {
     // without actually sending an OTP. The Firestore check is our primary method.
     // This function is here for future extensibility if we find better methods.
     
-    console.log('Phone number not found in Firestore:', phoneNumber);
     return false;
   } catch (error) {
-    console.error('Error in comprehensive phone number check:', error);
     // Log additional context for debugging
-    console.warn('Phone number check failed for:', phoneNumber, 'Error:', error.message);
     return false;
   }
 };
@@ -162,7 +147,6 @@ export const sendOTP = async (phoneNumber, skipExistenceCheck = false) => {
       throw new Error('Invalid phone number format. Please enter a valid phone number.');
     }
     
-    console.log('Sending OTP to:', formattedPhone);
     
     // Check if phone number already exists in users collection (only for signup)
     if (!skipExistenceCheck) {
@@ -179,19 +163,12 @@ export const sendOTP = async (phoneNumber, skipExistenceCheck = false) => {
     // Store the confirmation state globally
     globalPhoneAuthState = confirmation;
     
-    console.log('SMS sent successfully');
     return {
       success: true,
       verificationId: confirmation.verificationId || 'rnfirebase-confirmation',
       confirmation // For direct access if needed
     };
   } catch (error) {
-    console.error('Error sending OTP:', error);
-    console.error('Error details:', {
-      code: error.code,
-      message: error.message,
-      stack: error.stack
-    });
     
     // Handle specific Firebase errors
     if (error.code === 'auth/invalid-phone-number') {
@@ -215,27 +192,21 @@ export const sendOTP = async (phoneNumber, skipExistenceCheck = false) => {
 // Verify OTP and complete sign in
 export const verifyOTP = async (verificationId, otp) => {
   try {
-    console.log('Verifying OTP:', otp);
     
     // Use the global phone auth state if available
     if (globalPhoneAuthState) {
-      console.log('Using global phone auth state for verification');
       const credential = await globalPhoneAuthState.confirm(otp);
       
       if (credential.user) {
-        console.log('Phone verification successful');
-        globalPhoneAuthState = null; // Clear the global state
         return credential.user;
       } else {
         throw new Error('Verification failed - no user returned');
       }
     } else {
       // Fallback to manual verification (should not happen with React Native Firebase)
-      console.log('No global phone auth state, attempting manual verification');
       throw new Error('Verification session expired. Please request a new code.');
     }
   } catch (error) {
-    console.error('Error verifying OTP:', error);
     
     // Handle specific verification errors
     if (error.code === 'auth/invalid-verification-code') {
@@ -258,14 +229,11 @@ export const handleMultiFactorError = async (error) => {
     const resolver = error.resolver;
     const hints = resolver.hints;
     
-    console.log('Multi-factor auth required');
-    console.log('Available hints:', hints.length);
     
     // For now, we'll handle phone-based MFA
     const phoneHints = hints.filter(hint => hint.factorId === 'phone');
     if (phoneHints.length > 0) {
       const phoneHint = phoneHints[0];
-      console.log('Using phone hint:', phoneHint.uid);
       
       // Send verification code to the enrolled phone number
       const authInstance = getAuth();
@@ -285,18 +253,15 @@ export const handleMultiFactorError = async (error) => {
 // Resolve 2FA challenge
 export const resolve2FAChallenge = async (verificationId, otp, resolver) => {
   try {
-    console.log('Resolving 2FA challenge with OTP:', otp);
     
     const credential = await resolver.confirm(otp);
     
     if (credential.user) {
-      console.log('2FA challenge resolved successfully');
       return credential.user;
     } else {
       throw new Error('2FA verification failed - no user returned');
     }
   } catch (error) {
-    console.error('Error resolving 2FA challenge:', error);
     throw error;
   }
 };
@@ -306,9 +271,7 @@ export const signOutUser = async () => {
   try {
     const authInstance = getAuth();
     await signOut(authInstance);
-    console.log('User signed out successfully');
   } catch (error) {
-    console.error('Error signing out:', error);
     throw error;
   }
 };
@@ -370,21 +333,17 @@ export const createUserProfile = async (userData, phoneNumber) => {
         if (isRealVenmoProfile) {
           // This is a real Venmo profile picture - use it
           cleanUserData.profilePhoto = userData.venmoProfilePic.trim();
-          console.log('Using real Venmo profile picture');
         } else {
           // This is a fallback avatar - generate a new one based on user's name
           cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
-          console.log('Using fallback avatar (Venmo user exists but no pfp)');
         }
       } catch (urlError) {
         // Fallback to generated avatar if Venmo URL parsing fails
         cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
-        console.log('URL parsing failed, using fallback avatar');
       }
     } else {
       // No Venmo profile picture, use generated avatar
       cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
-      console.log('No Venmo data, using fallback avatar');
     }
 
     // Create user document with auth UID as document ID
@@ -401,16 +360,6 @@ export const createUserProfile = async (userData, phoneNumber) => {
     };
 
     // Log what's being saved
-    console.log('Creating user profile with data:', {
-      firstName: cleanUserData.firstName,
-      lastName: cleanUserData.lastName,
-      username: cleanUserData.username,
-      phoneNumber: cleanUserData.phoneNumber,
-      venmoUsername: cleanUserData.venmoUsername,
-      hasVenmoUsername: !!cleanUserData.venmoUsername,
-      profilePhoto: cleanUserData.profilePhoto,
-      isRealVenmoProfile: cleanUserData.profilePhoto && !cleanUserData.profilePhoto.includes('ui-avatars.com')
-    });
 
     // Store in Firestore using the auth UID as document ID
     const firestoreInstance = getFirestore(getApp());
@@ -422,7 +371,6 @@ export const createUserProfile = async (userData, phoneNumber) => {
       id: user.uid
     };
   } catch (error) {
-    console.error('Error creating user profile:', error);
     throw error;
   }
 };
@@ -438,10 +386,8 @@ export const storeTemporarySignupData = async (data) => {
     
     // Store in AsyncStorage with a temporary key
     await AsyncStorage.setItem('temp_signup_data', JSON.stringify(tempData));
-    console.log('Temporary signup data stored');
     return tempData;
   } catch (error) {
-    console.error('Error storing temporary signup data:', error);
     throw error;
   }
 };
@@ -455,7 +401,6 @@ export const getTemporarySignupData = async () => {
     }
     return null;
   } catch (error) {
-    console.error('Error getting temporary signup data:', error);
     return null;
   }
 };
@@ -464,8 +409,6 @@ export const getTemporarySignupData = async () => {
 export const clearTemporarySignupData = async () => {
   try {
     await AsyncStorage.removeItem('temp_signup_data');
-    console.log('Temporary signup data cleared');
   } catch (error) {
-    console.error('Error clearing temporary signup data:', error);
   }
 };

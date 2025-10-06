@@ -17,7 +17,6 @@ export const ExpenseDataProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Live listener for expenses
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -28,7 +27,6 @@ export const ExpenseDataProvider = ({ children }) => {
       return;
     }
 
-    console.log('Setting up live expense listener for user:', currentUser.uid);
     setLoading(true);
 
     const firestoreInstance = getFirestore(getApp());
@@ -48,20 +46,14 @@ export const ExpenseDataProvider = ({ children }) => {
           ...doc.data()
         }));
         
-        console.log('Live update: Fetched', userExpenses.length, 'expenses');
         setExpenses(userExpenses);
         
-        // Calculate balances directly using the universal calculator
         const calculatedBalances = calculateUserTotalBalance(userExpenses, currentUser.uid);
         setBalances(calculatedBalances);
         
         setLoading(false);
       },
       (error) => {
-        console.error('Error in expenses listener:', error);
-        
-        // Fallback: Get all expenses and filter client-side (same logic as getUserExpenses)
-        console.log('Falling back to client-side filtering');
         const fallbackQuery = query(
           collection(firestoreInstance, 'expenses'),
           orderBy('createdAt', 'desc')
@@ -75,19 +67,15 @@ export const ExpenseDataProvider = ({ children }) => {
               ...doc.data()
             }));
             
-            // Use the same filtering logic as getUserExpenses
             const userExpenses = allExpenses.filter(expense => {
-              // Check if user is the creator
               if (expense.createdBy === currentUser.uid) {
                 return true;
               }
               
-              // Check if user is in participants array
               if (expense.participants && Array.isArray(expense.participants)) {
                 return expense.participants.some(participant => participant.userId === currentUser.uid);
               }
               
-              // Check if user is in participantsMap (for newer expenses)
               if (expense.participantsMap && expense.participantsMap[currentUser.uid]) {
                 return true;
               }
@@ -95,17 +83,14 @@ export const ExpenseDataProvider = ({ children }) => {
               return false;
             });
             
-            console.log('Live update (fallback): Fetched', userExpenses.length, 'expenses');
             setExpenses(userExpenses);
             
-            // Calculate balances directly using the universal calculator
             const calculatedBalances = calculateUserTotalBalance(userExpenses, currentUser.uid);
             setBalances(calculatedBalances);
             
             setLoading(false);
           },
           (fallbackError) => {
-            console.error('Error in fallback expenses listener:', fallbackError);
             setExpenses([]);
             setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
             setLoading(false);
@@ -119,7 +104,6 @@ export const ExpenseDataProvider = ({ children }) => {
     return unsubscribeExpenses;
   }, []);
 
-  // Live listener for user profile
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -127,7 +111,6 @@ export const ExpenseDataProvider = ({ children }) => {
       return;
     }
 
-    console.log('Setting up live user profile listener for user:', currentUser.uid);
 
     const firestoreInstance = getFirestore(getApp());
     const userRef = doc(firestoreInstance, 'users', currentUser.uid);
@@ -142,12 +125,10 @@ export const ExpenseDataProvider = ({ children }) => {
             userId: currentUser.uid
           });
         } else {
-          console.log('No user profile found for:', currentUser.uid);
           setUserProfile(null);
         }
       },
       (error) => {
-        console.error('Error in user profile listener:', error);
         setUserProfile(null);
       }
     );
@@ -155,7 +136,6 @@ export const ExpenseDataProvider = ({ children }) => {
     return unsubscribeProfile;
   }, []);
 
-  // Handle auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChange((user) => {
       if (!user) {

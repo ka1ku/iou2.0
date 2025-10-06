@@ -22,10 +22,8 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
   const { state } = useExpense();
   const { participants } = state;
 
-  // Calculate total amount for this item
   const totalAmount = parseFloat(item.amount) || 0;
 
-  // Memoized calculation for who paid
   const paidByInfo = useMemo(() => {
     const payers = item.selectedPayers || [];
     if (payers.length === 0) return "Paid by Unassigned";
@@ -42,7 +40,6 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
     return `Paid by ${payerDetails[0].name} and ${payerDetails.length - 1} others`;
   }, [item.selectedPayers, participants]);
 
-  // Memoized calculation for how the expense is split
   const splitInfo = useMemo(() => {
     const consumers = item.selectedConsumers || [];
     const splits = item.splits || [];
@@ -82,7 +79,6 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
       margin="none"
       style={[styles.cardContainer, styles.noBorder]}
     >
-      {/* Header Section */}
       <View style={styles.header}>
         <View style={styles.titleSection}>
           <Text style={styles.itemName} numberOfLines={2}>
@@ -100,7 +96,6 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Split Details */}
       <View style={styles.splitSection}>
         <Text style={styles.sectionTitle}>Split Details</Text>
         <View style={styles.splitList}>
@@ -130,10 +125,8 @@ const styles = StyleSheet.create({
   noBorder: {
     borderWidth: 0,
     borderColor: 'transparent',
-    ...Shadows.card,
   },
 
-  // Header Section
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -163,7 +156,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  // Menu Button
   menuButton: {
     width: 36,
     height: 36,
@@ -175,7 +167,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.divider,
   },
 
-  // Split Section
   splitSection: {
     marginTop: Spacing.lg,
   },
@@ -201,8 +192,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
   },
   participantInfo: {
     flexDirection: "row",

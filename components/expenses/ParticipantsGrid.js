@@ -24,7 +24,6 @@ import { useExpense } from '../../contexts/ExpenseContext';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
 
-// Memoized components to prevent unnecessary re-renders
 const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect }) => {
   const name = (item.fullName || `${item.firstName || ''} ${item.lastName || ''}`).trim() || 'Unknown';
   
@@ -154,7 +153,6 @@ const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
   </View>
 ));
 
-// Search components
 const SearchPane = React.memo(({ 
   debouncedQuery, 
   selectedFriends, 
@@ -280,7 +278,6 @@ const ParticipantsGrid = forwardRef(({
   expenseId = null,
   currentUserId = null
 }, ref) => {
-  // Use context instead of props
   const { state, actions } = useExpense();
   const { participants, selectedFriends } = state;
 
@@ -313,7 +310,6 @@ const ParticipantsGrid = forwardRef(({
       });
       setContacts(data || []);
     } catch (e) {
-      console.error('Contacts error', e);
     }
   }, []);
 
@@ -361,7 +357,6 @@ const ParticipantsGrid = forwardRef(({
     
     handleSMSInvite({
       ...contact,
-      // Normalize phone before passing to SMS invite
       phoneNumbers: [{ number: (contact.phoneNumbers?.[0]?.number || '').replace(/\D/g, '') }]
     });
   }, [selectedFriends]);
@@ -431,20 +426,18 @@ const ParticipantsGrid = forwardRef(({
 
   return (
     <View style={styles.container}>
-      {/* Participant Snapshot Section */}
       <TouchableOpacity
         style={styles.participantSnapshotContainer}
         onPress={() => setShowModal(true)}
         activeOpacity={0.8}
       >
-        {/* Avatar Stack */}
         <View style={styles.avatarStackContainer}>
-          {participants.filter(p => p.name !== 'Me').slice(0, 4).map((participant, index) => (
+          {participants.filter(p => p.userId !== currentUserId).slice(0, 4).map((participant, index) => (
             <View
               key={participant.id}
               style={[
                 styles.avatarStackItem,
-                { zIndex: participants.filter(p => p.name !== 'Me').length - index }
+                { zIndex: participants.filter(p => p.userId !== currentUserId).length - index }
               ]}
             >
               {participant.profilePhoto ? (
@@ -459,31 +452,26 @@ const ParticipantsGrid = forwardRef(({
             </View>
           ))}
 
-          {/* Overflow Indicator */}
-          {participants.filter(p => p.name !== 'Me').length > 4 && (
+          {participants.filter(p => p.userId !== currentUserId).length > 4 && (
             <View style={styles.overflowContainer}>
-              <Text style={styles.overflowText}>+{participants.filter(p => p.name !== 'Me').length - 4}</Text>
+              <Text style={styles.overflowText}>+{participants.filter(p => p.userId !== currentUserId).length - 4}</Text>
             </View>
           )}
         </View>
 
-        {/* Action Text */}
         <View style={styles.actionContainer}>
           <Text style={styles.actionText}>Manage group</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
 
-      {/* Friend Selection Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.modalContainer}>
-          {/* Header */}
           <View style={styles.modalHeader}>
             <TouchableOpacity 
               style={styles.backButton}
               onPress={async () => {
                 try {
-                  // Build participants list: current user + selected friends
                   const authUser = getCurrentUser();
                   if (expenseId && authUser?.uid) {
                     const participantsToSave = allMembers.map((member) => {
@@ -505,7 +493,6 @@ const ParticipantsGrid = forwardRef(({
                     await updateExpenseParticipants(expenseId, participantsToSave, authUser.uid);
                   }
                 } catch (e) {
-                  console.error('Failed to save participants:', e);
                   Alert.alert('Error', 'Could not save group members.');
                 } finally {
                   setShowModal(false);
@@ -520,7 +507,6 @@ const ParticipantsGrid = forwardRef(({
           </View>
 
           <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-            {/* Current Members */}
             <View style={styles.membersContainer}>
               <FlatList
                 data={allMembers.filter(member => !member.isCurrentUser)}
@@ -532,10 +518,8 @@ const ParticipantsGrid = forwardRef(({
               />
             </View>
 
-            {/* Search Bar */}
             <MemoizedSearchInput value={localQuery} onChangeText={setLocalQuery} />
 
-            {/* Search Results */}
             <MemoizedSearchResults 
               searchPaneProps={{
                 debouncedQuery: deferredQuery,
@@ -561,7 +545,6 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: Spacing.sm,
   },
-  // Participant Snapshot Styles
   participantSnapshotContainer: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
@@ -646,7 +629,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
-  // FriendSelector Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: Colors.surface,

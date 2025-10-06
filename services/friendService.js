@@ -5,7 +5,6 @@ import {
 } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
 
-// Get user profile by ID
 export const getUserProfile = async (userId) => {
   try {
     const firestoreInstance = getFirestore(getApp());
@@ -21,12 +20,10 @@ export const getUserProfile = async (userId) => {
       ...userDoc.data()
     };
   } catch (error) {
-    console.error('Error getting user profile:', error);
     return null;
   }
 };
 
-// Parse deep link invitation
 export const parseFriendInviteLink = (url) => {
   try {
     if (!url.includes('friend-invite')) {
@@ -43,7 +40,6 @@ export const parseFriendInviteLink = (url) => {
       phoneNumber: params.get('pn')
     };
   } catch (error) {
-    console.error('Error parsing friend invite link:', error);
     return null;
   }
 };

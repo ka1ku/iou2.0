@@ -43,22 +43,18 @@ const ProfileScreen = ({ navigation }) => {
   }
 
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-    >
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.profileSection}>
-            <View style={styles.avatarContainer}>
-              <ProfilePicture
-                source={userProfile?.profilePhoto}
-                size={80}
-                username={userProfile?.username || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`}
-                showFallback
-              />
-            </View>
-
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.profileSection}>
+          <View style={styles.avatarContainer}>
+            <ProfilePicture
+              source={userProfile?.profilePhoto}
+              size={52}
+              username={userProfile?.username || `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`}
+              showFallback
+            />
+          </View>
+          <View style={styles.profileInfo}>
             <Text style={styles.userName}>
               {userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : 'User'}
             </Text>
@@ -66,14 +62,19 @@ const ProfileScreen = ({ navigation }) => {
               {userProfile?.username ? `@${userProfile.username}` : 'No username'}
             </Text>
           </View>
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Settings')} 
-            style={styles.settingsButton}
-          >
-            <Ionicons name="settings-outline" size={24} color={Colors.textSecondary} />
-          </TouchableOpacity>
         </View>
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('Settings')} 
+          style={styles.settingsButton}
+        >
+          <Ionicons name="settings-outline" size={26} color={Colors.textPrimary} />
+        </TouchableOpacity>
+      </View>
 
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         <BalanceSummary 
           balances={balances}
           loading={loading}
@@ -87,8 +88,8 @@ const ProfileScreen = ({ navigation }) => {
           onExpensePress={handleExpensePress}
           userProfile={userProfile}
         />
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
@@ -99,10 +100,11 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: Colors.background,
   },
   scrollContent: {
     paddingTop: 0,
-    paddingBottom: 20,
+    paddingBottom: Spacing.xl,
   },
   loadingContainer: {
     flex: 1,
@@ -112,45 +114,48 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.surface,
     paddingTop: 60,
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderBottomWidth: 0.5,
+    borderBottomColor: Colors.divider,
   },
   profileSection: {
+    flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    justifyContent: 'center',
-    width: '100%',
   },
   avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: Colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.md,
-    alignSelf: 'center',
-    ...Shadows.card,
+    ...Shadows.avatar,
+  },
+  profileInfo: {
+    marginLeft: Spacing.md,
+    flex: 1,
+    justifyContent: 'center',
   },
   userName: {
-    ...Typography.h2,
+    ...Typography.h3,
+    fontSize: 19,
     color: Colors.textPrimary,
-    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 2,
   },
   userEmail: {
     ...Typography.body,
+    fontSize: 14,
     color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: Spacing.xs,
   },
   settingsButton: {
-    padding: 8,
-    position: 'absolute',
-    top: 60,
-    right: Spacing.xl,
+    padding: Spacing.sm,
+    marginLeft: Spacing.sm,
   },
 });
 

@@ -41,7 +41,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
       const factors = await getEnrolledFactors();
       setEnrolledFactors(factors);
     } catch (error) {
-      console.error('Error loading enrolled factors:', error);
       Alert.alert('Error', 'Failed to load 2FA settings');
     } finally {
       setLoading(false);
@@ -49,10 +48,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
   };
 
   const formatPhoneNumber = (text) => {
-    // Remove all non-digits
     const cleaned = text.replace(/\D/g, '');
-    
-    // Apply formatting: (XXX) XXX-XXXX
     if (cleaned.length <= 3) {
       return cleaned;
     } else if (cleaned.length <= 6) {
@@ -87,7 +83,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
       setVerificationStep(true);
       Alert.alert('Success', 'Verification code sent to your phone');
     } catch (error) {
-      console.error('Error starting enrollment:', error);
       Alert.alert('Error', error.message || 'Failed to start 2FA enrollment');
     } finally {
       setEnrolling(false);
@@ -114,7 +109,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
       setSessionInfo(null);
       await loadEnrolledFactors();
     } catch (error) {
-      console.error('Error completing enrollment:', error);
       Alert.alert('Error', error.message || 'Failed to complete 2FA enrollment');
     } finally {
       setEnrolling(false);
@@ -136,7 +130,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
               Alert.alert('Success', '2FA method removed successfully');
               await loadEnrolledFactors();
             } catch (error) {
-              console.error('Error removing 2FA method:', error);
               Alert.alert('Error', error.message || 'Failed to remove 2FA method');
             }
           },
@@ -278,7 +271,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
           <Text style={styles.title}>Two-Factor Authentication</Text>
         </View>
 
-        {/* Description */}
         <View style={styles.descriptionContainer}>
           <View style={styles.infoCard}>
             <Ionicons name="shield-checkmark" size={32} color={Colors.accent} />
@@ -289,7 +281,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Enrolled Factors */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Enrolled Methods</Text>
           {enrolledFactors.length === 0 ? (
@@ -325,7 +316,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Add New Method */}
         {!showEnrollForm && (
           <TouchableOpacity
             style={styles.addButton}
@@ -336,7 +326,6 @@ const TwoFactorAuthScreen = ({ navigation }) => {
           </TouchableOpacity>
         )}
 
-        {/* Enrollment Form */}
         {showEnrollForm && renderEnrollmentForm()}
       </ScrollView>
     </SafeAreaView>

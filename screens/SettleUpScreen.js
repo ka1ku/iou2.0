@@ -141,7 +141,6 @@ const SettleUpScreen = ({ route, navigation }) => {
         try {
           await saveSettlement();
         } catch (error) {
-          console.error('Error saving initial settlements:', error);
         }
       };
       saveInitialSettlements();
@@ -210,7 +209,6 @@ const SettleUpScreen = ({ route, navigation }) => {
           });
         }
       } catch (error) {
-        console.error('Error checking settlement recalculation:', error);
       }
     };
     
@@ -255,7 +253,6 @@ const SettleUpScreen = ({ route, navigation }) => {
       });
       
     } catch (error) {
-      console.error('Error recalculating settlements:', error);
       Alert.alert('Error', 'Failed to recalculate settlements. Please try again.');
     } finally {
       setLoading(false);
@@ -290,7 +287,6 @@ const SettleUpScreen = ({ route, navigation }) => {
 
       navigation.goBack();
     } catch (error) {
-      console.error('Error saving expense with settlement:', error);
       Alert.alert('Error', 'Failed to save expense: ' + error.message);
     } finally {
       setLoading(false);
@@ -316,7 +312,6 @@ const SettleUpScreen = ({ route, navigation }) => {
         Alert.alert('Error', 'Recipient does not have a Venmo username set up');
         return;
       }
-      console.log('recipientProfile', recipientProfile);
       
       // Mark that payment is being made
       const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
@@ -337,7 +332,6 @@ const SettleUpScreen = ({ route, navigation }) => {
         Alert.alert('Error', 'Venmo is not installed on this device');
       }
     } catch (error) {
-      console.error('Error opening Venmo deeplink:', error);
       Alert.alert('Error', 'Failed to open Venmo. Please try again.');
     }
   };
@@ -353,7 +347,6 @@ const SettleUpScreen = ({ route, navigation }) => {
     // Trigger the animation
     animateSettledUp(settlementId);
     
-    console.log('Marked as paid:', settlement);
   }, [animateSettledUp]);
 
   const updateSettlementStatus = useCallback(async (settlement, status) => {
@@ -380,9 +373,7 @@ const SettleUpScreen = ({ route, navigation }) => {
       // Update the expense with the new settlements
       await updateExpense(expense.id, { settlements: updatedSettlements }, getCurrentUser()?.uid);
       
-      console.log(`Updated settlement status to ${status} for ${settlement.from} -> ${settlement.to}`);
     } catch (error) {
-      console.error('Error updating settlement status:', error);
       throw error;
     }
   }, [expense, getCurrentUser]);
@@ -398,7 +389,6 @@ const SettleUpScreen = ({ route, navigation }) => {
         ...prev,
         [settlementId]: false
     }));
-    console.log('settledStates', settledStates);
     // Store animation values for this settlement
     setAnimationStates(prev => ({
       ...prev,
@@ -463,7 +453,6 @@ const SettleUpScreen = ({ route, navigation }) => {
       });
     }, 500);
     
-    console.log('Undid mark as paid:', settlement);
   }, []);
 
   const saveSettlement = useCallback(async () => {
@@ -509,7 +498,6 @@ const SettleUpScreen = ({ route, navigation }) => {
       
       return { success: true };
     } catch (error) {
-      console.error('Error saving settlement data:', error);
       return { success: false, error: error.message };
     }
   }, [expense, settlements, settledStates, requestSentStates, paymentMadeStates]);
@@ -557,7 +545,6 @@ const SettleUpScreen = ({ route, navigation }) => {
         Alert.alert('Error', 'Venmo is not installed on this device');
       }
     } catch (error) {
-      console.error('Error opening Venmo deeplink:', error);
       Alert.alert('Error', 'Failed to open Venmo. Please try again.');
     }
   };
@@ -804,10 +791,8 @@ const SettleUpScreen = ({ route, navigation }) => {
                       handleRequestPayment(settlement);
                     } else if (settlement.to === name && hasRequestBeenSent) {
                       // Request already sent, maybe show a message or do nothing
-                      console.log('Request already sent for:', settlement);
                     } else {
                       // TODO: Add send reminder functionality
-                      console.log('Send reminder for:', settlement);
                     }
                   }}
                   activeOpacity={0.8}
@@ -838,10 +823,8 @@ const SettleUpScreen = ({ route, navigation }) => {
                     handleRequestPayment(settlement);
                   } else if (settlement.to === name && hasRequestBeenSent) {
                     // Request already sent, maybe show a message or do nothing
-                    console.log('Request already sent for:', settlement);
                   } else {
                     // TODO: Add send reminder functionality
-                    console.log('Send reminder for:', settlement);
                   }
                 }}
                 activeOpacity={0.8}
@@ -935,14 +918,11 @@ const SettleUpScreen = ({ route, navigation }) => {
               // Save settlement data before navigating home
               const result = await saveSettlement();
               if (result.success) {
-                console.log('Settlement saved successfully, navigating home');
                 navigation.navigate('HomeMain');
               } else {
-                console.error('Failed to save settlement:', result.error);
                 Alert.alert('Error', 'Failed to save settlement. Please try again.');
               }
             } catch (error) {
-              console.error('Error in return home handler:', error);
               Alert.alert('Error', 'An unexpected error occurred. Please try again.');
             }
           }}

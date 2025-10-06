@@ -20,10 +20,8 @@ const SignInScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
 
   const formatPhoneNumber = (text) => {
-    // Remove all non-digits
     const cleaned = text.replace(/\D/g, '');
     
-    // Apply formatting: (XXX) XXX-XXXX
     if (cleaned.length <= 3) {
       return cleaned;
     } else if (cleaned.length <= 6) {
@@ -44,7 +42,6 @@ const SignInScreen = ({ navigation }) => {
       return;
     }
 
-    // Extract digits only for validation
     const digits = phoneNumber.replace(/\D/g, '');
     if (digits.length !== 10) {
       Alert.alert('Error', 'Please enter a valid 10-digit phone number');
@@ -53,24 +50,18 @@ const SignInScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      console.log('Attempting to send OTP to:', `+1${digits}`);
       const result = await sendOTP(`+1${digits}`, true); // Skip existence check for sign-in
       
-      console.log('OTP sent successfully, navigating to verify screen');
-      // Navigate to OTP verification screen with verificationId
       navigation.navigate('VerifyOTP', { 
         phoneNumber: `+1${digits}`,
         verificationId: result.verificationId,
         isInitialAuth: true
       });
     } catch (error) {
-      console.error('Error in handleSendOTP:', error);
       
-      // Check if it's a multi-factor auth error
       try {
         const mfaResult = await handleMultiFactorError(error);
         if (mfaResult.type === 'multi-factor-required') {
-          console.log('Multi-factor auth required, navigating to 2FA screen');
           navigation.navigate('VerifyOTP', {
             phoneNumber: mfaResult.phoneNumber,
             verificationId: mfaResult.verificationId,
@@ -81,8 +72,6 @@ const SignInScreen = ({ navigation }) => {
           return;
         }
       } catch (mfaError) {
-        // If MFA handling fails, fall through to regular error handling
-        console.log('MFA handling failed, treating as regular error');
       }
       
       Alert.alert('Error', error.message || 'Failed to send verification code. Please try again.');
@@ -98,7 +87,6 @@ const SignInScreen = ({ navigation }) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
@@ -110,7 +98,6 @@ const SignInScreen = ({ navigation }) => {
             <View style={styles.headerSpacer} />
           </View>
 
-          {/* Phone Number Input */}
           <View style={styles.formContainer}>
             <View style={styles.stepHeader}>
               <Text style={styles.stepTitle}>Phone Number</Text>
@@ -165,7 +152,6 @@ const SignInScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Info Section */}
           <View style={styles.infoContainer}>
             <View style={styles.infoItem}>
               <Ionicons name="shield-checkmark-outline" size={24} color={Colors.accent} />

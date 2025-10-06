@@ -21,60 +21,55 @@ import {
   deleteItemFromExpense,
 } from "../services/expenseService";
 import { calculateSettlement } from "../utils/settlementCalculator";
-import { ExpenseProvider, useExpense } from "../contexts/ExpenseContext";
+import { useExpense } from "../contexts/ExpenseContext";
 import ExpenseHeader from "../components/expenses/ExpenseHeader";
 import ExpenseFooter from "../components/expenses/ExpenseFooter";
 import ExpenseItemCard from "../components/expenses/ExpenseItemCard";
 import ExpenseViewCard from "../components/expenses/ExpenseViewCard";
 import ParticipantsGrid from "../components/expenses/ParticipantsGrid";
 
-// Internal component that uses the context
 const AddExpenseScreenContent = ({ route, navigation }) => {
   const { expense, isNewExpense = false } = route.params || {};
   const isEditing = !!expense && !isNewExpense;
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef(null);
 
-  // Use context instead of local state
   const { state, actions, total } = useExpense();
 
-  // Track which items are in edit mode
   const [editingItems, setEditingItems] = useState(new Set());
+  
+  const [newlyAddedItems, setNewlyAddedItems] = useState(new Set());
 
-  // Initialize screen and load expense data
   useEffect(() => {
     navigation.setOptions({
       title: isEditing ? "Edit Expense" : "Add Expense",
       tabBarStyle: { display: "none" },
     });
 
-    // Load expense data if editing
     if (expense && (isEditing || isNewExpense)) {
       actions.initializeFromExpense(expense, isEditing, isNewExpense);
     }
   }, [expense, isEditing, isNewExpense, navigation, actions]);
 
-  // Auto-edit the first item for new expenses
   useEffect(() => {
     if (!isEditing && state.items.length > 0) {
-      // Only set the first item to edit mode if no items are currently being edited
       setEditingItems(prev => {
         if (prev.size === 0) {
-          return new Set([0]); // First item (index 0) in edit mode
+          return new Set([0]);
         }
         return prev;
       });
     }
   }, [isEditing, state.items.length]);
 
-  // Update participants when friends are selected
   useEffect(() => {
-    const meParticipant = state.participants.find((p) => p.name === "Me");
+    const currentUserId = getCurrentUser()?.uid;
+    const meParticipant = state.participants.find((p) => p.userId === currentUserId);
     const allParticipants = [
       meParticipant || {
         name: "Me",
         id: "me-participant",
-        userId: getCurrentUser()?.uid,
+        userId: currentUserId,
         placeholder: false,
         phoneNumber: null,
         username: null,
@@ -91,7 +86,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       })),
     ];
 
-    // Only update if participants actually changed
     const participantsChanged =
       JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
     if (participantsChanged) {
@@ -99,7 +93,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     }
   }, [state.selectedFriends, state.participants, actions]);
 
-  // Helper function to prepare expense data
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
     if (!currentUser) throw new Error("No user signed in");
@@ -111,7 +104,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       state.title.trim() || state.items[0]?.name.trim() || "Expense";
 
     const mappedParticipants = state.participants.map((p) => {
-      if (p.name === "Me") {
+      if (p.userId === currentUser.uid) {
         return {
           ...p,
           name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
@@ -153,7 +146,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     };
   };
 
-  // Simplified validation
   const validateExpense = () => {
     if (state.participants.some((p) => !p.name.trim())) {
       Alert.alert("Error", "Please enter names for all participants");
@@ -188,7 +180,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     return true;
   };
 
-  // Main save function
   const handleSaveExpense = async () => {
     if (!validateExpense()) return;
 
@@ -217,21 +208,18 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       }
       navigation.goBack();
     } catch (error) {
-      console.error("Error saving expense:", error);
       Alert.alert("Error", "Failed to save expense: " + error.message);
     } finally {
       actions.setLoading(false);
     }
   };
 
-  // Calculate settlements
   const calculateSettlements = async () => {
     try {
       const expenseData = await prepareExpenseData();
       const settlementResult = calculateSettlement(expenseData);
       return settlementResult.settlements || [];
     } catch (error) {
-      console.error("Error calculating settlements:", error);
       return [];
     }
   };
@@ -241,7 +229,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
     actions.setLoading(true);
     try {
-      // Save expense first
       const expenseData = await prepareExpenseData();
       const currentUser = getCurrentUser();
 
@@ -257,10 +244,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         await createExpense(expenseData, currentUser.uid);
       }
 
-      // Calculate settlements
       const settlements = await calculateSettlements();
 
-      // Navigate to settlement screen
       navigation.navigate("SettleUp", {
         expense: {
           ...expense,
@@ -275,7 +260,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         },
       });
     } catch (error) {
-      console.error("Error saving expense before settlement:", error);
       Alert.alert("Error", "Failed to save expense: " + error.message);
     } finally {
       actions.setLoading(false);
@@ -286,50 +270,58 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     setEditingItems(prev => new Set([...prev, index]));
   };
 
-  const handleDeleteItem = (index) => {
-    Alert.alert(
-      "Delete Item",
-      "Are you sure you want to delete this item? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // If editing an existing expense, update Firestore
-              if (isEditing && expense?.id) {
-                const currentUser = getCurrentUser();
-                if (!currentUser) {
-                  Alert.alert("Error", "User not authenticated");
-                  return;
-                }
-                
-                await deleteItemFromExpense(expense.id, index, currentUser.uid);
-              }
-              
-              // Update local state
-              actions.removeItem(index);
-              setEditingItems(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(index);
-                return newSet;
-              });
-            } catch (error) {
-              console.error("Error deleting item:", error);
-              Alert.alert("Error", "Failed to delete item: " + error.message);
-            }
+  const handleDeleteItem = (index, skipConfirmation = false) => {
+    const performDelete = async () => {
+      try {
+        if (isEditing && expense?.id) {
+          const currentUser = getCurrentUser();
+          if (!currentUser) {
+            Alert.alert("Error", "User not authenticated");
+            return;
           }
+          
+          await deleteItemFromExpense(expense.id, index, currentUser.uid);
         }
-      ]
-    );
+        
+        actions.removeItem(index);
+        setEditingItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(index);
+          return newSet;
+        });
+        setNewlyAddedItems(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(index);
+          return newSet;
+        });
+      } catch (error) {
+        Alert.alert("Error", "Failed to delete item: " + error.message);
+      }
+    };
+
+    if (skipConfirmation) {
+      performDelete();
+    } else {
+      Alert.alert(
+        "Delete Item",
+        "Are you sure you want to delete this item? This action cannot be undone.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: performDelete
+          }
+        ]
+      );
+    }
   };
 
-  // Reusable function to add a new item and set it to edit mode
   const handleAddItem = () => {
     const newIndex = state.items.length;
     actions.addItem();
     setEditingItems(prev => new Set([...prev, newIndex]));
+    setNewlyAddedItems(prev => new Set([...prev, newIndex]));
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -373,7 +365,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Participants</Text>
               <View style={styles.memberCountBadge}>
                 <Text style={styles.memberCountText}>
-                  {state.participants.filter(p => p.name !== 'Me').length} {state.participants.filter(p => p.name !== 'Me').length === 1 ? 'other member' : 'other members'}
+                  {state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length} {state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length === 1 ? 'other member' : 'other members'}
                 </Text>
               </View>
             </View>
@@ -393,7 +385,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
               currentUserId={getCurrentUser()?.uid}
             />
 
-          {/* Items Section */}
           <Text style={styles.sectionTitle}>Items</Text>
 
           {state.items.length === 0 ? (
@@ -406,7 +397,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                 Start by adding your first item to this expense
               </Text>
               
-              {/* Primary Add Button - Integrated in empty state */}
               <TouchableOpacity
                 style={styles.emptyStateButton}
                 onPress={handleAddItem}
@@ -419,23 +409,29 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           ) : (
             <>
               {state.items.map((item, index) => {
-                const isEditing = editingItems.has(index);
+                const isItemEditing = editingItems.has(index);
 
-                if (isEditing) {
+                if (isItemEditing) {
                   return (
                     <ExpenseItemCard
                       key={item.id}
                       item={item}
                       index={index}
                       expenseId={expense?.id}
-                      isEditing={isEditing}
+                      isEditing={isItemEditing}
                       onCancelEdit={() => {
                         setEditingItems(prev => {
                           const newSet = new Set(prev);
                           newSet.delete(index);
                           return newSet;
                         });
+                        setNewlyAddedItems(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(index);
+                          return newSet;
+                        });
                       }}
+                      onDelete={() => handleDeleteItem(index, !isEditing || newlyAddedItems.has(index))}
                     />
                   );
                 } else {
@@ -451,7 +447,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                 }
               })}
 
-              {/* Subtle Add Item Button - When items exist */}
               <TouchableOpacity
                 style={styles.addAnotherItemButton}
                 onPress={handleAddItem}
@@ -592,11 +587,4 @@ const styles = StyleSheet.create({
   },
 });
 
-// Wrapper component with provider
-const AddExpenseScreen = (props) => (
-  <ExpenseProvider>
-    <AddExpenseScreenContent {...props} />
-  </ExpenseProvider>
-);
-
-export default AddExpenseScreen;
+export default AddExpenseScreenContent;

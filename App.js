@@ -11,19 +11,14 @@ import * as SplashScreen from 'expo-splash-screen';
 import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
 
-// Design tokens
 import { Colors, Typography } from './design/tokens';
 
-// Firebase initialization
 import '@react-native-firebase/app';
 import '@react-native-firebase/auth';
 import '@react-native-firebase/firestore';
 
-// Services
 import { onAuthStateChange } from './services/authService';
 import deepLinkService from './services/deepLinkService';
-
-// Screen imports
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SetupExpenseScreen from './screens/SetupExpenseScreen';
@@ -36,43 +31,45 @@ import VenmoTestScreen from './screens/settings/VenmoTest';
 import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 
-// Auth screens
 import WelcomeScreen from './screens/auth/WelcomeScreen';
 import SignInScreen from './screens/auth/SignInScreen';
 import SignUpScreen from './screens/auth/SignUpScreen';
 import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
 
-// Components
 import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
 
-// Contexts
 import { ExpenseProvider } from './contexts/ExpenseContext';
-import { ExpenseDataProvider } from './contexts/ExpenseDataContext';
-
-// Navigation constants
+import { ExpenseDataProvider, useExpenseData } from './contexts/ExpenseDataContext';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-// Wrapper components for screens that need ExpenseProvider
-const SetupExpenseScreenWithProvider = (props) => (
-  <ExpenseProvider>
-    <SetupExpenseScreen {...props} />
-  </ExpenseProvider>
-);
+const SetupExpenseScreenWithProvider = (props) => {
+  const { userProfile } = useExpenseData();
+  return (
+    <ExpenseProvider userProfile={userProfile}>
+      <SetupExpenseScreen {...props} />
+    </ExpenseProvider>
+  );
+};
 
-const AddExpenseScreenWithProvider = (props) => (
-  <ExpenseProvider>
-    <AddExpenseScreen {...props} />
-  </ExpenseProvider>
-);
+const AddExpenseScreenWithProvider = (props) => {
+  const { userProfile } = useExpenseData();
+  return (
+    <ExpenseProvider userProfile={userProfile}>
+      <AddExpenseScreen {...props} />
+    </ExpenseProvider>
+  );
+};
 
-const AddReceiptScreenWithProvider = (props) => (
-  <ExpenseProvider>
-    <AddReceiptScreen {...props} />
-  </ExpenseProvider>
-);
+const AddReceiptScreenWithProvider = (props) => {
+  const { userProfile } = useExpenseData();
+  return (
+    <ExpenseProvider userProfile={userProfile}>
+      <AddReceiptScreen {...props} />
+    </ExpenseProvider>
+  );
+};
 
-// Stack navigator for Home tab
 const HomeStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
@@ -84,7 +81,6 @@ const HomeStack = () => (
   </Stack.Navigator>
 );
 
-// Stack navigator for Profile tab
 const ProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
@@ -99,7 +95,6 @@ const ProfileStack = () => (
   </Stack.Navigator>
 );
 
-// Receipt Scanning Context
 const ReceiptScanningContext = createContext();
 
 export const useReceiptScanning = () => {
@@ -133,7 +128,6 @@ const ReceiptScanningProvider = ({ children }) => {
   );
 };
 
-// Main tab navigator
 const MainTabs = () => {
   const { isReceiptScanning, showScanningOverlay } = useReceiptScanning();
 
@@ -181,7 +175,6 @@ const MainTabs = () => {
         <Tab.Screen name="Profile" component={ProfileStack} />
       </Tab.Navigator>
       
-      {/* Receipt Scanning Overlays */}
       {isReceiptScanning && (
         <View style={[StyleSheet.absoluteFillObject, { zIndex: 1000, backgroundColor: 'white' }]} />
       )}
@@ -202,7 +195,6 @@ const MainTabs = () => {
 
 
 
-// Loading screen
 const LoadingScreen = () => (
   <SafeAreaView style={styles.loadingContainer}>
     <Ionicons name="card-outline" size={64} color={Colors.accent} />
@@ -211,7 +203,6 @@ const LoadingScreen = () => (
   </SafeAreaView>
 );
 
-// Authentication stack
 const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Welcome">
     <Stack.Screen name="Welcome" component={WelcomeScreen} />
@@ -221,7 +212,6 @@ const AuthStack = () => (
   </Stack.Navigator>
 );
 
-// Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
@@ -241,10 +231,8 @@ export default function App() {
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
-    // Initialize services
     const initializeServices = async () => {
       try {
-        // Initialize RevenueCat
         await Purchases.configure({
           apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
           appUserID: null,
@@ -252,24 +240,17 @@ export default function App() {
         
         Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
         
-        // Test RevenueCat connection
         const offerings = await Purchases.getOfferings();
-        console.log('RevenueCat offerings loaded:', offerings);
         
       } catch (error) {
-        console.error('Error initializing RevenueCat:', error);
-        console.log('RevenueCat bypass mode enabled - features will be available without subscription');
       }
       
       try {
-        // Initialize deep link service
         deepLinkService.initialize();
       } catch (error) {
-        console.error('Error initializing deep link service:', error);
       }
     };
 
-    // Listen for authentication state changes
     const unsubscribe = onAuthStateChange(async (user) => {
       setUser(user);
       setLoading(false);
@@ -278,8 +259,6 @@ export default function App() {
         try {
           await Purchases.setAppUserID(user.uid);
         } catch (error) {
-          console.error('Error setting RevenueCat user ID:', error);
-          console.log('RevenueCat bypass mode: user ID not set');
         }
       }
     });

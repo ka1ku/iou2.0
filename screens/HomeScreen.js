@@ -25,10 +25,7 @@ const HomeScreen = ({ navigation }) => {
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const { setIsReceiptScanning, startScanningAnimation, stopScanningAnimation } = useReceiptScanning();
   
-  // Use shared expense data
   const { expenses, loading } = useExpenseData();
-
-  // Calculate how much you owe for a specific expense using universal calculator
   const calculateExpenseBalance = (expense) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -39,15 +36,12 @@ const HomeScreen = ({ navigation }) => {
     return { youOwe: balance.netBalance, youPaid: balance.youPaid };
   };
 
-  // Determine settlement status for an expense
   const getSettlementStatus = (expense) => {
-    // If no settlements exist, check if there's a balance
     if (!expense.settlements || expense.settlements.length === 0) {
       const balance = calculateExpenseBalance(expense);
       return Math.abs(balance.youOwe) < 0.01 ? 'settled' : 'needsSettlement';
     }
 
-    // Check if all settlements are marked as paid
     const allSettled = expense.settlements.every(settlement => 
       settlement.status === 'markedAsPaid'
     );
@@ -57,16 +51,11 @@ const HomeScreen = ({ navigation }) => {
 
   const handleReceiptScan = async () => {
     try {
-      // Request access to receipt scanning (shows paywall if needed)
       const hasAccess = await requestReceiptScanningAccess();
       
       if (!hasAccess) {
-        // User doesn't have access and didn't purchase
         return;
       }
-
-      // User has access, proceed with receipt scanning
-      // Show options to user first
       Alert.alert(
         'Scan Receipt',
         'Choose how you want to scan your receipt.',
@@ -123,7 +112,6 @@ const HomeScreen = ({ navigation }) => {
         ]
       );
     } catch (error) {
-      console.error('Error starting receipt scan:', error);
       Alert.alert('Error', 'Failed to start receipt scanning');
     }
   };
@@ -133,26 +121,21 @@ const HomeScreen = ({ navigation }) => {
     const totalParticipants = item.participants?.length || 0;
     const expenseBalance = calculateExpenseBalance(item);
     
-    // Determine if this is a receipt or expense
     const isReceipt = item.expenseType === 'receipt' || 
                      item.fromReceiptScan || 
                      (item.title && item.title.toLowerCase().includes('receipt'));
     const isExpense = item.expenseType === 'expense' || !isReceipt;
     
-    // Calculate payment summary for selected payers
     const paymentSummary = {};
 
-    // Ensure selectedPayers is an array of indices
     const paidByIndices = Array.isArray(item.selectedPayers)
       ? item.selectedPayers
       : typeof item.selectedPayers === 'number'
         ? [item.selectedPayers]
         : [];
 
-    // Calculate total amount to be paid by selected payers
     const totalAmount = calculateExpenseTotal(item);
     
-    // If there are multiple payers, split the total amount equally among them
     const splitAmount = paidByIndices.length > 0 ? totalAmount / paidByIndices.length : 0;
 
     paidByIndices.forEach(idx => {
@@ -160,7 +143,6 @@ const HomeScreen = ({ navigation }) => {
       paymentSummary[paidByName] = (paymentSummary[paidByName] || 0) + splitAmount;
     });
 
-    // If no payers are specified, assign the whole amount to 'Unknown'
     if (paidByIndices.length === 0) {
       paymentSummary['Unknown'] = (paymentSummary['Unknown'] || 0) + totalAmount;
     }
@@ -177,7 +159,7 @@ const HomeScreen = ({ navigation }) => {
       <TouchableOpacity
         style={[styles.expenseCard, isReceipt && styles.receiptCard]}
         onPress={handleItemPress}
-        activeOpacity={0.8}
+        activeOpacity={0.92}
       >
         
         <View style={styles.expenseHeader}>
@@ -185,7 +167,6 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.expenseTitle}>{item.title}</Text>
           </View>
           <View style={styles.rightHeaderSection}>
-            {/* Type indicator */}
             <View style={[styles.typeBadge, isReceipt ? styles.receiptBadge : styles.expenseBadge]}>
               <Text style={[styles.typeText, isReceipt ? styles.receiptTypeText : styles.expenseTypeText]}>
                 {isReceipt ? 'Receipt' : 'Expense'}
@@ -203,7 +184,6 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                   );
                 } else {
-                  // Show balance information when not settled
                   if (expenseBalance.youOwe > 0) {
                     return (
                       <View style={styles.oweContainer}>
@@ -236,62 +216,79 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.expenseTotal}>${calculateExpenseTotal(item).toFixed(2)}</Text>
         </View>
 
-        {item.participants && item.participants.length > 0 && (
-          <View style={styles.participantsContainer}>
-            <Text style={styles.participantsLabel}>Participants:</Text>
-            <View style={styles.participantsAvatars}>
-              {item.participants.slice(0, 5).map((participant, index) => {
-                // Check if this participant paid for any items
-                const paidForItems = item.items?.some(item => 
-                  item.selectedPayers?.includes(index)
-                ) || false;
-                
-                // If this is the 5th participant and there are more than 5 total, show count
-                const isOverflowIndicator = index === 4 && item.participants.length > 5;
-                const remainingCount = item.participants.length - 5;
-                
-                return (
-                  <View key={index} style={styles.participantAvatarContainer}>
-                    <View style={styles.avatarWrapper}>
-                      {isOverflowIndicator ? (
-                        <View style={styles.overflowAvatar}>
-                          <Text style={styles.overflowText}>+{remainingCount}</Text>
-                        </View>
-                      ) : participant.profilePhoto ? (
-                        <Image 
-                          source={{ uri: participant.profilePhoto }} 
-                          style={styles.participantAvatar} 
-                        />
-                      ) : (
-                        <View style={[
-                          styles.participantAvatarPlaceholder,
-                          participant.name === 'Me' && styles.currentUserAvatar
-                        ]}>
-                          <Text style={[
-                            styles.participantAvatarInitials,
-                            participant.name === 'Me' && styles.currentUserInitials
+        {(() => {
+          const currentUserId = getCurrentUser()?.uid;
+          const otherMembers = item.participants?.filter(p => p.userId !== currentUserId) || [];
+          
+          if (otherMembers.length === 0) return null;
+          
+          return (
+            <View style={styles.participantsContainer}>
+              <View style={styles.participantsHeader}>
+                <Text style={styles.participantsLabel}>Other Members</Text>
+                <View style={styles.participantCountBadge}>
+                  <Ionicons name="people" size={12} color={Colors.textSecondary} />
+                  <Text style={styles.participantCountText}>{otherMembers.length}</Text>
+                </View>
+              </View>
+              <View style={styles.participantsAvatars}>
+                {otherMembers.slice(0, 6).map((participant, displayIndex) => {
+                  const originalIndex = item.participants?.findIndex(p => p === participant) ?? -1;
+                  
+                  const paidForItems = originalIndex >= 0 && (item.items?.some(item => 
+                    item.selectedPayers?.includes(originalIndex)
+                  ) || false);
+                  
+                  const isOverflowIndicator = displayIndex === 5 && otherMembers.length > 6;
+                  const remainingCount = otherMembers.length - 5;
+                  const getAvatarColor = (name) => {
+                    const colors = ['#FF6B9D', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA', '#FCBAD3'];
+                    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                    return colors[index % colors.length];
+                  };
+                  
+                  const avatarColor = getAvatarColor(participant.name);
+                  
+                  return (
+                    <View key={displayIndex} style={styles.participantAvatarContainer}>
+                      <View style={styles.avatarWrapper}>
+                        {isOverflowIndicator ? (
+                          <View style={styles.overflowAvatar}>
+                            <Ionicons name="ellipsis-horizontal" size={20} color={Colors.surface} />
+                          </View>
+                        ) : participant.profilePhoto ? (
+                          <View style={styles.avatarImageContainer}>
+                            <Image 
+                              source={{ uri: participant.profilePhoto }} 
+                              style={styles.participantAvatar} 
+                            />
+                          </View>
+                        ) : (
+                          <View style={[
+                            styles.participantAvatarPlaceholder,
+                            { backgroundColor: avatarColor }
                           ]}>
-                            {participant.name === 'Me' ? 'M' : (participant.name[0] || 'U').toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      
-                      {/* Payment indicator - only show for actual participants, not overflow indicator */}
-                      {!isOverflowIndicator && paidForItems && (
-                        <View style={styles.paymentIndicator}>
-                          <Ionicons name="logo-usd" size={12} color={Colors.surface} />
-                        </View>
-                      )}
+                            <Text style={styles.participantAvatarInitials}>
+                              {(participant.name[0] || 'U').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        {!isOverflowIndicator && paidForItems && (
+                          <View style={styles.paymentIndicator}>
+                            <Ionicons name="wallet" size={10} color={Colors.surface} />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.participantName} numberOfLines={1}>
+                        {isOverflowIndicator ? `+${remainingCount}` : participant.name.split(' ')[0]}
+                      </Text>
                     </View>
-                    <Text style={styles.participantName} numberOfLines={1}>
-                      {isOverflowIndicator ? 'More' : participant.name}
-                    </Text>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
       </TouchableOpacity>
     );
   };
@@ -363,7 +360,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 60, // Account for status bar manually
+    paddingTop: 60,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
     backgroundColor: Colors.surface,
@@ -430,25 +427,25 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    marginBottom: Spacing.lg,
     ...Shadows.card,
+    overflow: 'hidden',
   },
   receiptCard: {
     backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.blue + '20',
+    borderWidth: 1.5,
+    borderColor: Colors.blue + '30',
     borderRadius: Radius.lg,
     padding: Spacing.lg,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
     ...Shadows.card,
+    overflow: 'hidden',
   },
   expenseHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   titleContainer: {
     flexDirection: 'row',
@@ -457,8 +454,10 @@ const styles = StyleSheet.create({
   },
   expenseTitle: {
     ...Typography.title,
+    fontSize: 20,
     color: Colors.textPrimary,
     marginRight: Spacing.sm,
+    fontWeight: '600',
   },
   typeBadge: {
     flexDirection: 'row',
@@ -564,13 +563,17 @@ const styles = StyleSheet.create({
   },
 
   expenseDetails: {
-    marginBottom: 12,
+    marginBottom: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.xs,
   },
   expenseTotal: {
-    fontSize: 24,
-    fontFamily: Typography.familySemiBold,
+    fontSize: 32,
+    fontFamily: Typography.familyBold,
     color: Colors.accent,
     fontWeight: '700',
+    letterSpacing: -0.5,
   },
   expenseInfo: {
     ...Typography.body,
@@ -578,16 +581,39 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   participantsContainer: {
-    marginTop: 12,
-    paddingTop: 12,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.divider,
+  },
+  participantsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
   },
   participantsLabel: {
     ...Typography.label,
     color: Colors.textSecondary,
     fontWeight: '600',
-    marginBottom: 4,
+    fontSize: 13,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  participantCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    gap: 4,
+  },
+  participantCountText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
   },
   participantsList: {
     ...Typography.body,
@@ -650,30 +676,32 @@ const styles = StyleSheet.create({
   participantsAvatars: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   participantAvatarContainer: {
     alignItems: 'center',
-    minWidth: 60,
+    width: 64,
   },
   avatarWrapper: {
     position: 'relative',
     marginBottom: Spacing.xs,
   },
+  avatarImageContainer: {
+    position: 'relative',
+  },
   participantAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2.5,
     borderColor: Colors.surface,
-    ...Shadows.avatar,
+    backgroundColor: Colors.background,
   },
   participantAvatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.accent,
-    borderWidth: 2,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2.5,
     borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -681,48 +709,40 @@ const styles = StyleSheet.create({
   },
   participantAvatarInitials: {
     color: Colors.surface,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: Typography.familySemiBold,
-    fontWeight: '600',
-  },
-  currentUserAvatar: {
-    borderColor: Colors.accent,
-    borderWidth: 3,
-    backgroundColor: Colors.accent,
-  },
-  currentUserInitials: {
-    color: Colors.white,
-    fontWeight: '600',
-    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   paymentIndicator: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     backgroundColor: Colors.success,
-    borderWidth: 2,
+    borderWidth: 2.5,
     borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.button,
-    elevation: 2,
   },
   participantName: {
     ...Typography.caption,
     color: Colors.textPrimary,
     textAlign: 'center',
     fontSize: 11,
-    maxWidth: 60,
+    fontWeight: '500',
+    maxWidth: 64,
+    lineHeight: 14,
   },
   overflowAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.textSecondary,
-    borderWidth: 2,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.textSecondary + '90',
+    borderWidth: 2.5,
     borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -730,9 +750,9 @@ const styles = StyleSheet.create({
   },
   overflowText: {
     color: Colors.surface,
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: Typography.familySemiBold,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 
 });

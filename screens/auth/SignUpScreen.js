@@ -65,7 +65,6 @@ const SignUpScreen = ({ navigation }) => {
           if (tempData.username) setUsername(tempData.username);
         }
       } catch (error) {
-        console.error('Error loading temporary signup data:', error);
         setUserData(null);
       }
     };
@@ -102,12 +101,10 @@ const SignUpScreen = ({ navigation }) => {
     setVerificationError(null);
     
     try {
-      console.log('Verifying Venmo profile for:', usernameToVerify);
       
       // Use the real Venmo profile fetching logic
       const profileData = await fetchVenmoProfile(usernameToVerify, firstName, lastName);
       
-      console.log('Venmo profile data received:', profileData);
       
       // Always set the username and profile picture
       setVenmoUsername(profileData.username);
@@ -123,36 +120,25 @@ const SignUpScreen = ({ navigation }) => {
         // Check if they have a real profile picture
         const hasRealProfilePic = !profileData.imageUrl.includes('ui-avatars.com');
         
-        console.log('Venmo verification completed successfully:', {
-          username: profileData.username,
-          userExists: true,
-          hasRealProfilePic,
-          profilePic: profileData.imageUrl,
-          displayName: profileData.displayName
-        });
       } else if (profileData.userExists === false) {
         // User definitely doesn't exist
         setVenmoVerified(false);
         setVerificationError('Venmo user does not exist. Please check the username and try again.');
         
-        console.log('Venmo user does not exist, showing error');
       } else {
         // userExists is null - network or other error, can't determine
         setVenmoVerified(false);
         setVerificationError('Unable to verify Venmo account. Please check your connection and try again.');
         
-        console.log('Network or other error, cannot determine if user exists');
       }
       
     } catch (error) {
-      console.error('Venmo verification failed:', error);
       
       // This should rarely happen now since fetchVenmoProfile handles most errors
       setVenmoVerified(false);
       setVenmoProfilePic(generateFallbackAvatar(firstName, lastName, usernameToVerify.trim()));
       setVerificationError('Unable to verify Venmo account. Please check your connection and try again.');
       
-      console.log('Unexpected error in verification, using fallback avatar');
     } finally {
       setIsVerifying(false);
     }
@@ -239,13 +225,11 @@ const SignUpScreen = ({ navigation }) => {
 
   // Validate and format name input (only allow letters, spaces, hyphens, apostrophes)
   const handleFirstNameChange = (text) => {
-    // Only allow letters, spaces, hyphens, and apostrophes
     const filtered = text.replace(/[^a-zA-Z\s\-']/g, '');
     setFirstName(filtered);
   };
 
   const handleLastNameChange = (text) => {
-    // Only allow letters, spaces, hyphens, and apostrophes
     const filtered = text.replace(/[^a-zA-Z\s\-']/g, '');
     setLastName(filtered);
   };
@@ -312,7 +296,6 @@ const SignUpScreen = ({ navigation }) => {
         return false;
       }
     } catch (error) {
-      console.error('Error checking username:', error);
       Alert.alert('Error', 'Unable to check username availability. Please try again.');
       return false;
     }

@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useReducer, useMemo } from 'react';
+import React, { createContext, useContext, useReducer, useMemo, useEffect } from 'react';
 import { getCurrentUser } from '../services/authService';
 
-// Action types
 export const EXPENSE_ACTIONS = {
   SET_TITLE: 'SET_TITLE',
   SET_PARTICIPANTS: 'SET_PARTICIPANTS',
@@ -20,22 +19,26 @@ export const EXPENSE_ACTIONS = {
   SET_PARTICIPANTS_EXPANDED: 'SET_PARTICIPANTS_EXPANDED',
   RESET_STATE: 'RESET_STATE',
   INITIALIZE_FROM_EXPENSE: 'INITIALIZE_FROM_EXPENSE',
+  UPDATE_USER_PARTICIPANT: 'UPDATE_USER_PARTICIPANT',
 };
 
-// Initial state factory
-const createInitialState = () => {
+const createInitialState = (userProfile) => {
   const currentUserId = getCurrentUser()?.uid;
+  const userName = userProfile 
+    ? `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim() 
+    : 'Me';
+  
   return {
     title: '',
     participants: [
       {
-        name: 'Me',
+        name: userName,
         id: 'me-participant',
         userId: currentUserId,
         placeholder: false,
-        phoneNumber: null,
-        username: null,
-        profilePhoto: null,
+        phoneNumber: userProfile?.phoneNumber || null,
+        username: userProfile?.username || null,
+        profilePhoto: userProfile?.profilePhoto || null,
       },
     ],
     selectedFriends: [],
@@ -57,7 +60,6 @@ const createInitialState = () => {
   };
 };
 
-// Reducer function
 const expenseReducer = (state, action) => {
   switch (action.type) {
     case EXPENSE_ACTIONS.SET_TITLE:
@@ -142,22 +144,47 @@ const expenseReducer = (state, action) => {
       return { ...state, participantsExpanded: action.payload };
 
     case EXPENSE_ACTIONS.RESET_STATE:
-      return createInitialState();
+      return createInitialState(action.payload?.userProfile);
+
+    case EXPENSE_ACTIONS.UPDATE_USER_PARTICIPANT:
+      const { userProfile } = action.payload;
+      const currentUser = getCurrentUser();
+      if (!currentUser || !userProfile) return state;
+      
+      const userName = `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim();
+      const updatedParticipants = state.participants.map((p) => {
+        if (p.userId === currentUser.uid) {
+          return {
+            ...p,
+            name: userName,
+            phoneNumber: userProfile.phoneNumber || null,
+            username: userProfile.username || null,
+            profilePhoto: userProfile.profilePhoto || null,
+          };
+        }
+        return p;
+      });
+      
+      return { ...state, participants: updatedParticipants };
 
     case EXPENSE_ACTIONS.INITIALIZE_FROM_EXPENSE:
-      const { expense, isEditing, isNewExpense } = action.payload;
+      const { expense, isEditing, isNewExpense, userProfile: initUserProfile } = action.payload;
       if (!expense || (!isEditing && !isNewExpense)) {
         return state;
       }
 
       const currentUserId = getCurrentUser()?.uid;
+      
+      const currentUserParticipant = expense.participants?.find(p => p.userId === currentUserId);
+      const currentUserName = currentUserParticipant?.name || 
+        (initUserProfile ? `${initUserProfile.firstName || ''} ${initUserProfile.lastName || ''}`.trim() : 'Me');
+      
       const existingFriends = expense.participants
         .filter(
           (p) =>
-            p.name !== 'Me' &&
+            p.userId !== currentUserId &&
             !p.placeholder &&
-            p.userId &&
-            p.userId !== currentUserId
+            p.userId
         )
         .map((p) => ({
           id: p.userId,
@@ -169,13 +196,13 @@ const expenseReducer = (state, action) => {
 
       const newParticipants = [
         {
-          name: 'Me',
+          name: currentUserName,
           id: 'me-participant',
           userId: currentUserId,
           placeholder: false,
-          phoneNumber: null,
-          username: null,
-          profilePhoto: null,
+          phoneNumber: currentUserParticipant?.phoneNumber || initUserProfile?.phoneNumber || null,
+          username: currentUserParticipant?.username || initUserProfile?.username || null,
+          profilePhoto: currentUserParticipant?.profilePhoto || initUserProfile?.profilePhoto || null,
         },
         ...existingFriends.map((friend, index) => ({
           name: friend.name || '',
@@ -211,14 +238,20 @@ const expenseReducer = (state, action) => {
   }
 };
 
-// Context
 const ExpenseContext = createContext();
 
-// Provider component
-export const ExpenseProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(expenseReducer, null, createInitialState);
+export const ExpenseProvider = ({ children, userProfile }) => {
+  const [state, dispatch] = useReducer(expenseReducer, null, () => createInitialState(userProfile));
 
-  // Calculate total (memoized for performance)
+  useEffect(() => {
+    if (userProfile) {
+      dispatch({ 
+        type: EXPENSE_ACTIONS.UPDATE_USER_PARTICIPANT, 
+        payload: { userProfile } 
+      });
+    }
+  }, [userProfile]);
+
   const total = useMemo(() => {
     return (
       state.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) +
@@ -226,7 +259,6 @@ export const ExpenseProvider = ({ children }) => {
     );
   }, [state.items, state.fees]);
 
-  // Action creators
   const actions = useMemo(() => ({
     setTitle: (title) => dispatch({ type: EXPENSE_ACTIONS.SET_TITLE, payload: title }),
     
@@ -268,14 +300,23 @@ export const ExpenseProvider = ({ children }) => {
     setParticipantsExpanded: (expanded) => 
       dispatch({ type: EXPENSE_ACTIONS.SET_PARTICIPANTS_EXPANDED, payload: expanded }),
     
-    resetState: () => dispatch({ type: EXPENSE_ACTIONS.RESET_STATE }),
+    resetState: (userProfile) => dispatch({ 
+      type: EXPENSE_ACTIONS.RESET_STATE, 
+      payload: { userProfile } 
+    }),
     
     initializeFromExpense: (expense, isEditing, isNewExpense) => 
       dispatch({ 
         type: EXPENSE_ACTIONS.INITIALIZE_FROM_EXPENSE, 
-        payload: { expense, isEditing, isNewExpense } 
+        payload: { expense, isEditing, isNewExpense, userProfile } 
       }),
-  }), []);
+      
+    updateUserParticipant: (userProfile) => 
+      dispatch({ 
+        type: EXPENSE_ACTIONS.UPDATE_USER_PARTICIPANT, 
+        payload: { userProfile } 
+      }),
+  }), [userProfile]);
 
   const value = useMemo(() => ({
     state,
@@ -290,7 +331,6 @@ export const ExpenseProvider = ({ children }) => {
   );
 };
 
-// Custom hook to use the context
 export const useExpense = () => {
   const context = useContext(ExpenseContext);
   if (!context) {

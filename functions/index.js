@@ -4,11 +4,9 @@ const algoliasearch = require('algoliasearch');
 
 admin.initializeApp();
 
-// Initialize Algolia
 const algoliaClient = algoliasearch('I0T07P5NB6', 'fb4e3327d2030d4c281cdc6fa64f7984');
 const usersIndex = algoliaClient.initIndex('users');
 
-// Firestore trigger to sync users to Algolia
 exports.syncUserToAlgolia = functions.firestore
   .document('users/{userId}')
   .onWrite(async (change, context) => {
@@ -17,7 +15,6 @@ exports.syncUserToAlgolia = functions.firestore
     
     try {
       if (change.after.exists && userData) {
-        // User created or updated - add/update in Algolia (without phone numbers)
         const searchableUser = {
           objectID: userId,
           profilePhoto: userData.profilePhoto || '',
@@ -26,7 +23,6 @@ exports.syncUserToAlgolia = functions.firestore
           username: userData.username || '',
           venmoUsername: userData.venmoUsername || '',
           fullName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-          // Remove phone numbers from index and searchable text
           searchableText: [
             userData.username || '',
             userData.venmoUsername || '',
@@ -35,21 +31,15 @@ exports.syncUserToAlgolia = functions.firestore
         };
         
         await usersIndex.saveObject(searchableUser);
-        console.log(`User ${userId} synced to Algolia (without phone numbers)`);
       } else {
-        // User deleted - remove from Algolia
         await usersIndex.deleteObject(userId);
-        console.log(`User ${userId} removed from Algolia`);
       }
     } catch (error) {
-      console.error(`Error syncing user ${userId} to Algolia:`, error);
       throw error;
     }
   });
 
-// Cloud Function to send test push notification
 exports.sendTestNotification = functions.https.onCall(async (data, context) => {
-  // Check if user is authenticated
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -57,7 +47,6 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
   try {
     const userId = context.auth.uid;
     
-    // Get user's FCM token from Firestore
     const userDoc = await admin.firestore().collection('users').doc(userId).get();
     
     if (!userDoc.exists) {
@@ -71,7 +60,6 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('failed-precondition', 'FCM token not found');
     }
 
-    // Send test notification
     const message = {
       notification: {
         title: 'Test Push Notification',
@@ -86,7 +74,6 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
     };
 
     const response = await admin.messaging().send(message);
-    console.log('Test notification sent successfully:', response);
 
     return {
       success: true,
@@ -95,14 +82,11 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
     };
 
   } catch (error) {
-    console.error('Error sending test notification:', error);
     throw new functions.https.HttpsError('internal', 'Failed to send test notification');
   }
 });
 
-// Cloud Function to send notification to specific user
 exports.sendNotificationToUser = functions.https.onCall(async (data, context) => {
-  // Check if user is authenticated
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -114,7 +98,6 @@ exports.sendNotificationToUser = functions.https.onCall(async (data, context) =>
       throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
     }
 
-    // Get target user's FCM token
     const userDoc = await admin.firestore().collection('users').doc(targetUserId).get();
     
     if (!userDoc.exists) {
@@ -128,7 +111,6 @@ exports.sendNotificationToUser = functions.https.onCall(async (data, context) =>
       throw new functions.https.HttpsError('failed-precondition', 'Target user has no FCM token');
     }
 
-    // Send notification
     const message = {
       notification: {
         title,
@@ -142,7 +124,6 @@ exports.sendNotificationToUser = functions.https.onCall(async (data, context) =>
     };
 
     const response = await admin.messaging().send(message);
-    console.log('Notification sent successfully:', response);
 
     return {
       success: true,
@@ -151,7 +132,6 @@ exports.sendNotificationToUser = functions.https.onCall(async (data, context) =>
     };
 
   } catch (error) {
-    console.error('Error sending notification:', error);
     throw new functions.https.HttpsError('internal', 'Failed to send notification');
   }
 });

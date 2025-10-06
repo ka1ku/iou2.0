@@ -27,7 +27,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   const currentUserId = getCurrentUser()?.uid;
 
-  // Use expense context
   const { state, actions } = useExpense();
   const { title, participants, selectedFriends, participantsExpanded, loading } = state;
 
@@ -45,45 +44,12 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     profilePhoto: null
   }), [currentUserId]);
 
-  // Set title from scanned receipt if available
   useEffect(() => {
     if (scannedReceipt?.title) {
       actions.setTitle(scannedReceipt.title);
     }
   }, [scannedReceipt, actions]);
 
-  // Initialize "Me" participant with current user's profile data
-  useEffect(() => {
-    const initializeMeParticipant = async () => {
-      try {
-        const currentUser = getCurrentUser();
-        if (currentUser) {
-          const userProfile = await getUserProfile(currentUser.uid);
-          if (userProfile) {
-            const updatedParticipants = [...participants];
-            if (updatedParticipants.length > 0 && updatedParticipants[0].name === 'Me') {
-              updatedParticipants[0] = {
-                ...updatedParticipants[0],
-                name: 'Me',
-                userId: currentUser.uid,
-                placeholder: false,
-                phoneNumber: userProfile.phoneNumber,
-                username: userProfile.username,
-                profilePhoto: userProfile.profilePhoto
-              };
-              actions.setParticipants(updatedParticipants);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error initializing user participant:', error);
-      }
-    };
-
-    initializeMeParticipant();
-  }, [participants, actions]);
-
-  // Handle scanned receipt data
   useEffect(() => {
     if (scannedReceipt && fromReceiptScan) {
       if (scannedReceipt.participants && scannedReceipt.participants.length > 0) {
@@ -92,9 +58,8 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     }
   }, [scannedReceipt, fromReceiptScan, actions]);
 
-  // Update participants when friends are selected
   useEffect(() => {
-    const meParticipant = participants.find(p => p.name === 'Me');
+    const meParticipant = participants.find(p => p.userId === currentUserId);
     const allParticipants = [
       meParticipant || createMeParticipant(),
       ...selectedFriends.map((friend, index) => ({ 
@@ -108,21 +73,18 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       }))
     ];
     
-    // Only update if participants actually changed
     const participantsChanged = JSON.stringify(allParticipants) !== JSON.stringify(participants);
     if (participantsChanged) {
       actions.setParticipants(allParticipants);
       setHasUnsavedChanges(true);
     }
-  }, [selectedFriends, createMeParticipant, participants, actions]);
-  // Track changes for navigation warning
+  }, [selectedFriends, createMeParticipant, participants, actions, currentUserId]);
   useEffect(() => {
     if (title.trim() !== '') {
       setHasUnsavedChanges(true);
     }
   }, [title]);
 
-  // Navigation warning
   useFocusEffect(
     useCallback(() => {
       const unsubscribe = navigation.addListener('beforeRemove', (e) => {
@@ -178,11 +140,12 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       if (!userProfile) throw new Error('Failed to get user profile');
 
       const mappedParticipants = participants.map((p) => {
-        if (p.name === 'Me') {
+        // Check if this is the current user by userId (works for both "Me" and actual name)
+        if (p.userId === currentUser.uid) {
           return {
             ...p,
             name: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
-            userId: p.userId || currentUser.uid,
+            userId: currentUser.uid,
             placeholder: false,
             phoneNumber: userProfile.phoneNumber,
             username: userProfile.username,
@@ -200,10 +163,9 @@ const SetupExpenseScreen = ({ route, navigation }) => {
         };
       });
 
-      // Create basic expense/receipt structure
       const expenseData = {
         title: finalTitle,
-        total: 0, // Will be updated when items are added
+        total: 0,
         expenseType: expenseType,
         participants: mappedParticipants,
         items: [{
@@ -215,30 +177,27 @@ const SetupExpenseScreen = ({ route, navigation }) => {
           selectedPayers: [0]
         }],
         fees: [],
-        selectedPayers: [0], // Default to first participant (Me)
+        selectedPayers: [0],
         join: { enabled: true },
-        isSetupComplete: false // Flag to indicate this needs further editing
+        isSetupComplete: false
       };
 
-      // Create the expense in Firestore
       const createdExpense = await createExpense(expenseData, currentUser.uid);
       
-      // Navigate to the appropriate detail screen with the created expense
       if (expenseType === 'receipt') {
         navigation.replace('AddReceipt', { 
           expense: createdExpense,
-          isNewExpense: true, // Flag to indicate this is a new expense creation
+          isNewExpense: true,
           ...(scannedReceipt && fromReceiptScan ? { scannedReceipt, fromReceiptScan } : {})
         });
       } else {
         navigation.replace('AddExpense', { 
           expense: createdExpense,
-          isNewExpense: true // Flag to indicate this is a new expense creation
+          isNewExpense: true
         });
       }
 
     } catch (error) {
-      console.error('Error creating basic expense:', error);
       Alert.alert('Error', 'Failed to create ' + expenseType + ': ' + error.message);
     } finally {
       actions.setLoading(false);
@@ -247,11 +206,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* <ExpenseHeader
-        title={expenseType === 'receipt' ? 'Setup Receipt' : 'Setup Expense'}
-        onBackPress={() => navigation.goBack()}
-        hideSettings={true}
-      /> */}
         
       <KeyboardAvoidingView 
         style={styles.keyboardAvoidingView}
@@ -266,9 +220,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
             paddingHorizontal: 0
           }}
         >
-          {/* Main Content */}
           <View style={styles.mainContent}>
-            {/* Title Section */}
             <View style={styles.titleSection}>
               <Text style={styles.mainTitle}>
                 What would you like to call this {expenseType}?
@@ -289,14 +241,11 @@ const SetupExpenseScreen = ({ route, navigation }) => {
               />
             </View>
 
-            {/* Participants Section */}
             <View style={styles.participantsSection}>
               <Text style={styles.sectionTitle}>Who's splitting this?</Text>
               
-              {/* Current Participants */}
               <View style={styles.participantsContainer}>
                 <View style={styles.participantsList}>
-                  {/* Add People Button - First Item */}
                   <TouchableOpacity 
                     style={styles.addPersonButton}
                     onPress={() => participantsGridRef.current?.openModal()}
@@ -329,11 +278,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                             </Text>
                           </View>
                         )}
-                        {/* {participant.name === 'Me' && (
-                          <View style={styles.currentUserBadge}>
-                            <Text style={styles.currentUserBadgeText}>You</Text>
-                          </View>
-                        )} */}
                       </View>
                       <Text style={styles.participantName} numberOfLines={1}>
                         {participant.name === 'Me' ? 'You' : participant.name}
@@ -350,7 +294,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
           </View>
         </ScrollView>
 
-        {/* Bottom Action */}
         <View style={styles.bottomContainer}>
           <TouchableOpacity
             style={[
@@ -381,7 +324,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Hidden ParticipantsGrid for modal functionality */}
       <View style={{ position: 'absolute', left: -9999 }}>
         <ParticipantsGrid
           ref={participantsGridRef}
