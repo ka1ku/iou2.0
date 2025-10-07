@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
@@ -296,13 +297,13 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     const meParticipant = state.participants.find((p) => p.userId === currentUserId);
     const allParticipants = [
       meParticipant || {
-        name: "Me",
+        name: getCurrentUser()?.fullName || getCurrentUser()?.firstName || "Unknown User",
         id: "me-participant",
         userId: currentUserId,
         placeholder: false,
         phoneNumber: null,
-        username: null,
-        profilePhoto: null,
+        username: getCurrentUser()?.username || null,
+        profilePhoto: getCurrentUser()?.profilePhoto || null,
       },
       ...state.selectedFriends.map((friend, index) => ({
         name: friend.name || "",
@@ -448,10 +449,11 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         <View style={styles.content}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Participants</Text>
-            <View style={styles.memberCountBadge}>
-              <Text style={styles.memberCountText}>
-                {state.participants.filter(p => p.userId !== currentUserId).length} {state.participants.filter(p => p.userId !== currentUserId).length === 1 ? 'other member' : 'other members'}
+            <View style={styles.memberCountContainer}>
+              <Text style={styles.memberCountNumber}>
+                {state.participants.length}
               </Text>
+              <Ionicons name="people" size={12} color={Colors.surface} />
             </View>
           </View>
 
@@ -518,14 +520,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textPrimary,
   },
-  memberCountBadge: {
+  memberCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: Colors.accent,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: Radius.pill,
-    alignSelf: 'flex-start',
+    gap: Spacing.xs,
   },
-  memberCountText: {
+  memberCountNumber: {
     color: Colors.surface,
     fontWeight: '600',
     fontSize: 12,

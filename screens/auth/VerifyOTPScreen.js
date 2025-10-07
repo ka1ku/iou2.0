@@ -113,14 +113,22 @@ const VerifyOTPScreen = ({ navigation, route }) => {
           }
           
           try {
-            setLoadingMessage('Creating your profile...');
+            // Check if user has a real Venmo profile picture to upload
+            const hasRealVenmoProfile = userData.venmoProfilePic && !userData.venmoProfilePic.includes('ui-avatars.com');
+            
+            if (hasRealVenmoProfile) {
+              setLoadingMessage('Uploading your profile picture...');
+            } else {
+              setLoadingMessage('Creating your profile...');
+            }
+            
             const createdUser = await createUserProfile(userData, phoneNumber);
             
             setLoadingMessage('Finalizing your account...');
             await clearTemporarySignupData();
             
             setLoadingMessage('Securing your data...');
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             setLoading(false);
             setLoadingMessage('');

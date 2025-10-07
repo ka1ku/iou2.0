@@ -13,6 +13,7 @@ import {
 } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
 import { generateFallbackAvatar } from '../utils/venmoUtils';
+import { downloadAndUploadImage } from './imageHandler';
 
 // Store verification session globally for access in verify function
 let globalPhoneAuthState = null;
@@ -331,8 +332,13 @@ export const createUserProfile = async (userData, phoneNumber) => {
         const isRealVenmoProfile = !userData.venmoProfilePic.includes('ui-avatars.com');
         
         if (isRealVenmoProfile) {
-          // This is a real Venmo profile picture - use it
-          cleanUserData.profilePhoto = userData.venmoProfilePic.trim();
+          // This is a real Venmo profile picture - download and upload to Firebase Storage
+          try {
+            cleanUserData.profilePhoto = await downloadAndUploadImage(userData.venmoProfilePic.trim(), user.uid);
+          } catch (uploadError) {
+            // If upload fails, fallback to the original Venmo URL
+            cleanUserData.profilePhoto = userData.venmoProfilePic.trim();
+          }
         } else {
           // This is a fallback avatar - generate a new one based on user's name
           cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');

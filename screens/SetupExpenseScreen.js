@@ -34,15 +34,18 @@ const SetupExpenseScreen = ({ route, navigation }) => {
   const [titleInputFocused, setTitleInputFocused] = useState(false);
   const participantsGridRef = useRef(null);
 
-  const createMeParticipant = useCallback(() => ({
-    name: 'Me',
-    id: 'me-participant',
-    userId: currentUserId,
-    placeholder: false,
-    phoneNumber: null,
-    username: null,
-    profilePhoto: null
-  }), [currentUserId]);
+  const createMeParticipant = useCallback(() => {
+    const currentUser = getCurrentUser();
+    return {
+      name: currentUser?.fullName || currentUser?.firstName || 'Unknown User',
+      id: 'me-participant',
+      userId: currentUserId,
+      placeholder: false,
+      phoneNumber: null,
+      username: currentUser?.username || null,
+      profilePhoto: currentUser?.profilePhoto || null
+    };
+  }, [currentUserId]);
 
   useEffect(() => {
     if (scannedReceipt?.title) {

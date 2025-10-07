@@ -16,13 +16,28 @@ export const ExpenseDataProvider = ({ children }) => {
   });
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
 
+  // Listen for authentication state changes
   useEffect(() => {
-    const currentUser = getCurrentUser();
+    const unsubscribe = onAuthStateChange((user) => {
+      setCurrentUser(user);
+      if (!user) {
+        setExpenses([]);
+        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
+        setUserProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Set up expenses listener when user changes
+  useEffect(() => {
     if (!currentUser) {
       setExpenses([]);
       setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
-      setUserProfile(null);
       setLoading(false);
       return;
     }
@@ -102,15 +117,14 @@ export const ExpenseDataProvider = ({ children }) => {
     );
 
     return unsubscribeExpenses;
-  }, []);
+  }, [currentUser]);
 
+  // Set up user profile listener when user changes
   useEffect(() => {
-    const currentUser = getCurrentUser();
     if (!currentUser) {
       setUserProfile(null);
       return;
     }
-
 
     const firestoreInstance = getFirestore(getApp());
     const userRef = doc(firestoreInstance, 'users', currentUser.uid);
@@ -134,20 +148,7 @@ export const ExpenseDataProvider = ({ children }) => {
     );
 
     return unsubscribeProfile;
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChange((user) => {
-      if (!user) {
-        setExpenses([]);
-        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
-        setUserProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return unsubscribe;
-  }, []);
+  }, [currentUser]);
 
   const value = {
     expenses,

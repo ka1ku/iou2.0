@@ -167,6 +167,7 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.expenseHeader}>
           <View style={styles.titleContainer}>
             <Text style={styles.expenseTitle}>{item.title}</Text>
+            <Text style={styles.expenseTotal}>${calculateExpenseTotal(item).toFixed(2)}</Text>
           </View>
           <View style={styles.rightHeaderSection}>
             <View style={[styles.typeBadge, isReceipt ? styles.receiptBadge : styles.expenseBadge]}>
@@ -212,10 +213,6 @@ const HomeScreen = ({ navigation }) => {
               })()}
             </View>
           </View>
-        </View>
-        
-        <View style={styles.expenseDetails}>
-          <Text style={styles.expenseTotal}>${calculateExpenseTotal(item).toFixed(2)}</Text>
         </View>
 
         {(() => {
@@ -447,19 +444,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     flex: 1,
   },
   expenseTitle: {
     ...Typography.title,
     fontSize: 20,
     color: Colors.textPrimary,
-    marginRight: Spacing.sm,
     fontWeight: '600',
+    marginBottom: Spacing.xs,
   },
   typeBadge: {
     flexDirection: 'row',
@@ -470,7 +467,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     minWidth: 70,
     justifyContent: 'center',
-    marginRight: Spacing.sm,
   },
   typeText: {
     ...Typography.label,
@@ -493,7 +489,6 @@ const styles = StyleSheet.create({
   },
   expenseBalance: {
     alignItems: 'flex-end',
-    minWidth: 80,
   },
   oweContainer: {
     flexDirection: 'row',
@@ -560,18 +555,13 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   rightHeaderSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  expenseDetails: {
-    marginBottom: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'baseline',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
     gap: Spacing.xs,
   },
+
   expenseTotal: {
-    fontSize: 32,
+    fontSize: 24,
     fontFamily: Typography.familyBold,
     color: Colors.accent,
     fontWeight: '700',
@@ -683,6 +673,7 @@ const styles = StyleSheet.create({
   participantAvatarContainer: {
     alignItems: 'center',
     width: 64,
+    marginBottom: Spacing.xs,
   },
   avatarWrapper: {
     position: 'relative',
@@ -734,10 +725,11 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textPrimary,
     textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '500',
+    fontSize: 12,
+    fontWeight: '600',
     maxWidth: 64,
-    lineHeight: 14,
+    lineHeight: 16,
+    letterSpacing: 0.2,
   },
   overflowAvatar: {
     width: 48,

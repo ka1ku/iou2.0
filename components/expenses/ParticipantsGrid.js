@@ -10,16 +10,15 @@ import {
   Image,
   ScrollView,
   Alert,
-  Linking,
-  Platform
+
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import * as Contacts from 'expo-contacts';
-import algoliasearch from 'algoliasearch';
+import { algoliasearch } from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
 import { getCurrentUser } from '../../services/authService';
-import { generateExpenseJoinLink, getExpenseJoinInfo, updateExpenseParticipants, sendExpenseInviteSMS } from '../../services/expenseService';
+import { updateExpenseParticipants, sendExpenseInviteSMS } from '../../services/expenseService';
 import { useExpense } from '../../contexts/ExpenseContext';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
@@ -145,7 +144,7 @@ const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
     <Text style={styles.memberName} numberOfLines={1}>
       {item.name}
     </Text>
-    {!item.isCurrentUser && item.username && (
+    {item.username && (
       <Text style={styles.memberUsername} numberOfLines={1}>
         @{item.username}
       </Text>
@@ -278,7 +277,6 @@ const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
 ));
 
 const ParticipantsGrid = forwardRef(({ 
-  onParticipantPress,
   expenseId = null,
   currentUserId = null
 }, ref) => {
@@ -384,8 +382,9 @@ const ParticipantsGrid = forwardRef(({
   const currentUserData = useMemo(() => {
     const currentUser = getCurrentUser();
     return {
-      id: 'current-user',
-      name: 'You',
+      id: currentUser?.uid || 'current-user',
+      name: currentUser?.fullName || currentUser?.firstName || 'Unknown User',
+      username: currentUser?.username,
       profilePhoto: currentUser?.profilePhoto,
       isCurrentUser: true
     };
@@ -436,12 +435,12 @@ const ParticipantsGrid = forwardRef(({
         activeOpacity={0.8}
       >
         <View style={styles.avatarStackContainer}>
-          {participants.filter(p => p.userId !== currentUserId).slice(0, 4).map((participant, index) => (
+          {participants.slice(0, 4).map((participant, index) => (
             <View
               key={participant.id}
               style={[
                 styles.avatarStackItem,
-                { zIndex: participants.filter(p => p.userId !== currentUserId).length - index }
+                { zIndex: participants.length - index }
               ]}
             >
               {participant.profilePhoto ? (
@@ -456,9 +455,9 @@ const ParticipantsGrid = forwardRef(({
             </View>
           ))}
 
-          {participants.filter(p => p.userId !== currentUserId).length > 4 && (
+          {participants.length > 4 && (
             <View style={styles.overflowContainer}>
-              <Text style={styles.overflowText}>+{participants.filter(p => p.userId !== currentUserId).length - 4}</Text>
+              <Text style={styles.overflowText}>+{participants.length - 4}</Text>
             </View>
           )}
         </View>
@@ -513,7 +512,7 @@ const ParticipantsGrid = forwardRef(({
           <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
             <View style={styles.membersContainer}>
               <FlatList
-                data={allMembers.filter(member => !member.isCurrentUser)}
+                data={allMembers}
                 horizontal
                 keyExtractor={(item) => item.id}
                 renderItem={renderMemberItem}
@@ -574,7 +573,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.button,
   },
   avatarStackImage: {
     width: 36,
@@ -604,7 +602,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: -8,
-    ...Shadows.button,
   },
   overflowText: {
     ...Typography.caption,
@@ -621,16 +618,6 @@ const styles = StyleSheet.create({
     ...Typography.body2,
     color: Colors.textSecondary,
     marginRight: Spacing.xs,
-  },
-  currentUserAvatarStack: {
-    borderColor: Colors.accent,
-    borderWidth: 3,
-    backgroundColor: Colors.accent,
-  },
-  currentUserInitials: {
-    color: Colors.white,
-    fontWeight: '600',
-    fontSize: 14,
   },
 
   modalContainer: {

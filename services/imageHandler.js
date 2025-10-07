@@ -1,5 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Alert, Linking } from 'react-native';
+import storage from '@react-native-firebase/storage';
+import * as FileSystem from 'expo-file-system';
 
 
 export const checkCameraPermissions = async () => {
@@ -127,5 +129,95 @@ export const imageToBase64 = async (uri) => {
 
   } catch (error) {
     throw new Error('Failed to convert image to base64. Please try a different image format or restart the app.');
+  }
+};
+
+/**
+ * Download an image from a URL to a local temporary file
+ * @param {string} imageUrl - The URL of the image to download
+ * @returns {Promise<string>} - The local file URI
+ */
+export const downloadImageFromUrl = async (imageUrl) => {
+  try {
+    // Create a temporary file path
+    const filename = `temp_profile_${Date.now()}.jpg`;
+    const localUri = `${FileSystem.cacheDirectory}${filename}`;
+    
+    // Download the image
+    const downloadResult = await FileSystem.downloadAsync(imageUrl, localUri);
+    
+    if (downloadResult.status !== 200) {
+      throw new Error('Failed to download image');
+    }
+    
+    return downloadResult.uri;
+  } catch (error) {
+    throw new Error(`Failed to download image: ${error.message}`);
+  }
+};
+
+/**
+ * Upload an image to Firebase Storage
+ * @param {string} localUri - The local file URI of the image to upload
+ * @param {string} userId - The user's UID to use in the storage path
+ * @returns {Promise<string>} - The download URL of the uploaded image
+ */
+export const uploadImageToStorage = async (localUri, userId) => {
+  try {
+    // Create a reference to the storage location
+    const filename = `profile_${userId}_${Date.now()}.jpg`;
+    const storageRef = storage().ref(`profile_pictures/${userId}/${filename}`);
+    
+    // Upload the file
+    await storageRef.putFile(localUri);
+    
+    // Get the download URL
+    const downloadUrl = await storageRef.getDownloadURL();
+    
+    return downloadUrl;
+  } catch (error) {
+    throw new Error(`Failed to upload image to storage: ${error.message}`);
+  }
+};
+
+/**
+ * Download an image from URL and upload it to Firebase Storage
+ * @param {string} imageUrl - The URL of the image to download
+ * @param {string} userId - The user's UID
+ * @returns {Promise<string>} - The Firebase Storage download URL
+ */
+export const downloadAndUploadImage = async (imageUrl, userId) => {
+  let localUri = null;
+  
+  try {
+    // Skip if it's a ui-avatars fallback
+    if (imageUrl.includes('ui-avatars.com')) {
+      return imageUrl;
+    }
+    
+    // Download the image to local storage
+    localUri = await downloadImageFromUrl(imageUrl);
+    
+    // Upload to Firebase Storage
+    const storageUrl = await uploadImageToStorage(localUri, userId);
+    
+    // Clean up the temporary file
+    try {
+      await FileSystem.deleteAsync(localUri, { idempotent: true });
+    } catch (cleanupError) {
+      // Ignore cleanup errors
+    }
+    
+    return storageUrl;
+  } catch (error) {
+    // Clean up on error
+    if (localUri) {
+      try {
+        await FileSystem.deleteAsync(localUri, { idempotent: true });
+      } catch (cleanupError) {
+        // Ignore cleanup errors
+      }
+    }
+    throw error;
   }
 };
