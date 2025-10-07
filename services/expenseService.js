@@ -1,5 +1,4 @@
 import { 
-  getFirestore, 
   collection, 
   addDoc, 
   doc, 
@@ -11,9 +10,10 @@ import {
   getDoc,
   getDocs
 } from '@react-native-firebase/firestore';
-import { getApp } from '@react-native-firebase/app';
+import { getFirestoreInstance, createParticipantsMap } from '../utils/firestoreUtils';
 import { getUserProfile } from './friendService';
 import { Linking, Platform } from 'react-native';
+import { handleError, ERROR_MESSAGES } from '../utils/errorHandler';
 
 const generateInviteToken = () => Math.random().toString(36).slice(2, 12);
 const generateJoinCode = () => {
@@ -27,15 +27,7 @@ const generateJoinCode = () => {
 
 export const createExpense = async (expenseData, userId) => {
   try {
-    
-    const participantsMap = {};
-    if (expenseData.participants) {
-      expenseData.participants.forEach((participant) => {
-        if (participant.userId) {
-          participantsMap[participant.userId] = true;
-        }
-      });
-    }
+    const participantsMap = createParticipantsMap(expenseData.participants);
     
     const expense = {
       ...expenseData,
@@ -52,9 +44,8 @@ export const createExpense = async (expenseData, userId) => {
       }
     };
     
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const docRef = await addDoc(collection(firestoreInstance, 'expenses'), expense);
-    
     
     return {
       ...expense,
@@ -67,25 +58,17 @@ export const createExpense = async (expenseData, userId) => {
 
 export const updateExpense = async (expenseId, updateData, userId) => {
   try {
-    
     let finalUpdateData = { ...updateData };
     
     if (updateData.participants) {
-      const participantsMap = {};
-      updateData.participants.forEach((participant) => {
-        if (participant.userId) {
-          participantsMap[participant.userId] = true;
-        }
-      });
-      finalUpdateData.participantsMap = participantsMap;
+      finalUpdateData.participantsMap = createParticipantsMap(updateData.participants);
     }
     
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     await updateDoc(doc(firestoreInstance, 'expenses', expenseId), {
       ...finalUpdateData,
       updatedAt: serverTimestamp()
     });
-    
   } catch (error) {
     throw error;
   }
@@ -93,7 +76,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
 
 export const getExpenseById = async (expenseId) => {
   try {
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     const snap = await getDoc(expenseRef);
     if (!snap.exists()) return null;
@@ -105,8 +88,7 @@ export const getExpenseById = async (expenseId) => {
 
 export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
   try {
-    
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     
     const expenseSnap = await getDoc(expenseRef);
@@ -132,13 +114,7 @@ export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
 
 export const updateExpenseParticipants = async (expenseId, participants, userId) => {
   try {
-    
-    const participantsMap = {};
-    participants.forEach((participant) => {
-      if (participant.userId) {
-        participantsMap[participant.userId] = true;
-      }
-    });
+    const participantsMap = createParticipantsMap(participants);
     
     await updateExpense(expenseId, {
       participants,
@@ -154,14 +130,14 @@ export const updateExpenseParticipants = async (expenseId, participants, userId)
 
 export const getExpenseJoinInfo = async (expenseId, { initializeIfMissing = false } = {}) => {
   try {
-    if (!expenseId) throw new Error('Missing expenseId');
+    if (!expenseId) throw new Error(ERROR_MESSAGES.MISSING_EXPENSE_ID);
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     const expenseDoc = await getDoc(expenseRef);
 
     if (!expenseDoc.exists()) {
-      throw new Error('Expense not found');
+      throw new Error(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
     }
 
     const expenseData = expenseDoc.data();
@@ -223,26 +199,26 @@ export const generateExpenseJoinLink = ({ expenseId, token, code, phone, preferU
 export const joinExpense = async ({ expenseId, token, code, userId, userPhone }) => {
   try {
     if (!userId) {
-      throw new Error('Missing user ID');
+      throw new Error(ERROR_MESSAGES.MISSING_USER_ID);
     }
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     let expenseData, expenseRef;
 
     if (expenseId && token) {
       expenseRef = doc(firestoreInstance, 'expenses', expenseId);
       const expenseSnap = await getDoc(expenseRef);
       if (!expenseSnap.exists()) {
-        throw new Error('Expense not found');
+        throw new Error(ERROR_MESSAGES.EXPENSE_NOT_FOUND);
       }
       expenseData = expenseSnap.data();
 
       if (expenseData.join?.token !== token) {
-        throw new Error('Invalid join link');
+        throw new Error(ERROR_MESSAGES.INVALID_JOIN_LINK);
       }
 
       if (code && expenseData.join?.code !== code) {
-        throw new Error('Invalid room code');
+        throw new Error(ERROR_MESSAGES.INVALID_ROOM_CODE);
       }
     } else if (code) {
       const expensesQuery = query(
@@ -253,18 +229,18 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
       const snapshot = await getDocs(expensesQuery);
       
       if (snapshot.empty) {
-        throw new Error('Invalid room code');
+        throw new Error(ERROR_MESSAGES.INVALID_ROOM_CODE);
       }
       
       const expenseDoc = snapshot.docs[0];
       expenseData = expenseDoc.data();
       expenseRef = expenseDoc.ref;
     } else {
-      throw new Error('Missing join parameters');
+      throw new Error(ERROR_MESSAGES.MISSING_JOIN_PARAMETERS);
     }
 
     if (!expenseData.join?.enabled) {
-      throw new Error('Joining is disabled for this expense');
+      throw new Error(ERROR_MESSAGES.JOINING_DISABLED);
     }
 
     const isAlreadyParticipant = expenseData.participants?.some(p => p.userId === userId);
@@ -274,7 +250,7 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
 
     const userProfile = await getUserProfile(userId);
     if (!userProfile) {
-      throw new Error('User profile not found');
+      throw new Error(ERROR_MESSAGES.USER_PROFILE_NOT_FOUND);
     }
 
     const newParticipant = {
@@ -307,7 +283,7 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
 export const sendExpenseInviteSMS = async ({ expenseId, phoneNumber, contactName, preferUniversal = false }) => {
   const digitsOnly = (phoneNumber || '').replace(/\D/g, '');
   if (!digitsOnly) {
-    throw new Error('Phone number required');
+    throw new Error(ERROR_MESSAGES.PHONE_NUMBER_REQUIRED);
   }
 
   const nameForMessage = contactName || 'there';

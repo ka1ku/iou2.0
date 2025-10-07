@@ -1,13 +1,12 @@
 import { 
-  getFirestore, 
   doc, 
   getDoc
 } from '@react-native-firebase/firestore';
-import { getApp } from '@react-native-firebase/app';
+import { getFirestoreInstance } from '../utils/firestoreUtils';
 
 export const getUserProfile = async (userId) => {
   try {
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     
     const userDoc = await getDoc(doc(firestoreInstance, 'users', userId));
     

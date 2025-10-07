@@ -1,7 +1,6 @@
 import auth, { getAuth, onAuthStateChanged, signOut, signInWithPhoneNumber } from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
-  getFirestore, 
   collection, 
   addDoc, 
   serverTimestamp,
@@ -11,9 +10,10 @@ import {
   where,
   getDocs
 } from '@react-native-firebase/firestore';
-import { getApp } from '@react-native-firebase/app';
+import { getFirestoreInstance } from '../utils/firestoreUtils';
 import { generateFallbackAvatar } from '../utils/venmoUtils';
 import { downloadAndUploadImage } from './imageHandler';
+import { handleError, ERROR_MESSAGES } from '../utils/errorHandler';
 
 // Store verification session globally for access in verify function
 let globalPhoneAuthState = null;
@@ -77,7 +77,7 @@ export const formatPhoneNumber = (phoneNumber) => {
 // Check if username already exists in users collection
 export const checkUsernameExists = async (username) => {
   try {
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     
     // Query users collection for the username
     const usersRef = collection(firestoreInstance, 'users');
@@ -96,7 +96,7 @@ export const checkUsernameExists = async (username) => {
 // Check if phone number already exists in users collection
 export const checkPhoneNumberExists = async (phoneNumber) => {
   try {
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     
     // Query users collection for the phone number
     const usersRef = collection(firestoreInstance, 'users');
@@ -145,7 +145,7 @@ export const sendOTP = async (phoneNumber, skipExistenceCheck = false) => {
     
     // Validate formatted phone number
     if (!formattedPhone.startsWith('+') || formattedPhone.length < 10) {
-      throw new Error('Invalid phone number format. Please enter a valid phone number.');
+      throw new Error(ERROR_MESSAGES['auth/invalid-phone-number']);
     }
     
     
@@ -153,7 +153,7 @@ export const sendOTP = async (phoneNumber, skipExistenceCheck = false) => {
     if (!skipExistenceCheck) {
       const phoneExists = await checkPhoneNumberExistsInAuth(formattedPhone);
       if (phoneExists) {
-        throw new Error('An account with this phone number already exists. Please sign in instead or use a different phone number.');
+        throw new Error(ERROR_MESSAGES.ACCOUNT_EXISTS);
       }
     }
     
@@ -170,23 +170,7 @@ export const sendOTP = async (phoneNumber, skipExistenceCheck = false) => {
       confirmation // For direct access if needed
     };
   } catch (error) {
-    
-    // Handle specific Firebase errors
-    if (error.code === 'auth/invalid-phone-number') {
-      throw new Error('Invalid phone number format. Please enter a valid phone number.');
-    } else if (error.code === 'auth/too-many-requests') {
-      throw new Error('Too many verification attempts. Please try again later.');
-    } else if (error.code === 'auth/quota-exceeded') {
-      throw new Error('SMS quota exceeded. Please try again later.');
-    } else if (error.code === 'auth/invalid-app-credential') {
-      throw new Error('Invalid app credential. Please check your Firebase configuration.');
-    } else if (error.code === 'auth/app-not-authorized') {
-      throw new Error('This app is not authorized to use Firebase Authentication. Please check your Firebase console settings.');
-    } else if (error.code === 'auth/invalid-oauth-client-id') {
-      throw new Error('Firebase configuration error. Please ensure you have the correct GoogleService-Info.plist and google-services.json files from your Firebase Console.');
-    }
-    
-    throw new Error(`Failed to send verification code: ${error.message}`);
+    throw new Error(handleError(error, 'sendOTP'));
   }
 };
 
@@ -208,19 +192,7 @@ export const verifyOTP = async (verificationId, otp) => {
       throw new Error('Verification session expired. Please request a new code.');
     }
   } catch (error) {
-    
-    // Handle specific verification errors
-    if (error.code === 'auth/invalid-verification-code') {
-      throw new Error('Invalid verification code. Please check the code and try again.');
-    } else if (error.code === 'auth/invalid-verification-id') {
-      throw new Error('Verification session expired. Please request a new code.');
-    } else if (error.code === 'auth/code-expired') {
-      throw new Error('Verification code has expired. Please request a new code.');
-    } else if (error.code === 'auth/too-many-requests') {
-      throw new Error('Too many verification attempts. Please try again later.');
-    }
-    
-    throw error;
+    throw new Error(handleError(error, 'verifyOTP'));
   }
 };
 
@@ -297,22 +269,22 @@ export const createUserProfile = async (userData, phoneNumber) => {
     const user = authInstance.currentUser;
     
     if (!user) {
-      throw new Error('No user signed in');
+      throw new Error(ERROR_MESSAGES.NO_USER_SIGNED_IN);
     }
 
 
 
     // Validate required fields
     if (!userData.firstName || !userData.lastName) {
-      throw new Error('Missing required user data: firstName and lastName are required');
+      throw new Error(ERROR_MESSAGES.MISSING_REQUIRED_FIELDS);
     }
     
     if (!userData.username) {
-      throw new Error('Missing required user data: username is required');
+      throw new Error(ERROR_MESSAGES.MISSING_USERNAME);
     }
 
     if (!phoneNumber && !user.phoneNumber) {
-      throw new Error('Missing phone number');
+      throw new Error(ERROR_MESSAGES.MISSING_PHONE_NUMBER);
     }
 
     // Clean and prepare user data
@@ -368,7 +340,7 @@ export const createUserProfile = async (userData, phoneNumber) => {
     // Log what's being saved
 
     // Store in Firestore using the auth UID as document ID
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const docRef = doc(firestoreInstance, 'users', user.uid);
     await setDoc(docRef, userDoc);
     

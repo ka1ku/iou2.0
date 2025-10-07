@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUser, onAuthStateChange } from '../services/authService';
-import { getFirestore, doc, onSnapshot, query, where, orderBy, collection } from '@react-native-firebase/firestore';
-import { getApp } from '@react-native-firebase/app';
+import { doc, onSnapshot, query, where, orderBy, collection } from '@react-native-firebase/firestore';
+import { getFirestoreInstance, isUserParticipant } from '../utils/firestoreUtils';
 import { calculateUserTotalBalance } from '../utils/balanceCalculator';
 
 const ExpenseDataContext = createContext();
@@ -44,7 +44,7 @@ export const ExpenseDataProvider = ({ children }) => {
 
     setLoading(true);
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     
     // Try to use the optimized participantsMap query first
     const expensesQuery = query(
@@ -69,6 +69,7 @@ export const ExpenseDataProvider = ({ children }) => {
         setLoading(false);
       },
       (error) => {
+        // Fallback to querying all expenses and filtering client-side
         const fallbackQuery = query(
           collection(firestoreInstance, 'expenses'),
           orderBy('createdAt', 'desc')
@@ -82,21 +83,10 @@ export const ExpenseDataProvider = ({ children }) => {
               ...doc.data()
             }));
             
-            const userExpenses = allExpenses.filter(expense => {
-              if (expense.createdBy === currentUser.uid) {
-                return true;
-              }
-              
-              if (expense.participants && Array.isArray(expense.participants)) {
-                return expense.participants.some(participant => participant.userId === currentUser.uid);
-              }
-              
-              if (expense.participantsMap && expense.participantsMap[currentUser.uid]) {
-                return true;
-              }
-              
-              return false;
-            });
+            // Use the utility function to filter expenses
+            const userExpenses = allExpenses.filter(expense => 
+              isUserParticipant(expense, currentUser.uid)
+            );
             
             setExpenses(userExpenses);
             
@@ -126,7 +116,7 @@ export const ExpenseDataProvider = ({ children }) => {
       return;
     }
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const userRef = doc(firestoreInstance, 'users', currentUser.uid);
 
     const unsubscribeProfile = onSnapshot(
