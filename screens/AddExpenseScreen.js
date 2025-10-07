@@ -402,7 +402,9 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                 onPress={handleAddItem}
                 activeOpacity={0.7}
               >
-                <Ionicons name="add-circle" size={20} color={Colors.white} />
+                <View style={styles.emptyStateButtonIcon}>
+                  <Ionicons name="add" size={20} color={Colors.accent} />
+                </View>
                 <Text style={styles.emptyStateButtonText}>Add Your First Item</Text>
               </TouchableOpacity>
             </View>
@@ -544,18 +546,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.accent + "10",
     borderRadius: Radius.md,
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md + 2,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    borderStyle: "dashed",
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     alignSelf: "stretch",
     marginHorizontal: Spacing.md,
   },
+  emptyStateButtonIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.sm,
+  },
   emptyStateButtonText: {
-    color: Colors.white,
+    color: Colors.accent,
     fontWeight: "600",
-    fontSize: 15,
-    marginLeft: Spacing.sm,
+    fontSize: 16,
   },
   addAnotherItemButton: {
     flexDirection: "row",

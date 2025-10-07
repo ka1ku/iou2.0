@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 
 const ExpenseHeader = ({ 
   title, 
@@ -15,7 +14,7 @@ const ExpenseHeader = ({
   const insets = useSafeAreaInsets();
 
   return (
-    <BlurView intensity={30} tint="light" style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
+    <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
       <TouchableOpacity 
         style={styles.backButton}
         onPress={onBackPress}
@@ -35,7 +34,7 @@ const ExpenseHeader = ({
           <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
       )}
-    </BlurView>
+    </View>
   );
 };
 
@@ -49,20 +48,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomColor: Colors.divider,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: Colors.divider,
   },
   headerTitle: {
     ...Typography.h2,
@@ -77,11 +77,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: Colors.divider,
   },
 });
 

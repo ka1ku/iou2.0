@@ -505,26 +505,25 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.lg,
   },
   memberCountBadge: {
     backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.pill,
+    alignSelf: 'flex-start',
   },
   memberCountText: {
     color: Colors.surface,

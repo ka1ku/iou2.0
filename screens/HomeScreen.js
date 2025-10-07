@@ -69,6 +69,7 @@ const HomeScreen = ({ navigation }) => {
                 startScanningAnimation();
               },
               () => {
+                setScanningReceipt(false);
                 stopScanningAnimation();
               },
               (receiptData) => {
@@ -93,6 +94,7 @@ const HomeScreen = ({ navigation }) => {
                 startScanningAnimation();
               },
               () => {
+                setScanningReceipt(false);
                 stopScanningAnimation();
               },
               (receiptData) => {

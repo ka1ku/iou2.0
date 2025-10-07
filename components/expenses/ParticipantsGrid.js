@@ -231,11 +231,15 @@ const SearchPane = React.memo(({
       
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Contacts</Text>
-        {filteredContacts.map((contact, index) => (
-          <View key={`contact-${index}`}>
-            {renderContact({ item: contact })}
-          </View>
-        ))}
+        {filteredContacts.map((contact, index) => {
+          const contactKey = contact.id || 
+                            `contact-${contact.name || 'unknown'}-${contact.phoneNumbers?.[0]?.number || index}`;
+          return (
+            <View key={contactKey}>
+              {renderContact({ item: contact })}
+            </View>
+          );
+        })}
       </View>
     </View>
   );

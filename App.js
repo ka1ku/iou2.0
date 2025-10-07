@@ -16,6 +16,7 @@ import { Colors, Typography } from './design/tokens';
 import '@react-native-firebase/app';
 import '@react-native-firebase/auth';
 import '@react-native-firebase/firestore';
+import '@react-native-firebase/ai';
 
 import { onAuthStateChange } from './services/authService';
 import deepLinkService from './services/deepLinkService';
