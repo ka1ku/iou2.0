@@ -1,5 +1,4 @@
 import { 
-  getFirestore, 
   collection, 
   addDoc, 
   doc, 
@@ -11,7 +10,7 @@ import {
   getDoc,
   getDocs
 } from '@react-native-firebase/firestore';
-import { getApp } from '@react-native-firebase/app';
+import { getFirestoreInstance, createParticipantsMap } from '../utils/firestoreUtils';
 import { getUserProfile } from './friendService';
 import { Linking, Platform } from 'react-native';
 
@@ -28,14 +27,7 @@ const generateJoinCode = () => {
 export const createExpense = async (expenseData, userId) => {
   try {
     
-    const participantsMap = {};
-    if (expenseData.participants) {
-      expenseData.participants.forEach((participant) => {
-        if (participant.userId) {
-          participantsMap[participant.userId] = true;
-        }
-      });
-    }
+    const participantsMap = createParticipantsMap(expenseData.participants);
     
     const expense = {
       ...expenseData,
@@ -52,7 +44,7 @@ export const createExpense = async (expenseData, userId) => {
       }
     };
     
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const docRef = await addDoc(collection(firestoreInstance, 'expenses'), expense);
     
     
@@ -71,16 +63,10 @@ export const updateExpense = async (expenseId, updateData, userId) => {
     let finalUpdateData = { ...updateData };
     
     if (updateData.participants) {
-      const participantsMap = {};
-      updateData.participants.forEach((participant) => {
-        if (participant.userId) {
-          participantsMap[participant.userId] = true;
-        }
-      });
-      finalUpdateData.participantsMap = participantsMap;
+      finalUpdateData.participantsMap = createParticipantsMap(updateData.participants);
     }
     
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     await updateDoc(doc(firestoreInstance, 'expenses', expenseId), {
       ...finalUpdateData,
       updatedAt: serverTimestamp()
@@ -93,7 +79,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
 
 export const getExpenseById = async (expenseId) => {
   try {
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     const snap = await getDoc(expenseRef);
     if (!snap.exists()) return null;
@@ -106,7 +92,7 @@ export const getExpenseById = async (expenseId) => {
 export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
   try {
     
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     
     const expenseSnap = await getDoc(expenseRef);
@@ -133,12 +119,7 @@ export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
 export const updateExpenseParticipants = async (expenseId, participants, userId) => {
   try {
     
-    const participantsMap = {};
-    participants.forEach((participant) => {
-      if (participant.userId) {
-        participantsMap[participant.userId] = true;
-      }
-    });
+    const participantsMap = createParticipantsMap(participants);
     
     await updateExpense(expenseId, {
       participants,
@@ -156,7 +137,7 @@ export const getExpenseJoinInfo = async (expenseId, { initializeIfMissing = fals
   try {
     if (!expenseId) throw new Error('Missing expenseId');
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
     const expenseDoc = await getDoc(expenseRef);
 
@@ -226,7 +207,7 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
       throw new Error('Missing user ID');
     }
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     let expenseData, expenseRef;
 
     if (expenseId && token) {

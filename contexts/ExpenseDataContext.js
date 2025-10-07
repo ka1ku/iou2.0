@@ -1,19 +1,14 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { getCurrentUser, onAuthStateChange } from '../services/authService';
-import { getFirestore, doc, onSnapshot, query, where, orderBy, collection } from '@react-native-firebase/firestore';
-import { getApp } from '@react-native-firebase/app';
+import { doc, onSnapshot, query, where, orderBy, collection } from '@react-native-firebase/firestore';
+import { getFirestoreInstance, getDefaultExpenseState, getDefaultBalanceState, isUserParticipant } from '../utils/firestoreUtils';
 import { calculateUserTotalBalance } from '../utils/balanceCalculator';
 
 const ExpenseDataContext = createContext();
 
 export const ExpenseDataProvider = ({ children }) => {
   const [expenses, setExpenses] = useState([]);
-  const [balances, setBalances] = useState({
-    totalOwed: 0,
-    totalOwes: 0,
-    netBalance: 0,
-    debtBreakdown: {}
-  });
+  const [balances, setBalances] = useState(getDefaultBalanceState());
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
@@ -23,10 +18,11 @@ export const ExpenseDataProvider = ({ children }) => {
     const unsubscribe = onAuthStateChange((user) => {
       setCurrentUser(user);
       if (!user) {
-        setExpenses([]);
-        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
-        setUserProfile(null);
-        setLoading(false);
+        const defaultState = getDefaultExpenseState();
+        setExpenses(defaultState.expenses);
+        setBalances(defaultState.balances);
+        setUserProfile(defaultState.userProfile);
+        setLoading(defaultState.loading);
       }
     });
 
@@ -36,15 +32,16 @@ export const ExpenseDataProvider = ({ children }) => {
   // Set up expenses listener when user changes
   useEffect(() => {
     if (!currentUser) {
-      setExpenses([]);
-      setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
-      setLoading(false);
+      const defaultState = getDefaultExpenseState();
+      setExpenses(defaultState.expenses);
+      setBalances(defaultState.balances);
+      setLoading(defaultState.loading);
       return;
     }
 
     setLoading(true);
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     
     // Try to use the optimized participantsMap query first
     const expensesQuery = query(
@@ -82,21 +79,9 @@ export const ExpenseDataProvider = ({ children }) => {
               ...doc.data()
             }));
             
-            const userExpenses = allExpenses.filter(expense => {
-              if (expense.createdBy === currentUser.uid) {
-                return true;
-              }
-              
-              if (expense.participants && Array.isArray(expense.participants)) {
-                return expense.participants.some(participant => participant.userId === currentUser.uid);
-              }
-              
-              if (expense.participantsMap && expense.participantsMap[currentUser.uid]) {
-                return true;
-              }
-              
-              return false;
-            });
+            const userExpenses = allExpenses.filter(expense => 
+              isUserParticipant(expense, currentUser.uid)
+            );
             
             setExpenses(userExpenses);
             
@@ -106,9 +91,10 @@ export const ExpenseDataProvider = ({ children }) => {
             setLoading(false);
           },
           (fallbackError) => {
-            setExpenses([]);
-            setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
-            setLoading(false);
+            const defaultState = getDefaultExpenseState();
+            setExpenses(defaultState.expenses);
+            setBalances(defaultState.balances);
+            setLoading(defaultState.loading);
           }
         );
         
@@ -126,7 +112,7 @@ export const ExpenseDataProvider = ({ children }) => {
       return;
     }
 
-    const firestoreInstance = getFirestore(getApp());
+    const firestoreInstance = getFirestoreInstance();
     const userRef = doc(firestoreInstance, 'users', currentUser.uid);
 
     const unsubscribeProfile = onSnapshot(
