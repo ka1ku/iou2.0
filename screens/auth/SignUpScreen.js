@@ -460,6 +460,8 @@ const SignUpScreen = ({ navigation }) => {
             placeholder="Enter your first name"
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="words"
+            autoCorrect={false}
+            keyboardType="default"
             autoFocus
           />
         </View>
@@ -473,6 +475,8 @@ const SignUpScreen = ({ navigation }) => {
             placeholder="Enter your last name"
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="words"
+            autoCorrect={false}
+            keyboardType="default"
           />
         </View>
       </View>
@@ -499,6 +503,7 @@ const SignUpScreen = ({ navigation }) => {
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
+            keyboardType="default"
             autoFocus
           />
           <Text style={styles.inputHint}>
@@ -573,6 +578,7 @@ const SignUpScreen = ({ navigation }) => {
                   autoCorrect={false}
                   autoComplete="off"
                   spellCheck={false}
+                  keyboardType="default"
                 />
                 
                 {/* Loading indicator or checkmark on the right */}

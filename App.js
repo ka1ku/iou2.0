@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import { NavigationContainer, getFocusedRouteNameFromRoute } from '@react-navigation/native';
+import { NavigationContainer, getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,6 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
 import LottieView from 'lottie-react-native';
-import Purchases from 'react-native-purchases';
 
 import { Colors, Typography } from './design/tokens';
 
@@ -20,6 +19,7 @@ import '@react-native-firebase/ai';
 
 import { onAuthStateChange } from './services/authService';
 import deepLinkService from './services/deepLinkService';
+import notificationService from './services/notificationService';
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SetupExpenseScreen from './screens/SetupExpenseScreen';
@@ -29,6 +29,9 @@ import SettleUpScreen from './screens/SettleUpScreen';
 import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
 import NotificationSettingsScreen from './screens/settings/NotificationSettingsScreen';
 import VenmoTestScreen from './screens/settings/VenmoTest';
+import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
+import ConnectedAccountsScreen from './screens/settings/ConnectedAccountsScreen';
+import TermsOfServiceScreen from './screens/settings/TermsOfServiceScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 
@@ -41,6 +44,8 @@ import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
 
 import { ExpenseProvider } from './contexts/ExpenseContext';
 import { ExpenseDataProvider, useExpenseData } from './contexts/ExpenseDataContext';
+import { NotificationProvider, useNotifications } from './contexts/NotificationContext';
+import { ReceiptScanningProvider, useReceiptScanning } from './contexts/ReceiptScanningContext';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -86,6 +91,9 @@ const ProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="ConnectedAccounts" component={ConnectedAccountsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
     <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
@@ -96,37 +104,67 @@ const ProfileStack = () => (
   </Stack.Navigator>
 );
 
-const ReceiptScanningContext = createContext();
+// Component to handle notification navigation
+const NotificationNavigationHandler = () => {
+  const navigation = useNavigation();
+  const { isInitialized } = useNotifications();
 
-export const useReceiptScanning = () => {
-  const context = useContext(ReceiptScanningContext);
-  if (!context) {
-    throw new Error('useReceiptScanning must be used within a ReceiptScanningProvider');
-  }
-  return context;
-};
+  useEffect(() => {
+    if (!isInitialized) return;
 
-const ReceiptScanningProvider = ({ children }) => {
-  const [isReceiptScanning, setIsReceiptScanning] = useState(false);
-  const [showScanningOverlay, setShowScanningOverlay] = useState(false);
+    const unsubscribe = notificationService.onMessage((message) => {
+      if (message.type === 'navigation' && message.data) {
+        handleNotificationNavigation(message.data);
+      }
+    });
 
-  const startScanningAnimation = () => setShowScanningOverlay(true);
-  const stopScanningAnimation = () => setShowScanningOverlay(false);
+    return unsubscribe;
+  }, [isInitialized, navigation]);
 
-  const value = {
-    isReceiptScanning,
-    setIsReceiptScanning,
-    showScanningOverlay,
-    setShowScanningOverlay,
-    startScanningAnimation,
-    stopScanningAnimation,
+  const handleNotificationNavigation = (data) => {
+    const { route, expenseId, userId, screen } = data;
+    
+    try {
+      switch (route) {
+        case 'expense':
+          if (expenseId) {
+            navigation.navigate('Home', {
+              screen: 'ExpenseSettings',
+              params: { expenseId }
+            });
+          }
+          break;
+        case 'friend':
+          if (userId) {
+            navigation.navigate('Profile', {
+              screen: 'FriendProfile',
+              params: { userId }
+            });
+          }
+          break;
+        case 'settle':
+          navigation.navigate('Home', {
+            screen: 'SettleUp'
+          });
+          break;
+        case 'profile':
+          navigation.navigate('Profile');
+          break;
+        case 'home':
+          navigation.navigate('Home');
+          break;
+        default:
+          if (screen) {
+            navigation.navigate(screen);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Failed to navigate from notification:', error);
+    }
   };
 
-  return (
-    <ReceiptScanningContext.Provider value={value}>
-      {children}
-    </ReceiptScanningContext.Provider>
-  );
+  return null;
 };
 
 const MainTabs = () => {
@@ -142,7 +180,11 @@ const MainTabs = () => {
 
   const getTabBarStyle = (route) => {
     const routeName = getFocusedRouteNameFromRoute(route);
-    const hiddenRoutes = ['AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 'NotificationSettings', 'VenmoTest', 'FriendProfile', 'Settings'];
+    const hiddenRoutes = [
+      'AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 
+      'NotificationSettings', 'VenmoTest', 'FriendProfile', 'Settings',
+      'ProfileSettings', 'ConnectedAccounts', 'TermsOfService'
+    ];
 
     return {
       backgroundColor: Colors.surface,
@@ -175,6 +217,8 @@ const MainTabs = () => {
         <Tab.Screen name="Home" component={HomeStack} />
         <Tab.Screen name="Profile" component={ProfileStack} />
       </Tab.Navigator>
+      
+      <NotificationNavigationHandler />
       
       {isReceiptScanning && (
         <View style={[StyleSheet.absoluteFillObject, { zIndex: 1000, backgroundColor: 'white' }]} />
@@ -218,6 +262,7 @@ SplashScreen.preventAutoHideAsync();
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigationRef = useRef();
   const [fontsLoaded, fontError] = useFonts({
     Poppins_400Regular,
     Poppins_500Medium,
@@ -233,18 +278,19 @@ export default function App() {
 
   useEffect(() => {
     const initializeServices = async () => {
-      try {
-        await Purchases.configure({
-          apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
-          appUserID: null,
-        });
-        
-        Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-        
-        const offerings = await Purchases.getOfferings();
-        
-      } catch (error) {
-      }
+      // RevenueCat temporarily disabled - uncomment when ready to enable subscriptions
+      // try {
+      //   await Purchases.configure({
+      //     apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
+      //     appUserID: null,
+      //   });
+      //   
+      //   Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+      //   
+      //   const offerings = await Purchases.getOfferings();
+      //   
+      // } catch (error) {
+      // }
       
       try {
         deepLinkService.initialize();
@@ -256,12 +302,13 @@ export default function App() {
       setUser(user);
       setLoading(false);
       
-      if (user?.uid) {
-        try {
-          await Purchases.setAppUserID(user.uid);
-        } catch (error) {
-        }
-      }
+      // RevenueCat temporarily disabled - uncomment when ready to enable subscriptions
+      // if (user?.uid) {
+      //   try {
+      //     await Purchases.setAppUserID(user.uid);
+      //   } catch (error) {
+      //   }
+      // }
     });
 
     initializeServices();
@@ -290,13 +337,15 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer onReady={onLayoutRootView}>
+      <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
         <StatusBar style="dark" />
         <ExpenseDataProvider>
-          <ReceiptScanningProvider>
-            {user ? <MainTabs /> : <AuthStack />}
-            <ExpenseJoinHandler />
-          </ReceiptScanningProvider>
+          <NotificationProvider>
+            <ReceiptScanningProvider>
+              {user ? <MainTabs /> : <AuthStack />}
+              <ExpenseJoinHandler />
+            </ReceiptScanningProvider>
+          </NotificationProvider>
         </ExpenseDataProvider>
       </NavigationContainer>
     </SafeAreaProvider>

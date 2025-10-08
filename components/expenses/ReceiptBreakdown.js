@@ -162,7 +162,14 @@ const ReceiptBreakdown = ({
               <View key={item.id} style={styles.itemContainer}>
                 <View style={styles.lineItem}>
                   {isEditingName ? (
-                    <TextInput style={[styles.itemName, styles.inputField]} defaultValue={item.name || `Item ${index + 1}`} onBlur={(e) => handleUpdate('item', index, 'name', e.nativeEvent.text)} autoFocus />
+                    <TextInput 
+                      style={[styles.itemName, styles.inputField]} 
+                      defaultValue={item.name || `Item ${index + 1}`} 
+                      onBlur={(e) => handleUpdate('item', index, 'name', e.nativeEvent.text)} 
+                      autoFocus
+                      keyboardType="default"
+                      autoCorrect={false}
+                    />
                   ) : (
                     <Text style={styles.itemName} onPress={() => setEditingItem({ index, field: 'name' })}>{item.name || `Item ${index + 1}`}</Text>
                   )}
@@ -268,6 +275,8 @@ const ReceiptBreakdown = ({
                   value={customFeeName}
                   onChangeText={setCustomFeeName}
                   returnKeyType="next"
+                  keyboardType="default"
+                  autoCorrect={false}
                 />
               )}
 

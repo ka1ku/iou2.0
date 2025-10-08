@@ -17,7 +17,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
-import { createExpense } from '../services/expenseService';
+import { createExpense, deleteExpense } from '../services/expenseService';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
 import { useExpense } from '../contexts/ExpenseContext';
@@ -95,23 +95,14 @@ const SetupExpenseScreen = ({ route, navigation }) => {
           return;
         }
 
-        e.preventDefault();
-        Alert.alert(
-          'Unsaved Changes',
-          'You have unsaved changes. Are you sure you want to leave?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Leave',
-              style: 'destructive',
-              onPress: () => navigation.dispatch(e.data.action),
-            },
-          ]
-        );
+        // Reset the expense context state when exiting
+        actions.resetState();
+        // Allow navigation to proceed
+        navigation.dispatch(e.data.action);
       });
 
       return unsubscribe;
-    }, [navigation, hasUnsavedChanges, loading])
+    }, [navigation, hasUnsavedChanges, loading, actions])
   );
 
   useEffect(() => {
@@ -171,14 +162,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
         total: 0,
         expenseType: expenseType,
         participants: mappedParticipants,
-        items: [{
-          id: Date.now().toString(),
-          name: '',
-          amount: 0,
-          selectedConsumers: [0],
-          splits: [],
-          selectedPayers: [0]
-        }],
+        items: [],
         fees: [],
         selectedPayers: [0],
         join: { enabled: true },
@@ -239,6 +223,8 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                 placeholderTextColor={Colors.textSecondary}
                 autoFocus={!scannedReceipt}
                 returnKeyType="next"
+                keyboardType="default"
+                autoCorrect={false}
                 onFocus={() => setTitleInputFocused(true)}
                 onBlur={() => setTitleInputFocused(false)}
               />
@@ -261,7 +247,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                   </TouchableOpacity>
 
                   {participants.map((participant, index) => (
-                    <View key={participant.id} style={styles.participantItem}>
+                    <View key={participant.id || `participant-${index}`} style={styles.participantItem}>
                       <View style={styles.participantAvatar}>
                         {participant.profilePhoto ? (
                           <Image 

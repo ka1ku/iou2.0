@@ -418,3 +418,65 @@ export const clearTemporarySignupData = async () => {
   } catch (error) {
   }
 };
+
+// Update user profile
+export const updateUserProfile = async (profileData) => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('No authenticated user');
+    }
+
+    const firestoreInstance = getFirestore(getApp());
+    const userDocRef = doc(firestoreInstance, 'users', user.uid);
+    
+    // Prepare update data
+    const updateData = {
+      firstName: profileData.firstName,
+      lastName: profileData.lastName,
+      username: profileData.username,
+      updatedAt: serverTimestamp()
+    };
+
+    // Handle profile photo if it's a local URI
+    if (profileData.profilePhoto && profileData.profilePhoto.startsWith('file://')) {
+      try {
+        // Upload the new image to Firebase Storage
+        updateData.profilePhoto = await downloadAndUploadImage(profileData.profilePhoto, user.uid);
+      } catch (uploadError) {
+        console.error('Failed to upload profile photo:', uploadError);
+        // Continue without updating photo if upload fails
+      }
+    } else if (profileData.profilePhoto) {
+      // If it's already a URL, use it directly
+      updateData.profilePhoto = profileData.profilePhoto;
+    }
+
+    await setDoc(userDocRef, updateData, { merge: true });
+    
+    return {
+      ...updateData,
+      id: user.uid
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Delete user account and all associated data
+export const deleteUserAccount = async () => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('No authenticated user');
+    }
+
+    // TODO: Call Cloud Function to delete all user data
+    // For now, just sign out the user
+    await signOutUser();
+    
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};

@@ -213,13 +213,13 @@ const SearchPane = React.memo(({
     <View style={styles.searchContent}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent people</Text>
-        {filteredHits.map((friend) => (
-          <View key={friend.objectID}>
+        {filteredHits.map((friend, index) => (
+          <View key={friend.objectID || `friend-${index}`}>
             {renderFriendItem({ item: friend })}
           </View>
         ))}
-        {filteredInvitedContacts.map((contact) => (
-          <View key={contact.id}>
+        {filteredInvitedContacts.map((contact, index) => (
+          <View key={contact.id || `invited-contact-${index}`}>
             <MemoizedInvitedContactItem 
               item={contact} 
               onSMSInvite={handleSMSInvite}
@@ -255,6 +255,8 @@ const MemoizedSearchInput = React.memo(({ value, onChangeText }) => (
         value={value}
         onChangeText={onChangeText}
         autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="default"
       />
     </View>
   </View>

@@ -303,6 +303,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
                   setValidationErrors(prev => ({ ...prev, name: false }));
                 }
               }}
+              keyboardType="default"
+              autoCorrect={false}
             />
           </View>
           {onCancelEdit && (

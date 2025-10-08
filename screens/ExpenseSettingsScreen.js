@@ -16,9 +16,7 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { BlurView } from "expo-blur";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Colors, Spacing, Radius, Shadows, Typography } from "../design/tokens";
 
@@ -33,8 +31,6 @@ import {
 
 const ExpenseSettingsScreen = ({ route, navigation }) => {
   const { expense } = route.params;
-
-  const insets = useSafeAreaInsets();
 
   const currentUser = getCurrentUser();
 
@@ -53,8 +49,6 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
   useEffect(() => {
     navigation.setOptions({
       headerShown: false,
-
-      tabBarStyle: { display: "none" },
     });
   }, [navigation]);
 
@@ -397,157 +391,116 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
   );
 
   return (
-    <View style={styles.container}>
-      <BlurView
-        intensity={40}
-        tint="light"
-        style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}
-      >
-        <TouchableOpacity
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
+          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Expense Settings</Text>
-
-          <Text style={styles.headerSubtitle}>
-            Manage your expense preferences
-          </Text>
-        </View>
-
-        <View style={styles.headerSpacer} />
-      </BlurView>
-
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingTop: insets.top + 100,
-          paddingBottom: 120,
-        }}
-      >
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Expense Name</Text>
-
-            <View style={styles.sectionIcon}>
-              <Ionicons name="pencil-outline" size={24} color={Colors.accent} />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.nameRow}
-            onPress={handleChangeExpenseName}
-            disabled={loading}
-            activeOpacity={0.7}
-          >
-            <View style={styles.nameInfo}>
-              <Text style={styles.nameTitle}>Current Name</Text>
-
-              <Text style={styles.nameValue}>
-                {expense?.title || "Untitled Expense"}
-              </Text>
-            </View>
-
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={Colors.textSecondary}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Share Expense</Text>
-
-            <View style={styles.sectionIcon}>
-              <Ionicons name="share-outline" size={24} color={Colors.accent} />
-            </View>
-          </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingTitle}>Allow others to join</Text>
-
-              <Text style={styles.settingDescription}>
-                Let others join this expense using the invite link
-              </Text>
-            </View>
-
-            <Switch
-              value={joinEnabled}
-              onValueChange={handleToggleJoin}
+        <Text style={styles.headerTitle}>Expense Settings</Text>
+        <View style={styles.placeholder} />
+      </View>
+      
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        {/* Expense Name Section */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Expense Name</Text>
+          <View style={styles.settingsList}>
+            <TouchableOpacity
+              style={styles.settingItem}
+              onPress={handleChangeExpenseName}
               disabled={loading}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor={joinEnabled ? Colors.surface : Colors.textSecondary}
-            />
+            >
+              <Ionicons name="pencil-outline" size={24} color={Colors.textSecondary} />
+              <View style={styles.settingContent}>
+                <Text style={styles.settingText}>Change Name</Text>
+                <Text style={styles.settingDescription}>
+                  {expense?.title || "Untitled Expense"}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
           </View>
+        </View>
 
-          {joinEnabled && joinInfo && (
-            <View style={styles.inviteSection}>
-              <View style={styles.inviteActions}>
+        {/* Share Expense Section */}
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Share Expense</Text>
+          <View style={styles.settingsList}>
+            <View style={styles.settingItem}>
+              <Ionicons name="people-outline" size={24} color={Colors.textSecondary} />
+              <View style={styles.settingContent}>
+                <Text style={styles.settingText}>Allow others to join</Text>
+                <Text style={styles.settingDescription}>
+                  Let others join this expense using the invite link
+                </Text>
+              </View>
+              <Switch
+                value={joinEnabled}
+                onValueChange={handleToggleJoin}
+                disabled={loading}
+                trackColor={{ false: Colors.border, true: Colors.accent }}
+                thumbColor={joinEnabled ? Colors.surface : Colors.textSecondary}
+              />
+            </View>
+
+            {joinEnabled && joinInfo && (
+              <>
                 <TouchableOpacity
-                  style={styles.copyButton}
+                  style={styles.settingItem}
                   onPress={handleShareInviteLink}
                   disabled={loading}
                 >
-                  <Ionicons
-                    name="share-outline"
-                    size={20}
-                    color={Colors.surface}
-                  />
-
-                  <Text style={styles.copyButtonText}>Share Link</Text>
+                  <Ionicons name="share-outline" size={24} color={Colors.textSecondary} />
+                  <View style={styles.settingContent}>
+                    <Text style={styles.settingText}>Share Link</Text>
+                    <Text style={styles.settingDescription}>
+                      Share the invite link with others
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.shareButton}
+                  style={styles.settingItem}
                   onPress={handleCopyInviteLink}
                   disabled={loading}
                 >
-                  <Ionicons
-                    name="copy-outline"
-                    size={20}
-                    color={Colors.surface}
-                  />
-
-                  <Text style={styles.shareButtonText}>Copy Link</Text>
+                  <Ionicons name="copy-outline" size={24} color={Colors.textSecondary} />
+                  <View style={styles.settingContent}>
+                    <Text style={styles.settingText}>Copy Link</Text>
+                    <Text style={styles.settingDescription}>
+                      Copy the invite link to clipboard
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
                 </TouchableOpacity>
-              </View>
-            </View>
-          )}
+              </>
+            )}
+          </View>
         </View>
 
         {canLeaveExpense && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Leave Expense</Text>
-
-              <View style={styles.sectionIcon}>
-                <Ionicons name="exit-outline" size={24} color={Colors.error} />
-              </View>
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>Leave Expense</Text>
+            <View style={styles.settingsList}>
+              <TouchableOpacity
+                style={styles.settingItem}
+                onPress={handleLeaveExpense}
+                disabled={loading}
+              >
+                <Ionicons name="exit-outline" size={24} color={Colors.danger} />
+                <View style={styles.settingContent}>
+                  <Text style={styles.settingText}>Leave Expense</Text>
+                  <Text style={styles.settingDescription}>
+                    You will be removed from all splits and won't be able to access this expense anymore.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.danger} />
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.leaveButton}
-              onPress={handleLeaveExpense}
-              disabled={loading}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="exit-outline" size={20} color={Colors.error} />
-
-              <Text style={styles.leaveButtonText}>Leave Expense</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.leaveDescription}>
-              You will be removed from all splits and won't be able to access
-              this expense anymore.
-            </Text>
           </View>
         )}
       </ScrollView>
@@ -563,8 +516,10 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
+              <View style={styles.modalIcon}>
+                <Ionicons name="create-outline" size={32} color={Colors.accent} />
+              </View>
               <Text style={styles.modalTitle}>Change Expense Name</Text>
-
               <Text style={styles.modalSubtitle}>
                 Enter a new name for this expense
               </Text>
@@ -581,6 +536,8 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
                 placeholderTextColor={Colors.textSecondary}
                 autoFocus={true}
                 maxLength={50}
+                keyboardType="default"
+                autoCorrect={false}
               />
             </View>
 
@@ -608,581 +565,185 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-
+    backgroundColor: Colors.surface,
+  },
+  scrollView: {
+    flex: 1,
     backgroundColor: Colors.background,
   },
-
+  scrollContent: {
+    paddingBottom: 100, // Extra padding for home bar area
+  },
   header: {
-    position: "absolute",
-
-    top: 0,
-
-    left: 0,
-
-    right: 0,
-
-    zIndex: 1000,
-
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "space-between",
-
-    paddingHorizontal: Spacing.xl,
-
-    paddingBottom: Spacing.lg,
-
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-
-    borderBottomColor: "rgba(0, 0, 0, 0.1)",
+    borderBottomColor: Colors.divider,
   },
-
   backButton: {
-    width: 40,
-
-    height: 40,
-
-    borderRadius: Radius.md,
-
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-
-    justifyContent: "center",
-
-    alignItems: "center",
-
-    borderWidth: 1,
-
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    padding: Spacing.sm,
   },
-
   headerTitle: {
-    ...Typography.h3,
-
+    ...Typography.h2,
     color: Colors.textPrimary,
-
-    fontWeight: "700",
-
-    textAlign: "center",
-
-    marginBottom: 2,
+    textAlign: 'center',
   },
-
-  headerSubtitle: {
-    ...Typography.caption,
-
-    color: Colors.textSecondary,
-
-    textAlign: "center",
-
-    opacity: 0.8,
+  placeholder: {
+    width: 40, // Same width as back button to center the title
   },
-
-  headerContent: {
-    flex: 1,
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  headerSpacer: {
-    width: 40,
-
-    height: 40,
-  },
-
-  content: {
-    flex: 1,
-
-    paddingHorizontal: Spacing.xl,
-  },
-
-  section: {
-    backgroundColor: Colors.card,
-
+  settingsSection: {
+    margin: Spacing.lg,
     marginBottom: Spacing.xl,
-
-    padding: Spacing.lg,
-
-    borderRadius: Radius.lg,
-
-    ...Shadows.card,
-
-    borderWidth: 1,
-
-    borderColor: "rgba(218, 163, 64, 0.1)",
   },
-
-  sectionHeader: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    marginBottom: Spacing.lg,
-
-    paddingBottom: Spacing.sm,
-
-    borderBottomWidth: 1,
-
-    borderBottomColor: "rgba(218, 163, 64, 0.15)",
-  },
-
   sectionTitle: {
     ...Typography.h3,
-
     color: Colors.textPrimary,
-
-    flex: 1,
-
-    fontWeight: "700",
-
-    letterSpacing: 0.5,
+    marginBottom: Spacing.md,
   },
-
-  sectionIcon: {
-    width: 44,
-
-    height: 44,
-
-    borderRadius: Radius.md,
-
-    backgroundColor: Colors.surfaceLight,
-
-    justifyContent: "center",
-
-    alignItems: "center",
-
-    ...Shadows.avatar,
-
-    borderWidth: 1,
-
-    borderColor: "rgba(218, 163, 64, 0.2)",
-  },
-
-  settingRow: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "space-between",
-
-    marginBottom: Spacing.lg,
-
-    paddingVertical: Spacing.md,
-
-    paddingHorizontal: Spacing.md,
-
-    backgroundColor: Colors.surface,
-
-    borderRadius: Radius.sm,
-
-    ...Shadows.button,
-
-    borderWidth: 1,
-
-    borderColor: Colors.border,
-  },
-
-  settingInfo: {
-    flex: 1,
-
-    marginRight: Spacing.md,
-  },
-
-  settingTitle: {
-    ...Typography.body1,
-
-    color: Colors.textPrimary,
-
-    fontWeight: "600",
-
-    marginBottom: Spacing.xs,
-
-    letterSpacing: 0.3,
-  },
-
-  settingDescription: {
-    ...Typography.body2,
-
-    color: Colors.textSecondary,
-
-    lineHeight: 20,
-
-    opacity: 0.8,
-  },
-
-  inviteSection: {
-    marginTop: Spacing.lg,
-
-    padding: Spacing.lg,
-
-    backgroundColor: Colors.surfaceLight,
-
+  settingsList: {
+    backgroundColor: Colors.card,
     borderRadius: Radius.lg,
-
-    borderWidth: 1,
-
-    borderColor: "rgba(218, 163, 64, 0.1)",
-
     ...Shadows.card,
   },
-
-  inviteActions: {
-    flexDirection: "row",
-
-    gap: Spacing.sm,
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
   },
-
-  copyButton: {
-    flex: 1,
-
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "center",
-
-    backgroundColor: Colors.accent,
-
-    paddingVertical: Spacing.md,
-
-    paddingHorizontal: Spacing.lg,
-
-    borderRadius: Radius.sm,
-
-    gap: Spacing.xs,
-
-    ...Shadows.button,
-
-    borderWidth: 1,
-
-    borderColor: Colors.accentDark,
-
-    minHeight: 44,
-  },
-
-  copyButtonText: {
-    ...Typography.body2,
-
-    color: Colors.surface,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.2,
-  },
-
-  shareButton: {
-    flex: 1,
-
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "center",
-
-    backgroundColor: Colors.blue,
-
-    paddingVertical: Spacing.md,
-
-    paddingHorizontal: Spacing.lg,
-
-    borderRadius: Radius.sm,
-
-    gap: Spacing.xs,
-
-    ...Shadows.button,
-
-    borderWidth: 1,
-
-    borderColor: "#3A7BD5",
-
-    minHeight: 44,
-  },
-
-  shareButtonText: {
-    ...Typography.body2,
-
-    color: Colors.surface,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.2,
-  },
-
-  leaveButton: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "center",
-
-    backgroundColor: "rgba(229, 107, 111, 0.1)",
-
-    borderWidth: 2,
-
-    borderColor: Colors.error,
-
-    paddingVertical: Spacing.md,
-
-    paddingHorizontal: Spacing.lg,
-
-    borderRadius: Radius.sm,
-
-    gap: Spacing.xs,
-
-    marginBottom: Spacing.lg,
-
-    ...Shadows.button,
-
-    minHeight: 44,
-  },
-
-  leaveButtonText: {
-    ...Typography.body2,
-
-    color: Colors.error,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.2,
-  },
-
-  leaveDescription: {
-    ...Typography.body2,
-
-    color: Colors.textSecondary,
-
-    textAlign: "center",
-
-    lineHeight: 20,
-
-    opacity: 0.8,
-
-    paddingHorizontal: Spacing.sm,
-  },
-
-  nameRow: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    justifyContent: "space-between",
-
-    paddingVertical: Spacing.md,
-
-    paddingHorizontal: Spacing.md,
-
-    backgroundColor: Colors.surfaceLight,
-
-    borderRadius: Radius.sm,
-
-    borderWidth: 1,
-
-    borderColor: Colors.border,
-
-    ...Shadows.button,
-
-    marginTop: Spacing.sm,
-  },
-
-  nameInfo: {
-    flex: 1,
-  },
-
-  nameTitle: {
-    ...Typography.body2,
-
-    color: Colors.textSecondary,
-
-    marginBottom: Spacing.xs,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.3,
-  },
-
-  nameValue: {
-    ...Typography.body1,
-
+  settingText: {
+    ...Typography.body,
     color: Colors.textPrimary,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.2,
+    fontWeight: '600',
+    marginBottom: Spacing.xs,
+  },
+  settingDescription: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+  },
+  settingContent: {
+    flex: 1,
+    marginLeft: Spacing.md,
   },
 
   modalOverlay: {
     flex: 1,
-
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-
-    justifyContent: "center",
-
-    alignItems: "center",
-
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: Spacing.xl,
   },
-
   modalContent: {
     backgroundColor: Colors.surface,
-
     borderRadius: Radius.xl,
-
     padding: Spacing.xl,
-
-    width: "100%",
-
-    maxWidth: 400,
-
+    width: '100%',
+    maxWidth: 380,
     ...Shadows.card,
-
     borderWidth: 1,
-
-    borderColor: "rgba(218, 163, 64, 0.15)",
+    borderColor: Colors.border,
   },
-
   modalHeader: {
-    alignItems: "center",
-
-    marginBottom: Spacing.xxl,
-
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
     paddingBottom: Spacing.lg,
-
     borderBottomWidth: 1,
-
-    borderBottomColor: "rgba(218, 163, 64, 0.15)",
+    borderBottomColor: Colors.divider,
   },
-
+  modalIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.card,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+    borderWidth: 2,
+    borderColor: Colors.accent,
+    ...Shadows.card,
+  },
   modalTitle: {
     ...Typography.h2,
-
     color: Colors.textPrimary,
-
     marginBottom: Spacing.sm,
-
-    textAlign: "center",
-
-    fontWeight: "700",
-
-    letterSpacing: 0.5,
+    textAlign: 'center',
+    fontWeight: '600',
   },
-
   modalSubtitle: {
-    ...Typography.body1,
-
+    ...Typography.body,
     color: Colors.textSecondary,
-
-    textAlign: "center",
-
-    opacity: 0.8,
-
-    lineHeight: 22,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 
   inputContainer: {
-    marginBottom: Spacing.xxl,
+    marginBottom: Spacing.xl,
   },
-
   inputLabel: {
-    ...Typography.body1,
-
+    ...Typography.body,
     color: Colors.textPrimary,
-
     marginBottom: Spacing.md,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.3,
+    fontWeight: '600',
   },
-
   textInput: {
-    ...Typography.body1,
-
+    ...Typography.body,
     color: Colors.textPrimary,
-
     backgroundColor: Colors.card,
-
     borderWidth: 2,
-
     borderColor: Colors.border,
-
-    borderRadius: Radius.md,
-
+    borderRadius: Radius.lg,
     paddingHorizontal: Spacing.lg,
-
     paddingVertical: Spacing.lg,
-
     fontSize: 16,
-
-    fontWeight: "500",
-
+    fontWeight: '500',
     ...Shadows.button,
   },
-
   modalActions: {
-    flexDirection: "row",
-
+    flexDirection: 'row',
     gap: Spacing.md,
   },
-
   modalButton: {
     flex: 1,
-
-    paddingVertical: Spacing.md,
-
+    paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.lg,
-
-    borderRadius: Radius.sm,
-
-    alignItems: "center",
-
+    borderRadius: Radius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
     ...Shadows.button,
-
-    minHeight: 44,
   },
-
   cancelButton: {
-    backgroundColor: Colors.surfaceLight,
-
+    backgroundColor: Colors.card,
     borderWidth: 2,
-
     borderColor: Colors.border,
   },
-
   saveButton: {
     backgroundColor: Colors.accent,
-
     borderWidth: 2,
-
-    borderColor: Colors.accentDark,
+    borderColor: Colors.accent,
   },
-
   cancelButtonText: {
-    ...Typography.body2,
-
+    ...Typography.body,
     color: Colors.textSecondary,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.2,
+    fontWeight: '600',
   },
-
   saveButtonText: {
-    ...Typography.body2,
-
+    ...Typography.body,
     color: Colors.surface,
-
-    fontWeight: "600",
-
-    letterSpacing: 0.2,
+    fontWeight: '600',
   },
 });
 

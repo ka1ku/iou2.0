@@ -153,7 +153,7 @@ const RecentExpenses = ({
           <Text style={styles.emptyStateSubtitle}>Start tracking your shared expenses</Text>
           <TouchableOpacity
             style={styles.createExpenseButton}
-            onPress={() => onExpensePress('AddExpense')}
+            onPress={() => onExpensePress('SetupExpense')}
           >
             <Ionicons name="add-circle-outline" size={20} color="white" style={styles.createExpenseButtonIcon} />
             <Text style={styles.createExpenseButtonText}>Create Your First Expense</Text>

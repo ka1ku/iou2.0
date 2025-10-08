@@ -17,7 +17,7 @@ import { getCurrentUser } from '../services/authService';
 import { handleTakePhoto, handlePickImage } from '../services/imageHandler';
 import { processReceiptImage } from '../services/receiptScanner';
 import { requestReceiptScanningAccess } from '../services/subscriptionService';
-import { useReceiptScanning } from '../App';
+import { useReceiptScanning } from '../contexts/ReceiptScanningContext';
 import { calculateUserBalanceForExpense, calculateExpenseTotal } from '../utils/balanceCalculator';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 
