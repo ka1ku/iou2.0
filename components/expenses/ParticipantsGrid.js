@@ -393,6 +393,11 @@ const ParticipantsGrid = forwardRef(({
   }, []);
 
   const allMembers = useMemo(() => [currentUserData, ...selectedFriends], [currentUserData, selectedFriends]);
+  
+  const displayParticipants = useMemo(() => {
+    const currentUser = getCurrentUser();
+    return participants.filter(p => p.userId !== currentUser?.uid);
+  }, [participants]);
 
   const filteredContacts = useMemo(() => {
     const q = (deferredQuery || '').trim().toLowerCase();
@@ -437,12 +442,12 @@ const ParticipantsGrid = forwardRef(({
         activeOpacity={0.8}
       >
         <View style={styles.avatarStackContainer}>
-          {participants.slice(0, 4).map((participant, index) => (
+          {displayParticipants.slice(0, 4).map((participant, index) => (
             <View
               key={participant.id}
               style={[
                 styles.avatarStackItem,
-                { zIndex: participants.length - index }
+                { zIndex: displayParticipants.length - index }
               ]}
             >
               {participant.profilePhoto ? (
@@ -457,15 +462,15 @@ const ParticipantsGrid = forwardRef(({
             </View>
           ))}
 
-          {participants.length > 4 && (
+          {displayParticipants.length > 4 && (
             <View style={styles.overflowContainer}>
-              <Text style={styles.overflowText}>+{participants.length - 4}</Text>
+              <Text style={styles.overflowText}>+{displayParticipants.length - 4}</Text>
             </View>
           )}
         </View>
 
         <View style={styles.actionContainer}>
-          <Text style={styles.actionText}>Manage group</Text>
+          <Text style={styles.actionText}>Manage group ({participants.length})</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
@@ -514,7 +519,7 @@ const ParticipantsGrid = forwardRef(({
           <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
             <View style={styles.membersContainer}>
               <FlatList
-                data={allMembers}
+                data={selectedFriends}
                 horizontal
                 keyExtractor={(item) => item.id}
                 renderItem={renderMemberItem}
