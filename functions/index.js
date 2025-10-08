@@ -399,3 +399,91 @@ exports.onExpenseJoin = functions.firestore
       console.error('Error in onExpenseJoin:', error);
     }
   });
+
+// Update user information across all expenses
+exports.updateUserInExpenses = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  try {
+    const { userId, firstName, lastName, username, profilePhoto } = data;
+    
+    if (!userId || !firstName || !lastName) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required fields: userId, firstName, lastName');
+    }
+
+    const db = admin.firestore();
+    
+    // Query all expenses where this user is a participant
+    const expensesQuery = db.collection('expenses').where(`participantsMap.${userId}`, '==', true);
+    const expensesSnapshot = await expensesQuery.get();
+    
+    if (expensesSnapshot.empty) {
+      return {
+        success: true,
+        message: 'No expenses found for this user',
+        expensesUpdated: 0
+      };
+    }
+
+    let expensesUpdated = 0;
+    let batch = db.batch();
+    let batchCount = 0;
+    const maxBatchSize = 500; // Firestore batch limit
+
+    // Update each expense
+    for (const expenseDoc of expensesSnapshot.docs) {
+      const expenseData = expenseDoc.data();
+      const participants = expenseData.participants || [];
+      
+      // Find and update the user's participant entry
+      let participantUpdated = false;
+      const updatedParticipants = participants.map(participant => {
+        if (participant.userId === userId) {
+          participantUpdated = true;
+          return {
+            ...participant,
+            name: `${firstName} ${lastName}`.trim(),
+            username: username || participant.username,
+            profilePhoto: profilePhoto || participant.profilePhoto
+          };
+        }
+        return participant;
+      });
+
+      // Only update if the participant was found and changed
+      if (participantUpdated) {
+        batch.update(expenseDoc.ref, {
+          participants: updatedParticipants,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        expensesUpdated++;
+        batchCount++;
+
+        // Commit batch if we've reached the limit
+        if (batchCount >= maxBatchSize) {
+          await batch.commit();
+          batch = db.batch();
+          batchCount = 0;
+        }
+      }
+    }
+
+    // Commit any remaining operations
+    if (batchCount > 0) {
+      await batch.commit();
+    }
+
+    return {
+      success: true,
+      message: `Successfully updated user information in ${expensesUpdated} expenses`,
+      expensesUpdated: expensesUpdated
+    };
+
+  } catch (error) {
+    console.error('Error in updateUserInExpenses:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to update user in expenses: ' + error.message);
+  }
+});

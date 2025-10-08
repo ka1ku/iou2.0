@@ -85,7 +85,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
       await updateUserProfile(localProfile);
       await refreshUserProfile();
       setHasChanges(false);
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert('Success', 'Profile updated successfully! Your changes have been applied to all your expenses.');
     } catch (error) {
       Alert.alert('Error', 'Failed to update profile');
     } finally {
@@ -206,7 +206,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
               disabled={isLoading}
             >
               {isLoading ? (
-                <Text style={styles.saveButtonText}>Saving...</Text>
+                <Text style={styles.saveButtonText}>Updating profile...</Text>
               ) : (
                 <>
                   <Ionicons name="checkmark-circle-outline" size={24} color={Colors.accent} />

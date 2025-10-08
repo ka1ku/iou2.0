@@ -11,6 +11,7 @@ import {
   where,
   getDocs
 } from '@react-native-firebase/firestore';
+import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { getApp } from '@react-native-firebase/app';
 import { generateFallbackAvatar } from '../utils/venmoUtils';
 import { downloadAndUploadImage } from './imageHandler';
@@ -453,6 +454,25 @@ export const updateUserProfile = async (profileData) => {
     }
 
     await setDoc(userDocRef, updateData, { merge: true });
+    
+    // Call cloud function to update user info in all expenses (background operation)
+    try {
+      const functions = getFunctions();
+      const updateUserInExpenses = httpsCallable(functions, 'updateUserInExpenses');
+      
+      await updateUserInExpenses({
+        userId: user.uid,
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        username: profileData.username,
+        profilePhoto: updateData.profilePhoto
+      });
+      
+      console.log('Successfully updated user information in expenses');
+    } catch (expenseUpdateError) {
+      // Log error but don't fail the profile update
+      console.error('Failed to update user information in expenses:', expenseUpdateError);
+    }
     
     return {
       ...updateData,
