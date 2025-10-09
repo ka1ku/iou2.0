@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { useExpense } from '../../contexts/ExpenseContext';
@@ -55,6 +55,8 @@ const PaidBySection = () => {
                     <Image
                       source={{ uri: participant.profilePhoto }}
                       style={styles.paidByAvatarImage}
+                      contentFit="cover"
+                      transition={200}
                     />
                   ) : (
                     <View style={[

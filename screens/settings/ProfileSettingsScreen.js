@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -127,6 +127,8 @@ const ProfileSettingsScreen = ({ navigation }) => {
                   <Image 
                     source={{ uri: localProfile.profilePhoto }} 
                     style={styles.profileImage}
+                    contentFit="cover"
+                    transition={200}
                   />
                 ) : (
                   <View style={styles.profilePlaceholder}>

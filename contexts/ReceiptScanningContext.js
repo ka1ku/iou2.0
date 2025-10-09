@@ -35,3 +35,5 @@ export const ReceiptScanningProvider = ({ children }) => {
 
 export default ReceiptScanningContext;
 
+
+

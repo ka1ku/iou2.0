@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  Image,
   Linking,
   Alert,
   AppState,
   Animated,
   Easing,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
@@ -596,7 +596,7 @@ const SettleUpScreen = ({ route, navigation }) => {
           <View style={styles.participantColumn}>
             <View style={styles.participantAvatarContainer}>
               {fromParticipant?.profilePhoto ? (
-                <Image source={{ uri: fromParticipant.profilePhoto }} style={styles.participantAvatar} />
+                <Image source={{ uri: fromParticipant.profilePhoto }} style={styles.participantAvatar} contentFit="cover" transition={200} />
               ) : (
                 <View style={[
                   styles.participantAvatarPlaceholder,
@@ -688,7 +688,7 @@ const SettleUpScreen = ({ route, navigation }) => {
           <View style={styles.participantColumn}>
             <View style={styles.participantAvatarContainer}>
               {toParticipant?.profilePhoto ? (
-                <Image source={{ uri: toParticipant.profilePhoto }} style={styles.participantAvatar} />
+                <Image source={{ uri: toParticipant.profilePhoto }} style={styles.participantAvatar} contentFit="cover" transition={200} />
               ) : (
                 <View style={[
                   styles.participantAvatarPlaceholder,

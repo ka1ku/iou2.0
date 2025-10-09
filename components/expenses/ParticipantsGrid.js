@@ -7,11 +7,11 @@ import {
   FlatList,
   TextInput,
   Modal,
-  Image,
   ScrollView,
   Alert,
 
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import * as Contacts from 'expo-contacts';
@@ -30,7 +30,7 @@ const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect }) => 
     <TouchableOpacity style={styles.listItem} onPress={() => onToggleSelect({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}>
       <View style={styles.avatarContainer}>
         {item.profilePhoto ? (
-          <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+          <Image source={{ uri: item.profilePhoto }} style={styles.avatar} contentFit="cover" transition={200} />
         ) : (
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
@@ -69,7 +69,7 @@ const MemoizedContactItem = React.memo(({ item, onInviteContact, onSMSInvite }) 
     <TouchableOpacity style={styles.listItem} onPress={() => onInviteContact(item)}>
       <View style={styles.avatarContainer}>
         {item.imageAvailable && item.image?.uri ? (
-          <Image source={{ uri: item.image.uri }} style={styles.avatar} />
+          <Image source={{ uri: item.image.uri }} style={styles.avatar} contentFit="cover" transition={200} />
         ) : (
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarInitials}>{(name[0] || 'U').toUpperCase()}</Text>
@@ -97,7 +97,7 @@ const MemoizedInvitedContactItem = React.memo(({ item, onSMSInvite }) => {
     <View style={styles.listItem}>
       <View style={styles.avatarContainer}>
         {item.profilePhoto ? (
-          <Image source={{ uri: item.profilePhoto }} style={styles.avatar} />
+          <Image source={{ uri: item.profilePhoto }} style={styles.avatar} contentFit="cover" transition={200} />
         ) : (
           <View style={styles.avatarPlaceholder}>
             <Text style={styles.avatarInitials}>{(item.name[0] || 'U').toUpperCase()}</Text>
@@ -124,7 +124,7 @@ const MemoizedMemberItem = React.memo(({ item, onRemoveFriend }) => (
   <View style={styles.memberItem}>
     <View style={styles.memberAvatarContainer}>
       {item.profilePhoto ? (
-        <Image source={{ uri: item.profilePhoto }} style={styles.memberAvatar} />
+        <Image source={{ uri: item.profilePhoto }} style={styles.memberAvatar} contentFit="cover" transition={200} />
       ) : (
         <View style={styles.memberAvatarPlaceholder}>
           <Text style={styles.memberAvatarInitials}>
@@ -451,7 +451,7 @@ const ParticipantsGrid = forwardRef(({
               ]}
             >
               {participant.profilePhoto ? (
-                <Image source={{ uri: participant.profilePhoto }} style={styles.avatarStackImage} />
+                <Image source={{ uri: participant.profilePhoto }} style={styles.avatarStackImage} contentFit="cover" transition={200} />
               ) : (
                 <View style={styles.avatarStackPlaceholder}>
                   <Text style={styles.avatarStackInitials}>
@@ -470,7 +470,7 @@ const ParticipantsGrid = forwardRef(({
         </View>
 
         <View style={styles.actionContainer}>
-          <Text style={styles.actionText}>Manage group ({participants.length})</Text>
+          <Text style={styles.actionText}>Manage group</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>

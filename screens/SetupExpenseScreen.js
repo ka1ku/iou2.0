@@ -9,8 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -53,13 +53,8 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     }
   }, [scannedReceipt, actions]);
 
-  useEffect(() => {
-    if (scannedReceipt && fromReceiptScan) {
-      if (scannedReceipt.participants && scannedReceipt.participants.length > 0) {
-        actions.setParticipants(scannedReceipt.participants);
-      }
-    }
-  }, [scannedReceipt, fromReceiptScan, actions]);
+  // Don't set participants from scanned receipt - they're incomplete data
+  // The expense context already creates the current user participant properly with userProfile
 
   useEffect(() => {
     const meParticipant = participants.find(p => p.userId === currentUserId);
@@ -246,13 +241,17 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                     <Text style={styles.addPersonText} numberOfLines={1}>Add people</Text>
                   </TouchableOpacity>
 
-                  {participants.map((participant, index) => (
+                  {participants
+                    .filter(p => p.userId !== currentUserId)
+                    .map((participant, index) => (
                     <View key={participant.id || `participant-${index}`} style={styles.participantItem}>
                       <View style={styles.participantAvatar}>
                         {participant.profilePhoto ? (
                           <Image 
                             source={{ uri: participant.profilePhoto }} 
                             style={styles.participantImage}
+                            contentFit="cover"
+                            transition={200}
                           />
                         ) : (
                           <View style={[

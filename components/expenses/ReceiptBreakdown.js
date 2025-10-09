@@ -5,13 +5,13 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Image,
   ScrollView,
   LayoutAnimation,
   UIManager,
   Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import PriceInput from './PriceInput'; 
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
@@ -203,7 +203,7 @@ const ReceiptBreakdown = ({
                       >
                         <View>
                           {participant.profilePhoto ? (
-                            <Image source={{ uri: participant.profilePhoto }} style={styles.chipAvatar} />
+                            <Image source={{ uri: participant.profilePhoto }} style={styles.chipAvatar} contentFit="cover" transition={200} />
                           ) : (
                             <View style={[styles.chipAvatar, styles.chipInitialsWrapper]}>
                               <Text style={styles.chipInitials}>{(participant.name?.[0] || 'U').toUpperCase()}</Text>

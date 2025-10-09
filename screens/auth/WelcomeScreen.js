@@ -4,8 +4,8 @@ import {
   Text,
   StyleSheet,
   StatusBar,
-  Image,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
@@ -22,7 +22,8 @@ const WelcomeScreen = ({ navigation }) => {
           <Image 
             source={require('../../assets/appstore.png')} 
             style={styles.logoImage}
-            resizeMode="contain"
+            contentFit="contain"
+            transition={200}
           />
         </View>
         <Text style={styles.title}>Welcome to IOU</Text>

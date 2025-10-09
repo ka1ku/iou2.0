@@ -365,7 +365,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
               <Text style={styles.sectionTitle}>Participants</Text>
               <View style={styles.memberCountContainer}>
                 <Text style={styles.memberCountNumber}>
-                  {state.participants.length}
+                  {state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length}
                 </Text>
                 <Ionicons name="people" size={12} color={Colors.surface} />
               </View>

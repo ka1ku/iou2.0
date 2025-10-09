@@ -9,6 +9,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
 import LottieView from 'lottie-react-native';
+import Purchases from 'react-native-purchases';
 
 import { Colors, Typography } from './design/tokens';
 
@@ -278,19 +279,18 @@ export default function App() {
 
   useEffect(() => {
     const initializeServices = async () => {
-      // RevenueCat temporarily disabled - uncomment when ready to enable subscriptions
-      // try {
-      //   await Purchases.configure({
-      //     apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
-      //     appUserID: null,
-      //   });
-      //   
-      //   Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-      //   
-      //   const offerings = await Purchases.getOfferings();
-      //   
-      // } catch (error) {
-      // }
+      try {
+        await Purchases.configure({
+          apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
+          appUserID: null,
+        });
+        
+        Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+        
+        const offerings = await Purchases.getOfferings();
+        
+      } catch (error) {
+      }
       
       try {
         deepLinkService.initialize();
@@ -302,13 +302,12 @@ export default function App() {
       setUser(user);
       setLoading(false);
       
-      // RevenueCat temporarily disabled - uncomment when ready to enable subscriptions
-      // if (user?.uid) {
-      //   try {
-      //     await Purchases.setAppUserID(user.uid);
-      //   } catch (error) {
-      //   }
-      // }
+      if (user?.uid) {
+        try {
+          await Purchases.setAppUserID(user.uid);
+        } catch (error) {
+        }
+      }
     });
 
     initializeServices();

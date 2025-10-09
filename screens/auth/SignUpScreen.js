@@ -9,9 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
@@ -521,7 +521,8 @@ const SignUpScreen = ({ navigation }) => {
           <Image 
             source={require('../../assets/venmo.png')} 
             style={styles.venmoLogo}
-            resizeMode="contain"
+            contentFit="contain"
+            transition={200}
           />
         </View>
         <Text style={styles.stepTitle}>Link Your Venmo</Text>

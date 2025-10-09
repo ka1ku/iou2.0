@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Image, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
+import { Image } from 'expo-image';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 
 const ProfilePicture = ({ 
@@ -44,7 +45,8 @@ const ProfilePicture = ({
           style={imageStyle}
           onLoad={handleImageLoad}
           onError={handleImageError}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={200}
         />
         {/* Show placeholder only while the source image is loading */}
         {!imageLoaded && (
@@ -68,7 +70,8 @@ const ProfilePicture = ({
         style={imageStyle}
         onLoad={handleImageLoad}
         onError={handleImageError}
-        resizeMode="cover"
+        contentFit="cover"
+        transition={200}
       />
       {/* Show placeholder only while the fallback image is loading */}
       {!imageLoaded && (

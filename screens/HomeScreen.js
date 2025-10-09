@@ -7,9 +7,9 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Linking,
-  Image
+  Linking
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
@@ -259,7 +259,9 @@ const HomeScreen = ({ navigation }) => {
                           <View style={styles.avatarImageContainer}>
                             <Image 
                               source={{ uri: participant.profilePhoto }} 
-                              style={styles.participantAvatar} 
+                              style={styles.participantAvatar}
+                              contentFit="cover"
+                              transition={200} 
                             />
                           </View>
                         ) : (

@@ -339,16 +339,15 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     if (scannedReceipt && fromReceiptScan) {
       actions.setTitle(scannedReceipt.title || '');
       
-      if (scannedReceipt.participants && scannedReceipt.participants.length > 0) {
-        actions.setParticipants(scannedReceipt.participants);
-      }
+      // Don't set participants from scanned receipt - they're incomplete
+      // The expense context already creates the current user participant properly
       
       if (scannedReceipt.items && scannedReceipt.items.length > 0) {
         const formattedItems = scannedReceipt.items.map((item, index) => ({
           id: Date.now().toString() + index,
           name: item.name || '',
           amount: parseFloat(item.amount) || 0,
-          selectedConsumers: [0],
+          selectedConsumers: [],
           selectedPayers: [0],
           splits: []
         }));
@@ -451,7 +450,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             <Text style={styles.sectionTitle}>Participants</Text>
             <View style={styles.memberCountContainer}>
               <Text style={styles.memberCountNumber}>
-                {state.participants.length}
+                {state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length}
               </Text>
               <Ionicons name="people" size={12} color={Colors.surface} />
             </View>
@@ -536,10 +535,6 @@ const styles = StyleSheet.create({
   },
 });
 
-const AddReceiptScreen = (props) => (
-  <ExpenseProvider>
-    <AddReceiptScreenContent {...props} />
-  </ExpenseProvider>
-);
+const AddReceiptScreen = AddReceiptScreenContent;
 
 export default AddReceiptScreen;
