@@ -1,31 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Linking
+  TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
-import { handleTakePhoto, handlePickImage } from '../services/imageHandler';
-import { processReceiptImage } from '../services/receiptScanner';
-import { requestReceiptScanningAccess } from '../services/subscriptionService';
-import { useReceiptScanning } from '../contexts/ReceiptScanningContext';
 import { calculateUserBalanceForExpense, calculateExpenseTotal } from '../utils/balanceCalculator';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 
 const HomeScreen = ({ navigation }) => {
-  const [scanningReceipt, setScanningReceipt] = useState(false);
-  const { setIsReceiptScanning, startScanningAnimation, stopScanningAnimation } = useReceiptScanning();
-  
   const { expenses, loading } = useExpenseData();
+  const [searchQuery, setSearchQuery] = useState('');
   const calculateExpenseBalance = (expense) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -49,74 +41,27 @@ const HomeScreen = ({ navigation }) => {
     return allSettled ? 'settled' : 'needsSettlement';
   };
 
-  const handleReceiptScan = async () => {
-    try {
-      const hasAccess = await requestReceiptScanningAccess();
-      
-      if (!hasAccess) {
-        return;
-      }
-      Alert.alert(
-        'Scan Receipt',
-        'Choose how you want to scan your receipt.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Take Photo', onPress: () => handleTakePhoto(
-            (imageUri) => processReceiptImage(
-              imageUri,
-              () => {
-                setScanningReceipt(true);
-                startScanningAnimation();
-              },
-              () => {
-                setScanningReceipt(false);
-                stopScanningAnimation();
-              },
-              (receiptData) => {
-                navigation.navigate('SetupExpense', { 
-                  expenseType: 'receipt',
-                  scannedReceipt: receiptData,
-                  fromReceiptScan: true 
-                });
-              },
-              (errorMessage) => {
-                Alert.alert('Receipt Scanning Error', errorMessage);
-              }
-            ),
-            (error) => Alert.alert('Error', error),
-            setIsReceiptScanning
-          ) },
-          { text: 'Choose from Gallery', onPress: () => handlePickImage(
-            (imageUri) => processReceiptImage(
-              imageUri,
-              () => {
-                setScanningReceipt(true);
-                startScanningAnimation();
-              },
-              () => {
-                setScanningReceipt(false);
-                stopScanningAnimation();
-              },
-              (receiptData) => {
-                navigation.navigate('SetupExpense', { 
-                  expenseType: 'receipt',
-                  scannedReceipt: receiptData,
-                  fromReceiptScan: true 
-                });
-              },
-              (errorMessage) => {
-                Alert.alert('Receipt Scanning Error', errorMessage);
-              }
-            ),
-            (error) => Alert.alert('Error', error),
-            setIsReceiptScanning
-          ) }
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start receipt scanning');
+  // Filter expenses based on search query
+  const filteredExpenses = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return expenses;
     }
-  };
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    return expenses.filter(expense => {
+      // Search by expense title
+      const titleMatch = expense.title?.toLowerCase().includes(query);
+      
+      // Search by participant names
+      const participantMatch = expense.participants?.some(participant => 
+        participant.name?.toLowerCase().includes(query) ||
+        participant.username?.toLowerCase().includes(query)
+      );
+      
+      return titleMatch || participantMatch;
+    });
+  }, [expenses, searchQuery]);
 
   const renderExpenseItem = ({ item }) => {
     const totalItems = item.items?.length || 0;
@@ -296,10 +241,19 @@ const HomeScreen = ({ navigation }) => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="receipt-outline" size={64} color="#ccc" />
-      <Text style={styles.emptyStateText}>No expenses yet</Text>
+      <Ionicons 
+        name={searchQuery.trim() ? "search-outline" : "receipt-outline"} 
+        size={64} 
+        color="#ccc" 
+      />
+      <Text style={styles.emptyStateText}>
+        {searchQuery.trim() ? 'No expenses found' : 'No expenses yet'}
+      </Text>
       <Text style={styles.emptyStateSubtext}>
-        Tap the + button to create your first expense
+        {searchQuery.trim() 
+          ? 'Try a different search term'
+          : 'Tap the Create button to add your first expense'
+        }
       </Text>
     </View>
   );
@@ -314,38 +268,38 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>My Expenses</Text>
-        </View>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={styles.receiptButton}
-            onPress={handleReceiptScan}
-            disabled={scanningReceipt}
-            activeOpacity={0.7}
-          >
-            {scanningReceipt ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Ionicons name="scan-outline" size={26} color="white" />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('SetupExpense', { expenseType: 'expense' })}
-          >
-            <Ionicons name="add" size={26} color="white" />
-          </TouchableOpacity>
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search expenses or members..."
+            placeholderTextColor={Colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       <FlatList
-        data={expenses}
+        data={filteredExpenses}
         renderItem={renderExpenseItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={expenses.length === 0 ? styles.emptyContainer : styles.listContainer}
+        contentContainerStyle={filteredExpenses.length === 0 ? styles.emptyContainer : styles.listContainer}
         ListEmptyComponent={renderEmptyState}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
       />
 
     </View>
@@ -357,10 +311,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  searchContainer: {
     paddingTop: 60,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
@@ -368,38 +319,29 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
-  headerLeft: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
-  headerTitle: {
-    ...Typography.h2,
+  searchIcon: {
+    marginRight: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    ...Typography.body,
     color: Colors.textPrimary,
-    marginRight: Spacing.sm,
+    paddingVertical: 0,
+    fontSize: 16,
   },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-
-  receiptButton: {
-    backgroundColor: Colors.blue,
-    width: 44,
-    height: 44,
-    borderRadius: Radius.pill,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.sm,
-    ...Shadows.card,
-  },
-  addButton: {
-    backgroundColor: Colors.accent,
-    width: 44,
-    height: 44,
-    borderRadius: Radius.pill,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Shadows.card,
+  clearButton: {
+    marginLeft: Spacing.sm,
+    padding: Spacing.xs,
   },
   listContainer: {
     padding: Spacing.lg,
