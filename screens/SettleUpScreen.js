@@ -528,7 +528,6 @@ const SettleUpScreen = ({ route, navigation }) => {
       Alert.alert('Error', copyToClipboard ? 'Failed to copy to clipboard. Please try again.' : 'Failed to open Venmo. Please try again.');
     }
   };
-
   const handleMarkAsPaid = useCallback(async (settlement) => {
     console.log('[handleMarkAsPaid] Called with settlement:', settlement);
     // Use consistent key format for settlement ID
@@ -793,8 +792,8 @@ const SettleUpScreen = ({ route, navigation }) => {
       const payerProfile = await getUserProfile(payerParticipant.userId);
       console.log('[handleRequestPayment] Payer profile:', payerProfile);
       
-      if (!payerProfile?.username) {
-        console.error('[handleRequestPayment] No username found for payer');
+      if (!payerProfile?.venmoUsername) {
+        console.error('[handleRequestPayment] No Venmo username found for payer');
         Alert.alert('Error', 'Payer does not have a Venmo username set up');
         return;
       }
@@ -802,7 +801,7 @@ const SettleUpScreen = ({ route, navigation }) => {
       // Create Venmo deeplink for requesting payment
       const amount = settlement.amount.toFixed(2);
       const note = `IOU Payment Request - ${expense.title || 'Expense'}`;
-      const deeplink = `venmo://paycharge?txn=charge&recipients=${payerProfile.username}&amount=${amount}&note=${encodeURIComponent(note)}`;
+      const deeplink = `venmo://paycharge?txn=charge&recipients=${payerProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
       console.log('[handleRequestPayment] Venmo deeplink:', deeplink);
 
       if (copyToClipboard) {
@@ -1113,10 +1112,10 @@ const SettleUpScreen = ({ route, navigation }) => {
                   console.log('[Action Button] Pressed for settlement:', settlement, 'buttonText:', getButtonText());
                   if (settlement.from === name) {
                     console.log('[Action Button] Calling handleMakePayment');
-                    handleMakePayment(settlement);
+                    handleMakePayment(settlement,true);
                   } else if (settlement.to === name && !hasRequestBeenSent) {
                     console.log('[Action Button] Calling handleRequestPayment');
-                    handleRequestPayment(settlement);
+                    handleRequestPayment(settlement, true);
                   } else if (settlement.to === name && hasRequestBeenSent) {
                     console.log('[Action Button] Request already sent, doing nothing');
                     // Request already sent, maybe show a message or do nothing
