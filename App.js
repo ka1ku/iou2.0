@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { NavigationContainer, getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -10,8 +10,9 @@ import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, P
 import * as SplashScreen from 'expo-splash-screen';
 import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { Colors, Typography } from './design/tokens';
+import { Colors, Typography, Shadows, Radius } from './design/tokens';
 
 import '@react-native-firebase/app';
 import '@react-native-firebase/auth';
@@ -42,11 +43,13 @@ import SignUpScreen from './screens/auth/SignUpScreen';
 import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
 
 import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
+import CreateBottomSheet from './components/CreateBottomSheet';
 
 import { ExpenseProvider } from './contexts/ExpenseContext';
 import { ExpenseDataProvider, useExpenseData } from './contexts/ExpenseDataContext';
 import { NotificationProvider, useNotifications } from './contexts/NotificationContext';
 import { ReceiptScanningProvider, useReceiptScanning } from './contexts/ReceiptScanningContext';
+
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
@@ -168,12 +171,18 @@ const NotificationNavigationHandler = () => {
   return null;
 };
 
+// Empty component for Create tab (doesn't render anything)
+const CreateTabScreen = () => null;
+
 const MainTabs = () => {
+  const navigation = useNavigation();
+  const bottomSheetRef = useRef(null);
   const { isReceiptScanning, showScanningOverlay } = useReceiptScanning();
 
   const getTabBarIcon = (routeName, focused, color, size) => {
     const iconMap = {
       Home: focused ? 'home' : 'home-outline',
+      Create: 'add-circle',
       Profile: focused ? 'person' : 'person-outline',
     };
     return <Ionicons name={iconMap[routeName]} size={size} color={color} />;
@@ -216,8 +225,31 @@ const MainTabs = () => {
         })}
       >
         <Tab.Screen name="Home" component={HomeStack} />
+        <Tab.Screen
+          name="Create"
+          component={CreateTabScreen}
+          options={{
+            tabBarButton: (props) => (
+              <View style={styles.createButtonContainer}>
+                <TouchableOpacity
+                  style={styles.createButton}
+                  onPress={() => bottomSheetRef.current?.open()}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={32} color={Colors.white} />
+                </TouchableOpacity>
+              </View>
+            ),
+            tabBarLabel: '',
+          }}
+        />
         <Tab.Screen name="Profile" component={ProfileStack} />
       </Tab.Navigator>
+      
+      <CreateBottomSheet 
+        ref={bottomSheetRef}
+        navigation={navigation}
+      />
       
       <NotificationNavigationHandler />
       
@@ -336,17 +368,19 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
-        <StatusBar style="dark" />
-        <ExpenseDataProvider>
-          <NotificationProvider>
-            <ReceiptScanningProvider>
-              {user ? <MainTabs /> : <AuthStack />}
-              <ExpenseJoinHandler />
-            </ReceiptScanningProvider>
-          </NotificationProvider>
-        </ExpenseDataProvider>
-      </NavigationContainer>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
+          <StatusBar style="dark" />
+          <ExpenseDataProvider>
+            <NotificationProvider>
+              <ReceiptScanningProvider>
+                {user ? <MainTabs /> : <AuthStack />}
+                <ExpenseJoinHandler />
+              </ReceiptScanningProvider>
+            </NotificationProvider>
+          </ExpenseDataProvider>
+        </NavigationContainer>
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }
@@ -401,5 +435,22 @@ const styles = StyleSheet.create({
   lottieAnimation: {
     width: 300,
     height: 300,
+  },
+  createButtonContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: -20,
+  },
+  createButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.card,
+    borderWidth: 4,
+    borderColor: Colors.surface,
   },
 });
