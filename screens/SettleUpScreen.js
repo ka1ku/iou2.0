@@ -1,35 +1,34 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Dimensions,
   Linking,
   Alert,
   AppState,
   Animated,
   Easing,
+  Clipboard,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { calculateSettlement, calculateSettlementWithPartialSettlements, getSettlementSummary } from '../utils/settlementCalculator';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
-import { createExpense, updateExpense } from '../services/expenseService';
+import { createExpense, updateExpense, getExpenseById } from '../services/expenseService';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const AVATAR_SIZE = 48;
-const AVATAR_MARGIN = 6;
-const BUBBLE_WIDTH = 60;
 
 const SettleUpScreen = ({ route, navigation }) => {
-  const { expense } = route.params;
-  const participants = expense.participants;
+  console.log('[SettleUpScreen] Component mounted');
+  const { expense: initialExpense } = route.params;
+  const insets = useSafeAreaInsets();
+  const [expense, setExpense] = useState(initialExpense); // Store expense in state so we can refresh it
   const [loading, setLoading] = useState(false);
   const [requestSentStates, setRequestSentStates] = useState({}); // Track which requests have been sent
   const [isVenmoAppActive, setIsVenmoAppActive] = useState(false);
@@ -39,17 +38,75 @@ const SettleUpScreen = ({ route, navigation }) => {
   const [settlementRecalculated, setSettlementRecalculated] = useState(false); // Track if settlements were recalculated
   const [recalculationInfo, setRecalculationInfo] = useState(null); // Info about recalculation
   
+  const participants = expense?.participants || [];
+  const name = participants[0]?.name || 'Unknown';
+  
+  // Fetch fresh expense data from Firestore when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[SettleUpScreen] useFocusEffect triggered');
+      const fetchFreshExpense = async () => {
+        if (!initialExpense?.id) {
+          console.log('[SettleUpScreen] No expense ID, skipping fetch');
+          return;
+        }
+        
+        try {
+          console.log('[SettleUpScreen] Fetching fresh expense data from Firestore for ID:', initialExpense.id);
+          const freshExpense = await getExpenseById(initialExpense.id);
+          if (freshExpense) {
+            console.log('[SettleUpScreen] Fresh expense fetched:', {
+              id: freshExpense.id,
+              title: freshExpense.title,
+              settlementsCount: freshExpense.settlements?.length || 0,
+              settlements: freshExpense.settlements
+            });
+            setExpense(freshExpense);
+            
+            // If no settlements exist in Firestore, calculate and save them
+            if (!freshExpense.settlements || freshExpense.settlements.length === 0) {
+              console.log('[SettleUpScreen] No settlements in Firestore, calculating and saving');
+              const optimalSettlement = calculateSettlement(freshExpense);
+              const settlementsToSave = optimalSettlement.settlements.map(s => ({
+                debtor: s.from,
+                creditor: s.to,
+                amount: s.amount,
+                status: 'noAction',
+                updatedAt: new Date().toISOString(),
+                associatedItems: [],
+              }));
+              
+              console.log('[SettleUpScreen] Saving calculated settlements to Firestore:', settlementsToSave);
+              const currentUser = getCurrentUser();
+              await updateExpense(freshExpense.id, { settlements: settlementsToSave }, currentUser?.uid);
+              console.log('[SettleUpScreen] Settlements saved successfully');
+              
+              // Update local expense with saved settlements
+              setExpense(prev => ({ ...prev, settlements: settlementsToSave }));
+            }
+          } else {
+            console.log('[SettleUpScreen] Expense not found in Firestore');
+          }
+        } catch (error) {
+          console.error('[SettleUpScreen] Failed to fetch fresh expense data:', error);
+        }
+      };
+      
+      fetchFreshExpense();
+    }, [initialExpense?.id])
+  );
+  
   if (!expense) {
+    console.log('[SettleUpScreen] No expense, going back');
     navigation.goBack();
     return null;
   }
   
   if (!participants || participants.length === 0) {
+    console.log('[SettleUpScreen] No participants, going back');
     navigation.goBack();
     return null;
   }
-  
-  const name = participants[0]?.name || 'Unknown';
   
   // Animation function for settled up state
   const animateSettledUp = useCallback((settlementId) => {
@@ -112,76 +169,139 @@ const SettleUpScreen = ({ route, navigation }) => {
     }, 200);
   }, []);
   
-  // Initialize settlement states from existing settlements and save settlements if they don't exist
+  // Initialize settlement states from existing settlements
   useEffect(() => {
-    if (expense.settlements && expense.settlements.length > 0) {
+    console.log('[SettleUpScreen] Initializing settlement states, expense.settlements:', expense?.settlements);
+    if (expense?.settlements && expense.settlements.length > 0) {
+      console.log('[SettleUpScreen] Found', expense.settlements.length, 'existing settlements');
       const initialSettledStates = {};
       const initialRequestSentStates = {};
       const initialPaymentMadeStates = {};
       expense.settlements.forEach(settlement => {
-        const settlementId = `${settlement.debtor}-${settlement.creditor}-${settlement.amount}`;
+        // Use consistent key format (defined below, but we need to create it inline here)
+        const from = settlement.debtor || settlement.from;
+        const to = settlement.creditor || settlement.to;
+        const roundedAmount = Math.round(settlement.amount * 100) / 100;
+        const settlementId = `${from}|||${to}|||${roundedAmount}`;
+        
+        console.log('[SettleUpScreen] Processing settlement:', {
+          id: settlementId,
+          debtor: settlement.debtor,
+          creditor: settlement.creditor,
+          amount: settlement.amount,
+          status: settlement.status
+        });
         
         if (settlement.status === 'markedAsPaid') {
           initialSettledStates[settlementId] = true;
+          console.log('[SettleUpScreen] Marked as paid:', settlementId);
         }
         if (settlement.status === 'paymentRequested') {
           initialRequestSentStates[settlementId] = true;
+          console.log('[SettleUpScreen] Payment requested:', settlementId);
         }
         if (settlement.status === 'paymentMade') {
           initialPaymentMadeStates[settlementId] = true;
+          console.log('[SettleUpScreen] Payment made:', settlementId);
         }
       });
       
+      console.log('[SettleUpScreen] Setting initial states:', {
+        settledStates: initialSettledStates,
+        requestSentStates: initialRequestSentStates,
+        paymentMadeStates: initialPaymentMadeStates
+      });
       setSettledStates(initialSettledStates);
       setRequestSentStates(initialRequestSentStates);
       setPaymentMadeStates(initialPaymentMadeStates);
     } else {
-      // If no settlements exist, save the calculated ones
-      const saveInitialSettlements = async () => {
-        try {
-          await saveSettlement();
-        } catch (error) {
-        }
-      };
-      saveInitialSettlements();
+      console.log('[SettleUpScreen] No settlements found in expense');
     }
-  }, [expense.settlements, saveSettlement]);
+  }, [expense?.settlements]);
 
   // AppState listener to detect when user returns from Venmo
   useEffect(() => {
-    const handleAppStateChange = (nextAppState) => {
+    const handleAppStateChange = async (nextAppState) => {
+      console.log('[SettleUpScreen] AppState changed:', nextAppState, 'isVenmoAppActive:', isVenmoAppActive);
       if (nextAppState === 'active' && isVenmoAppActive) {
+        console.log('[SettleUpScreen] User returned from Venmo app, marking request as sent');
         // User returned from Venmo app, mark the last request as sent
         setIsVenmoAppActive(false);
         
         // Find the most recent request that hasn't been marked as sent yet
+        let settlementToUpdate = null;
         setRequestSentStates(prev => {
+          console.log('[SettleUpScreen] Current requestSentStates:', prev);
           const updated = { ...prev };
           // Find the first false value and mark it as true
           for (const [key, value] of Object.entries(updated)) {
             if (value === false) {
+              console.log('[SettleUpScreen] Found unsent request:', key);
               updated[key] = true;
+              
+              // Parse the settlement from the key
+              // Handle names that might contain hyphens by splitting on the last two hyphens
+              const parts = key.split('-');
+              if (parts.length >= 3) {
+                const amount = parseFloat(parts[parts.length - 1]);
+                const to = parts[parts.length - 2];
+                const from = parts.slice(0, -2).join('-');
+                settlementToUpdate = {
+                  from,
+                  to,
+                  amount
+                };
+                console.log('[SettleUpScreen] Parsed settlement from key:', settlementToUpdate);
+              }
+              
               break;
             }
           }
+          console.log('[SettleUpScreen] Updated requestSentStates:', updated);
           return updated;
         });
+        
+        // Save to Firestore after state update
+        if (settlementToUpdate) {
+          try {
+            console.log('[SettleUpScreen] Saving payment request status to Firestore:', settlementToUpdate);
+            await updateSettlementStatus(settlementToUpdate, 'paymentRequested');
+            console.log('[SettleUpScreen] Payment request status saved successfully');
+          } catch (error) {
+            console.error('[SettleUpScreen] Failed to save payment request status:', error);
+            // Revert the state on error
+            const requestId = getSettlementKey(settlementToUpdate);
+            console.log('[SettleUpScreen] Reverting request state for:', requestId);
+            setRequestSentStates(prev => ({
+              ...prev,
+              [requestId]: false
+            }));
+          }
+        } else {
+          console.log('[SettleUpScreen] No settlement to update found');
+        }
       }
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [isVenmoAppActive]);
+  }, [isVenmoAppActive, updateSettlementStatus, getSettlementKey]);
 
   // Check if settlements need to be recalculated due to expense changes
   useEffect(() => {
     const checkSettlementRecalculation = async () => {
-      if (!expense.settlements || expense.settlements.length === 0) return;
+      console.log('[SettleUpScreen] Checking if settlements need recalculation');
+      if (!expense.settlements || expense.settlements.length === 0) {
+        console.log('[SettleUpScreen] No settlements to check for recalculation');
+        return;
+      }
       
       try {
         // Calculate what settlements should be based on current expense data
+        console.log('[SettleUpScreen] Calculating expected settlements');
         const currentSettlements = calculateSettlementWithPartialSettlements(expense, expense.settlements);
         const expectedSettlements = currentSettlements.settlements;
+        console.log('[SettleUpScreen] Expected settlements count:', expectedSettlements.length);
         
         // Compare with existing settlements (ignoring status and timestamps)
         const existingSettlementsNormalized = expense.settlements.map(s => ({
@@ -196,19 +316,30 @@ const SettleUpScreen = ({ route, navigation }) => {
           amount: s.amount
         }));
         
+        console.log('[SettleUpScreen] Comparing settlements:', {
+          existing: existingSettlementsNormalized,
+          expected: expectedSettlementsNormalized
+        });
+        
         // Check if settlements have changed
         const settlementsChanged = JSON.stringify(existingSettlementsNormalized.sort()) !== 
                                  JSON.stringify(expectedSettlementsNormalized.sort());
         
+        console.log('[SettleUpScreen] Settlements changed:', settlementsChanged);
+        
         if (settlementsChanged) {
+          console.log('[SettleUpScreen] Settlements need recalculation');
           setSettlementRecalculated(true);
           setRecalculationInfo({
             paidSettlements: currentSettlements.paidSettlements,
             newSettlements: currentSettlements.newSettlements,
             totalSettlements: expectedSettlements.length
           });
+        } else {
+          console.log('[SettleUpScreen] No recalculation needed');
         }
       } catch (error) {
+        console.error('[SettleUpScreen] Error checking settlement recalculation:', error);
       }
     };
     
@@ -216,20 +347,25 @@ const SettleUpScreen = ({ route, navigation }) => {
   }, [expense]);
 
   // Use settlements from expense data if available, otherwise calculate them
-  const settlements = expense.settlements && expense.settlements.length > 0 
+  // This needs to be defined before the initialization effect
+  const settlements = expense?.settlements && expense.settlements.length > 0 
     ? expense.settlements.map(s => ({
         from: s.debtor,
         to: s.creditor,
         amount: s.amount,
         status: s.status || 'noAction'
       }))
-    : (() => {
+    : (expense ? (() => {
+        console.log('[SettleUpScreen] No settlements in expense, calculating optimal settlement');
         const optimalSettlement = calculateSettlement(expense);
+        console.log('[SettleUpScreen] Calculated optimal settlements, count:', optimalSettlement.settlements.length);
         return optimalSettlement.settlements.map(s => ({
           ...s,
           status: 'noAction'
         }));
-      })();
+      })() : []);
+  
+  console.log('[SettleUpScreen] Final settlements array:', settlements);
     
   // Function to recalculate settlements and update the expense
   const recalculateSettlements = useCallback(async () => {
@@ -295,100 +431,263 @@ const SettleUpScreen = ({ route, navigation }) => {
 
 
 
-  const handleMakePayment = async (settlement) => {
+  // Helper function to create a consistent settlement key for matching
+  // Must be defined early so it can be used by other functions
+  const getSettlementKey = useCallback((settlement) => {
+    // Use debtor/creditor if available (from Firestore), otherwise from/to (calculated)
+    const from = settlement.debtor || settlement.from;
+    const to = settlement.creditor || settlement.to;
+    const amount = settlement.amount;
+    // Round amount to 2 decimal places for consistent matching (avoid floating point issues)
+    const roundedAmount = Math.round(amount * 100) / 100;
+    return `${from}|||${to}|||${roundedAmount}`;
+  }, []);
+
+  // Helper function to check if two settlements match
+  const settlementsMatch = useCallback((settlement1, settlement2) => {
+    const key1 = getSettlementKey(settlement1);
+    const key2 = getSettlementKey(settlement2);
+    return key1 === key2;
+  }, [getSettlementKey]);
+
+  const handleMakePayment = async (settlement, copyToClipboard = false) => {
+    console.log('[handleMakePayment] Called with settlement:', settlement, 'copyToClipboard:', copyToClipboard);
     try {
       // Find the participant who should receive the payment
       const recipientParticipant = participants.find(p => p.name === settlement.to);
+      console.log('[handleMakePayment] Recipient participant:', recipientParticipant);
       
       if (!recipientParticipant?.userId) {
+        console.error('[handleMakePayment] No recipient userId found');
         Alert.alert('Error', 'Unable to find recipient information');
         return;
       }
 
       // Get the recipient's profile to get their Venmo username
+      console.log('[handleMakePayment] Fetching recipient profile for userId:', recipientParticipant.userId);
       const recipientProfile = await getUserProfile(recipientParticipant.userId);
+      console.log('[handleMakePayment] Recipient profile:', recipientProfile);
       
       if (!recipientProfile?.venmoUsername) {
+        console.error('[handleMakePayment] No venmoUsername found for recipient');
         Alert.alert('Error', 'Recipient does not have a Venmo username set up');
         return;
       }
       
-      // Mark that payment is being made
-      const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
-      setPaymentMadeStates(prev => ({
-        ...prev,
-        [settlementId]: true
-      }));
+      // Mark that payment is being made (use consistent key format)
+      const settlementId = getSettlementKey(settlement);
+      console.log('[handleMakePayment] Settlement ID:', settlementId);
+      console.log('[handleMakePayment] Setting paymentMadeStates for:', settlementId);
+      setPaymentMadeStates(prev => {
+        const updated = { ...prev, [settlementId]: true };
+        console.log('[handleMakePayment] Updated paymentMadeStates:', updated);
+        return updated;
+      });
+      
+      // Save to Firestore
+      try {
+        console.log('[handleMakePayment] Saving paymentMade status to Firestore for settlement:', settlement);
+        await updateSettlementStatus(settlement, 'paymentMade');
+        console.log('[handleMakePayment] PaymentMade status saved successfully');
+      } catch (error) {
+        console.error('[handleMakePayment] Failed to save settlement status:', error);
+        // Revert local state on error
+        console.log('[handleMakePayment] Reverting paymentMadeStates for:', settlementId);
+        setPaymentMadeStates(prev => ({
+          ...prev,
+          [settlementId]: false
+        }));
+        Alert.alert('Error', 'Failed to save status. Please try again.');
+        return;
+      }
       
       // Create Venmo deeplink
       const amount = settlement.amount.toFixed(2);
       const note = `IOU Payment - ${expense.title || 'Expense'}`;
       const deeplink = `venmo://paycharge?txn=pay&recipients=${recipientProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
-      // Open the deeplink
-      const supported = await Linking.canOpenURL(deeplink);
-      if (supported) {
-        await Linking.openURL(deeplink);
+      console.log('[handleMakePayment] Venmo deeplink:', deeplink);
+      
+      if (copyToClipboard) {
+        // Copy to clipboard instead of opening
+        console.log('[handleMakePayment] Copying deeplink to clipboard');
+        Clipboard.setString(deeplink);
+        Alert.alert('Copied!', 'Venmo payment link has been copied to your clipboard.');
       } else {
-        Alert.alert('Error', 'Venmo is not installed on this device');
+        // Open the deeplink (original behavior)
+        const supported = await Linking.canOpenURL(deeplink);
+        if (supported) {
+          console.log('[handleMakePayment] Opening Venmo deeplink');
+          await Linking.openURL(deeplink);
+        } else {
+          console.error('[handleMakePayment] Venmo is not installed');
+          Alert.alert('Error', 'Venmo is not installed on this device');
+        }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to open Venmo. Please try again.');
+      console.error('[handleMakePayment] Error:', error);
+      Alert.alert('Error', copyToClipboard ? 'Failed to copy to clipboard. Please try again.' : 'Failed to open Venmo. Please try again.');
     }
   };
 
-  const handleMarkAsPaid = useCallback((settlement) => {
-    const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+  const handleMarkAsPaid = useCallback(async (settlement) => {
+    console.log('[handleMarkAsPaid] Called with settlement:', settlement);
+    // Use consistent key format for settlement ID
+    const settlementId = getSettlementKey(settlement);
+    console.log('[handleMarkAsPaid] Settlement ID:', settlementId);
     
     // Mark as settled
-    setSettledStates(prev => ({
-      ...prev,
-      [settlementId]: true
-    }));
+    console.log('[handleMarkAsPaid] Setting settledStates for:', settlementId);
+    setSettledStates(prev => {
+      const updated = { ...prev, [settlementId]: true };
+      console.log('[handleMarkAsPaid] Updated settledStates:', updated);
+      return updated;
+    });
     // Trigger the animation
+    console.log('[handleMarkAsPaid] Triggering animation for:', settlementId);
     animateSettledUp(settlementId);
     
-  }, [animateSettledUp]);
-
-  const updateSettlementStatus = useCallback(async (settlement, status) => {
+    // Save to Firestore
     try {
-      if (!expense.id) {
+      console.log('[handleMarkAsPaid] Saving markedAsPaid status to Firestore for settlement:', settlement);
+      await updateSettlementStatus(settlement, 'markedAsPaid');
+      console.log('[handleMarkAsPaid] MarkedAsPaid status saved successfully');
+    } catch (error) {
+      console.error('[handleMarkAsPaid] Failed to save settlement status:', error);
+      // Revert local state on error
+      console.log('[handleMarkAsPaid] Reverting settledStates for:', settlementId);
+      setSettledStates(prev => ({
+        ...prev,
+        [settlementId]: false
+      }));
+      Alert.alert('Error', 'Failed to save status. Please try again.');
+    }
+  }, [animateSettledUp, updateSettlementStatus, getSettlementKey]);
+
+  const updateSettlementStatus = useCallback(async (settlementToUpdate, newStatus) => {
+    console.log('[updateSettlementStatus] Called with settlement:', settlementToUpdate, 'newStatus:', newStatus);
+    try {
+      if (!expense?.id) {
+        console.error('[updateSettlementStatus] Expense ID is missing');
         throw new Error('Expense ID is missing');
       }
 
-      // Get current settlements from the expense
-      const currentSettlements = expense.settlements || [];
+      console.log('[updateSettlementStatus] Expense ID:', expense.id);
       
-      // Find and update the specific settlement
-      const updatedSettlements = currentSettlements.map(s => {
-        if (s.debtor === settlement.from && s.creditor === settlement.to && s.amount === settlement.amount) {
+      // Fetch the LATEST expense data from Firestore to ensure we have current state
+      console.log('[updateSettlementStatus] Fetching latest expense data from Firestore');
+      const latestExpense = await getExpenseById(expense.id);
+      if (!latestExpense) {
+        throw new Error('Expense not found in Firestore');
+      }
+      
+      const currentSettlements = latestExpense.settlements || [];
+      console.log('[updateSettlementStatus] Current settlements from Firestore:', currentSettlements.length);
+      console.log('[updateSettlementStatus] All current settlements:', JSON.stringify(currentSettlements, null, 2));
+      
+      // Find the exact settlement to update using strict matching
+      let settlementFound = false;
+      let updatedCount = 0;
+      
+      const updatedSettlements = currentSettlements.map((s, index) => {
+        const matches = settlementsMatch(s, settlementToUpdate);
+        
+        console.log(`[updateSettlementStatus] Settlement ${index} comparison:`, {
+          stored: { debtor: s.debtor, creditor: s.creditor, amount: s.amount, status: s.status },
+          target: { from: settlementToUpdate.from, to: settlementToUpdate.to, debtor: settlementToUpdate.debtor, creditor: settlementToUpdate.creditor, amount: settlementToUpdate.amount },
+          matches: matches
+        });
+        
+        if (matches) {
+          if (settlementFound) {
+            console.error('[updateSettlementStatus] WARNING: Multiple settlements matched! This should not happen.');
+          }
+          settlementFound = true;
+          updatedCount++;
+          console.log(`[updateSettlementStatus] ✓ MATCH FOUND - Updating settlement ${index} from status '${s.status}' to '${newStatus}'`);
           return {
-            ...s,
-            status: status,
+            ...s, // Preserve ALL existing fields
+            status: newStatus,
             updatedAt: new Date().toISOString()
           };
         }
+        
+        // Return settlement unchanged
         return s;
       });
 
+      if (!settlementFound) {
+        const errorMsg = `No matching settlement found! Target: ${JSON.stringify(settlementToUpdate)}`;
+        console.error('[updateSettlementStatus]', errorMsg);
+        console.error('[updateSettlementStatus] Available settlements:', currentSettlements.map(s => ({ debtor: s.debtor, creditor: s.creditor, amount: s.amount, status: s.status })));
+        throw new Error(errorMsg);
+      }
+
+      if (updatedCount > 1) {
+        console.error('[updateSettlementStatus] ERROR: Multiple settlements were updated! This is a bug.');
+      }
+
+      console.log('[updateSettlementStatus] Updated settlements array:', JSON.stringify(updatedSettlements, null, 2));
+      console.log('[updateSettlementStatus] Verification - settlements before/after count:', currentSettlements.length, '->', updatedSettlements.length);
+      
+      // Verify we didn't accidentally modify other settlements
+      const statusChanges = [];
+      updatedSettlements.forEach((updated, index) => {
+        const original = currentSettlements[index];
+        if (original.status !== updated.status) {
+          statusChanges.push({
+            index,
+            original: original.status,
+            updated: updated.status,
+            settlement: { debtor: original.debtor, creditor: original.creditor, amount: original.amount }
+          });
+        }
+      });
+      console.log('[updateSettlementStatus] Status changes detected:', statusChanges);
+      
+      if (statusChanges.length > 1) {
+        console.error('[updateSettlementStatus] ERROR: Multiple settlements changed status! Only one should change.');
+      }
+
+      console.log('[updateSettlementStatus] Calling updateExpense with settlements');
+      
       // Update the expense with the new settlements
-      await updateExpense(expense.id, { settlements: updatedSettlements }, getCurrentUser()?.uid);
+      const currentUser = getCurrentUser();
+      console.log('[updateSettlementStatus] Current user:', currentUser?.uid);
+      await updateExpense(expense.id, { settlements: updatedSettlements }, currentUser?.uid);
+      console.log('[updateSettlementStatus] updateExpense completed successfully');
+      
+      // Update local expense state with the new settlements
+      setExpense(prev => ({
+        ...prev,
+        settlements: updatedSettlements
+      }));
+      console.log('[updateSettlementStatus] Local expense state updated');
       
     } catch (error) {
+      console.error('[updateSettlementStatus] Error:', error);
       throw error;
     }
-  }, [expense, getCurrentUser]);
+  }, [expense, settlementsMatch]);
 
-  const handleUndoMarkAsPaid = useCallback((settlement) => {
-    const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+  const handleUndoMarkAsPaid = useCallback(async (settlement) => {
+    console.log('[handleUndoMarkAsPaid] Called with settlement:', settlement);
+    // Use consistent key format for settlement ID
+    const settlementId = getSettlementKey(settlement);
+    console.log('[handleUndoMarkAsPaid] Settlement ID:', settlementId);
+    
     // Create animation values for the undo transition
     const undoScale = new Animated.Value(1);
     const settledUpOpacity = new Animated.Value(1);
     const buttonsOpacity = new Animated.Value(0);
     const buttonsScale = new Animated.Value(0.8);
-    setSettledStates(prev => ({
-        ...prev,
-        [settlementId]: false
-    }));
+    
+    console.log('[handleUndoMarkAsPaid] Setting settledStates to false for:', settlementId);
+    setSettledStates(prev => {
+      const updated = { ...prev, [settlementId]: false };
+      console.log('[handleUndoMarkAsPaid] Updated settledStates:', updated);
+      return updated;
+    });
+    
     // Store animation values for this settlement
     setAnimationStates(prev => ({
       ...prev,
@@ -400,6 +699,23 @@ const SettleUpScreen = ({ route, navigation }) => {
         buttonsScale,
       }
     }));
+    
+    // Save to Firestore
+    try {
+      console.log('[handleUndoMarkAsPaid] Saving noAction status to Firestore for settlement:', settlement);
+      await updateSettlementStatus(settlement, 'noAction');
+      console.log('[handleUndoMarkAsPaid] NoAction status saved successfully');
+    } catch (error) {
+      console.error('[handleUndoMarkAsPaid] Failed to save settlement status:', error);
+      // Revert local state on error
+      console.log('[handleUndoMarkAsPaid] Reverting settledStates for:', settlementId);
+      setSettledStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to save status. Please try again.');
+      return;
+    }
     
     // Start the undo animation sequence
     Animated.sequence([
@@ -451,71 +767,34 @@ const SettleUpScreen = ({ route, navigation }) => {
         delete newState[settlementId];
         return newState;
       });
-    }, 500);
+          }, 500);
     
-  }, []);
+  }, [updateSettlementStatus, getSettlementKey]);
 
-  const saveSettlement = useCallback(async () => {
-    try {
-      // Validate expense ID
-      if (!expense.id) {
-        throw new Error('Expense ID is missing');
-      }
-      
-      // Create settlements array from the current settlements (which are working correctly)
-      const settlementsData = (settlements || []).map(settlement => {
-        const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
-        const isSettled = settledStates[settlementId] === true;
-        const hasRequestBeenSent = requestSentStates[settlementId] === true;
-        const hasPaymentBeenMade = paymentMadeStates[settlementId] === true;
-        
-        // Determine status based on user actions, but preserve existing status if no new actions
-        let status = settlement.status || 'noAction';
-        if (isSettled == true) {
-          status = 'markedAsPaid';
-        }
-        if (isSettled == false) {
-          status = 'noAction';
-        } 
-        else if (hasPaymentBeenMade) {
-          status = 'paymentMade';
-        } else if (hasRequestBeenSent) {
-          status = 'paymentRequested';
-        }
-        
-        return {
-          debtor: settlement.from || 'Unknown',
-          creditor: settlement.to || 'Unknown',
-          amount: settlement.amount || 0,
-          updatedAt: new Date().toISOString(),
-          associatedItems: [], // TODO: Map to specific items if needed
-          status: status
-        };
-      });
-      
-      // Update the expense with settlements data
-      await updateExpense(expense.id, { settlements: settlementsData }, getCurrentUser()?.uid);
-      
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  }, [expense, settlements, settledStates, requestSentStates, paymentMadeStates]);
+  // REMOVED: saveSettlement function - it was causing conflicts by overwriting individual updates
+  // Individual settlement updates now happen directly via updateSettlementStatus
+  // This ensures each settlement update is atomic and doesn't affect others
 
-  const handleRequestPayment = async (settlement) => {
+  const handleRequestPayment = async (settlement, copyToClipboard = false) => {
+    console.log('[handleRequestPayment] Called with settlement:', settlement, 'copyToClipboard:', copyToClipboard);
     try {
       // Find the participant who should make the payment
       const payerParticipant = participants.find(p => p.name === settlement.from);
+      console.log('[handleRequestPayment] Payer participant:', payerParticipant);
       
       if (!payerParticipant?.userId) {
+        console.error('[handleRequestPayment] No payer userId found');
         Alert.alert('Error', 'Unable to find payer information');
         return;
       }
 
       // Get the payer's profile to get their Venmo username
+      console.log('[handleRequestPayment] Fetching payer profile for userId:', payerParticipant.userId);
       const payerProfile = await getUserProfile(payerParticipant.userId);
+      console.log('[handleRequestPayment] Payer profile:', payerProfile);
       
       if (!payerProfile?.username) {
+        console.error('[handleRequestPayment] No username found for payer');
         Alert.alert('Error', 'Payer does not have a Venmo username set up');
         return;
       }
@@ -524,41 +803,80 @@ const SettleUpScreen = ({ route, navigation }) => {
       const amount = settlement.amount.toFixed(2);
       const note = `IOU Payment Request - ${expense.title || 'Expense'}`;
       const deeplink = `venmo://paycharge?txn=charge&recipients=${payerProfile.username}&amount=${amount}&note=${encodeURIComponent(note)}`;
+      console.log('[handleRequestPayment] Venmo deeplink:', deeplink);
 
-      // Open the deeplink
-      const supported = await Linking.canOpenURL(deeplink);
-      if (supported) {
-        // Mark that Venmo app is being opened
-        setIsVenmoAppActive(true);
+      if (copyToClipboard) {
+        // Copy to clipboard instead of opening
+        console.log('[handleRequestPayment] Copying deeplink to clipboard');
+        Clipboard.setString(deeplink);
+        Alert.alert('Copied!', 'Venmo payment request link has been copied to your clipboard.');
         
-        // Create a unique identifier for this request
-        const requestId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
+        // Use consistent key format for request ID
+        const requestId = getSettlementKey(settlement);
+        console.log('[handleRequestPayment] Request ID:', requestId);
         
-        // Store the request ID for tracking
-        setRequestSentStates(prev => ({
-          ...prev,
-          [requestId]: false // Initially false, will be set to true when user returns
-        }));
+        // Mark request as sent since we copied it
+        console.log('[handleRequestPayment] Setting requestSentStates for:', requestId);
+        setRequestSentStates(prev => {
+          const updated = { ...prev, [requestId]: true };
+          console.log('[handleRequestPayment] Updated requestSentStates:', updated);
+          return updated;
+        });
         
-        await Linking.openURL(deeplink);
+        // Save to Firestore immediately since we're not tracking app state change
+        try {
+          console.log('[handleRequestPayment] Saving paymentRequested status to Firestore');
+          await updateSettlementStatus(settlement, 'paymentRequested');
+          console.log('[handleRequestPayment] PaymentRequested status saved successfully');
+        } catch (error) {
+          console.error('[handleRequestPayment] Failed to save payment request status:', error);
+        }
       } else {
-        Alert.alert('Error', 'Venmo is not installed on this device');
+        // Open the deeplink (original behavior)
+        const supported = await Linking.canOpenURL(deeplink);
+        if (supported) {
+          console.log('[handleRequestPayment] Venmo is supported, opening deeplink');
+          // Mark that Venmo app is being opened
+          setIsVenmoAppActive(true);
+          console.log('[handleRequestPayment] Set isVenmoAppActive to true');
+          
+          // Use consistent key format for request ID
+          const requestId = getSettlementKey(settlement);
+          console.log('[handleRequestPayment] Request ID:', requestId);
+          
+          // Store the request ID for tracking (will be saved to Firestore when user returns from Venmo)
+          console.log('[handleRequestPayment] Setting requestSentStates for:', requestId);
+          setRequestSentStates(prev => {
+            const updated = { ...prev, [requestId]: false };
+            console.log('[handleRequestPayment] Updated requestSentStates:', updated);
+            return updated;
+          });
+          
+          await Linking.openURL(deeplink);
+          console.log('[handleRequestPayment] Venmo deeplink opened');
+        } else {
+          console.error('[handleRequestPayment] Venmo is not installed');
+          Alert.alert('Error', 'Venmo is not installed on this device');
+        }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to open Venmo. Please try again.');
+      console.error('[handleRequestPayment] Error:', error);
+      Alert.alert('Error', copyToClipboard ? 'Failed to copy to clipboard. Please try again.' : 'Failed to open Venmo. Please try again.');
     }
   };
 
-  const renderSettlementItem = (settlement, index) => {
+  const renderSettlementItem = useCallback((settlement, index) => {
     const fromParticipant = participants.find(p => p.name === settlement.from);
     const toParticipant = participants.find(p => p.name === settlement.to);
     
+    // Use consistent key format for settlement IDs
+    const settlementId = getSettlementKey(settlement);
+    const requestId = settlementId; // Use same ID for consistency
+    
     // Check if a request has been sent for this settlement
-    const requestId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
     const hasRequestBeenSent = requestSentStates[requestId] === true || settlement.status === 'paymentRequested';
     
     // Check if this settlement is marked as paid/settled
-    const settlementId = `${settlement.from}-${settlement.to}-${settlement.amount}`;
     const isSettled = settledStates[settlementId] === true || settlement.status === 'markedAsPaid';
     const animationState = animationStates[settlementId] || null;
     
@@ -621,66 +939,27 @@ const SettleUpScreen = ({ route, navigation }) => {
             )}
           </View>
 
-          {/* Arrow and Amount */}
-          <View style={styles.arrowContainer}>
-            {(() => {
-              // Calculate dynamic arrow positioning
-              const avatarSize = AVATAR_SIZE; // Avatar width
-              const avatarMargin = AVATAR_MARGIN; // Margin around avatar
-              const totalAvatarWidth = avatarSize + (avatarMargin * 2);
-              const arrowContainerWidth = screenWidth * 0.9 - (totalAvatarWidth * 2) - (Spacing.lg * 4); // Account for padding
-              const bubbleWidth = BUBBLE_WIDTH; // Width of the amount bubble
-              const arrowStartX = 10;
-              const arrowEndX = arrowContainerWidth - 10;
-              const bubbleCenterX = arrowContainerWidth / 2;
-              const bubbleStartX = bubbleCenterX - (bubbleWidth / 2);
-              const bubbleEndX = bubbleCenterX + (bubbleWidth / 2);
-              
-              return (
-                <Svg width={arrowContainerWidth} height="50" viewBox={`0 0 ${arrowContainerWidth} 50`} style={styles.arrowSvg}>
-                  <Defs>
-                    <LinearGradient id={`arrowGradient-${index}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                      <Stop offset="0%" stopColor={Colors.accent} stopOpacity="0.3" />
-                      <Stop offset="25%" stopColor={Colors.accent} stopOpacity="0.8" />
-                      <Stop offset="75%" stopColor={Colors.accent} stopOpacity="0.8" />
-                      <Stop offset="100%" stopColor={Colors.accent} stopOpacity="0.3" />
-                    </LinearGradient>
-                  </Defs>
-                  
-                  {/* Arrow line - dynamically positioned */}
-                  <Path
-                    d={`M ${arrowStartX} 25 L ${arrowEndX} 25`}
-                    stroke={`url(#arrowGradient-${index})`}
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                  />
-                  
-                  {/* Amount bubble background - dynamically positioned */}
-                  <Path
-                    d={`M ${bubbleStartX} 10 L ${bubbleEndX} 10 A 15 15 0 0 1 ${bubbleEndX} 40 L ${bubbleStartX} 40 A 15 15 0 0 1 ${bubbleStartX} 10 Z`}
-                    fill={Colors.surface}
-                    stroke={Colors.accent}
-                    strokeWidth="2"
-                  />
-                  
-                  {/* Arrow head - dynamically positioned */}
-                  <Path
-                    d={`M ${arrowEndX - 10} 20 L ${arrowEndX} 25 L ${arrowEndX - 10} 30`}
-                    stroke={Colors.accent}
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                </Svg>
-              );
-            })()}
+          {/* Settlement Text with Arrows */}
+          <View style={styles.settlementTextContainer}>
+            {/* Left Arrow */}
+            <View style={styles.arrowLine}>
+              <View style={styles.arrowLineInner} />
+            </View>
             
-            {/* Amount text positioned over the bubble */}
-            <View style={styles.amountTextContainer}>
-              <Text style={styles.amountText}>
+            {/* Text Content */}
+            <View style={styles.textContent}>
+              {/* <Text style={styles.settlementLabel}>
+                {settlement.from === name ? 'you owe' : 'owes you'}
+              </Text> */}
+              <Text style={styles.settlementAmount}>
                 ${settlement.amount.toFixed(2)}
               </Text>
+            </View>
+            
+            {/* Right Arrow */}
+            <View style={styles.arrowLine}>
+              <View style={styles.arrowLineInner} />
+              <View style={styles.arrowHead} />
             </View>
           </View>
 
@@ -756,7 +1035,10 @@ const SettleUpScreen = ({ route, navigation }) => {
                 >
                   <TouchableOpacity
                     style={styles.undoButton}
-                    onPress={() => handleUndoMarkAsPaid(settlement)}
+                    onPress={() => {
+                      console.log('[Undo Button] Pressed for settlement:', settlement);
+                      handleUndoMarkAsPaid(settlement);
+                    }}
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
@@ -777,7 +1059,10 @@ const SettleUpScreen = ({ route, navigation }) => {
               >
                 <TouchableOpacity
                   style={styles.markAsPaidButton}
-                  onPress={() => handleMarkAsPaid(settlement)}
+                  onPress={() => {
+                    console.log('[Mark as Paid Button (settled state)] Pressed for settlement:', settlement);
+                    handleMarkAsPaid(settlement);
+                  }}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
@@ -785,13 +1070,18 @@ const SettleUpScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={getButtonStyle()}
                   onPress={() => {
+                    console.log('[Action Button (settled state)] Pressed for settlement:', settlement, 'buttonText:', getButtonText());
                     if (settlement.from === name) {
-                      handleMakePayment(settlement);
+                      console.log('[Action Button (settled state)] Calling handleMakePayment');
+                      handleMakePayment(settlement, true);
                     } else if (settlement.to === name && !hasRequestBeenSent) {
-                      handleRequestPayment(settlement);
+                      console.log('[Action Button (settled state)] Calling handleRequestPayment');
+                      handleRequestPayment(settlement, true);
                     } else if (settlement.to === name && hasRequestBeenSent) {
+                      console.log('[Action Button (settled state)] Request already sent, doing nothing');
                       // Request already sent, maybe show a message or do nothing
                     } else {
+                      console.log('[Action Button (settled state)] Send reminder (not implemented)');
                       // TODO: Add send reminder functionality
                     }
                   }}
@@ -809,7 +1099,10 @@ const SettleUpScreen = ({ route, navigation }) => {
             <>
               <TouchableOpacity
                 style={styles.markAsPaidButton}
-                onPress={() => handleMarkAsPaid(settlement)}
+                onPress={() => {
+                  console.log('[Mark as Paid Button] Pressed for settlement:', settlement);
+                  handleMarkAsPaid(settlement);
+                }}
                 activeOpacity={0.8}
               >
                 <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
@@ -817,13 +1110,18 @@ const SettleUpScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 style={getButtonStyle()}
                 onPress={() => {
+                  console.log('[Action Button] Pressed for settlement:', settlement, 'buttonText:', getButtonText());
                   if (settlement.from === name) {
+                    console.log('[Action Button] Calling handleMakePayment');
                     handleMakePayment(settlement);
                   } else if (settlement.to === name && !hasRequestBeenSent) {
+                    console.log('[Action Button] Calling handleRequestPayment');
                     handleRequestPayment(settlement);
                   } else if (settlement.to === name && hasRequestBeenSent) {
+                    console.log('[Action Button] Request already sent, doing nothing');
                     // Request already sent, maybe show a message or do nothing
                   } else {
+                    console.log('[Action Button] Send reminder (not implemented)');
                     // TODO: Add send reminder functionality
                   }
                 }}
@@ -839,20 +1137,20 @@ const SettleUpScreen = ({ route, navigation }) => {
         </View>
       </View>
     );
-  };
+  }, [participants, name, requestSentStates, settledStates, animationStates, getSettlementKey, handleMarkAsPaid, handleMakePayment, handleRequestPayment, handleUndoMarkAsPaid, expense]);
 
   return (
     <View style={styles.container}>
-      <BlurView intensity={30} tint="light" style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settle Up</Text>
+        <Text style={styles.headerTitle}>{expense.title || 'Settle Up'}</Text>
         <View style={styles.headerSpacer} />
-      </BlurView>
+      </View>
 
       <ScrollView 
         style={styles.content}
@@ -888,7 +1186,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         {/* Settlements List */}
         <View style={styles.settlementsSection}>
           <Text style={styles.sectionTitle}>
-            Optimal Settlements
+            Settlement Proposals
           </Text>
           
           {settlements.length > 0 ? (
@@ -914,17 +1212,11 @@ const SettleUpScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.returnHomeButton}
           onPress={async () => {
-            try {
-              // Save settlement data before navigating home
-              const result = await saveSettlement();
-              if (result.success) {
-                navigation.navigate('HomeMain');
-              } else {
-                Alert.alert('Error', 'Failed to save settlement. Please try again.');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-            }
+            console.log('[Return Home Button] Pressed');
+            // All settlement updates are already saved individually via updateSettlementStatus
+            // No need to sync anything - just navigate
+            console.log('[Return Home Button] Navigating to HomeMain');
+            navigation.navigate('HomeMain');
           }}
           activeOpacity={0.8}
         >
@@ -950,21 +1242,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: Spacing.xl,
-    paddingTop: 60,
-    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.md,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+    borderBottomColor: Colors.divider,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: Radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: Colors.divider,
   },
   headerTitle: {
     ...Typography.h2,
@@ -1040,7 +1332,7 @@ const styles = StyleSheet.create({
   },
   participantColumn: {
     alignItems: 'center',
-    flex: 1,
+    width: 80,
   },
   participantAvatarContainer: {
     position: 'relative',
@@ -1099,35 +1391,60 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: Math.ceil(AVATAR_SIZE / 5),
   },
-  arrowContainer: {
+  settlementTextContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.sm,
+  },
+  arrowLine: {
+    flex: 1,
+    height: 10,
+    backgroundColor: Colors.accent,
+    opacity: 0.4,
     position: 'relative',
-    height: 50,
-    minWidth: 100, // Ensure minimum width for the arrow
+    justifyContent: 'center',
   },
-  arrowSvg: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+  arrowLineInner: {
+    height: 10,
+    backgroundColor: Colors.accent,
   },
-  amountTextContainer: {
+  arrowHead: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 50,
+    right: -12,
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 24,
+    borderRightWidth: 0,
+    borderTopWidth: 18,
+    borderBottomWidth: 18,
+    borderLeftColor: Colors.accent,
+    borderRightColor: 'transparent',
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  textContent: {
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 3,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: Colors.surface,
+    zIndex: 1,
   },
-  amountText: {
-    ...Typography.label,
+  settlementLabel: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontSize: 12,
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  settlementAmount: {
+    ...Typography.h3,
     color: Colors.accent,
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 20,
     textAlign: 'center',
   },
   noSettlements: {
