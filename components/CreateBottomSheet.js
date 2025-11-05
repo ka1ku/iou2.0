@@ -10,7 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
-import { handleTakePhoto, handlePickImage } from '../services/imageHandler';
+import { handleTakePhoto as takePhoto, handlePickImage as pickImage } from '../services/imageHandler';
 import { processReceiptImage } from '../services/receiptScanner';
 import { requestReceiptScanningAccess } from '../services/subscriptionService';
 import { useReceiptScanning } from '../contexts/ReceiptScanningContext';
@@ -21,17 +21,21 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
   const snapPoints = useMemo(() => ['50%'], []);
   const [index, setIndex] = useState(-1);
   const [scanningReceipt, setScanningReceipt] = useState(false);
+  const [showScanOptions, setShowScanOptions] = useState(false);
   const { setIsReceiptScanning, startScanningAnimation, stopScanningAnimation } = useReceiptScanning();
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
     open: () => {
+      setShowScanOptions(false);
       bottomSheetRef.current?.snapToIndex(0);
     },
     close: () => {
+      setShowScanOptions(false);
       bottomSheetRef.current?.close();
     },
     snapToIndex: (idx) => {
+      setShowScanOptions(false);
       bottomSheetRef.current?.snapToIndex(idx);
     },
   }));
@@ -50,90 +54,88 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
     }, 300);
   }, [navigation]);
 
-  const handleScanReceipt = useCallback(async () => {
-    bottomSheetRef.current?.close();
-    
-    try {
-      const hasAccess = await requestReceiptScanningAccess();
-      
-      if (!hasAccess) {
-        return;
-      }
-      
-      setTimeout(() => {
-        Alert.alert(
-          'Scan Receipt',
-          'Choose how you want to scan your receipt.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Take Photo', 
-              onPress: () => handleTakePhoto(
-                (imageUri) => processReceiptImage(
-                  imageUri,
-                  () => {
-                    setScanningReceipt(true);
-                    startScanningAnimation();
-                  },
-                  () => {
-                    setScanningReceipt(false);
-                    stopScanningAnimation();
-                  },
-                  (receiptData) => {
-                    navigation.navigate('Home', {
-                      screen: 'SetupExpense',
-                      params: { 
-                        expenseType: 'receipt',
-                        scannedReceipt: receiptData,
-                        fromReceiptScan: true 
-                      }
-                    });
-                  },
-                  (errorMessage) => {
-                    Alert.alert('Receipt Scanning Error', errorMessage);
-                  }
-                ),
-                (error) => Alert.alert('Error', error),
-                setIsReceiptScanning
-              ) 
-            },
-            { 
-              text: 'Choose from Gallery', 
-              onPress: () => handlePickImage(
-                (imageUri) => processReceiptImage(
-                  imageUri,
-                  () => {
-                    setScanningReceipt(true);
-                    startScanningAnimation();
-                  },
-                  () => {
-                    setScanningReceipt(false);
-                    stopScanningAnimation();
-                  },
-                  (receiptData) => {
-                    navigation.navigate('Home', {
-                      screen: 'SetupExpense',
-                      params: { 
-                        expenseType: 'receipt',
-                        scannedReceipt: receiptData,
-                        fromReceiptScan: true 
-                      }
-                    });
-                  },
-                  (errorMessage) => {
-                    Alert.alert('Receipt Scanning Error', errorMessage);
-                  }
-                ),
-                (error) => Alert.alert('Error', error),
-                setIsReceiptScanning
-              ) 
-            }
-          ]
-        );
-      }, 300);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start receipt scanning');
+  const handleScanReceipt = useCallback(() => {
+    setShowScanOptions(true);
+  }, []);
+
+  const handleTakePhoto = useCallback(async () => {
+    // Check access first
+    const hasAccess = await requestReceiptScanningAccess();
+    if (!hasAccess) {
+      return;
     }
+
+    bottomSheetRef.current?.close();
+    setTimeout(() => {
+      takePhoto(
+        (imageUri) => processReceiptImage(
+          imageUri,
+          () => {
+            setScanningReceipt(true);
+            startScanningAnimation();
+          },
+          () => {
+            setScanningReceipt(false);
+            stopScanningAnimation();
+          },
+          (receiptData) => {
+            navigation.navigate('Home', {
+              screen: 'SetupExpense',
+              params: { 
+                expenseType: 'receipt',
+                scannedReceipt: receiptData,
+                fromReceiptScan: true 
+              }
+            });
+          },
+          (errorMessage) => {
+            Alert.alert('Receipt Scanning Error', errorMessage);
+          }
+        ),
+        (error) => Alert.alert('Error', error),
+        setIsReceiptScanning
+      );
+    }, 300);
+  }, [navigation, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
+
+  const handlePickFromGallery = useCallback(async () => {
+    // Check access first
+    const hasAccess = await requestReceiptScanningAccess();
+    if (!hasAccess) {
+      return;
+    }
+
+    bottomSheetRef.current?.close();
+    setTimeout(() => {
+      pickImage(
+        (imageUri) => processReceiptImage(
+          imageUri,
+          () => {
+            setScanningReceipt(true);
+            startScanningAnimation();
+          },
+          () => {
+            setScanningReceipt(false);
+            stopScanningAnimation();
+          },
+          (receiptData) => {
+            navigation.navigate('Home', {
+              screen: 'SetupExpense',
+              params: { 
+                expenseType: 'receipt',
+                scannedReceipt: receiptData,
+                fromReceiptScan: true 
+              }
+            });
+          },
+          (errorMessage) => {
+            Alert.alert('Receipt Scanning Error', errorMessage);
+          }
+        ),
+        (error) => Alert.alert('Error', error),
+        setIsReceiptScanning
+      );
+    }, 300);
   }, [navigation, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
 
   const renderBackdrop = useCallback(
@@ -160,38 +162,91 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
       handleIndicatorStyle={styles.handleIndicator}
     >
       <BottomSheetView style={[styles.contentContainer, { paddingBottom: insets.bottom + Spacing.lg }]}>
-        
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity
-            style={styles.option}
-            onPress={handleAddExpense}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: Colors.accent + '20' }]}>
-              <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
+        {!showScanOptions ? (
+          <>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>Create New</Text>
             </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Add Expense</Text>
-              <Text style={styles.optionSubtitle}>Manually add an expense</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
+            
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity
+                style={styles.option}
+                onPress={handleAddExpense}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: Colors.accent + '20' }]}>
+                  <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Add Expense</Text>
+                  <Text style={styles.optionSubtitle}>Manually add an expense</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.option, { marginTop: Spacing.md }]}
-            onPress={handleScanReceipt}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
-              <Ionicons name="camera-outline" size={28} color={Colors.blue} />
+              <TouchableOpacity
+                style={[styles.option, { marginTop: Spacing.md }]}
+                onPress={handleScanReceipt}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
+                  <Ionicons name="camera-outline" size={28} color={Colors.blue} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Scan Receipt</Text>
+                  <Text style={styles.optionSubtitle}>Scan a receipt to extract items</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
             </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Scan Receipt</Text>
-              <Text style={styles.optionSubtitle}>Scan a receipt to extract items</Text>
+          </>
+        ) : (
+          <>
+            <View style={styles.headerRow}>
+              <TouchableOpacity
+                onPress={() => setShowScanOptions(false)}
+                style={styles.backButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={styles.title}>Scan Receipt</Text>
+              <View style={styles.backButtonPlaceholder} />
             </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
+            
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity
+                style={styles.option}
+                onPress={handleTakePhoto}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
+                  <Ionicons name="camera" size={28} color={Colors.blue} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Take Photo</Text>
+                  <Text style={styles.optionSubtitle}>Capture a new receipt photo</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.option, { marginTop: Spacing.md }]}
+                onPress={handlePickFromGallery}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
+                  <Ionicons name="images-outline" size={28} color={Colors.blue} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Choose from Gallery</Text>
+                  <Text style={styles.optionSubtitle}>Select an existing photo</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </BottomSheetView>
     </BottomSheet>
   );
@@ -216,10 +271,26 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingHorizontal: Spacing.lg,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xl,
+  },
   title: {
     ...Typography.h2,
     color: Colors.textPrimary,
-    marginBottom: Spacing.xl,
+    flex: 1,
+    textAlign: 'center',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  backButtonPlaceholder: {
+    width: 40,
   },
   optionsContainer: {},
   option: {

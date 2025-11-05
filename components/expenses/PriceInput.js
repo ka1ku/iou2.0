@@ -16,8 +16,11 @@ const PriceInput = ({
   const [displayValue, setDisplayValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
-  // Sync external value with internal display value
+  // Sync external value with internal display value (only when not focused)
   useEffect(() => {
+    // Don't sync external value while user is actively typing
+    if (isFocused) return;
+    
     if (value === null || value === undefined || value === '') {
       setDisplayValue('');
       return;
@@ -28,7 +31,7 @@ const PriceInput = ({
     } else {
       setDisplayValue('');
     }
-  }, [value]);
+  }, [value, isFocused]);
 
   const clampDecimals = useCallback(
     (text) => {
@@ -67,19 +70,34 @@ const PriceInput = ({
     const clean = clampDecimals(text);
     setDisplayValue(clean);
 
-    if (clean === '' || clean === '.') {
-      onChangeText && onChangeText(null);
+    // Handle empty input - allow it to be empty while typing
+    if (clean === '') {
+      onChangeText && onChangeText(0);
       return;
     }
+    
+    // Handle partial decimal input
+    if (clean === '.' || clean === '0.') {
+      onChangeText && onChangeText(0);
+      return;
+    }
+    
     const n = Number(clean);
-    onChangeText && onChangeText(Number.isFinite(n) ? n : null);
+    onChangeText && onChangeText(Number.isFinite(n) ? n : 0);
   };
 
   const handleFocus = () => setIsFocused(true);
 
   const handleBlur = () => {
     setIsFocused(false);
-    if (!displayValue) return;
+    
+    // If empty or just a decimal point, format as 0.00
+    if (!displayValue || displayValue === '.' || displayValue === '0.') {
+      const formatted = (0).toFixed(maxDecimals);
+      setDisplayValue(formatted);
+      onChangeText && onChangeText(0);
+      return;
+    }
 
     const n = Number(displayValue);
     if (Number.isFinite(n)) {
@@ -87,8 +105,8 @@ const PriceInput = ({
       setDisplayValue(padded);
       onChangeText && onChangeText(n);
     } else {
-      setDisplayValue('');
-      onChangeText && onChangeText(null);
+      setDisplayValue((0).toFixed(maxDecimals));
+      onChangeText && onChangeText(0);
     }
   };
 
