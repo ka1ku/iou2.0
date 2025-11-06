@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Haptics from 'expo-haptics';
 import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -188,6 +189,10 @@ const MainTabs = () => {
     return <Ionicons name={iconMap[routeName]} size={size} color={color} />;
   };
 
+  const handleTabPress = (routeName) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   const getTabBarStyle = (route) => {
     const routeName = getFocusedRouteNameFromRoute(route);
     const hiddenRoutes = [
@@ -224,7 +229,13 @@ const MainTabs = () => {
           headerShown: false,
         })}
       >
-        <Tab.Screen name="Home" component={HomeStack} />
+        <Tab.Screen 
+          name="Home" 
+          component={HomeStack}
+          listeners={{
+            tabPress: () => handleTabPress('Home'),
+          }}
+        />
         <Tab.Screen
           name="Create"
           component={CreateTabScreen}
@@ -233,7 +244,10 @@ const MainTabs = () => {
               <View style={styles.createButtonContainer}>
                 <TouchableOpacity
                   style={styles.createButton}
-                  onPress={() => bottomSheetRef.current?.open()}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    bottomSheetRef.current?.open();
+                  }}
                   activeOpacity={0.8}
                 >
                   <Ionicons name="add" size={32} color={Colors.white} />
@@ -243,7 +257,13 @@ const MainTabs = () => {
             tabBarLabel: '',
           }}
         />
-        <Tab.Screen name="Profile" component={ProfileStack} />
+        <Tab.Screen 
+          name="Profile" 
+          component={ProfileStack}
+          listeners={{
+            tabPress: () => handleTabPress('Profile'),
+          }}
+        />
       </Tab.Navigator>
       
       <CreateBottomSheet 
@@ -443,7 +463,7 @@ const styles = StyleSheet.create({
     top: -20,
   },
   createButton: {
-    width: 64,
+    width: 80,
     height: 64,
     borderRadius: 32,
     backgroundColor: Colors.accent,
