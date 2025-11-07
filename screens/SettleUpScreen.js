@@ -331,7 +331,7 @@ const SettleUpScreen = ({ route, navigation }) => {
           console.log('[SettleUpScreen] Settlements need recalculation');
           setSettlementRecalculated(true);
           setRecalculationInfo({
-            paidSettlements: currentSettlements.paidSettlements,
+            paidSettlements: currentSettlements.transferredSettlements || 0,
             newSettlements: currentSettlements.newSettlements,
             totalSettlements: expectedSettlements.length
           });
@@ -668,11 +668,141 @@ const SettleUpScreen = ({ route, navigation }) => {
     }
   }, [expense, settlementsMatch]);
 
-  const handleUndoMarkAsPaid = useCallback(async (settlement) => {
-    console.log('[handleUndoMarkAsPaid] Called with settlement:', settlement);
+  const performSettlementReset = useCallback(async (settlement, fullReset = false) => {
+    try {
+      setLoading(true);
+      
+      // Fetch the latest expense data
+      const latestExpense = await getExpenseById(expense.id);
+      if (!latestExpense) {
+        throw new Error('Expense not found');
+      }
+      
+      let newSettlements;
+      
+      if (fullReset) {
+        // Full reset: Calculate settlements as if expense was created for the first time
+        console.log('[performSettlementReset] Full reset - recalculating all settlements from scratch');
+        const settlementResult = calculateSettlement(latestExpense);
+        newSettlements = settlementResult.settlements.map(s => ({
+          debtor: s.from,
+          creditor: s.to,
+          amount: s.amount,
+          status: 'noAction',
+          updatedAt: new Date().toISOString(),
+          associatedItems: [],
+        }));
+      } else {
+        // Partial reset: Only recalculate settlements with status 'noAction', preserving transferred ones
+        console.log('[performSettlementReset] Partial reset - recalculating only noAction settlements');
+        
+        // Filter out the settlement being reset and get all settlements with transferred money
+        const existingSettlements = latestExpense.settlements || [];
+        const settlementFrom = settlement.debtor || settlement.from;
+        const settlementTo = settlement.creditor || settlement.to;
+        const settlementAmount = settlement.amount;
+        const roundedSettlementAmount = Math.round(settlementAmount * 100) / 100;
+        
+        // Keep settlements with transferred money (excluding the one being reset)
+        const transferredSettlements = existingSettlements.filter(s => {
+          const sFrom = s.debtor || s.from;
+          const sTo = s.creditor || s.to;
+          const sAmount = s.amount;
+          const roundedSAmount = Math.round(sAmount * 100) / 100;
+          
+          const status = s.status || 'noAction';
+          const isTransferred = status !== 'noAction';
+          const isBeingReset = sFrom === settlementFrom && 
+                               sTo === settlementTo && 
+                               roundedSAmount === roundedSettlementAmount;
+          
+          // Keep if it has transferred money AND it's not the one being reset
+          return isTransferred && !isBeingReset;
+        });
+        
+        // Recalculate settlements preserving the transferred ones
+        const settlementResult = calculateSettlementWithPartialSettlements(
+          latestExpense,
+          transferredSettlements
+        );
+        
+        // Format settlements for Firestore
+        newSettlements = settlementResult.settlements.map(s => {
+          // Check if this settlement matches a preserved transferred settlement
+          const preservedSettlement = transferredSettlements.find(transferred => {
+            const transferredFrom = transferred.debtor || transferred.from;
+            const transferredTo = transferred.creditor || transferred.to;
+            const transferredAmount = transferred.amount;
+            const settlementFrom = s.from || s.debtor;
+            const settlementTo = s.to || s.creditor;
+            const settlementAmount = s.amount;
+            
+            const roundedTransferredAmount = Math.round(transferredAmount * 100) / 100;
+            const roundedSettlementAmount = Math.round(settlementAmount * 100) / 100;
+            
+            return transferredFrom === settlementFrom && 
+                   transferredTo === settlementTo && 
+                   roundedTransferredAmount === roundedSettlementAmount;
+          });
+          
+          if (preservedSettlement) {
+            // Preserve transferred settlement
+            return {
+              debtor: preservedSettlement.debtor || preservedSettlement.from,
+              creditor: preservedSettlement.creditor || preservedSettlement.to,
+              amount: preservedSettlement.amount,
+              status: preservedSettlement.status,
+              updatedAt: preservedSettlement.updatedAt || new Date().toISOString(),
+              associatedItems: preservedSettlement.associatedItems || [],
+            };
+          } else {
+            // New settlement (was 'noAction' or newly calculated)
+            return {
+              debtor: s.from,
+              creditor: s.to,
+              amount: s.amount,
+              status: 'noAction',
+              updatedAt: new Date().toISOString(),
+              associatedItems: [],
+            };
+          }
+        });
+      }
+      
+      console.log('[performSettlementReset] New settlements calculated:', newSettlements.length);
+      
+      // Update the expense with new settlements
+      const currentUser = getCurrentUser();
+      await updateExpense(expense.id, { settlements: newSettlements }, currentUser?.uid);
+      
+      console.log('[performSettlementReset] Settlements reset successfully');
+      
+      // Update local expense state with new settlements (no navigation animation)
+      const updatedExpense = { ...latestExpense, settlements: newSettlements };
+      setExpense(updatedExpense);
+      
+      // Reset settlement-related state
+      // The useEffect will reinitialize states from the new settlements
+      setSettledStates({});
+      setRequestSentStates({});
+      setPaymentMadeStates({});
+      setAnimationStates({});
+      setSettlementRecalculated(false);
+      setRecalculationInfo(null);
+      
+    } catch (error) {
+      console.error('[performSettlementReset] Error:', error);
+      Alert.alert('Error', 'Failed to reset settlements. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [expense, getCurrentUser, updateExpense]);
+
+  const performUndoMarkAsPaid = useCallback(async (settlement) => {
+    console.log('[performUndoMarkAsPaid] Called with settlement:', settlement);
     // Use consistent key format for settlement ID
     const settlementId = getSettlementKey(settlement);
-    console.log('[handleUndoMarkAsPaid] Settlement ID:', settlementId);
+    console.log('[performUndoMarkAsPaid] Settlement ID:', settlementId);
     
     // Create animation values for the undo transition
     const undoScale = new Animated.Value(1);
@@ -680,10 +810,10 @@ const SettleUpScreen = ({ route, navigation }) => {
     const buttonsOpacity = new Animated.Value(0);
     const buttonsScale = new Animated.Value(0.8);
     
-    console.log('[handleUndoMarkAsPaid] Setting settledStates to false for:', settlementId);
+    console.log('[performUndoMarkAsPaid] Setting settledStates to false for:', settlementId);
     setSettledStates(prev => {
       const updated = { ...prev, [settlementId]: false };
-      console.log('[handleUndoMarkAsPaid] Updated settledStates:', updated);
+      console.log('[performUndoMarkAsPaid] Updated settledStates:', updated);
       return updated;
     });
     
@@ -701,13 +831,13 @@ const SettleUpScreen = ({ route, navigation }) => {
     
     // Save to Firestore
     try {
-      console.log('[handleUndoMarkAsPaid] Saving noAction status to Firestore for settlement:', settlement);
+      console.log('[performUndoMarkAsPaid] Saving noAction status to Firestore for settlement:', settlement);
       await updateSettlementStatus(settlement, 'noAction');
-      console.log('[handleUndoMarkAsPaid] NoAction status saved successfully');
+      console.log('[performUndoMarkAsPaid] NoAction status saved successfully');
     } catch (error) {
-      console.error('[handleUndoMarkAsPaid] Failed to save settlement status:', error);
+      console.error('[performUndoMarkAsPaid] Failed to save settlement status:', error);
       // Revert local state on error
-      console.log('[handleUndoMarkAsPaid] Reverting settledStates for:', settlementId);
+      console.log('[performUndoMarkAsPaid] Reverting settledStates for:', settlementId);
       setSettledStates(prev => ({
         ...prev,
         [settlementId]: true
@@ -769,6 +899,102 @@ const SettleUpScreen = ({ route, navigation }) => {
           }, 500);
     
   }, [updateSettlementStatus, getSettlementKey]);
+
+  const handleUndoMarkAsPaid = useCallback(async (settlement) => {
+    console.log('[handleUndoMarkAsPaid] Called with settlement:', settlement);
+    
+    // Fetch the latest expense to get current settlement status
+    try {
+      const latestExpense = await getExpenseById(expense.id);
+      if (!latestExpense) {
+        Alert.alert('Error', 'Expense not found');
+        return;
+      }
+      
+      // Find the matching settlement in the latest expense data
+      const currentSettlement = latestExpense.settlements?.find(s => {
+        const settlementFrom = settlement.debtor || settlement.from;
+        const settlementTo = settlement.creditor || settlement.to;
+        const settlementAmount = settlement.amount;
+        const sFrom = s.debtor || s.from;
+        const sTo = s.creditor || s.to;
+        const sAmount = s.amount;
+        
+        const roundedSettlementAmount = Math.round(settlementAmount * 100) / 100;
+        const roundedSAmount = Math.round(sAmount * 100) / 100;
+        
+        return sFrom === settlementFrom && 
+               sTo === settlementTo && 
+               roundedSettlementAmount === roundedSAmount;
+      });
+      
+      // Check if the settlement has a status other than 'noAction' (money was transferred)
+      const currentStatus = currentSettlement?.status || settlement.status || 'noAction';
+      const hasTransferredMoney = currentStatus !== 'noAction';
+      
+      if (hasTransferredMoney) {
+        // Check if all OTHER settlements (excluding this one) have status 'noAction'
+        const allSettlements = latestExpense.settlements || [];
+        const otherSettlements = allSettlements.filter(s => {
+          const settlementFrom = settlement.debtor || settlement.from;
+          const settlementTo = settlement.creditor || settlement.to;
+          const settlementAmount = settlement.amount;
+          const sFrom = s.debtor || s.from;
+          const sTo = s.creditor || s.to;
+          const sAmount = s.amount;
+          
+          const roundedSettlementAmount = Math.round(settlementAmount * 100) / 100;
+          const roundedSAmount = Math.round(sAmount * 100) / 100;
+          
+          // Exclude the settlement being reset
+          return !(sFrom === settlementFrom && 
+                   sTo === settlementTo && 
+                   roundedSettlementAmount === roundedSAmount);
+        });
+        
+        const hasOtherNoActionSettlements = otherSettlements.some(s => {
+          const status = s.status || 'noAction';
+          return status === 'noAction';
+        });
+        
+        if (hasOtherNoActionSettlements) {
+          // At least one other settlement has 'noAction', show alert
+          Alert.alert(
+            'Reset Settlement Status',
+            'Undoing will recalibrate settlements with no action status. Settlements where money has already been transferred will be preserved.\n\nDo you want to proceed?',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => {
+                  console.log('[handleUndoMarkAsPaid] User cancelled reset');
+                }
+              },
+              {
+                text: 'Proceed',
+                style: 'destructive',
+                onPress: async () => {
+                  console.log('[handleUndoMarkAsPaid] User confirmed reset - partial recalculation');
+                  await performSettlementReset(settlement, false); // false = partial recalculation
+                }
+              }
+            ]
+          );
+        } else {
+          // All other settlements have transferred money, no alert needed - just recalculate silently
+          console.log('[handleUndoMarkAsPaid] All other settlements have transferred money - partial recalculation without alert');
+          await performSettlementReset(settlement, false); // false = partial recalculation
+        }
+        return;
+      }
+      
+      // If status is already 'noAction', proceed with normal undo
+      await performUndoMarkAsPaid(settlement);
+    } catch (error) {
+      console.error('[handleUndoMarkAsPaid] Error checking settlement status:', error);
+      Alert.alert('Error', 'Failed to check settlement status. Please try again.');
+    }
+  }, [expense, performSettlementReset, performUndoMarkAsPaid]);
 
   // REMOVED: saveSettlement function - it was causing conflicts by overwriting individual updates
   // Individual settlement updates now happen directly via updateSettlementStatus

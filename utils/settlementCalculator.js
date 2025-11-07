@@ -145,19 +145,31 @@ const generateSettlementProposal = (balances) => {
 export const calculateSettlementWithPartialSettlements = (expense, existingSettlements = []) => {
   const { participants, items, fees } = expense;
   if (!participants || !items) {
-    return { settlements: [], totalSettlements: 0, paidSettlements: 0, newSettlements: 0 };
+    return { settlements: [], totalSettlements: 0, transferredSettlements: 0, newSettlements: 0 };
   }
 
-  const paidSettlements = existingSettlements.filter(s => s.status === 'markedAsPaid');
-  const unpaidSettlements = existingSettlements.filter(s => s.status !== 'markedAsPaid');
+  // Preserve ALL settlements where money has been transferred (status !== 'noAction')
+  // This includes: markedAsPaid, paymentMade, paymentRequested
+  // Only settlements with status === 'noAction' represent money that hasn't been transferred yet
+  const transferredSettlements = existingSettlements.filter(s => {
+    const status = s.status || 'noAction';
+    return status !== 'noAction';
+  });
+  const untransferredSettlements = existingSettlements.filter(s => {
+    const status = s.status || 'noAction';
+    return status === 'noAction';
+  });
 
   const currentBalances = calculateParticipantBalances(expense, participants, items, fees, 
     items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) + 
     (fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0)
   );
 
+  // Adjust balances to account for all transferred settlements
+  // These settlements represent money that has already been transferred, so we need to
+  // factor them into the balance calculations
   const adjustedBalances = [...currentBalances];
-  paidSettlements.forEach(settlement => {
+  transferredSettlements.forEach(settlement => {
     const debtor = settlement.debtor || settlement.from;
     const creditor = settlement.creditor || settlement.to;
     
@@ -170,14 +182,17 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
     }
   });
 
+  // Generate new settlements based on adjusted balances
+  // This will create settlements for the remaining balance after accounting for transferred amounts
   const newSettlements = generateSettlementProposal(adjustedBalances);
 
+  // Combine preserved transferred settlements with new settlements
   const allSettlements = [
-    ...paidSettlements.map(s => ({
+    ...transferredSettlements.map(s => ({
       from: s.debtor || s.from,
       to: s.creditor || s.to,
-      amount: s.amount,
-      status: s.status,
+      amount: s.amount, // Keep original amount - money already transferred
+      status: s.status, // Preserve original status
       preserved: true
     })),
     ...newSettlements.map(s => ({
@@ -192,7 +207,7 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
     balances: currentBalances,
     totalSettlements: allSettlements.length,
     totalAmount: allSettlements.reduce((sum, s) => sum + s.amount, 0),
-    paidSettlements: paidSettlements.length,
+    transferredSettlements: transferredSettlements.length,
     newSettlements: newSettlements.length
   };
 };

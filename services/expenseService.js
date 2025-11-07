@@ -14,6 +14,8 @@ import {
 } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
 import { Linking, Platform } from 'react-native';
+import { calculateSettlementWithPartialSettlements, calculateSettlement } from '../utils/settlementCalculator';
+import { getUserProfile } from './friendService';
 
 const generateInviteToken = () => Math.random().toString(36).slice(2, 12);
 const generateJoinCode = () => {
@@ -84,6 +86,116 @@ export const updateExpense = async (expenseId, updateData, userId) => {
     // Add updatedBy field
     finalUpdateData.updatedBy = userId;
     
+    // Check if we need to recalculate settlements
+    // Only recalculate if items, participants, or fees are being updated
+    // AND settlements are not being explicitly updated (to avoid infinite loops)
+    const shouldRecalculateSettlements = 
+      !updateData.settlements && // Don't recalculate if settlements are being explicitly set
+      (updateData.items !== undefined || 
+       updateData.participants !== undefined || 
+       updateData.fees !== undefined);
+    
+    if (shouldRecalculateSettlements) {
+      try {
+        // Fetch the current expense to get existing settlements and all expense data
+        const firestoreInstance = getFirestore(getApp());
+        const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
+        const expenseSnap = await getDoc(expenseRef);
+        
+        if (expenseSnap.exists()) {
+          const currentExpense = { id: expenseSnap.id, ...expenseSnap.data() };
+          const existingSettlements = currentExpense.settlements || [];
+          
+          // Only recalculate if settlements already exist
+          if (existingSettlements.length > 0) {
+            // Merge the update data with current expense data to get the complete expense
+            const updatedExpense = {
+              ...currentExpense,
+              ...finalUpdateData,
+              // Ensure we have the updated items, participants, and fees
+              items: updateData.items !== undefined ? updateData.items : currentExpense.items,
+              participants: updateData.participants !== undefined ? updateData.participants : currentExpense.participants,
+              fees: updateData.fees !== undefined ? updateData.fees : currentExpense.fees,
+            };
+            
+            // Recalculate settlements preserving paid ones
+            const settlementResult = calculateSettlementWithPartialSettlements(
+              updatedExpense,
+              existingSettlements
+            );
+            
+            // Format settlements for Firestore (use debtor/creditor format)
+            // The calculateSettlementWithPartialSettlements function preserves settlements where
+            // money has been transferred (status !== 'noAction') and marks them with preserved: true
+            const recalculatedSettlements = settlementResult.settlements.map(s => {
+              // If this settlement was preserved (money already transferred), keep it fixed
+              // Preserved settlements maintain their original amount and status because money was already transferred
+              if (s.preserved === true) {
+                // Find the original settlement to preserve all its metadata exactly
+                const originalSettlement = existingSettlements.find(existing => {
+                  const existingFrom = existing.debtor || existing.from;
+                  const existingTo = existing.creditor || existing.to;
+                  const existingAmount = existing.amount;
+                  const settlementFrom = s.from || s.debtor;
+                  const settlementTo = s.to || s.creditor;
+                  const settlementAmount = s.amount;
+                  
+                  // Round amounts for comparison
+                  const roundedExisting = Math.round(existingAmount * 100) / 100;
+                  const roundedSettlement = Math.round(settlementAmount * 100) / 100;
+                  
+                  return existingFrom === settlementFrom && 
+                         existingTo === settlementTo && 
+                         roundedExisting === roundedSettlement;
+                });
+                
+                // Use original settlement data exactly as it was (money already transferred)
+                // This preserves the original amount, status (markedAsPaid, paymentMade, paymentRequested), and metadata
+                if (originalSettlement) {
+                  return {
+                    debtor: originalSettlement.debtor || originalSettlement.from,
+                    creditor: originalSettlement.creditor || originalSettlement.to,
+                    amount: originalSettlement.amount, // Keep original amount - money already transferred
+                    status: originalSettlement.status, // Preserve status (markedAsPaid, paymentMade, paymentRequested, etc.)
+                    updatedAt: originalSettlement.updatedAt || new Date().toISOString(),
+                    associatedItems: originalSettlement.associatedItems || [],
+                  };
+                } else {
+                  // Fallback if original not found (shouldn't happen, but safety net)
+                  // Use the preserved settlement data from the calculator
+                  return {
+                    debtor: s.from,
+                    creditor: s.to,
+                    amount: s.amount, // Preserved amount from calculator
+                    status: s.status, // Should be markedAsPaid, paymentMade, paymentRequested, etc.
+                    updatedAt: new Date().toISOString(),
+                    associatedItems: [],
+                  };
+                }
+              } else {
+                // This is a new settlement (no money transferred yet)
+                // Generated based on adjusted balances after accounting for transferred settlements
+                return {
+                  debtor: s.from,
+                  creditor: s.to,
+                  amount: s.amount,
+                  status: 'noAction', // New settlements start with noAction
+                  updatedAt: new Date().toISOString(),
+                  associatedItems: [],
+                };
+              }
+            });
+            
+            // Add recalculated settlements to update data
+            finalUpdateData.settlements = recalculatedSettlements;
+          }
+        }
+      } catch (recalcError) {
+        // If recalculation fails, log but don't block the update
+        console.error('[updateExpense] Failed to recalculate settlements:', recalcError);
+      }
+    }
+    
     const firestoreInstance = getFirestore(getApp());
     await updateDoc(doc(firestoreInstance, 'expenses', expenseId), {
       ...finalUpdateData,
@@ -124,10 +236,10 @@ export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
     
     const updatedItems = currentItems.filter((_, index) => index !== itemIndex);
     
-    await updateDoc(expenseRef, {
-      items: updatedItems,
-      updatedAt: serverTimestamp()
-    });
+    // Use updateExpense instead of updateDoc to trigger settlement recalculation
+    await updateExpense(expenseId, {
+      items: updatedItems
+    }, userId);
     
     return true;
   } catch (error) {
