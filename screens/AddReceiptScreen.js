@@ -224,27 +224,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       );
       return false;
     }
-    const hasSplitMismatch = state.items.some((item) => {
-      const itemTotal = parseFloat(item.amount) || 0;
-      if (!(item.selectedConsumers && item.selectedConsumers.length)) return false;
-      if (!item.splits || item.splits.length === 0) return itemTotal > 0;
-      const totalSplits = item.splits.reduce((sum, split) => {
-        if (typeof split === "object" && split !== null) {
-          const amount = "amount" in split ? parseFloat(split.amount) : NaN;
-          return sum + (isNaN(amount) ? 0 : amount);
-        }
-        const numericSplit = parseFloat(split);
-        return sum + (isNaN(numericSplit) ? 0 : numericSplit);
-      }, 0);
-      return Math.abs(itemTotal - totalSplits) > SPLIT_TOLERANCE;
-    });
-    if (hasSplitMismatch) {
-      Alert.alert(
-        "Split Mismatch",
-        "Each item's split amounts must add up to the item total before saving the receipt."
-      );
-      return false;
-    }
     return true;
   };
 

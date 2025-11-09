@@ -329,12 +329,12 @@ const SettleUpScreen = ({ route, navigation }) => {
           return updated;
         });
         
-        // Save to Firestore after state update
+        // Save to Firestore after state update with paymentRequested status
         if (settlementToUpdate) {
           try {
-            console.log('[SettleUpScreen] Saving payment request status to Firestore:', settlementToUpdate);
+            console.log('[SettleUpScreen] Saving paymentRequested status to Firestore:', settlementToUpdate);
             await updateSettlementStatus(settlementToUpdate, 'paymentRequested');
-            console.log('[SettleUpScreen] Payment request status saved successfully');
+            console.log('[SettleUpScreen] PaymentRequested status saved successfully');
             const animationKey = requestKey || getSettlementKey(settlementToUpdate);
             if (animationKey) {
               animateActionCompleted(animationKey);
@@ -558,7 +558,7 @@ const SettleUpScreen = ({ route, navigation }) => {
 
       animateActionCompleted(settlementId);
       
-      // Save to Firestore
+      // Save to Firestore with paymentMade status (creditor needs to confirm)
       try {
         console.log('[handleMakePayment] Saving paymentMade status to Firestore for settlement:', settlement);
         await updateSettlementStatus(settlement, 'paymentMade');
@@ -782,7 +782,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         const settlementAmount = settlement.amount;
         const roundedSettlementAmount = Math.round(settlementAmount * 100) / 100;
         
-        // Keep settlements with transferred money (excluding the one being reset)
+        // Keep settlements with transferred money, payment made, or payment requested (excluding the one being reset)
         const transferredSettlements = existingSettlements.filter(s => {
           const sFrom = s.debtor || s.from;
           const sTo = s.creditor || s.to;
@@ -790,12 +790,13 @@ const SettleUpScreen = ({ route, navigation }) => {
           const roundedSAmount = Math.round(sAmount * 100) / 100;
           
           const status = s.status || 'noAction';
+          // Preserve settlements that have any action taken (not just noAction)
           const isTransferred = status !== 'noAction';
           const isBeingReset = sFrom === settlementFrom && 
                                sTo === settlementTo && 
                                roundedSAmount === roundedSettlementAmount;
           
-          // Keep if it has transferred money AND it's not the one being reset
+          // Keep if it has transferred money, payment made, or payment requested AND it's not the one being reset
           return isTransferred && !isBeingReset;
         });
         
@@ -1007,7 +1008,7 @@ const SettleUpScreen = ({ route, navigation }) => {
                roundedSettlementAmount === roundedSAmount;
       });
       
-      // Check if the settlement has a status other than 'noAction' (money was transferred)
+      // Check if the settlement has a status other than 'noAction' (money was transferred, payment made, or payment requested)
       const currentStatus = currentSettlement?.status || settlement.status || 'noAction';
       const hasTransferredMoney = currentStatus !== 'noAction';
       
@@ -1040,7 +1041,7 @@ const SettleUpScreen = ({ route, navigation }) => {
           // At least one other settlement has 'noAction', show alert
           Alert.alert(
             'Reset Settlement Status',
-            'Undoing will recalibrate settlements with no action status. Settlements where money has already been transferred will be preserved.\n\nDo you want to proceed?',
+            'Undoing will recalibrate settlements with no action status. Settlements where money has already been transferred, payment made, or payment requested will be preserved.\n\nDo you want to proceed?',
             [
               {
                 text: 'Cancel',
@@ -1060,8 +1061,8 @@ const SettleUpScreen = ({ route, navigation }) => {
             ]
           );
         } else {
-          // All other settlements have transferred money, no alert needed - just recalculate silently
-          console.log('[handleUndoMarkAsPaid] All other settlements have transferred money - partial recalculation without alert');
+          // All other settlements have transferred money, payment made, or payment requested, no alert needed - just recalculate silently
+          console.log('[handleUndoMarkAsPaid] All other settlements have transferred money, payment made, or payment requested - partial recalculation without alert');
           await performSettlementReset(settlement, false); // false = partial recalculation
         }
         return;
@@ -1128,7 +1129,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         });
         animateActionCompleted(requestId);
         
-        // Save to Firestore immediately since we're not tracking app state change
+        // Save to Firestore immediately with paymentRequested status (debtor needs to confirm)
         try {
           console.log('[handleRequestPayment] Saving paymentRequested status to Firestore');
           await updateSettlementStatus(settlement, 'paymentRequested');
@@ -1697,54 +1698,69 @@ const SettleUpScreen = ({ route, navigation }) => {
           ) : (
             // Normal Button State
             <>
-              <TouchableOpacity
-                style={styles.markAsPaidButton}
-                onPress={() => {
-                  console.log('[Mark as Paid Button] Pressed for settlement:', settlement);
-                  handleMarkAsPaid(settlement);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={getButtonStyle()}
-                onPress={() => {
-                  console.log('[Action Button] Pressed for settlement:', settlement, 'buttonText:', getButtonText());
-                  if (isDebtor) {
-                    if (hasRequestBeenSent) {
-                      console.log('[Action Button] Confirming payment made');
+              {/* Show confirm button alone when awaiting confirmation */}
+              {(isDebtor && hasRequestBeenSent) || (isCreditor && isPaymentMade) ? (
+                <TouchableOpacity
+                  style={[styles.requestPaymentButton, styles.confirmActionButton]}
+                  onPress={() => {
+                    if (isDebtor && hasRequestBeenSent) {
+                      console.log('[Confirm Button] Confirming payment made');
                       handleConfirmPaymentMade(settlement);
-                    } else {
-                      console.log('[Action Button] Calling handleMakePayment');
-                      handleMakePayment(settlement, true);
-                    }
-                  } else if (isCreditor) {
-                    if (isPaymentMade) {
-                      console.log('[Action Button] Confirming payment received');
+                    } else if (isCreditor && isPaymentMade) {
+                      console.log('[Confirm Button] Confirming payment received');
                       handleConfirmPaymentReceived(settlement);
-                    } else if (!hasRequestBeenSent) {
-                      console.log('[Action Button] Calling handleRequestPayment');
-                      handleRequestPayment(settlement, true);
-                    } else {
-                      console.log('[Action Button] Request already sent, doing nothing');
                     }
-                  } else {
-                    if (hasReminderBeenSent) {
-                      console.log('[Action Button] Reminder already sent, ignoring press');
-                      return;
-                    }
-                    console.log('[Action Button] Send reminder');
-                    handleSendReminder(settlement);
-                  }
-                }}
-                activeOpacity={0.8}
-                disabled={(isSpectator && hasReminderBeenSent)}
-              >
-                <Text style={getButtonTextStyle()}>
-                  {getButtonText()}
-                </Text>
-              </TouchableOpacity>
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.confirmActionButtonText}>
+                    {isDebtor && hasRequestBeenSent ? 'Confirm payment made' : 'Confirm payment received'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.markAsPaidButton}
+                    onPress={() => {
+                      console.log('[Mark as Paid Button] Pressed for settlement:', settlement);
+                      handleMarkAsPaid(settlement);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={getButtonStyle()}
+                    onPress={() => {
+                      console.log('[Action Button] Pressed for settlement:', settlement, 'buttonText:', getButtonText());
+                      if (isDebtor) {
+                        console.log('[Action Button] Calling handleMakePayment');
+                        handleMakePayment(settlement, true);
+                      } else if (isCreditor) {
+                        if (!hasRequestBeenSent) {
+                          console.log('[Action Button] Calling handleRequestPayment');
+                          handleRequestPayment(settlement, true);
+                        } else {
+                          console.log('[Action Button] Request already sent, doing nothing');
+                        }
+                      } else {
+                        if (hasReminderBeenSent) {
+                          console.log('[Action Button] Reminder already sent, ignoring press');
+                          return;
+                        }
+                        console.log('[Action Button] Send reminder');
+                        handleSendReminder(settlement);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                    disabled={(isSpectator && hasReminderBeenSent)}
+                  >
+                    <Text style={getButtonTextStyle()}>
+                      {getButtonText()}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </>
           )}
         </View>
