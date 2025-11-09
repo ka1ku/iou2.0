@@ -18,13 +18,15 @@ import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
 import { createExpense, updateExpense, updateExpenseParticipants, deleteItemFromExpense } from '../services/expenseService';
-import { calculateSettlement } from '../utils/settlementCalculator';
+import { calculateSettlement, calculateSettlementWithPartialSettlements } from '../utils/settlementCalculator';
 import { ExpenseProvider, useExpense } from '../contexts/ExpenseContext';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import ExpenseFooter from '../components/expenses/ExpenseFooter';
 import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
 import PaidBySection from '../components/expenses/PaidBySection';
 import ReceiptBreakdown from '../components/expenses/ReceiptBreakdown';
+
+const SPLIT_TOLERANCE = 0.01;
 
 const AddReceiptScreenContent = ({ route, navigation }) => {
   const { expense, scannedReceipt, fromReceiptScan, isNewExpense = false } = route.params || {};
@@ -222,6 +224,27 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       );
       return false;
     }
+    const hasSplitMismatch = state.items.some((item) => {
+      const itemTotal = parseFloat(item.amount) || 0;
+      if (!(item.selectedConsumers && item.selectedConsumers.length)) return false;
+      if (!item.splits || item.splits.length === 0) return itemTotal > 0;
+      const totalSplits = item.splits.reduce((sum, split) => {
+        if (typeof split === "object" && split !== null) {
+          const amount = "amount" in split ? parseFloat(split.amount) : NaN;
+          return sum + (isNaN(amount) ? 0 : amount);
+        }
+        const numericSplit = parseFloat(split);
+        return sum + (isNaN(numericSplit) ? 0 : numericSplit);
+      }, 0);
+      return Math.abs(itemTotal - totalSplits) > SPLIT_TOLERANCE;
+    });
+    if (hasSplitMismatch) {
+      Alert.alert(
+        "Split Mismatch",
+        "Each item's split amounts must add up to the item total before saving the receipt."
+      );
+      return false;
+    }
     return true;
   };
 
@@ -295,10 +318,61 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       const participantProportions = calculateParticipantProportions(expenseData.items, expenseData.participants, expenseData.fees);
       
       const expenseDataWithFeeSplits = applyProportionalFeeSplits(expenseData, participantProportions);
+
+      const existingSettlements = expense?.settlements || [];
+      let settlementResult;
+
+      if (existingSettlements.length > 0) {
+        settlementResult = calculateSettlementWithPartialSettlements(
+          expenseDataWithFeeSplits,
+          existingSettlements
+        );
+      } else {
+        settlementResult = calculateSettlement(expenseDataWithFeeSplits);
+      }
+
+      const mappedSettlements = (settlementResult.settlements || []).map((settlement) => {
+        const from = settlement.debtor || settlement.from;
+        const to = settlement.creditor || settlement.to;
+        const amount = settlement.amount;
+        const status = settlement.status || 'noAction';
+        const isPreserved = settlement.preserved === true;
+
+        if (isPreserved) {
+          const matchedExisting = existingSettlements.find(existing => {
+            const existingFrom = existing.debtor || existing.from;
+            const existingTo = existing.creditor || existing.to;
+            const existingAmount = existing.amount;
+
+            const roundedExisting = Math.round(existingAmount * 100) / 100;
+            const roundedAmount = Math.round(amount * 100) / 100;
+
+            return existingFrom === from &&
+                   existingTo === to &&
+                   roundedExisting === roundedAmount;
+          });
+
+          return {
+            debtor: from,
+            creditor: to,
+            amount,
+            status: matchedExisting?.status || status,
+            updatedAt: matchedExisting?.updatedAt || new Date().toISOString(),
+            associatedItems: matchedExisting?.associatedItems || [],
+          };
+        }
+
+        return {
+          debtor: from,
+          creditor: to,
+          amount,
+          status,
+          updatedAt: new Date().toISOString(),
+          associatedItems: [],
+        };
+      });
       
-      const settlementResult = calculateSettlement(expenseDataWithFeeSplits);
-      
-      return settlementResult.settlements || [];
+      return mappedSettlements;
     } catch (error) {
       return [];
     }
@@ -332,14 +406,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       navigation.navigate("SettleUp", {
         expense: {
           ...expense,
-          settlements: settlements.map((settlement) => ({
-            debtor: settlement.from,
-            creditor: settlement.to,
-            amount: settlement.amount,
-            status: "noAction",
-            updatedAt: new Date().toISOString(),
-            associatedItems: [],
-          })),
+          settlements: settlements,
         },
       });
     } catch (error) {

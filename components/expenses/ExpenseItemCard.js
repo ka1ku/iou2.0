@@ -38,6 +38,8 @@ const smartRoundSplit = (total, count) => {
   return amounts;
 };
 
+const SPLIT_TOLERANCE = 0.01;
+
 const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEditing = false }) => {
   const { state, actions } = useExpense();
   const { participants } = state;
@@ -52,6 +54,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     amount: false,
     payers: false,
     consumers: false,
+    splitMismatch: false,
   });
 
   useEffect(() => {
@@ -152,8 +155,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       : [...item.selectedConsumers, pIndex];
     if (newConsumers.length > 0)
       actions.updateItem(index, { selectedConsumers: newConsumers });
-    if (validationErrors.consumers && newConsumers.length > 0) {
-      setValidationErrors(prev => ({ ...prev, consumers: false }));
+    if ((validationErrors.consumers || validationErrors.splitMismatch) && newConsumers.length > 0) {
+      setValidationErrors(prev => ({ ...prev, consumers: false, splitMismatch: false }));
     }
   };
 
@@ -171,7 +174,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     if (onDelete) {
       onDelete();
     } else {
-      onCancelEdit && onCancelEdit();
+      onCancelEdit && onCancelEdit({ revertChanges: true });
     }
   };
 
@@ -181,6 +184,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       amount: !item.amount || parseFloat(item.amount) <= 0 || isNaN(parseFloat(item.amount)),
       payers: !item.selectedPayers || item.selectedPayers.length === 0,
       consumers: !item.selectedConsumers || item.selectedConsumers.length === 0,
+      splitMismatch: false,
     };
 
     setValidationErrors(errors);
@@ -201,6 +205,23 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       return false;
     }
 
+    const allocatedTotal = (item.selectedConsumers || []).reduce((sum, consumerIndex) => {
+      const split = derivedSplits[consumerIndex];
+      return sum + (split && typeof split.amount === "number" ? split.amount : 0);
+    }, 0);
+    const totalAmount = parseFloat(item.amount) || 0;
+
+    if (Math.abs(totalAmount - allocatedTotal) > SPLIT_TOLERANCE) {
+      setValidationErrors(prev => ({ ...prev, splitMismatch: true }));
+      Alert.alert(
+        "Split Mismatch",
+        "Split amounts must add up to the item total before you can save this item."
+      );
+      return false;
+    }
+
+    setValidationErrors(prev => ({ ...prev, splitMismatch: false }));
+
     return true;
   };
 
@@ -214,15 +235,16 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       amount: false,
       payers: false,
       consumers: false,
+      splitMismatch: false,
     });
 
     if (!isEditing) {
-      onCancelEdit && onCancelEdit();
+      onCancelEdit && onCancelEdit({ revertChanges: false });
       return;
     }
 
     if (!expenseId) {
-      onCancelEdit && onCancelEdit();
+      onCancelEdit && onCancelEdit({ revertChanges: false });
       return;
     }
 
@@ -253,7 +275,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       const { participants, ...otherFields } = expenseData;
       await updateExpense(expenseId, otherFields, currentUser.uid);
 
-      onCancelEdit && onCancelEdit();
+      onCancelEdit && onCancelEdit({ revertChanges: false });
     } catch (error) {
       Alert.alert("Error", "Failed to save expense: " + error.message);
     } finally {
@@ -261,14 +283,20 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     }
   };
 
-  const totalAllocated = derivedSplits.reduce(
-    (sum, split) => sum + (split.amount || 0),
-    0
-  );
+  const totalAllocated = (item.selectedConsumers || []).reduce((sum, consumerIndex) => {
+    const split = derivedSplits[consumerIndex];
+    return sum + (split && typeof split.amount === "number" ? split.amount : 0);
+  }, 0);
   const totalAmount = parseFloat(item.amount) || 0;
   const remainingAmount = totalAmount - totalAllocated;
+  useEffect(() => {
+    if (validationErrors.splitMismatch && Math.abs(remainingAmount) <= SPLIT_TOLERANCE) {
+      setValidationErrors(prev => ({ ...prev, splitMismatch: false }));
+    }
+  }, [remainingAmount, validationErrors.splitMismatch]);
+
   let errorMessage = null;
-  if (Math.abs(remainingAmount) > 0.015) {
+  if (Math.abs(remainingAmount) > SPLIT_TOLERANCE) {
     if (remainingAmount < 0)
       errorMessage = `Total exceeds bill by $${Math.abs(
         remainingAmount
@@ -404,12 +432,17 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       </View>
 
       <View style={styles.splitContainer}>
-        <Text style={[styles.splitLabel, validationErrors.consumers && styles.errorLabel]}>
-          Split{validationErrors.consumers && " *"}
+        <Text
+          style={[
+            styles.splitLabel,
+            (validationErrors.consumers || validationErrors.splitMismatch) && styles.errorLabel
+          ]}
+        >
+          Split{(validationErrors.consumers || validationErrors.splitMismatch) && " *"}
         </Text>
         <View style={[
           styles.splitCard,
-          validationErrors.consumers && styles.sectionError
+          (validationErrors.consumers || validationErrors.splitMismatch) && styles.sectionError
         ]}>
           <View style={styles.header}>
             {errorMessage ? (

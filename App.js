@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     top: -20,
   },
   createButton: {
-    width: 80,
+    width: 64,
     height: 64,
     borderRadius: 32,
     backgroundColor: Colors.accent,

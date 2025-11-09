@@ -22,7 +22,11 @@ const ExpenseHeader = ({
         <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
       </TouchableOpacity>
       
-      <Text style={[styles.headerTitle, hideSettings && styles.headerTitleCentered]}>
+      <Text
+        style={[styles.headerTitle, hideSettings && styles.headerTitleCentered]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {title || (isEditing ? 'Edit' : 'Add')}
       </Text>
       
@@ -69,6 +73,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     flex: 1,
     textAlign: 'center',
+    marginHorizontal: Spacing.md,
   },
   headerTitleCentered: {
     marginRight: 40, // Balance the back button width to truly center the title

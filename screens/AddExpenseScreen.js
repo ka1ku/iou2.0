@@ -28,6 +28,8 @@ import ExpenseItemCard from "../components/expenses/ExpenseItemCard";
 import ExpenseViewCard from "../components/expenses/ExpenseViewCard";
 import ParticipantsGrid from "../components/expenses/ParticipantsGrid";
 
+const SPLIT_TOLERANCE = 0.01;
+
 const AddExpenseScreenContent = ({ route, navigation }) => {
   const { expense, isNewExpense = false } = route.params || {};
   const isEditing = !!expense && !isNewExpense;
@@ -39,6 +41,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
   const [editingItems, setEditingItems] = useState(new Set());
   
   const [newlyAddedItems, setNewlyAddedItems] = useState(new Set());
+  const itemSnapshotsRef = useRef(new Map());
 
   useEffect(() => {
     navigation.setOptions({
@@ -177,6 +180,27 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       );
       return false;
     }
+    const hasSplitMismatch = state.items.some((item) => {
+      const itemTotal = parseFloat(item.amount) || 0;
+      if (!(item.selectedConsumers && item.selectedConsumers.length)) return false;
+      if (!item.splits || item.splits.length === 0) return itemTotal > 0;
+      const totalSplits = item.splits.reduce((sum, split) => {
+        if (typeof split === "object" && split !== null) {
+          const amount = "amount" in split ? parseFloat(split.amount) : NaN;
+          return sum + (isNaN(amount) ? 0 : amount);
+        }
+        const numericSplit = parseFloat(split);
+        return sum + (isNaN(numericSplit) ? 0 : numericSplit);
+      }, 0);
+      return Math.abs(itemTotal - totalSplits) > SPLIT_TOLERANCE;
+    });
+    if (hasSplitMismatch) {
+      Alert.alert(
+        "Split Mismatch",
+        "Each item's split amounts must add up to the item total before saving the expense."
+      );
+      return false;
+    }
     return true;
   };
 
@@ -267,7 +291,40 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
   };
 
   const handleEditItem = (index) => {
+    const item = state.items[index];
+    if (item && isEditing && !newlyAddedItems.has(index)) {
+      itemSnapshotsRef.current.set(item.id, JSON.parse(JSON.stringify(item)));
+    }
     setEditingItems(prev => new Set([...prev, index]));
+  };
+
+  const exitItemEditMode = (index, { revertChanges } = { revertChanges: false }) => {
+    const currentItem = state.items[index];
+    if (!currentItem) return;
+
+    if (revertChanges) {
+      const snapshot = itemSnapshotsRef.current.get(currentItem.id);
+      if (snapshot) {
+        const restoredItems = state.items.map((item) =>
+          item.id === currentItem.id ? snapshot : item
+        );
+        actions.setItems(restoredItems);
+      }
+    }
+
+    setEditingItems(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(index);
+      return newSet;
+    });
+
+    setNewlyAddedItems(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(index);
+      return newSet;
+    });
+
+    itemSnapshotsRef.current.delete(currentItem.id);
   };
 
   const handleDeleteItem = (index, skipConfirmation = false) => {
@@ -282,7 +339,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           
           await deleteItemFromExpense(expense.id, index, currentUser.uid);
         }
-        
+        const itemToDelete = state.items[index];
         actions.removeItem(index);
         setEditingItems(prev => {
           const newSet = new Set(prev);
@@ -294,6 +351,9 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           newSet.delete(index);
           return newSet;
         });
+        if (itemToDelete) {
+          itemSnapshotsRef.current.delete(itemToDelete.id);
+        }
       } catch (error) {
         Alert.alert("Error", "Failed to delete item: " + error.message);
       }
@@ -413,6 +473,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
             <>
               {state.items.map((item, index) => {
                 const isItemEditing = editingItems.has(index);
+                const isNewlyAdded = newlyAddedItems.has(index);
+                const shouldDeleteOnCancel = !isEditing || isNewlyAdded;
 
                 if (isItemEditing) {
                   return (
@@ -422,19 +484,16 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                       index={index}
                       expenseId={expense?.id}
                       isEditing={isItemEditing}
-                      onCancelEdit={() => {
-                        setEditingItems(prev => {
-                          const newSet = new Set(prev);
-                          newSet.delete(index);
-                          return newSet;
-                        });
-                        setNewlyAddedItems(prev => {
-                          const newSet = new Set(prev);
-                          newSet.delete(index);
-                          return newSet;
-                        });
-                      }}
-                      onDelete={() => handleDeleteItem(index, !isEditing || newlyAddedItems.has(index))}
+                      onCancelEdit={({ revertChanges } = { revertChanges: false }) =>
+                        exitItemEditMode(index, {
+                          revertChanges: shouldDeleteOnCancel ? false : revertChanges ?? false,
+                        })
+                      }
+                      onDelete={
+                        shouldDeleteOnCancel
+                          ? () => handleDeleteItem(index, !isEditing || newlyAddedItems.has(index))
+                          : undefined
+                      }
                     />
                   );
                 } else {

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
+import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 
 const ExpenseFooter = ({ 
   loading = false,
@@ -17,14 +17,17 @@ const ExpenseFooter = ({
         style={[styles.settleButton, loading && styles.buttonDisabled]}
         onPress={onSettlePress}
         disabled={loading}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
-        <View style={styles.buttonContent}>
-          <Ionicons name="card" size={22} color={Colors.white} />
-          <Text style={styles.settleButtonText}>
-            {loading ? 'Processing...' : settleButtonText}
-          </Text>
-        </View>
+        <Ionicons
+          name="card"
+          size={20}
+          color={Colors.surface}
+          style={styles.settleIcon}
+        />
+        <Text style={styles.settleButtonText}>
+          {loading ? 'Processing...' : settleButtonText}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -46,27 +49,29 @@ const styles = StyleSheet.create({
   },
   settleButton: {
     backgroundColor: Colors.accent,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
     borderRadius: Radius.lg,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.accentDark,
-  },
-  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    justifyContent: 'center',
+    ...Shadows.button,
+  },
+  settleIcon: {
+    marginRight: Spacing.sm,
   },
   settleButtonText: {
     ...Typography.title,
-    color: Colors.white,
+    color: Colors.surface,
     fontWeight: '600',
     fontSize: 16,
   },
   buttonDisabled: {
     backgroundColor: Colors.textSecondary,
-    borderColor: Colors.textSecondary,
+    shadowOpacity: 0,
+    elevation: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
 });
 

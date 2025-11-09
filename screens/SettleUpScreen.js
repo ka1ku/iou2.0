@@ -11,6 +11,7 @@ import {
   Animated,
   Easing,
   Clipboard,
+  Share,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +35,7 @@ const SettleUpScreen = ({ route, navigation }) => {
   const [isVenmoAppActive, setIsVenmoAppActive] = useState(false);
   const [settledStates, setSettledStates] = useState({}); // Track which settlements are marked as paid
   const [paymentMadeStates, setPaymentMadeStates] = useState({}); // Track which settlements have payments made
+  const [reminderSentStates, setReminderSentStates] = useState({}); // Track reminders sent by observers
   const [animationStates, setAnimationStates] = useState({}); // Track animation states for each settlement
   const [settlementRecalculated, setSettlementRecalculated] = useState(false); // Track if settlements were recalculated
   const [recalculationInfo, setRecalculationInfo] = useState(null); // Info about recalculation
@@ -168,6 +170,63 @@ const SettleUpScreen = ({ route, navigation }) => {
       ]).start();
     }, 200);
   }, []);
+
+  const animateActionCompleted = useCallback((settlementId) => {
+    const buttonCombinationScale = new Animated.Value(1);
+    const checkmarkScale = new Animated.Value(0);
+    const checkmarkOpacity = new Animated.Value(0);
+    const settledTextOpacity = new Animated.Value(0);
+
+    setAnimationStates(prev => ({
+      ...prev,
+      [settlementId]: {
+        ...prev[settlementId],
+        buttonCombinationScale,
+        checkmarkScale,
+        checkmarkOpacity,
+        settledTextOpacity,
+      }
+    }));
+
+    Animated.sequence([
+      Animated.timing(buttonCombinationScale, {
+        toValue: 0.95,
+        duration: 150,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonCombinationScale, {
+        toValue: 1,
+        duration: 150,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(checkmarkScale, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(checkmarkOpacity, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(settledTextOpacity, {
+          toValue: 1,
+          duration: 350,
+          delay: 100,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 150);
+  }, []);
   
   // Initialize settlement states from existing settlements
   useEffect(() => {
@@ -177,6 +236,7 @@ const SettleUpScreen = ({ route, navigation }) => {
       const initialSettledStates = {};
       const initialRequestSentStates = {};
       const initialPaymentMadeStates = {};
+      const initialReminderSentStates = {};
       expense.settlements.forEach(settlement => {
         // Use consistent key format (defined below, but we need to create it inline here)
         const from = settlement.debtor || settlement.from;
@@ -204,16 +264,22 @@ const SettleUpScreen = ({ route, navigation }) => {
           initialPaymentMadeStates[settlementId] = true;
           console.log('[SettleUpScreen] Payment made:', settlementId);
         }
+        if (settlement.status === 'reminderSent') {
+          initialReminderSentStates[settlementId] = true;
+          console.log('[SettleUpScreen] Reminder sent:', settlementId);
+        }
       });
       
       console.log('[SettleUpScreen] Setting initial states:', {
         settledStates: initialSettledStates,
         requestSentStates: initialRequestSentStates,
-        paymentMadeStates: initialPaymentMadeStates
+        paymentMadeStates: initialPaymentMadeStates,
+        reminderSentStates: initialReminderSentStates
       });
       setSettledStates(initialSettledStates);
       setRequestSentStates(initialRequestSentStates);
       setPaymentMadeStates(initialPaymentMadeStates);
+      setReminderSentStates(initialReminderSentStates);
     } else {
       console.log('[SettleUpScreen] No settlements found in expense');
     }
@@ -230,6 +296,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         
         // Find the most recent request that hasn't been marked as sent yet
         let settlementToUpdate = null;
+        let requestKey = null;
         setRequestSentStates(prev => {
           console.log('[SettleUpScreen] Current requestSentStates:', prev);
           const updated = { ...prev };
@@ -238,6 +305,7 @@ const SettleUpScreen = ({ route, navigation }) => {
             if (value === false) {
               console.log('[SettleUpScreen] Found unsent request:', key);
               updated[key] = true;
+              requestKey = key;
               
               // Parse the settlement from the key
               // Handle names that might contain hyphens by splitting on the last two hyphens
@@ -267,6 +335,10 @@ const SettleUpScreen = ({ route, navigation }) => {
             console.log('[SettleUpScreen] Saving payment request status to Firestore:', settlementToUpdate);
             await updateSettlementStatus(settlementToUpdate, 'paymentRequested');
             console.log('[SettleUpScreen] Payment request status saved successfully');
+            const animationKey = requestKey || getSettlementKey(settlementToUpdate);
+            if (animationKey) {
+              animateActionCompleted(animationKey);
+            }
           } catch (error) {
             console.error('[SettleUpScreen] Failed to save payment request status:', error);
             // Revert the state on error
@@ -285,7 +357,7 @@ const SettleUpScreen = ({ route, navigation }) => {
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription?.remove();
-  }, [isVenmoAppActive, updateSettlementStatus, getSettlementKey]);
+  }, [isVenmoAppActive, updateSettlementStatus, getSettlementKey, animateActionCompleted]);
 
   // Check if settlements need to be recalculated due to expense changes
   useEffect(() => {
@@ -483,6 +555,8 @@ const SettleUpScreen = ({ route, navigation }) => {
         console.log('[handleMakePayment] Updated paymentMadeStates:', updated);
         return updated;
       });
+
+      animateActionCompleted(settlementId);
       
       // Save to Firestore
       try {
@@ -497,6 +571,11 @@ const SettleUpScreen = ({ route, navigation }) => {
           ...prev,
           [settlementId]: false
         }));
+        setAnimationStates(prev => {
+          const updated = { ...prev };
+          delete updated[settlementId];
+          return updated;
+        });
         Alert.alert('Error', 'Failed to save status. Please try again.');
         return;
       }
@@ -511,7 +590,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         // Copy to clipboard instead of opening
         console.log('[handleMakePayment] Copying deeplink to clipboard');
         Clipboard.setString(deeplink);
-        Alert.alert('Copied!', 'Venmo payment link has been copied to your clipboard.');
+        // Alert.alert('Copied!', 'Venmo payment link has been copied to your clipboard.');
       } else {
         // Open the deeplink (original behavior)
         const supported = await Linking.canOpenURL(deeplink);
@@ -1047,6 +1126,7 @@ const SettleUpScreen = ({ route, navigation }) => {
           console.log('[handleRequestPayment] Updated requestSentStates:', updated);
           return updated;
         });
+        animateActionCompleted(requestId);
         
         // Save to Firestore immediately since we're not tracking app state change
         try {
@@ -1055,6 +1135,15 @@ const SettleUpScreen = ({ route, navigation }) => {
           console.log('[handleRequestPayment] PaymentRequested status saved successfully');
         } catch (error) {
           console.error('[handleRequestPayment] Failed to save payment request status:', error);
+          setRequestSentStates(prev => ({
+            ...prev,
+            [requestId]: false
+          }));
+          setAnimationStates(prev => {
+            const updated = { ...prev };
+            delete updated[requestId];
+            return updated;
+          });
         }
       } else {
         // Open the deeplink (original behavior)
@@ -1090,6 +1179,170 @@ const SettleUpScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleSendReminder = useCallback(async (settlement) => {
+    console.log('[handleSendReminder] Called with settlement:', settlement);
+    try {
+      const debtorName = settlement.debtor || settlement.from;
+      const creditorName = settlement.creditor || settlement.to;
+
+      if (debtorName === name || creditorName === name) {
+        console.log('[handleSendReminder] Current user is involved in settlement; reminder flow not applicable');
+        return;
+      }
+
+      const debtorParticipant = participants.find((p) => p.name === debtorName);
+      const creditorParticipant = participants.find((p) => p.name === creditorName);
+      console.log('[handleSendReminder] Debtor participant:', debtorParticipant);
+      console.log('[handleSendReminder] Creditor participant:', creditorParticipant);
+
+      if (!debtorParticipant) {
+        console.error('[handleSendReminder] Debtor participant not found');
+        Alert.alert('Error', 'Unable to find debtor information');
+        return;
+      }
+
+      if (!creditorParticipant?.userId) {
+        console.error('[handleSendReminder] Creditor userId missing');
+        Alert.alert('Error', 'Unable to find creditor information');
+        return;
+      }
+
+      const creditorProfile = await getUserProfile(creditorParticipant.userId);
+      console.log('[handleSendReminder] Creditor profile:', creditorProfile);
+
+      if (!creditorProfile?.venmoUsername) {
+        console.error('[handleSendReminder] Creditor venmoUsername missing');
+        Alert.alert('Error', 'Creditor does not have a Venmo username set up');
+        return;
+      }
+
+      const amount = settlement.amount.toFixed(2);
+      const note = `IOU Payment - ${expense.title || expense.receiptTitle || 'Expense'}`;
+      const venmoLink = `venmo://paycharge?txn=pay&recipients=${creditorProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
+      const expenseTitle = expense.title || expense.receiptTitle || 'this expense';
+      const message = `${debtorName} you owe ${creditorName} $${amount} for ${expenseTitle}.\n${venmoLink}`;
+
+      console.log('[handleSendReminder] Sharing message:', message);
+
+      const result = await Share.share({
+        title: 'Send Reminder',
+        message,
+        url: venmoLink,
+      });
+
+      if (result && result.action === Share.dismissedAction) {
+        console.log('[handleSendReminder] Share dismissed by user; not updating status');
+        return;
+      }
+
+      const settlementId = getSettlementKey(settlement);
+      console.log('[handleSendReminder] Reminder shared; updating state for:', settlementId);
+      setReminderSentStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+       animateActionCompleted(settlementId);
+
+      try {
+        await updateSettlementStatus(settlement, 'reminderSent');
+        console.log('[handleSendReminder] reminderSent status saved successfully');
+      } catch (statusError) {
+        console.error('[handleSendReminder] Failed to save reminderSent status:', statusError);
+        setReminderSentStates(prev => ({
+          ...prev,
+          [settlementId]: false
+        }));
+         setAnimationStates(prev => {
+          const updated = { ...prev };
+          delete updated[settlementId];
+          return updated;
+        });
+        throw statusError;
+      }
+    } catch (error) {
+      console.error('[handleSendReminder] Error:', error);
+      Alert.alert('Error', 'Failed to share reminder. Please try again.');
+    }
+  }, [participants, expense?.title, expense?.receiptTitle, getSettlementKey, updateSettlementStatus, name, animateActionCompleted]);
+
+  const handleUndoPaymentMade = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    console.log('[handleUndoPaymentMade] Undoing payment made for:', settlementId);
+    setPaymentMadeStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+
+    try {
+      await updateSettlementStatus(settlement, 'noAction');
+      console.log('[handleUndoPaymentMade] Status reverted to noAction successfully');
+      setAnimationStates(prev => {
+        const updated = { ...prev };
+        delete updated[settlementId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('[handleUndoPaymentMade] Failed to revert status:', error);
+      setPaymentMadeStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to undo payment. Please try again.');
+    }
+  }, [updateSettlementStatus, getSettlementKey]);
+
+  const handleUndoPaymentRequested = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    console.log('[handleUndoPaymentRequested] Undoing payment request for:', settlementId);
+    setRequestSentStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+
+    try {
+      await updateSettlementStatus(settlement, 'noAction');
+      console.log('[handleUndoPaymentRequested] Status reverted to noAction successfully');
+      setAnimationStates(prev => {
+        const updated = { ...prev };
+        delete updated[settlementId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('[handleUndoPaymentRequested] Failed to revert status:', error);
+      setRequestSentStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to undo request. Please try again.');
+    }
+  }, [updateSettlementStatus, getSettlementKey]);
+
+  const handleUndoReminderSent = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    console.log('[handleUndoReminderSent] Undoing reminder for:', settlementId);
+    setReminderSentStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+
+    try {
+      await updateSettlementStatus(settlement, 'noAction');
+      console.log('[handleUndoReminderSent] Status reverted to noAction successfully');
+      setAnimationStates(prev => {
+        const updated = { ...prev };
+        delete updated[settlementId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('[handleUndoReminderSent] Failed to revert status:', error);
+      setReminderSentStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to undo reminder. Please try again.');
+    }
+  }, [updateSettlementStatus, getSettlementKey]);
+
   const renderSettlementItem = useCallback((settlement, index) => {
     const fromParticipant = participants.find(p => p.name === settlement.from);
     const toParticipant = participants.find(p => p.name === settlement.to);
@@ -1097,9 +1350,12 @@ const SettleUpScreen = ({ route, navigation }) => {
     // Use consistent key format for settlement IDs
     const settlementId = getSettlementKey(settlement);
     const requestId = settlementId; // Use same ID for consistency
+    const isSpectator = settlement.from !== name && settlement.to !== name;
     
     // Check if a request has been sent for this settlement
     const hasRequestBeenSent = requestSentStates[requestId] === true || settlement.status === 'paymentRequested';
+    const isPaymentMade = paymentMadeStates[settlementId] === true || settlement.status === 'paymentMade';
+    const hasReminderBeenSent = reminderSentStates[settlementId] === true || settlement.status === 'reminderSent';
     
     // Check if this settlement is marked as paid/settled
     const isSettled = settledStates[settlementId] === true || settlement.status === 'markedAsPaid';
@@ -1112,7 +1368,7 @@ const SettleUpScreen = ({ route, navigation }) => {
       } else if (settlement.to === name) {
         return hasRequestBeenSent ? 'Request Sent' : 'Request Payment';
       } else {
-        return 'Send Reminder';
+        return hasReminderBeenSent ? 'Reminder Sent' : 'Send Reminder';
       }
     };
     
@@ -1120,6 +1376,9 @@ const SettleUpScreen = ({ route, navigation }) => {
       const baseStyle = styles.requestPaymentButton;
       if (settlement.to === name && hasRequestBeenSent) {
         return [baseStyle, styles.requestSentButton];
+      }
+      if (isSpectator && hasReminderBeenSent) {
+        return [baseStyle, styles.reminderSentButton];
       }
       return baseStyle;
     };
@@ -1129,7 +1388,46 @@ const SettleUpScreen = ({ route, navigation }) => {
       if (settlement.to === name && hasRequestBeenSent) {
         return [baseStyle, styles.requestSentButtonText];
       }
+      if (isSpectator && hasReminderBeenSent) {
+        return [baseStyle, styles.reminderSentButtonText];
+      }
       return baseStyle;
+    };
+
+    const combinedState = isSettled
+      ? 'settled'
+      : isPaymentMade
+        ? 'paymentMade'
+        : hasRequestBeenSent
+          ? 'paymentRequested'
+          : (isSpectator && hasReminderBeenSent ? 'reminderSent' : null);
+
+    const combinedTextMap = {
+      settled: 'Settled Up',
+      paymentMade: 'Payment Made',
+      paymentRequested: 'Payment Requested',
+      reminderSent: 'Reminder Sent'
+    };
+
+    const combinedIconMap = {
+      settled: 'checkmark',
+      paymentMade: 'checkmark-done',
+      paymentRequested: 'paper-plane',
+      reminderSent: 'notifications'
+    };
+
+    const combinedBackgroundMap = {
+      settled: Colors.success,
+      paymentMade: Colors.accent,
+      paymentRequested: Colors.accent,
+      reminderSent: Colors.accent
+    };
+
+    const combinedUndoHandlers = {
+      settled: () => handleUndoMarkAsPaid(settlement),
+      paymentMade: () => handleUndoPaymentMade(settlement),
+      paymentRequested: () => handleUndoPaymentRequested(settlement),
+      reminderSent: () => handleUndoReminderSent(settlement)
     };
 
     return (
@@ -1220,7 +1518,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
-          {isSettled ? (
+          {combinedState === 'settled' ? (
             // Settled Up State - Combined Button with Animation
             <Animated.View 
               style={[
@@ -1306,18 +1604,63 @@ const SettleUpScreen = ({ route, navigation }) => {
                       console.log('[Action Button (settled state)] Request already sent, doing nothing');
                       // Request already sent, maybe show a message or do nothing
                     } else {
-                      console.log('[Action Button (settled state)] Send reminder (not implemented)');
-                      // TODO: Add send reminder functionality
+                      if (hasReminderBeenSent) {
+                        console.log('[Action Button (settled state)] Reminder already sent, ignoring press');
+                        return;
+                      }
+                      console.log('[Action Button (settled state)] Send reminder');
+                      handleSendReminder(settlement);
                     }
                   }}
                   activeOpacity={0.8}
-                  disabled={settlement.to === name && hasRequestBeenSent}
+                  disabled={(settlement.to === name && hasRequestBeenSent) || (isSpectator && hasReminderBeenSent)}
                 >
                   <Text style={getButtonTextStyle()}>
                     {getButtonText()}
                   </Text>
                 </TouchableOpacity>
               </Animated.View>
+            </Animated.View>
+          ) : combinedState ? (
+            <Animated.View
+              style={[
+                styles.combinedActionContainer,
+                { backgroundColor: combinedBackgroundMap[combinedState] },
+                animationState?.buttonCombinationScale ? { transform: [{ scale: animationState.buttonCombinationScale }] } : {}
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.combinedActionCenter,
+                  animationState?.settledTextOpacity ? { opacity: animationState.settledTextOpacity } : {}
+                ]}
+              >
+                <Animated.View
+                  style={[
+                    styles.combinedIconWrapper,
+                    animationState?.checkmarkOpacity ? { opacity: animationState.checkmarkOpacity } : {},
+                    animationState?.checkmarkScale ? { transform: [{ scale: animationState.checkmarkScale }] } : {}
+                  ]}
+                >
+                  <Ionicons name={combinedIconMap[combinedState]} size={16} color={Colors.surface} style={styles.combinedActionIcon} />
+                </Animated.View>
+                <Animated.Text
+                  style={[
+                    styles.combinedActionText,
+                    animationState?.settledTextOpacity ? { opacity: animationState.settledTextOpacity } : {}
+                  ]}
+                >
+                  {combinedTextMap[combinedState]}
+                </Animated.Text>
+              </Animated.View>
+              <TouchableOpacity
+                style={styles.undoButton}
+                onPress={combinedUndoHandlers[combinedState]}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="arrow-undo" size={16} color={Colors.surface} />
+              </TouchableOpacity>
             </Animated.View>
           ) : (
             // Normal Button State
@@ -1345,13 +1688,17 @@ const SettleUpScreen = ({ route, navigation }) => {
                   } else if (settlement.to === name && hasRequestBeenSent) {
                     console.log('[Action Button] Request already sent, doing nothing');
                     // Request already sent, maybe show a message or do nothing
-                  } else {
-                    console.log('[Action Button] Send reminder (not implemented)');
-                    // TODO: Add send reminder functionality
+                } else {
+                  if (hasReminderBeenSent) {
+                    console.log('[Action Button] Reminder already sent, ignoring press');
+                    return;
+                  }
+                  console.log('[Action Button] Send reminder');
+                  handleSendReminder(settlement);
                   }
                 }}
                 activeOpacity={0.8}
-                disabled={settlement.to === name && hasRequestBeenSent}
+              disabled={(settlement.to === name && hasRequestBeenSent) || (isSpectator && hasReminderBeenSent)}
               >
                 <Text style={getButtonTextStyle()}>
                   {getButtonText()}
@@ -1362,7 +1709,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         </View>
       </View>
     );
-  }, [participants, name, requestSentStates, settledStates, animationStates, getSettlementKey, handleMarkAsPaid, handleMakePayment, handleRequestPayment, handleUndoMarkAsPaid, expense]);
+  }, [participants, name, requestSentStates, paymentMadeStates, settledStates, reminderSentStates, animationStates, getSettlementKey, handleMarkAsPaid, handleMakePayment, handleRequestPayment, handleSendReminder, handleUndoMarkAsPaid, handleUndoPaymentMade, handleUndoPaymentRequested, handleUndoReminderSent, expense]);
 
   return (
     <View style={styles.container}>
@@ -1373,7 +1720,13 @@ const SettleUpScreen = ({ route, navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{expense.title || 'Settle Up'}</Text>
+        <Text
+          style={styles.headerTitle}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {expense.title || 'Settle Up'}
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -1433,7 +1786,12 @@ const SettleUpScreen = ({ route, navigation }) => {
       </ScrollView>
 
       {/* Return Home Button */}
-      <View style={styles.bottomButtonContainer}>
+      <View
+        style={[
+          styles.bottomButtonContainer,
+          { paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+        ]}
+      >
         <TouchableOpacity
           style={styles.returnHomeButton}
           onPress={async () => {
@@ -1445,7 +1803,12 @@ const SettleUpScreen = ({ route, navigation }) => {
           }}
           activeOpacity={0.8}
         >
-          <Ionicons name="home" size={20} color={Colors.surface} style={styles.returnHomeIcon} />
+          <Ionicons
+            name="home"
+            size={20}
+            color={Colors.surface}
+            style={styles.returnHomeIcon}
+          />
           <Text style={styles.returnHomeButtonText}>Return Home</Text>
         </TouchableOpacity>
       </View>
@@ -1488,6 +1851,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     flex: 1,
     textAlign: 'center',
+    marginHorizontal: Spacing.md,
   },
   headerSpacer: {
     width: 40,
@@ -1729,6 +2093,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  reminderSentButton: {
+    backgroundColor: Colors.accent,
+    opacity: 0.85,
+  },
+  reminderSentButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
   settledUpContainer: {
     flex: 1,
     marginHorizontal: Spacing.xs,
@@ -1801,14 +2175,48 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
+  combinedActionContainer: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...Shadows.button,
+    minHeight: 44,
+  },
+  combinedActionCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  combinedActionIcon: {
+    marginRight: Spacing.xs,
+  },
+  combinedActionText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  combinedIconWrapper: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.xs,
+  },
   bottomButtonContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
-    paddingBottom: Spacing.xl + 20, // Extra padding for safe area
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.lg,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
