@@ -55,6 +55,7 @@ export const ExpenseDataProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const lastDocRef = useRef(null);
   const unsubscribeExpensesRef = useRef(null);
+  const hasReceivedInitialSnapshot = useRef(false);
 
   // Listen for authentication state changes
   useEffect(() => {
@@ -79,12 +80,14 @@ export const ExpenseDataProvider = ({ children }) => {
       setLoading(false);
       setHasMore(true);
       lastDocRef.current = null;
+      hasReceivedInitialSnapshot.current = false;
       return;
     }
 
     setLoading(true);
     setHasMore(true);
     lastDocRef.current = null;
+    hasReceivedInitialSnapshot.current = false;
 
     const firestoreInstance = getFirestore(getApp());
     
@@ -114,12 +117,16 @@ export const ExpenseDataProvider = ({ children }) => {
       // Merge with existing expenses to handle real-time updates
       setExpenses(prevExpenses => {
         // On first load, replace. On updates, merge.
-        if (prevExpenses.length === 0) {
+        if (prevExpenses.length === 0 && !hasReceivedInitialSnapshot.current) {
           return userExpenses;
         }
         return mergeAndSortExpenses(prevExpenses, userExpenses);
       });
       
+      // Only set loading to false after we've received the initial snapshot
+      if (!hasReceivedInitialSnapshot.current) {
+        hasReceivedInitialSnapshot.current = true;
+      }
       setLoading(false);
     };
 
@@ -134,6 +141,7 @@ export const ExpenseDataProvider = ({ children }) => {
         setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
         setLoading(false);
         setHasMore(false);
+        hasReceivedInitialSnapshot.current = true;
       }
     );
 

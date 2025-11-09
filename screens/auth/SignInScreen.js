@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { sendOTP, handleMultiFactorError } from '../../services/authService';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const SignInScreen = ({ navigation }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef(null);
 
   const formatPhoneNumber = (text) => {
     const cleaned = text.replace(/\D/g, '');
@@ -80,6 +82,14 @@ const SignInScreen = ({ navigation }) => {
     }
   };
 
+  // Delay autoFocus to reduce iOS system warnings
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView 
@@ -113,6 +123,7 @@ const SignInScreen = ({ navigation }) => {
                   <Text style={styles.countryCodeText}>🇺🇸 +1</Text>
                 </View>
                 <TextInput
+                  ref={inputRef}
                   style={styles.phoneInput}
                   value={phoneNumber}
                   onChangeText={handlePhoneNumberChange}
@@ -120,7 +131,6 @@ const SignInScreen = ({ navigation }) => {
                   placeholderTextColor={Colors.textSecondary}
                   keyboardType="phone-pad"
                   maxLength={14}
-                  autoFocus
                 />
               </View>
             </View>
@@ -131,15 +141,22 @@ const SignInScreen = ({ navigation }) => {
               disabled={loading}
               activeOpacity={0.8}
             >
-              <Text style={styles.sendButtonText}>
-                {loading ? 'Sending...' : 'Send Verification Code'}
-              </Text>
-              <Ionicons 
-                name="arrow-forward" 
-                size={20} 
-                color="white" 
-                style={styles.buttonIcon} 
-              />
+              {loading ? (
+                <>
+                  <LoadingSpinner size="small" color={Colors.white} />
+                  <Text style={styles.sendButtonText}>Sending...</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.sendButtonText}>Send Verification Code</Text>
+                  <Ionicons 
+                    name="arrow-forward" 
+                    size={20} 
+                    color="white" 
+                    style={styles.buttonIcon} 
+                  />
+                </>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -277,6 +294,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.lg,
     ...Shadows.card,
   },

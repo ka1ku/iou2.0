@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +17,7 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/token
 import { sendOTP, storeTemporarySignupData, clearTemporarySignupData, getTemporarySignupData, checkUsernameExists } from '../../services/authService';
 import { fetchVenmoProfile, generateFallbackAvatar } from '../../utils/venmoUtils';
 import ProfilePicture from '../../components/VenmoProfilePicture';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 
 
@@ -585,7 +585,7 @@ const SignUpScreen = ({ navigation }) => {
                 {/* Loading indicator or checkmark on the right */}
                 <View style={styles.venmoInputRightIcon}>
                   {isVerifying ? (
-                    <ActivityIndicator color={Colors.accent} size="small" />
+                    <LoadingSpinner size="small" />
                   ) : venmoVerified ? (
                     <Ionicons name="checkmark-circle" size={24} color={Colors.accent} />
                   ) : null}

@@ -14,6 +14,7 @@ import Purchases from 'react-native-purchases';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Colors, Typography, Shadows, Radius } from './design/tokens';
+import LoadingSpinner from './components/LoadingSpinner';
 
 import '@react-native-firebase/app';
 import '@react-native-firebase/auth';
@@ -35,7 +36,6 @@ import VenmoTestScreen from './screens/settings/VenmoTest';
 import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
 import ConnectedAccountsScreen from './screens/settings/ConnectedAccountsScreen';
 import TermsOfServiceScreen from './screens/settings/TermsOfServiceScreen';
-import ChangeVenmoScreen from './screens/settings/ChangeVenmoScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 
@@ -102,7 +102,6 @@ const ProfileStack = () => (
     <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="ChangeVenmo" component={ChangeVenmoScreen} options={{ headerShown: false }} />
     <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} options={{ headerShown: false }} />
     <Stack.Screen name="AddReceipt" component={AddReceiptScreenWithProvider} options={{ headerShown: false }} />
@@ -200,7 +199,7 @@ const MainTabs = () => {
     const hiddenRoutes = [
       'AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 
       'NotificationSettings', 'VenmoTest', 'FriendProfile', 'Settings',
-      'ProfileSettings', 'ConnectedAccounts', 'TermsOfService', 'ChangeVenmo'
+      'ProfileSettings', 'ConnectedAccounts', 'TermsOfService'
     ];
 
     return {
@@ -297,9 +296,7 @@ const MainTabs = () => {
 
 const LoadingScreen = () => (
   <SafeAreaView style={styles.loadingContainer}>
-    <Ionicons name="card-outline" size={64} color={Colors.accent} />
-    <Text style={styles.loadingText}>IOU</Text>
-    <Text style={styles.loadingSubtext}>Setting up your account...</Text>
+    <LoadingSpinner size="large" />
   </SafeAreaView>
 );
 

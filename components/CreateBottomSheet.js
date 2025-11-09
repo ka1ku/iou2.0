@@ -15,7 +15,7 @@ import { processReceiptImage } from '../services/receiptScanner';
 import { requestReceiptScanningAccess } from '../services/subscriptionService';
 import { useReceiptScanning } from '../contexts/ReceiptScanningContext';
 
-const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
+const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => {
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['50%'], []);
@@ -23,6 +23,55 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const [showScanOptions, setShowScanOptions] = useState(false);
   const { setIsReceiptScanning, startScanningAnimation, stopScanningAnimation } = useReceiptScanning();
+
+  // Get the target tab - prefer last active tab, fallback to checking navigation state
+  const getTargetTab = useCallback(() => {
+    // First, try to use the last active tab if provided
+    if (getLastActiveTab) {
+      const lastTab = getLastActiveTab();
+      if (lastTab && lastTab !== 'Create') {
+        return lastTab;
+      }
+    }
+    
+    // Fallback: Check navigation state to see which stack has nested routes
+    try {
+      const navState = navigation.getState();
+      if (!navState) return 'Home';
+      
+      // Check which stack has nested screens (more than just the main screen)
+      const homeRoute = navState.routes.find(r => r.name === 'Home');
+      const profileRoute = navState.routes.find(r => r.name === 'Profile');
+      
+      // If Profile stack has nested routes, user was navigating in Profile
+      if (profileRoute?.state?.routes) {
+        const profileStackState = profileRoute.state;
+        if (profileStackState.routes.length > 1) {
+          const currentRoute = profileStackState.routes[profileStackState.index || 0];
+          if (currentRoute?.name && currentRoute.name !== 'ProfileMain') {
+            return 'Profile';
+          }
+        }
+      }
+      
+      // If Home stack has nested routes, user was navigating in Home
+      if (homeRoute?.state?.routes) {
+        const homeStackState = homeRoute.state;
+        if (homeStackState.routes.length > 1) {
+          const currentRoute = homeStackState.routes[homeStackState.index || 0];
+          if (currentRoute?.name && currentRoute.name !== 'HomeMain') {
+            return 'Home';
+          }
+        }
+      }
+      
+      // Default to Home
+      return 'Home';
+    } catch (error) {
+      console.warn('Error determining target tab:', error);
+      return 'Home';
+    }
+  }, [navigation, getLastActiveTab]);
 
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -47,12 +96,14 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
   const handleAddExpense = useCallback(() => {
     bottomSheetRef.current?.close();
     setTimeout(() => {
-      navigation.navigate('Home', {
+      // Navigate to SetupExpense in the appropriate tab's stack
+      const targetTab = getTargetTab();
+      navigation.navigate(targetTab, {
         screen: 'SetupExpense',
         params: { expenseType: 'expense' },
       });
     }, 300);
-  }, [navigation]);
+  }, [navigation, getTargetTab]);
 
   const handleScanReceipt = useCallback(() => {
     setShowScanOptions(true);
@@ -79,7 +130,9 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
             stopScanningAnimation();
           },
           (receiptData) => {
-            navigation.navigate('Home', {
+            // Navigate to SetupExpense in the appropriate tab's stack
+            const targetTab = getTargetTab();
+            navigation.navigate(targetTab, {
               screen: 'SetupExpense',
               params: { 
                 expenseType: 'receipt',
@@ -96,7 +149,7 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
         setIsReceiptScanning
       );
     }, 300);
-  }, [navigation, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
+  }, [navigation, getTargetTab, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
 
   const handlePickFromGallery = useCallback(async () => {
     // Check access first
@@ -119,7 +172,9 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
             stopScanningAnimation();
           },
           (receiptData) => {
-            navigation.navigate('Home', {
+            // Navigate to SetupExpense in the appropriate tab's stack
+            const targetTab = getTargetTab();
+            navigation.navigate(targetTab, {
               screen: 'SetupExpense',
               params: { 
                 expenseType: 'receipt',
@@ -136,7 +191,7 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
         setIsReceiptScanning
       );
     }, 300);
-  }, [navigation, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
+  }, [navigation, getTargetTab, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
 
   const renderBackdrop = useCallback(
     (props) => (
@@ -174,7 +229,7 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
                 onPress={handleAddExpense}
                 activeOpacity={0.7}
               >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.accent + '20' }]}>
+                <View style={[styles.optionIcon, { backgroundColor: Colors.brandLight }]}>
                   <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
                 </View>
                 <View style={styles.optionContent}>
@@ -189,7 +244,7 @@ const CreateBottomSheet = forwardRef(({ navigation }, ref) => {
                 onPress={handleScanReceipt}
                 activeOpacity={0.7}
               >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
+                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '10' }]}>
                   <Ionicons name="camera-outline" size={28} color={Colors.blue} />
                 </View>
                 <View style={styles.optionContent}>
@@ -298,7 +353,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.lg,
     borderRadius: Radius.md,
-    backgroundColor: Colors.surfaceLight,
     borderWidth: 1,
     borderColor: Colors.divider,
   },

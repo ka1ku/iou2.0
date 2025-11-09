@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import { calculateUserBalanceForExpense, getFormattedBalanceString, getBalanceColor, calculateExpenseTotal } from '../../utils/balanceCalculator';
+import LoadingSpinner from '../LoadingSpinner';
 
 const RecentExpenses = ({ 
   expenses, 
@@ -24,8 +24,7 @@ const RecentExpenses = ({
 
   const SkeletonLoader = memo(() => (
     <View style={styles.skeletonLoader}>
-      <ActivityIndicator size="small" color={Colors.accent} />
-      <Text style={styles.skeletonText}>Loading...</Text>
+      <LoadingSpinner size="medium" />
     </View>
   ));
 
@@ -365,11 +364,6 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.divider,
-  },
-  skeletonText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.sm,
   },
   loadMoreButton: {
     backgroundColor: Colors.card,

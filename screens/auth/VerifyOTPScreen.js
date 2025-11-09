@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { verifyOTP, sendOTP, resolve2FAChallenge, createUserProfile, getTemporarySignupData, clearTemporarySignupData } from '../../services/authService';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const VerifyOTPScreen = ({ navigation, route }) => {
   const { phoneNumber, verificationId, isInitialAuth = true, is2FA = false, resolver = null, isSignUp = false } = route.params;
@@ -240,13 +241,19 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             disabled={loading || otp.some(digit => !digit)}
             activeOpacity={0.8}
           >
-            <Text style={styles.verifyButtonText}>
-              {loading ? 'Verifying...' : 'Verify Code'}
-            </Text>
+            {loading ? (
+              <>
+                <LoadingSpinner size="small" color={Colors.white} />
+                <Text style={styles.verifyButtonText}>Verifying...</Text>
+              </>
+            ) : (
+              <Text style={styles.verifyButtonText}>Verify Code</Text>
+            )}
           </TouchableOpacity>
 
           {loading && loadingMessage && (
             <View style={styles.loadingMessageContainer}>
+              <LoadingSpinner size="small" />
               <Text style={styles.loadingMessageText}>
                 {loadingMessage}
               </Text>
@@ -261,9 +268,14 @@ const VerifyOTPScreen = ({ navigation, route }) => {
                   disabled={resendLoading}
                   style={styles.resendButton}
                 >
-                  <Text style={styles.resendText}>
-                    {resendLoading ? 'Sending...' : 'Resend Code'}
-                  </Text>
+                  {resendLoading ? (
+                    <>
+                      <LoadingSpinner size="small" color={Colors.accent} />
+                      <Text style={styles.resendText}>Sending...</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.resendText}>Resend Code</Text>
+                  )}
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.timerText}>
@@ -357,6 +369,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.sm,
     marginBottom: Spacing.xl,
     ...Shadows.card,
   },
@@ -374,6 +388,9 @@ const styles = StyleSheet.create({
   },
   resendButton: {
     padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   resendText: {
     ...Typography.body,
@@ -404,6 +421,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    justifyContent: 'center',
     ...Shadows.card,
   },
   loadingMessageText: {

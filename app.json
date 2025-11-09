@@ -32,7 +32,7 @@
     "splash": {
       "image": "./assets/splashscreen.png",
       "resizeMode": "contain",
-      "backgroundColor": "#e6a21c"
+      "backgroundColor": "#f9f7f4"
     },
     "assetBundlePatterns": [
       "**/*"

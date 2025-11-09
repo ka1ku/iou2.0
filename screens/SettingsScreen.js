@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   ScrollView,
   Linking,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,11 +15,14 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
 import { signOutUser, getCurrentUser } from '../services/authService';
 import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ChangeVenmoBottomSheet from '../components/ChangeVenmoBottomSheet';
 
 const SettingsScreen = ({ navigation }) => {
   const { userProfile } = useExpenseData();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingFunction, setLoadingFunction] = useState(null);
+  const changeVenmoBottomSheetRef = useRef(null);
 
   const handleSignOut = () => {
     Alert.alert(
@@ -271,9 +273,7 @@ const SettingsScreen = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.settingItem}
-              onPress={() => navigation.navigate('Profile', {
-                screen: 'ChangeVenmo'
-              })}
+              onPress={() => changeVenmoBottomSheetRef.current?.open()}
             >
               <Ionicons name="card-outline" size={24} color={Colors.textSecondary} />
               <Text style={styles.settingText}>Change Venmo</Text>
@@ -324,7 +324,7 @@ const SettingsScreen = ({ navigation }) => {
               <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
               <Text style={styles.settingText}>Send Test Notification</Text>
               {isLoading && loadingFunction === 'testNotification' ? (
-                <ActivityIndicator size="small" color={Colors.accent} />
+                <LoadingSpinner size="small" />
               ) : (
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               )}
@@ -337,7 +337,7 @@ const SettingsScreen = ({ navigation }) => {
               <Ionicons name="sync-outline" size={24} color={Colors.textSecondary} />
               <Text style={styles.settingText}>Update User in Expenses</Text>
               {isLoading && loadingFunction === 'updateUser' ? (
-                <ActivityIndicator size="small" color={Colors.accent} />
+                <LoadingSpinner size="small" />
               ) : (
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               )}
@@ -350,7 +350,7 @@ const SettingsScreen = ({ navigation }) => {
               <Ionicons name="add-circle-outline" size={24} color={Colors.textSecondary} />
               <Text style={styles.settingText}>Create Synthetic Data</Text>
               {isLoading && loadingFunction === 'createSynthetic' ? (
-                <ActivityIndicator size="small" color={Colors.accent} />
+                <LoadingSpinner size="small" />
               ) : (
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               )}
@@ -363,7 +363,7 @@ const SettingsScreen = ({ navigation }) => {
               <Ionicons name="trash-outline" size={24} color={Colors.danger} />
               <Text style={[styles.settingText, { color: Colors.danger }]}>Delete Synthetic Data</Text>
               {isLoading && loadingFunction === 'deleteSynthetic' ? (
-                <ActivityIndicator size="small" color={Colors.danger} />
+                <LoadingSpinner size="small" color={Colors.danger} />
               ) : (
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               )}
@@ -382,6 +382,7 @@ const SettingsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <ChangeVenmoBottomSheet ref={changeVenmoBottomSheetRef} />
     </SafeAreaView>
   );
 };

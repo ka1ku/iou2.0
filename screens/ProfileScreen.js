@@ -13,6 +13,7 @@ import ProfilePicture from '../components/VenmoProfilePicture';
 import BalanceSummary from '../components/profiles/BalanceSummary';
 import RecentExpenses from '../components/profiles/RecentExpenses';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const ProfileScreen = ({ navigation }) => {
   const [displayedExpensesCount, setDisplayedExpensesCount] = useState(3);
@@ -37,7 +38,8 @@ const ProfileScreen = ({ navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <Text>Loading profile...</Text>
+        <LoadingSpinner size="large" />
+        <Text style={styles.loadingText}>Loading profile...</Text>
       </SafeAreaView>
     );
   }
@@ -110,6 +112,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    marginTop: Spacing.md,
   },
   header: {
     backgroundColor: Colors.surface,

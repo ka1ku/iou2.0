@@ -93,6 +93,7 @@ export const Shadows = {
 
 export const Typography = {
   // Poppins font family keys we will load in App.js
+  familyRegular: 'Poppins_400Regular',
   familyMedium: 'Poppins_500Medium',
   familySemiBold: 'Poppins_600SemiBold',
   familyBold: 'Poppins_700Bold',

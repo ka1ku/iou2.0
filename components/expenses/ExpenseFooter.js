@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import LoadingSpinner from '../LoadingSpinner';
 
 const ExpenseFooter = ({ 
   loading = false,
@@ -19,15 +20,22 @@ const ExpenseFooter = ({
         disabled={loading}
         activeOpacity={0.8}
       >
-        <Ionicons
-          name="card"
-          size={20}
-          color={Colors.surface}
-          style={styles.settleIcon}
-        />
-        <Text style={styles.settleButtonText}>
-          {loading ? 'Processing...' : settleButtonText}
-        </Text>
+        {loading ? (
+          <>
+            <LoadingSpinner size="small" color={Colors.surface} />
+            <Text style={styles.settleButtonText}>Processing...</Text>
+          </>
+        ) : (
+          <>
+            <Ionicons
+              name="card"
+              size={20}
+              color={Colors.surface}
+              style={styles.settleIcon}
+            />
+            <Text style={styles.settleButtonText}>{settleButtonText}</Text>
+          </>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -55,6 +63,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.sm,
     ...Shadows.button,
   },
   settleIcon: {

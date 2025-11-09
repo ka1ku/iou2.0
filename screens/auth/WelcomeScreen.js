@@ -143,7 +143,8 @@ const styles = StyleSheet.create({
     height: '150%',
   },
   title: {
-    ...Typography.h1,
+    fontSize: 32,
+    fontFamily: Typography.familyRegular,
     color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: Spacing.md,
@@ -179,12 +180,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + '25',
   },
   featureText: {
-    ...Typography.label,
+    fontSize: 12,
+    fontFamily: Typography.familyRegular,
     color: Colors.textPrimary,
     textAlign: 'center',
-    fontSize: 12,
     lineHeight: 16,
-    fontWeight: '500',
   },
   buttonContainer: {
     paddingHorizontal: Spacing.xl,

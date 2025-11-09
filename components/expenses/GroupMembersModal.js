@@ -76,7 +76,7 @@ const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect, isSta
           <Ionicons 
             name={isStarred ? "star" : "star-outline"} 
             size={20} 
-            color={isStarred ? Colors.warning : Colors.textSecondary} 
+            color={isStarred ? Colors.brand : Colors.textSecondary} 
           />
         </TouchableOpacity>
         <TouchableOpacity 
@@ -209,12 +209,17 @@ const SearchPane = React.memo(({
   const debouncedRefine = useRef(null);
   
   useEffect(() => {
+    // Only search if there's a query
+    if (!debouncedQuery || debouncedQuery.trim().length === 0) {
+      return;
+    }
+    
     if (debouncedRefine.current) {
       clearTimeout(debouncedRefine.current);
     }
     
     debouncedRefine.current = setTimeout(() => {
-      refine(debouncedQuery);
+      refine(debouncedQuery.trim());
     }, 200);
     
     return () => {
@@ -298,6 +303,18 @@ const SearchPane = React.memo(({
 
   return (
     <View style={styles.searchContent}>
+      {/* Search results - show only when there's a query and results */}
+      {hasQuery && searchHits.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Search Results</Text>
+          {searchHits.map((friend, index) => (
+            <View key={friend.objectID || `friend-${index}`}>
+              {renderFriendItem({ item: friend })}
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Recommended section - always show starred users */}
       {starredUsers.length > 0 && (
         <View style={styles.section}>
@@ -305,18 +322,6 @@ const SearchPane = React.memo(({
           {starredUsers.map((friend, index) => (
             <View key={friend.objectID || friend.id || `starred-${index}`}>
               {renderStarredFriendItem({ item: friend })}
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Search results - only show when there's a query and results */}
-      {hasQuery && searchHits.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Search Results</Text>
-          {searchHits.map((friend, index) => (
-            <View key={friend.objectID || `friend-${index}`}>
-              {renderFriendItem({ item: friend })}
             </View>
           ))}
         </View>
@@ -337,12 +342,21 @@ const SearchPane = React.memo(({
         </View>
       )}
 
-      {/* Empty state when no query, no starred users, and no invited contacts */}
+      {/* Empty state when no query, no recommended, and no invited contacts */}
       {!hasQuery && starredUsers.length === 0 && filteredInvitedContacts.length === 0 && (
         <View style={styles.emptyStateContainer}>
           <Ionicons name="star-outline" size={48} color={Colors.textSecondary} style={styles.emptyStateIcon} />
           <Text style={styles.emptyStateTitle}>No recommended people</Text>
           <Text style={styles.emptyStateText}>Search for people and star them to add them to your recommended list</Text>
+        </View>
+      )}
+
+      {/* Empty search state when query exists but no results */}
+      {hasQuery && searchHits.length === 0 && (
+        <View style={styles.emptyStateContainer}>
+          <Ionicons name="search-outline" size={48} color={Colors.textSecondary} style={styles.emptyStateIcon} />
+          <Text style={styles.emptyStateTitle}>No results found</Text>
+          <Text style={styles.emptyStateText}>Try searching with a different name or username</Text>
         </View>
       )}
     </View>
@@ -709,22 +723,32 @@ const GroupMembersModal = ({
       presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
       onRequestClose={onClose}
     >
-          <View style={[styles.modalHeader, { paddingTop: Platform.OS === 'ios' ? 0 : 60 }]}>
-            <View style={styles.modalHandle} />
-            <View style={styles.headerRow}>
-              <View style={styles.headerContent}>
-                <Text style={styles.headerTitle}>Group Members</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.doneButton}
-                onPress={handleDone}
-              >
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
+      <View style={styles.modalContainer}>
+        <View style={[styles.modalHeader, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top + Spacing.md }]}>
+          {Platform.OS === 'android' && <View style={styles.modalHandle} />}
+          <View style={styles.headerRow}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.checkButton}
+              onPress={handleDone}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="checkmark" size={24} color={Colors.accent} />
+            </TouchableOpacity>
           </View>
+        </View>
 
-        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollContainer} 
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.xl }]}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.membersContainer}>
             {selectedFriends.length > 0 ? (
               <FlatList
@@ -760,6 +784,7 @@ const GroupMembersModal = ({
             }} 
           />
         </ScrollView>
+      </View>
     </Modal>
   );
 };
@@ -772,58 +797,55 @@ const styles = StyleSheet.create({
   modalHeader: {
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
   modalHandle: {
-    width: 36,
-    height: 5,
+    width: 40,
+    height: 4,
     backgroundColor: Colors.divider,
-    borderRadius: 2.5,
+    borderRadius: 2,
     alignSelf: 'center',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.lg,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.md,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 44,
   },
-  doneButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-  },
-  doneButtonText: {
-    ...Typography.body1,
-    color: Colors.accent,
-    fontFamily: Typography.familySemiBold,
-  },
-  headerContent: {
-    flex: 1,
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'flex-start',
+    paddingLeft: Spacing.xs,
   },
-  headerTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
+  checkButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    paddingRight: Spacing.xs,
   },
   membersContainer: {
     backgroundColor: Colors.surface,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
   membersList: {
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   emptyMembersPlaceholder: {
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xl,
+    paddingVertical: Spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 120,
+    minHeight: 140,
   },
   emptyMembersText: {
     ...Typography.h3,
@@ -897,7 +919,8 @@ const styles = StyleSheet.create({
   searchContainer: {
     backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
@@ -925,15 +948,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
     marginTop: Spacing.md,
   },
   sectionTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-    marginTop: Spacing.sm,
+    ...Typography.title,
+    color: Colors.textSecondary,
+    fontFamily: Typography.familySemiBold,
+    marginBottom: Spacing.sm,
+    marginTop: Spacing.xs,
     paddingHorizontal: Spacing.xl,
+    fontSize: 13,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   listItem: {
     flexDirection: 'row',
@@ -1025,7 +1052,10 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    paddingBottom: Spacing.xxl,
+    backgroundColor: Colors.surface,
+  },
+  scrollContent: {
+    flexGrow: 1,
   },
   emptyStateContainer: {
     paddingHorizontal: Spacing.xl,

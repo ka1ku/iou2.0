@@ -21,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors, Spacing, Radius, Shadows, Typography } from "../design/tokens";
 
 import { getCurrentUser } from "../services/authService";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 import {
   updateExpense,
@@ -557,9 +558,14 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
                 disabled={loading || !newExpenseName.trim()}
                 activeOpacity={0.7}
               >
-                <Text style={styles.saveButtonText}>
-                  {loading ? "Saving..." : "Save"}
-                </Text>
+                {loading ? (
+                  <>
+                    <LoadingSpinner size="small" color={Colors.white} />
+                    <Text style={styles.saveButtonText}>Saving...</Text>
+                  </>
+                ) : (
+                  <Text style={styles.saveButtonText}>Save</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -734,6 +740,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     borderWidth: 2,
     borderColor: Colors.accent,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
   },
   cancelButtonText: {
     ...Typography.body,

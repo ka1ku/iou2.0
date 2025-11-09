@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { useExpenseData } from '../../contexts/ExpenseDataContext';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const ConnectedAccountsScreen = ({ navigation }) => {
   const { userProfile } = useExpenseData();
@@ -122,6 +123,7 @@ const ConnectedAccountsScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
+          <LoadingSpinner size="large" />
           <Text style={styles.loadingText}>Loading accounts...</Text>
         </View>
       </SafeAreaView>

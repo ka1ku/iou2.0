@@ -21,6 +21,7 @@ import { createExpense, deleteExpense } from '../services/expenseService';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
 import { useExpense } from '../contexts/ExpenseContext';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const SetupExpenseScreen = ({ route, navigation }) => {
   const { expenseType = 'expense', scannedReceipt, fromReceiptScan } = route.params || {};
@@ -197,12 +198,43 @@ const SetupExpenseScreen = ({ route, navigation }) => {
           style={styles.content} 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ 
-            paddingTop: insets.top,
-            paddingBottom: 140,
+            paddingTop: insets.top + Spacing.md,
+            paddingBottom: Spacing.xl,
             paddingHorizontal: 0
           }}
         >
           <View style={styles.mainContent}>
+            <View style={styles.headerRow}>
+              <View style={styles.headerSpacer} />
+              <TouchableOpacity
+                style={styles.continueButton}
+                onPress={handleCreateExpense}
+                disabled={loading || !title.trim()}
+                activeOpacity={0.6}
+              >
+                {loading ? (
+                  <View style={styles.buttonContent}>
+                    <LoadingSpinner size="small" color={Colors.accent} />
+                    <Text style={[styles.continueButtonText, (loading || !title.trim()) && styles.continueButtonTextDisabled]}>
+                      Creating...
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.buttonContent}>
+                    <Text style={[styles.continueButtonText, (!title.trim()) && styles.continueButtonTextDisabled]}>
+                      Continue
+                    </Text>
+                    <Ionicons 
+                      name="arrow-forward" 
+                      size={18} 
+                      color={!title.trim() ? Colors.textSecondary : Colors.accent} 
+                      style={styles.continueIcon}
+                    />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.titleSection}>
               <Text style={styles.mainTitle}>
                 What would you like to call this {expenseType}?
@@ -281,35 +313,6 @@ const SetupExpenseScreen = ({ route, navigation }) => {
             </View>
           </View>
         </ScrollView>
-
-        <View style={styles.bottomContainer}>
-          <TouchableOpacity
-            style={[
-              styles.continueButton, 
-              (loading || !title.trim()) && styles.continueButtonDisabled
-            ]}
-            onPress={handleCreateExpense}
-            disabled={loading || !title.trim()}
-            activeOpacity={0.85}
-          >
-            <View style={styles.buttonContent}>
-              {loading ? (
-                <>
-                  <View style={styles.loadingSpinner}>
-                    <Ionicons name="hourglass" size={20} color={Colors.white} />
-                  </View>
-                  <Text style={styles.continueButtonText}>Creating...</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.continueButtonText}>Continue</Text>
-                  <Ionicons name="arrow-forward" size={20} color={Colors.white} />
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
-          
-        </View>
       </KeyboardAvoidingView>
 
       <View style={{ position: 'absolute', left: -9999 }}>
@@ -336,9 +339,20 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.xxl,
+    paddingTop: Spacing.sm,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginBottom: Spacing.xl,
+    minHeight: 44,
+  },
+  headerSpacer: {
+    flex: 1,
   },
   titleSection: {
+    marginTop: 0,
     marginBottom: Spacing.xxl,
   },
   mainTitle: {
@@ -478,58 +492,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 18,
   },
-  bottomContainer: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 12,
-  },
   continueButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.lg,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.accentDark,
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 6,
-    minHeight: 56,
-  },
-  continueButtonDisabled: {
-    backgroundColor: Colors.textSecondary,
-    borderColor: Colors.textSecondary,
-    shadowColor: 'transparent',
-    shadowOpacity: 0,
-    elevation: 0,
+    minHeight: 44,
   },
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   continueButtonText: {
     ...Typography.title,
-    color: Colors.white,
+    color: Colors.accent,
     fontWeight: '600',
     fontSize: 16,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
-  loadingSpinner: {
-    transform: [{ rotate: '0deg' }],
+  continueButtonTextDisabled: {
+    color: Colors.textSecondary,
+  },
+  continueIcon: {
+    marginLeft: 2,
   },
 });
 

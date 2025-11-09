@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import Button from '../../components/Button';
 import { useNotifications } from '../../contexts/NotificationContext';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const NotificationSettingsScreen = ({ navigation }) => {
   const {
@@ -301,7 +302,10 @@ const NotificationSettingsScreen = ({ navigation }) => {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Text style={styles.saveButtonText}>Saving...</Text>
+              <>
+                <LoadingSpinner size="small" color={Colors.accent} />
+                <Text style={styles.saveButtonText}>Saving...</Text>
+              </>
             ) : (
               <>
                 <Ionicons name="checkmark-circle-outline" size={24} color={Colors.accent} />

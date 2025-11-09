@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  ActivityIndicator,
   TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import LoadingSpinner from '../../components/LoadingSpinner';
 import DeleteButton from '../../components/DeleteButton';
 import {
   getEnrolledFactors,
@@ -250,8 +250,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
           <Text style={styles.title}>Two-Factor Authentication</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-          <Text style={styles.loadingText}>Loading 2FA settings...</Text>
+          <LoadingSpinner size="large" />
         </View>
       </SafeAreaView>
     );
@@ -366,11 +365,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  loadingText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.md,
   },
   descriptionContainer: {
     marginBottom: Spacing.xl,

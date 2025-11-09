@@ -15,6 +15,7 @@ import { getCurrentUser } from '../services/authService';
 import { calculateUserBalanceForExpense, calculateExpenseTotal } from '../utils/balanceCalculator';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 import AnimatedSearchHeader from '../components/AnimatedSearchHeader';
+import LoadingSpinner from '../components/LoadingSpinner';
 
 const HomeScreen = ({ navigation }) => {
   const { expenses, loading, loadingMore, hasMore, loadMoreExpenses, balances } = useExpenseData();
@@ -362,7 +363,7 @@ const HomeScreen = ({ navigation }) => {
     
     return (
       <View style={styles.footerLoader}>
-        <Text style={styles.footerLoaderText}>Loading more expenses...</Text>
+        <LoadingSpinner size="small" />
       </View>
     );
   };
@@ -389,7 +390,7 @@ const HomeScreen = ({ navigation }) => {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <Text>Loading expenses...</Text>
+        <LoadingSpinner size="large" />
       </SafeAreaView>
     );
   }
@@ -413,7 +414,13 @@ const HomeScreen = ({ navigation }) => {
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="none"
+        keyboardDismissMode="on-drag"
+        onScrollBeginDrag={() => {
+          // Close search when user starts scrolling
+          if (searchHeaderRef.current) {
+            searchHeaderRef.current.close();
+          }
+        }}
         style={styles.list}
       />
 
@@ -814,11 +821,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  footerLoaderText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    fontSize: 14,
   },
 
 });

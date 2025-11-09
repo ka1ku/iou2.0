@@ -30,11 +30,11 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
   const [showInput, setShowInput] = useState(false);
   const insets = useSafeAreaInsets();
   const inputRef = useRef(null);
+  const shouldCloseOnBlurRef = useRef(true);
   
   // Animation values
   const searchWidth = useSharedValue(SEARCH_BUTTON_SIZE);
   const inputOpacity = useSharedValue(0);
-  const cancelButtonOpacity = useSharedValue(0);
   const leftSectionOpacity = useSharedValue(1);
 
   // Expose close method to parent via ref
@@ -48,6 +48,9 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
 
   useEffect(() => {
     if (isExpanded) {
+      // Reset blur flag when opening search
+      shouldCloseOnBlurRef.current = true;
+      
       // Fade out left section (title)
       leftSectionOpacity.value = withTiming(0, { duration: 200 });
       
@@ -63,8 +66,6 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
         inputOpacity.value = withTiming(1, { duration: 200 });
       }, 100);
       
-      cancelButtonOpacity.value = withTiming(1, { duration: 200, delay: 150 });
-      
       // Focus input after animation
       setTimeout(() => {
         inputRef.current?.focus();
@@ -72,7 +73,6 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
     } else {
       // Collapse search
       inputOpacity.value = withTiming(0, { duration: 150 });
-      cancelButtonOpacity.value = withTiming(0, { duration: 100 });
       
       // Fade in left section (title)
       leftSectionOpacity.value = withTiming(1, { duration: 200, delay: 100 });
@@ -115,7 +115,7 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
     const inputWidth = interpolate(
       searchWidth.value,
       [SEARCH_BUTTON_SIZE, EXPANDED_WIDTH],
-      [0, EXPANDED_WIDTH - SEARCH_BUTTON_SIZE - 40], // Subtract button and cancel button widths
+      [0, EXPANDED_WIDTH - SEARCH_BUTTON_SIZE], // Subtract button width only
       Extrapolate.CLAMP
     );
     
@@ -128,18 +128,6 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
   const leftSectionStyle = useAnimatedStyle(() => {
     return {
       opacity: leftSectionOpacity.value,
-    };
-  });
-
-  const cancelButtonStyle = useAnimatedStyle(() => {
-    return {
-      opacity: cancelButtonOpacity.value,
-      width: interpolate(
-        cancelButtonOpacity.value,
-        [0, 1],
-        [0, 40],
-        Extrapolate.CLAMP
-      ),
     };
   });
 
@@ -194,29 +182,35 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="search"
+                  onBlur={() => {
+                    // Close search when input loses focus (user taps outside)
+                    // Small delay to allow clear button presses to register
+                    setTimeout(() => {
+                      if (isExpanded && shouldCloseOnBlurRef.current) {
+                        handleCloseSearch();
+                      }
+                      // Reset the flag
+                      shouldCloseOnBlurRef.current = true;
+                    }, 150);
+                  }}
                 />
                 {searchQuery.length > 0 && (
                   <TouchableOpacity
-                    onPress={() => onSearchChange('')}
+                    onPress={() => {
+                      // Prevent closing on blur when clearing text
+                      shouldCloseOnBlurRef.current = false;
+                      onSearchChange('');
+                      // Keep focus on input after clearing
+                      setTimeout(() => {
+                        inputRef.current?.focus();
+                      }, 50);
+                    }}
                     style={styles.clearTextButton}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
                   </TouchableOpacity>
                 )}
-              </Animated.View>
-            )}
-
-            {/* Cancel Button */}
-            {showInput && (
-              <Animated.View style={[styles.cancelButtonContainer, cancelButtonStyle]}>
-                <TouchableOpacity
-                  onPress={handleCloseSearch}
-                  style={styles.cancelButton}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="close" size={20} color={Colors.textPrimary} />
-                </TouchableOpacity>
               </Animated.View>
             )}
           </Animated.View>
@@ -304,18 +298,6 @@ const styles = StyleSheet.create({
   clearTextButton: {
     padding: Spacing.xs,
     marginRight: Spacing.xs,
-  },
-  cancelButtonContainer: {
-    height: SEARCH_BUTTON_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  cancelButton: {
-    width: 40,
-    height: SEARCH_BUTTON_SIZE,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
 

@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { useSharedValue, withTiming } from 'react-native-reanimated';
 import Animated from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import DonutChart from '../charts/DonutChart';
+import LoadingSpinner from '../LoadingSpinner';
 
 const BalanceSummary = ({ balances, loading }) => {
   // Donut chart shared state (stable across re-focus without rerenders)
@@ -66,8 +66,7 @@ const BalanceSummary = ({ balances, loading }) => {
 
   const SkeletonLoader = memo(() => (
     <View style={styles.skeletonLoader}>
-      <ActivityIndicator size="small" color={Colors.accent} />
-      <Text style={styles.skeletonText}>Loading...</Text>
+      <LoadingSpinner size="medium" />
     </View>
   ));
 
@@ -175,11 +174,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginVertical: Spacing.md,
     ...Shadows.card,
-  },
-  skeletonText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.sm,
   },
 });
 

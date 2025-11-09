@@ -16,6 +16,7 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/token
 import Button from '../../components/Button';
 import { useExpenseData } from '../../contexts/ExpenseDataContext';
 import { updateUserProfile } from '../../services/authService';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 const ProfileSettingsScreen = ({ navigation }) => {
   const { userProfile, refreshUserProfile } = useExpenseData();
@@ -97,6 +98,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
+          <LoadingSpinner size="large" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </SafeAreaView>
@@ -208,7 +210,10 @@ const ProfileSettingsScreen = ({ navigation }) => {
               disabled={isLoading}
             >
               {isLoading ? (
-                <Text style={styles.saveButtonText}>Updating profile...</Text>
+                <>
+                  <LoadingSpinner size="small" color={Colors.accent} />
+                  <Text style={styles.saveButtonText}>Updating profile...</Text>
+                </>
               ) : (
                 <>
                   <Ionicons name="checkmark-circle-outline" size={24} color={Colors.accent} />
