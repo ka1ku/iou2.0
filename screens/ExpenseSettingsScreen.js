@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import {
   View,
@@ -10,18 +10,16 @@ import {
   Share,
   Switch,
   Clipboard,
-  TextInput,
-  Modal,
 } from "react-native";
 
 import { Ionicons } from "@expo/vector-icons";
 
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { Colors, Spacing, Radius, Shadows, Typography } from "../design/tokens";
+import { Colors, Spacing, Radius, Typography } from "../design/tokens";
 
 import { getCurrentUser } from "../services/authService";
-import LoadingSpinner from "../components/LoadingSpinner";
+import ChangeExpenseNameBottomSheet from "../components/ChangeExpenseNameBottomSheet";
 
 import {
   updateExpense,
@@ -43,9 +41,9 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
   const [joinInfo, setJoinInfo] = useState(null);
 
-  const [showNameModal, setShowNameModal] = useState(false);
+  const [expenseTitle, setExpenseTitle] = useState(expense?.title || "");
 
-  const [newExpenseName, setNewExpenseName] = useState(expense?.title || "");
+  const changeExpenseNameBottomSheetRef = useRef(null);
 
   useEffect(() => {
     navigation.setOptions({
@@ -108,10 +106,8 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         });
 
         await Share.share({
-          message: `Join my expense "${expense.title}" on IOU: ${inviteLink}`,
-
+          message: `Join my expense "${expenseTitle}" on IOU: ${inviteLink}`,
           title: "Join Expense",
-
           url: inviteLink,
         });
       } else if (joinEnabled) {
@@ -152,22 +148,18 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
   };
 
   const handleChangeExpenseName = () => {
-    setNewExpenseName(expense?.title || "");
-
-    setShowNameModal(true);
+    changeExpenseNameBottomSheetRef.current?.open();
   };
 
-  const handleSaveExpenseName = async () => {
+  const handleSaveExpenseName = async (newName) => {
     try {
-      if (!newExpenseName.trim()) {
+      if (!newName.trim()) {
         Alert.alert("Error", "Expense name cannot be empty");
-
         return;
       }
 
-      if (newExpenseName.trim() === expense?.title) {
-        setShowNameModal(false);
-
+      if (newName.trim() === expense?.title) {
+        changeExpenseNameBottomSheetRef.current?.close();
         return;
       }
 
@@ -176,18 +168,18 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
       await updateExpense(
         expense.id,
         {
-          title: newExpenseName.trim(),
+          title: newName.trim(),
         },
         currentUser?.uid
       );
 
-      expense.title = newExpenseName.trim();
+      expense.title = newName.trim();
+      setExpenseTitle(newName.trim());
 
-      setShowNameModal(false);
+      changeExpenseNameBottomSheetRef.current?.close();
 
       Alert.alert("Success", "Expense name updated successfully");
     } catch (error) {
-
       Alert.alert("Error", "Failed to update expense name");
     } finally {
       setLoading(false);
@@ -410,15 +402,18 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           <Text style={styles.sectionTitle}>Expense Name</Text>
           <View style={styles.settingsList}>
             <TouchableOpacity
-              style={styles.settingItem}
+              style={[styles.settingItem, styles.settingItemLast]}
               onPress={handleChangeExpenseName}
               disabled={loading}
+              activeOpacity={0.7}
             >
-              <Ionicons name="pencil-outline" size={24} color={Colors.textSecondary} />
+              <View style={[styles.iconContainer, styles.iconContainerAccent]}>
+                <Ionicons name="pencil-outline" size={20} color={Colors.accent} />
+              </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingText}>Change Name</Text>
                 <Text style={styles.settingDescription}>
-                  {expense?.title || "Untitled Expense"}
+                  {expenseTitle || "Untitled Expense"}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
@@ -430,8 +425,10 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         <View style={styles.settingsSection}>
           <Text style={styles.sectionTitle}>Share Expense</Text>
           <View style={styles.settingsList}>
-            <View style={styles.settingItem}>
-              <Ionicons name="people-outline" size={24} color={Colors.textSecondary} />
+            <View style={[styles.settingItem, !joinEnabled && styles.settingItemLast]}>
+              <View style={[styles.iconContainer, styles.iconContainerBlue]}>
+                <Ionicons name="people-outline" size={20} color={Colors.blue} />
+              </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingText}>Allow others to join</Text>
                 <Text style={styles.settingDescription}>
@@ -443,7 +440,8 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
                 onValueChange={handleToggleJoin}
                 disabled={loading}
                 trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor={joinEnabled ? Colors.surface : Colors.textSecondary}
+                thumbColor={Colors.surface}
+                ios_backgroundColor={Colors.border}
               />
             </View>
 
@@ -453,8 +451,11 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
                   style={styles.settingItem}
                   onPress={handleShareInviteLink}
                   disabled={loading}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="share-outline" size={24} color={Colors.textSecondary} />
+                  <View style={[styles.iconContainer, styles.iconContainerBlue]}>
+                    <Ionicons name="share-outline" size={20} color={Colors.blue} />
+                  </View>
                   <View style={styles.settingContent}>
                     <Text style={styles.settingText}>Share Link</Text>
                     <Text style={styles.settingDescription}>
@@ -465,11 +466,14 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.settingItem}
+                  style={[styles.settingItem, styles.settingItemLast]}
                   onPress={handleCopyInviteLink}
                   disabled={loading}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="copy-outline" size={24} color={Colors.textSecondary} />
+                  <View style={[styles.iconContainer, styles.iconContainerBlue]}>
+                    <Ionicons name="copy-outline" size={20} color={Colors.blue} />
+                  </View>
                   <View style={styles.settingContent}>
                     <Text style={styles.settingText}>Copy Link</Text>
                     <Text style={styles.settingDescription}>
@@ -485,16 +489,19 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
         {canLeaveExpense && (
           <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>Leave Expense</Text>
+            <Text style={styles.sectionTitle}>Danger Zone</Text>
             <View style={styles.settingsList}>
               <TouchableOpacity
-                style={styles.settingItem}
+                style={[styles.settingItem, styles.settingItemLast, styles.settingItemDanger]}
                 onPress={handleLeaveExpense}
                 disabled={loading}
+                activeOpacity={0.7}
               >
-                <Ionicons name="exit-outline" size={24} color={Colors.danger} />
+                <View style={[styles.iconContainer, styles.iconContainerDanger]}>
+                  <Ionicons name="exit-outline" size={20} color={Colors.danger} />
+                </View>
                 <View style={styles.settingContent}>
-                  <Text style={styles.settingText}>Leave Expense</Text>
+                  <Text style={[styles.settingText, styles.settingTextDanger]}>Leave Expense</Text>
                   <Text style={styles.settingDescription}>
                     You will be removed from all splits and won't be able to access this expense anymore.
                   </Text>
@@ -506,71 +513,12 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         )}
       </ScrollView>
 
-      <Modal
-        visible={showNameModal}
-        animationType="fade"
-        transparent={true}
-        presentationStyle="overFullScreen"
-        statusBarTranslucent={true}
-        onRequestClose={() => setShowNameModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalIcon}>
-                <Ionicons name="create-outline" size={32} color={Colors.accent} />
-              </View>
-              <Text style={styles.modalTitle}>Change Expense Name</Text>
-              <Text style={styles.modalSubtitle}>
-                Enter a new name for this expense
-              </Text>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Expense Name</Text>
-
-              <TextInput
-                style={styles.textInput}
-                value={newExpenseName}
-                onChangeText={setNewExpenseName}
-                placeholder="Enter expense name"
-                placeholderTextColor={Colors.textSecondary}
-                autoFocus={true}
-                maxLength={50}
-                keyboardType="default"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowNameModal(false)}
-                disabled={loading}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveExpenseName}
-                disabled={loading || !newExpenseName.trim()}
-                activeOpacity={0.7}
-              >
-                {loading ? (
-                  <>
-                    <LoadingSpinner size="small" color={Colors.white} />
-                    <Text style={styles.saveButtonText}>Saving...</Text>
-                  </>
-                ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ChangeExpenseNameBottomSheet
+        ref={changeExpenseNameBottomSheetRef}
+        expense={expense}
+        onSave={handleSaveExpenseName}
+        loading={loading}
+      />
     </SafeAreaView>
   );
 };
@@ -585,6 +533,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   scrollContent: {
+    paddingTop: Spacing.sm,
     paddingBottom: 100, // Extra padding for home bar area
   },
   header: {
@@ -592,18 +541,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
     backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomWidth: 0,
+    zIndex: 10,
   },
   backButton: {
     padding: Spacing.sm,
   },
   headerTitle: {
     ...Typography.h2,
+    fontSize: 22,
     color: Colors.textPrimary,
     textAlign: 'center',
+    fontWeight: '600',
   },
   placeholder: {
     width: 40, // Same width as back button to center the title
@@ -613,147 +564,73 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   sectionTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
+    ...Typography.label,
+    fontSize: 13,
+    color: Colors.textSecondary,
     marginBottom: Spacing.md,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    paddingLeft: Spacing.xs,
   },
   settingsList: {
     backgroundColor: Colors.card,
     borderRadius: Radius.lg,
-    ...Shadows.card,
+    overflow: 'hidden',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.lg,
+    paddingVertical: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    minHeight: 76,
+  },
+  settingItemLast: {
+    borderBottomWidth: 0,
   },
   settingText: {
     ...Typography.body,
+    fontSize: 16,
     color: Colors.textPrimary,
     fontWeight: '600',
     marginBottom: Spacing.xs,
+    letterSpacing: 0.2,
   },
   settingDescription: {
-    ...Typography.caption,
+    ...Typography.body2,
     color: Colors.textSecondary,
-    lineHeight: 16,
+    lineHeight: 18,
+    letterSpacing: 0.1,
   },
   settingContent: {
     flex: 1,
     marginLeft: Spacing.md,
   },
-
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  modalContent: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    width: '100%',
-    maxWidth: 380,
-    ...Shadows.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-    paddingBottom: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.card,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.lg,
-    borderWidth: 2,
-    borderColor: Colors.accent,
-    ...Shadows.card,
-  },
-  modalTitle: {
-    ...Typography.h2,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  modalSubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-
-  inputContainer: {
-    marginBottom: Spacing.xl,
-  },
-  inputLabel: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-    fontWeight: '600',
-  },
-  textInput: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.card,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.lg,
-    fontSize: 16,
-    fontWeight: '500',
-    ...Shadows.button,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.lg,
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
-    ...Shadows.button,
+    backgroundColor: Colors.background,
   },
-  cancelButton: {
-    backgroundColor: Colors.card,
-    borderWidth: 2,
-    borderColor: Colors.border,
+  iconContainerAccent: {
+    backgroundColor: Colors.accent + '15',
   },
-  saveButton: {
-    backgroundColor: Colors.accent,
-    borderWidth: 2,
-    borderColor: Colors.accent,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
+  iconContainerBlue: {
+    backgroundColor: Colors.blue + '15',
   },
-  cancelButtonText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    fontWeight: '600',
+  iconContainerDanger: {
+    backgroundColor: Colors.danger + '15',
   },
-  saveButtonText: {
-    ...Typography.body,
-    color: Colors.surface,
-    fontWeight: '600',
+  settingItemDanger: {
+    backgroundColor: Colors.danger + '05',
+  },
+  settingTextDanger: {
+    color: Colors.danger,
   },
 });
 

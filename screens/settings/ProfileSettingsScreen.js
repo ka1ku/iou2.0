@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +27,6 @@ const ProfileSettingsScreen = ({ navigation }) => {
     firstName: '',
     lastName: '',
     username: '',
-    phoneNumber: '',
     profilePhoto: null,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -43,7 +44,6 @@ const ProfileSettingsScreen = ({ navigation }) => {
         firstName: userProfile.firstName || '',
         lastName: userProfile.lastName || '',
         username: userProfile.username || '',
-        phoneNumber: userProfile.phoneNumber || '',
         profilePhoto: userProfile.profilePhoto || null,
       });
     }
@@ -118,13 +118,26 @@ const ProfileSettingsScreen = ({ navigation }) => {
         <View style={styles.placeholder} />
       </View>
       
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* Profile Photo Section */}
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Profile Photo</Text>
-          <View style={styles.settingsList}>
-            <View style={styles.photoSection}>
-              <View style={styles.photoContainer}>
+      <KeyboardAvoidingView 
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <ScrollView 
+          style={styles.scrollView} 
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Profile Photo Section */}
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>Profile Photo</Text>
+            <View style={styles.photoCard}>
+              <TouchableOpacity 
+                style={styles.photoContainer}
+                onPress={pickImage}
+                activeOpacity={0.8}
+              >
                 {localProfile.profilePhoto ? (
                   <Image 
                     source={{ uri: localProfile.profilePhoto }} 
@@ -134,96 +147,73 @@ const ProfileSettingsScreen = ({ navigation }) => {
                   />
                 ) : (
                   <View style={styles.profilePlaceholder}>
-                    <Ionicons name="person" size={40} color={Colors.textSecondary} />
+                    <Ionicons name="person" size={48} color={Colors.white} />
                   </View>
                 )}
-              </View>
-              <TouchableOpacity 
-                style={styles.changePhotoButton}
-                onPress={pickImage}
-              >
-                <Ionicons name="camera" size={16} color={Colors.accent} />
-                <Text style={styles.changePhotoText}>Change Photo</Text>
+                <View style={styles.editPhotoButton}>
+                  <Ionicons name="camera" size={18} color={Colors.white} />
+                </View>
               </TouchableOpacity>
+              <Text style={styles.photoHint}>Tap to change photo</Text>
             </View>
           </View>
-        </View>
 
-        {/* Personal Information */}
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-          <View style={styles.settingsList}>
-            <View style={styles.inputItem}>
-              <Text style={styles.inputLabel}>First Name</Text>
-              <TextInput
-                style={styles.textInput}
-                value={localProfile.firstName}
-                onChangeText={(value) => handleInputChange('firstName', value)}
-                placeholder="Enter first name"
-                placeholderTextColor={Colors.textSecondary}
-              />
-            </View>
+          {/* Personal Information */}
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>Personal Information</Text>
+            <View style={styles.settingsList}>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>FIRST NAME</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={localProfile.firstName}
+                  onChangeText={(value) => handleInputChange('firstName', value)}
+                  placeholder="Enter first name"
+                  placeholderTextColor={Colors.textSecondary}
+                />
+              </View>
 
-            <View style={styles.inputItem}>
-              <Text style={styles.inputLabel}>Last Name</Text>
-              <TextInput
-                style={styles.textInput}
-                value={localProfile.lastName}
-                onChangeText={(value) => handleInputChange('lastName', value)}
-                placeholder="Enter last name"
-                placeholderTextColor={Colors.textSecondary}
-              />
-            </View>
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>LAST NAME</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={localProfile.lastName}
+                  onChangeText={(value) => handleInputChange('lastName', value)}
+                  placeholder="Enter last name"
+                  placeholderTextColor={Colors.textSecondary}
+                />
+              </View>
 
-            <View style={styles.inputItem}>
-              <Text style={styles.inputLabel}>Username</Text>
-              <TextInput
-                style={styles.textInput}
-                value={localProfile.username}
-                onChangeText={(value) => handleInputChange('username', value)}
-                placeholder="Enter username"
-                placeholderTextColor={Colors.textSecondary}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputItem}>
-              <Text style={styles.inputLabel}>Phone Number</Text>
-              <TextInput
-                style={[styles.textInput, styles.disabledInput]}
-                value={localProfile.phoneNumber}
-                editable={false}
-                placeholder="Phone number"
-                placeholderTextColor={Colors.textSecondary}
-              />
-              <Text style={styles.disabledNote}>Phone number cannot be changed</Text>
+              <View style={[styles.inputContainer, styles.lastInputContainer]}>
+                <Text style={styles.inputLabel}>USERNAME</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={localProfile.username}
+                  onChangeText={(value) => handleInputChange('username', value)}
+                  placeholder="Enter username"
+                  placeholderTextColor={Colors.textSecondary}
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Save Button */}
-        {hasChanges && (
-          <View style={styles.saveSection}>
-            <TouchableOpacity 
-              style={styles.saveButton} 
-              onPress={saveProfile}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <LoadingSpinner size="small" color={Colors.accent} />
-                  <Text style={styles.saveButtonText}>Updating profile...</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle-outline" size={24} color={Colors.accent} />
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
+          {/* Save Button */}
+          {hasChanges && (
+            <View style={styles.saveButtonContainer}>
+              <Button
+                title="Save Changes"
+                onPress={saveProfile}
+                disabled={isLoading}
+                loading={isLoading}
+                variant="primary"
+                fullWidth
+                icon="checkmark-circle"
+              />
+            </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -232,6 +222,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.surface,
+  },
+  keyboardAvoid: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -269,6 +262,7 @@ const styles = StyleSheet.create({
   loadingText: {
     ...Typography.body,
     color: Colors.textSecondary,
+    marginTop: Spacing.md,
   },
   settingsSection: {
     margin: Spacing.lg,
@@ -279,105 +273,83 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: Spacing.md,
   },
-  settingsList: {
+  photoCard: {
     backgroundColor: Colors.card,
     borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    alignItems: 'center',
     ...Shadows.card,
   },
-  photoSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
   photoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: Spacing.lg,
-    ...Shadows.avatar,
+    position: 'relative',
+    marginBottom: Spacing.sm,
   },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   profilePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: Colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
+    ...Shadows.avatar,
   },
-  changePhotoButton: {
-    flexDirection: 'row',
+  editPhotoButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.accent,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.accent,
+    borderWidth: 3,
+    borderColor: Colors.card,
+    ...Shadows.button,
   },
-  changePhotoText: {
-    ...Typography.body,
-    color: Colors.accent,
-    marginLeft: Spacing.xs,
-    fontFamily: Typography.familySemiBold,
-  },
-  inputItem: {
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
-  },
-  inputLabel: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
-    marginBottom: Spacing.sm,
-  },
-  textInput: {
-    ...Typography.body,
-    color: Colors.textPrimary,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  disabledInput: {
-    backgroundColor: Colors.background,
-    color: Colors.textSecondary,
-  },
-  disabledNote: {
+  photoHint: {
     ...Typography.caption,
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
   },
-  saveSection: {
-    margin: Spacing.lg,
-    marginTop: Spacing.xxl,
-  },
-  saveButton: {
+  settingsList: {
     backgroundColor: Colors.card,
     borderRadius: Radius.lg,
     padding: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.accent,
     ...Shadows.card,
   },
-  saveButtonText: {
+  inputContainer: {
+    marginBottom: Spacing.lg,
+  },
+  lastInputContainer: {
+    marginBottom: 0,
+  },
+  inputLabel: {
+    ...Typography.label,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  textInput: {
+    height: 56,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    paddingHorizontal: Spacing.lg,
     ...Typography.body,
-    color: Colors.accent,
-    fontFamily: Typography.familySemiBold,
-    marginLeft: Spacing.sm,
+    color: Colors.textPrimary,
+    fontSize: 16,
+  },
+  saveButtonContainer: {
+    margin: Spacing.lg,
+    marginTop: Spacing.md,
   },
 });
 

@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
 import { Colors, Typography, Shadows, Radius } from './design/tokens';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -386,17 +387,19 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
-          <StatusBar style="dark" />
-          <ExpenseDataProvider>
-            <NotificationProvider>
-              <ReceiptScanningProvider>
-                {user ? <MainTabs /> : <AuthStack />}
-                <ExpenseJoinHandler />
-              </ReceiptScanningProvider>
-            </NotificationProvider>
-          </ExpenseDataProvider>
-        </NavigationContainer>
+        <BottomSheetModalProvider>
+          <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
+            <StatusBar style="dark" />
+            <ExpenseDataProvider>
+              <NotificationProvider>
+                <ReceiptScanningProvider>
+                  {user ? <MainTabs /> : <AuthStack />}
+                  <ExpenseJoinHandler />
+                </ReceiptScanningProvider>
+              </NotificationProvider>
+            </ExpenseDataProvider>
+          </NavigationContainer>
+        </BottomSheetModalProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );

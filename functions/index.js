@@ -40,6 +40,105 @@ exports.syncUserToAlgolia = functions.firestore
     }
   });
 
+// Trigger: Update user information in all expenses when profile changes
+exports.onUserProfileUpdate = functions.firestore
+  .document('users/{userId}')
+  .onUpdate(async (change, context) => {
+    const userId = context.params.userId;
+    const before = change.before.data();
+    const after = change.after.data();
+    
+    try {
+      // Check if firstName, lastName, or username changed
+      const firstNameChanged = before.firstName !== after.firstName;
+      const lastNameChanged = before.lastName !== after.lastName;
+      const usernameChanged = before.username !== after.username;
+      const profilePhotoChanged = before.profilePhoto !== after.profilePhoto;
+      
+      // Only proceed if relevant fields changed
+      if (!firstNameChanged && !lastNameChanged && !usernameChanged && !profilePhotoChanged) {
+        return null;
+      }
+      
+      // Prepare updated user data
+      const updatedName = `${after.firstName || ''} ${after.lastName || ''}`.trim();
+      const updatedUsername = after.username || '';
+      const updatedProfilePhoto = after.profilePhoto || null;
+      
+      // Query all expenses where this user is a participant
+      const db = admin.firestore();
+      const expensesQuery = db.collection('expenses').where('participantIds', 'array-contains', userId);
+      const expensesSnapshot = await expensesQuery.get();
+      
+      if (expensesSnapshot.empty) {
+        console.log(`No expenses found for user ${userId}`);
+        return null;
+      }
+      
+      console.log(`Updating user info in ${expensesSnapshot.size} expenses for user ${userId}`);
+      
+      // Batch write updates (Firestore allows up to 500 operations per batch)
+      const batchSize = 500;
+      const expenses = expensesSnapshot.docs;
+      
+      for (let i = 0; i < expenses.length; i += batchSize) {
+        const batch = db.batch();
+        const batchDocs = expenses.slice(i, i + batchSize);
+        
+        for (const expenseDoc of batchDocs) {
+          const expenseData = expenseDoc.data();
+          const participants = expenseData.participants || [];
+          
+          // Find and update the participant data for this user
+          const updatedParticipants = participants.map(participant => {
+            if (participant.userId === userId) {
+              const updatedParticipant = { ...participant };
+              
+              // Update name if firstName or lastName changed
+              if (firstNameChanged || lastNameChanged) {
+                updatedParticipant.name = updatedName || participant.name;
+              }
+              
+              // Update username if it changed
+              if (usernameChanged) {
+                updatedParticipant.username = updatedUsername || participant.username;
+              }
+              
+              // Update profilePhoto if it changed
+              if (profilePhotoChanged) {
+                updatedParticipant.profilePhoto = updatedProfilePhoto || participant.profilePhoto;
+              }
+              
+              return updatedParticipant;
+            }
+            return participant;
+          });
+          
+          // Only update if the participant was found and updated
+          const participantFound = participants.some(p => p.userId === userId);
+          if (participantFound) {
+            batch.update(expenseDoc.ref, {
+              participants: updatedParticipants,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        }
+        
+        // Commit this batch
+        await batch.commit();
+        console.log(`Updated batch ${Math.floor(i / batchSize) + 1} of expenses`);
+      }
+      
+      console.log(`Successfully updated user info in all expenses for user ${userId}`);
+      return null;
+    } catch (error) {
+      console.error(`Error updating user info in expenses for user ${userId}:`, error);
+      // Don't throw error to avoid retrying the entire function
+      // The error is logged for monitoring
+      return null;
+    }
+  });
+
 exports.syncExpenseToAlgolia = functions.firestore
   .document('expenses/{expenseId}')
   .onWrite(async (change, context) => {

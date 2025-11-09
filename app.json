@@ -64,6 +64,7 @@
     "plugins": [
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
+      "expo-notifications",
       [
         "expo-build-properties",
         {

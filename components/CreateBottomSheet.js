@@ -9,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
+import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { handleTakePhoto as takePhoto, handlePickImage as pickImage } from '../services/imageHandler';
 import { processReceiptImage } from '../services/receiptScanner';
@@ -94,6 +95,7 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
   }, []);
 
   const handleAddExpense = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     bottomSheetRef.current?.close();
     setTimeout(() => {
       // Navigate to SetupExpense in the appropriate tab's stack
@@ -106,10 +108,12 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
   }, [navigation, getTargetTab]);
 
   const handleScanReceipt = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setShowScanOptions(true);
   }, []);
 
   const handleTakePhoto = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Check access first
     const hasAccess = await requestReceiptScanningAccess();
     if (!hasAccess) {
@@ -152,6 +156,7 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
   }, [navigation, getTargetTab, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
 
   const handlePickFromGallery = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Check access first
     const hasAccess = await requestReceiptScanningAccess();
     if (!hasAccess) {
