@@ -588,10 +588,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             join: { enabled: state.joinEnabled }
           }})}
           isEditing={isEditing}
-          showTitleInput={true}
-          titleValue={state.title}
-          onTitleChange={actions.setTitle}
-          titlePlaceholder="Receipt title..."
         />
       
       <KeyboardAvoidingView 
@@ -601,7 +597,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         <ScrollView 
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: insets.top + 100, paddingBottom: 120 }}
+          contentContainerStyle={{ paddingTop: insets.top + 90, paddingBottom: 120 }}
         >
         <View style={styles.content}>
           <View style={styles.sectionHeader}>

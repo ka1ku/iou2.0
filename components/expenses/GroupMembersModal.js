@@ -18,17 +18,42 @@ import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import * as Contacts from 'expo-contacts';
 import { algoliasearch } from 'algoliasearch';
 import { Configure, InstantSearch, useInfiniteHits, useSearchBox } from 'react-instantsearch-core';
-import { getCurrentUser } from '../../services/authService';
+import { getCurrentUser, formatPhoneNumber } from '../../services/authService';
 import { updateExpenseParticipants, sendExpenseInviteSMS } from '../../services/expenseService';
 import { useExpense } from '../../contexts/ExpenseContext';
+import { getStarredUsers, starUser, unstarUser, isUserStarred } from '../../services/friendService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getFirestore, collection, query, where, getDocs, doc, getDoc, updateDoc } from '@react-native-firebase/firestore';
+import { getApp } from '@react-native-firebase/app';
 
 const searchClient = algoliasearch('I0T07P5NB6', 'adfc79b41b2490c5c685b1adebac864c');
 
-const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect }) => {
+const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect, isStarred, onToggleStar }) => {
   const name = (item.fullName || `${item.firstName || ''} ${item.lastName || ''}`).trim() || 'Unknown';
+  const userId = item.objectID || item.id;
+  
+  const handleStarPress = (e) => {
+    e.stopPropagation();
+    if (onToggleStar) {
+      onToggleStar();
+    }
+  };
+
+  const handleAddPress = (e) => {
+    e.stopPropagation();
+    if (userId) {
+      onToggleSelect({ id: userId, name, username: item.username, profilePhoto: item.profilePhoto });
+    }
+  };
+  
+  const handleItemPress = () => {
+    if (userId) {
+      onToggleSelect({ id: userId, name, username: item.username, profilePhoto: item.profilePhoto });
+    }
+  };
   
   return (
-    <TouchableOpacity style={styles.listItem} onPress={() => onToggleSelect({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}>
+    <TouchableOpacity style={styles.listItem} onPress={handleItemPress}>
       <View style={styles.avatarContainer}>
         {item.profilePhoto ? (
           <Image source={{ uri: item.profilePhoto }} style={styles.avatar} contentFit="cover" transition={200} />
@@ -42,16 +67,29 @@ const MemoizedFriendItem = React.memo(({ item, isSelected, onToggleSelect }) => 
         <Text style={styles.userName}>{name}</Text>
         {item.username && <Text style={styles.userHandle}>@{item.username}</Text>}
       </View>
-      <TouchableOpacity 
-        style={[styles.addButton, isSelected && styles.addButtonSelected]} 
-        onPress={() => onToggleSelect({ id: item.objectID, name, username: item.username, profilePhoto: item.profilePhoto })}
-      >
-        {isSelected ? (
-          <Ionicons name="checkmark" size={16} color={Colors.white} />
-        ) : (
-          <Text style={styles.addButtonText}>Add</Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity 
+          style={styles.starButton}
+          onPress={handleStarPress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons 
+            name={isStarred ? "star" : "star-outline"} 
+            size={20} 
+            color={isStarred ? Colors.warning : Colors.textSecondary} 
+          />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.addButton, isSelected && styles.addButtonSelected]} 
+          onPress={handleAddPress}
+        >
+          {isSelected ? (
+            <Ionicons name="checkmark" size={16} color={Colors.white} />
+          ) : (
+            <Text style={styles.addButtonText}>Add</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 });
@@ -159,9 +197,11 @@ const SearchPane = React.memo(({
   toggleSelectUser, 
   inviteContact, 
   handleSMSInvite,
-  filteredContacts,
   invitedContacts,
-  filteredInvitedContacts
+  filteredInvitedContacts,
+  starredUsers,
+  starredUserIds,
+  onToggleStar
 }) => {
   const { hits } = useInfiniteHits();
   const { refine } = useSearchBox();
@@ -191,56 +231,117 @@ const SearchPane = React.memo(({
     return currentUserId ? hits.filter(friend => friend && friend.objectID && friend.objectID !== currentUserId) : hits;
   }, [hits, currentUserId]);
 
+  // Filter out starred users from search results (they show in Recommended)
+  const searchHits = useMemo(() => {
+    return filteredHits.filter(hit => {
+      const userId = hit.objectID || hit.id;
+      return !starredUserIds.includes(userId);
+    });
+  }, [filteredHits, starredUserIds]);
+
   const renderFriendItem = useCallback(({ item }) => {
-    const isSelected = selectedFriends.some(f => f.id === item.objectID);
+    const userId = item.objectID || item.id;
+    const isSelected = selectedFriends.some(f => f.id === userId);
+    const isStarred = starredUserIds.includes(userId);
+    const handleStarToggle = () => {
+      onToggleStar(userId, {
+        firstName: item.firstName,
+        lastName: item.lastName,
+        fullName: item.fullName,
+        username: item.username,
+        profilePhoto: item.profilePhoto,
+      });
+    };
     return (
       <MemoizedFriendItem 
         item={item} 
         isSelected={isSelected} 
-        onToggleSelect={toggleSelectUser} 
+        onToggleSelect={toggleSelectUser}
+        isStarred={isStarred}
+        onToggleStar={handleStarToggle}
       />
     );
-  }, [selectedFriends, toggleSelectUser]);
-
-  const renderContact = useCallback(({ item }) => (
-    <MemoizedContactItem item={item} onInviteContact={inviteContact} onSMSInvite={handleSMSInvite} />
-  ), [inviteContact, handleSMSInvite]);
+  }, [selectedFriends, toggleSelectUser, starredUserIds, onToggleStar]);
 
   const renderInvitedContact = useCallback(({ item }) => (
     <MemoizedInvitedContactItem item={item} onSMSInvite={handleSMSInvite} />
   ), [handleSMSInvite]);
 
+  const renderStarredFriendItem = useCallback(({ item }) => {
+    const userId = item.objectID || item.id;
+    const isSelected = selectedFriends.some(f => f.id === userId);
+    const isStarred = true; // Always starred in this section
+    const handleStarToggle = () => {
+      onToggleStar(userId, {
+        firstName: item.firstName,
+        lastName: item.lastName,
+        fullName: item.fullName,
+        username: item.username,
+        profilePhoto: item.profilePhoto,
+      });
+    };
+    return (
+      <MemoizedFriendItem 
+        item={item} 
+        isSelected={isSelected} 
+        onToggleSelect={toggleSelectUser}
+        isStarred={isStarred}
+        onToggleStar={handleStarToggle}
+      />
+    );
+  }, [selectedFriends, toggleSelectUser, onToggleStar]);
+
+  const hasQuery = (debouncedQuery || '').trim().length > 0;
+
   return (
     <View style={styles.searchContent}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recent people</Text>
-        {filteredHits.map((friend, index) => (
-          <View key={friend.objectID || `friend-${index}`}>
-            {renderFriendItem({ item: friend })}
-          </View>
-        ))}
-        {filteredInvitedContacts.map((contact, index) => (
-          <View key={contact.id || `invited-contact-${index}`}>
-            <MemoizedInvitedContactItem 
-              item={contact} 
-              onSMSInvite={handleSMSInvite}
-            />
-          </View>
-        ))}
-      </View>
-      
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Contacts</Text>
-        {filteredContacts.map((contact, index) => {
-          const contactKey = contact.id || 
-                            `contact-${contact.name || 'unknown'}-${contact.phoneNumbers?.[0]?.number || index}`;
-          return (
-            <View key={contactKey}>
-              {renderContact({ item: contact })}
+      {/* Recommended section - always show starred users */}
+      {starredUsers.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recommended</Text>
+          {starredUsers.map((friend, index) => (
+            <View key={friend.objectID || friend.id || `starred-${index}`}>
+              {renderStarredFriendItem({ item: friend })}
             </View>
-          );
-        })}
-      </View>
+          ))}
+        </View>
+      )}
+
+      {/* Search results - only show when there's a query and results */}
+      {hasQuery && searchHits.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Search Results</Text>
+          {searchHits.map((friend, index) => (
+            <View key={friend.objectID || `friend-${index}`}>
+              {renderFriendItem({ item: friend })}
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Invited contacts */}
+      {filteredInvitedContacts.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Invited</Text>
+          {filteredInvitedContacts.map((contact, index) => (
+            <View key={contact.id || `invited-contact-${index}`}>
+              <MemoizedInvitedContactItem 
+                item={contact} 
+                onSMSInvite={handleSMSInvite}
+              />
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Empty state when no query, no starred users, and no invited contacts */}
+      {!hasQuery && starredUsers.length === 0 && filteredInvitedContacts.length === 0 && (
+        <View style={styles.emptyStateContainer}>
+          <Ionicons name="star-outline" size={48} color={Colors.textSecondary} style={styles.emptyStateIcon} />
+          <Text style={styles.emptyStateTitle}>No recommended people</Text>
+          <Text style={styles.emptyStateText}>Search for people and star them to add them to your recommended list</Text>
+        </View>
+      )}
     </View>
   );
 });
@@ -289,36 +390,192 @@ const GroupMembersModal = ({
   const insets = useSafeAreaInsets();
 
 
-  const [contacts, setContacts] = useState([]);
   const [localQuery, setLocalQuery] = useState('');
   const [invitedContacts, setInvitedContacts] = useState([]);
+  const [starredUsers, setStarredUsers] = useState([]);
+  const [starredUserIds, setStarredUserIds] = useState([]);
+  const [loadingStarred, setLoadingStarred] = useState(false);
   
   const deferredQuery = useDeferredValue(localQuery);
 
-  useEffect(() => {
-    initContacts();
+  const loadStarredUsers = useCallback(async () => {
+    try {
+      setLoadingStarred(true);
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        return;
+      }
+      
+      const starred = await getStarredUsers(currentUser.uid);
+      setStarredUsers(starred);
+      setStarredUserIds(starred.map(user => user.objectID || user.id));
+    } catch (error) {
+      console.error('Error loading starred users:', error);
+    } finally {
+      setLoadingStarred(false);
+    }
   }, []);
 
-  const initContacts = useCallback(async () => {
+  // Auto-star contacts that have accounts when permission is first granted
+  const autoStarContactsFromPhone = useCallback(async () => {
     try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) return;
+
+      // Check if we've already done this auto-star
+      const hasAutoStarred = await AsyncStorage.getItem(`auto_starred_contacts_${currentUser.uid}`);
+      if (hasAutoStarred === 'true') {
+        return; // Already done
+      }
+
+      // Check contacts permission
       const { status: existingStatus } = await Contacts.getPermissionsAsync();
       if (existingStatus !== 'granted') {
         const { status } = await Contacts.requestPermissionsAsync();
         if (status !== 'granted') return;
       }
-      const { data } = await Contacts.getContactsAsync({
+
+      // Get contacts
+      const { data: contactsData } = await Contacts.getContactsAsync({
         fields: [
           Contacts.Fields.FirstName,
           Contacts.Fields.LastName,
           Contacts.Fields.Name,
           Contacts.Fields.PhoneNumbers,
-          Contacts.Fields.Image,
         ],
       });
-      setContacts(data || []);
-    } catch (e) {
+
+      if (!contactsData || contactsData.length === 0) {
+        // Mark as done even if no contacts
+        await AsyncStorage.setItem(`auto_starred_contacts_${currentUser.uid}`, 'true');
+        return;
+      }
+
+      // Extract and format phone numbers
+      const phoneNumbers = contactsData
+        .map(contact => contact.phoneNumbers?.[0]?.number)
+        .filter(Boolean)
+        .map(phone => formatPhoneNumber(phone));
+
+      if (phoneNumbers.length === 0) {
+        await AsyncStorage.setItem(`auto_starred_contacts_${currentUser.uid}`, 'true');
+        return;
+      }
+
+      // Get current starred users to avoid duplicates
+      const currentStarred = await getStarredUsers(currentUser.uid);
+      const currentStarredIds = new Set(currentStarred.map(u => u.objectID || u.id));
+
+      // Query users by phone numbers (Firestore 'in' query limit is 10, so we need to batch)
+      const firestoreInstance = getFirestore(getApp());
+      const usersRef = collection(firestoreInstance, 'users');
+      const batchSize = 10;
+      const usersToStar = [];
+
+      for (let i = 0; i < phoneNumbers.length; i += batchSize) {
+        const batch = phoneNumbers.slice(i, i + batchSize);
+        
+        try {
+          const q = query(usersRef, where('phoneNumber', 'in', batch));
+          const querySnapshot = await getDocs(q);
+          
+          querySnapshot.forEach((doc) => {
+            const userId = doc.id;
+            
+            // Skip current user and already starred users
+            if (userId === currentUser.uid || currentStarredIds.has(userId)) {
+              return;
+            }
+            
+            usersToStar.push(userId);
+          });
+        } catch (error) {
+          console.error('Error querying users by phone:', error);
+        }
+      }
+
+      // Star all matched users
+      if (usersToStar.length > 0) {
+        const firestoreInstance = getFirestore(getApp());
+        const userDocRef = doc(firestoreInstance, 'users', currentUser.uid);
+        
+        // Get current starredUsers array
+        const userDocSnap = await getDoc(userDocRef);
+        const currentStarredUsers = userDocSnap.data()?.starredUsers || [];
+        
+        // Combine and deduplicate
+        const newStarredUsers = [...new Set([...currentStarredUsers, ...usersToStar])];
+        
+        await updateDoc(userDocRef, {
+          starredUsers: newStarredUsers
+        });
+
+        // Reload starred users to update UI
+        await loadStarredUsers();
+      }
+
+      // Mark as done
+      await AsyncStorage.setItem(`auto_starred_contacts_${currentUser.uid}`, 'true');
+    } catch (error) {
+      console.error('Error auto-starring contacts:', error);
     }
-  }, []);
+  }, [loadStarredUsers]);
+
+  // Load starred users when modal opens
+  useEffect(() => {
+    if (visible) {
+      loadStarredUsers();
+      autoStarContactsFromPhone();
+    }
+  }, [visible, loadStarredUsers, autoStarContactsFromPhone]);
+
+  const handleToggleStar = useCallback(async (userId, userData = null) => {
+    try {
+      const isCurrentlyStarred = starredUserIds.includes(userId);
+      
+      if (isCurrentlyStarred) {
+        await unstarUser(userId);
+        // Remove from local state immediately
+        setStarredUsers(prev => prev.filter(user => (user.objectID || user.id) !== userId));
+        setStarredUserIds(prev => prev.filter(id => id !== userId));
+      } else {
+        await starUser(userId);
+        // If we have user data from search, add it immediately for better UX
+        if (userData) {
+          const newStarredUser = {
+            id: userId,
+            objectID: userId,
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            fullName: userData.fullName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+            username: userData.username || '',
+            profilePhoto: userData.profilePhoto || null,
+          };
+          setStarredUsers(prev => {
+            // Check if already exists to avoid duplicates
+            if (prev.some(u => (u.objectID || u.id) === userId)) {
+              return prev;
+            }
+            return [...prev, newStarredUser];
+          });
+          setStarredUserIds(prev => {
+            if (prev.includes(userId)) {
+              return prev;
+            }
+            return [...prev, userId];
+          });
+        }
+        // Reload starred users in background to ensure we have latest data
+        loadStarredUsers().catch(err => console.error('Error reloading starred users:', err));
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Could not update star status.');
+      // Revert optimistic update on error
+      if (!isCurrentlyStarred) {
+        loadStarredUsers();
+      }
+    }
+  }, [starredUserIds, loadStarredUsers]);
 
   const toggleSelectUser = useCallback((user) => {
     const isSelected = selectedFriends.some(f => f.id === user.id);
@@ -397,17 +654,6 @@ const GroupMembersModal = ({
   }, []);
 
   const allMembers = useMemo(() => [currentUserData, ...selectedFriends], [currentUserData, selectedFriends]);
-
-  const filteredContacts = useMemo(() => {
-    const q = (deferredQuery || '').trim().toLowerCase();
-    if (q.length === 0) return contacts;
-    
-    return contacts.filter(c => {
-      const name = (c.firstName && c.lastName) ? `${c.firstName} ${c.lastName}` : (c.name || '');
-      const phone = (c.phoneNumbers?.[0]?.number || '').toLowerCase();
-      return name.toLowerCase().includes(q) || phone.includes(q);
-    });
-  }, [contacts, deferredQuery]);
 
   const filteredInvitedContacts = useMemo(() => {
     const q = (deferredQuery || '').trim().toLowerCase();
@@ -503,9 +749,11 @@ const GroupMembersModal = ({
               toggleSelectUser,
               inviteContact,
               handleSMSInvite,
-              filteredContacts,
               invitedContacts,
-              filteredInvitedContacts
+              filteredInvitedContacts,
+              starredUsers,
+              starredUserIds,
+              onToggleStar: handleToggleStar
             }} 
           />
         </ScrollView>
@@ -730,6 +978,16 @@ const styles = StyleSheet.create({
     ...Typography.body,
     color: Colors.textSecondary,
   },
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  starButton: {
+    padding: Spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   addButton: {
     backgroundColor: Colors.background,
     paddingHorizontal: Spacing.lg,
@@ -765,6 +1023,30 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
     paddingBottom: Spacing.xxl,
+  },
+  emptyStateContainer: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
+  },
+  emptyStateIcon: {
+    marginBottom: Spacing.md,
+    opacity: 0.5,
+  },
+  emptyStateTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: Spacing.xl,
+    lineHeight: 20,
   },
 });
 

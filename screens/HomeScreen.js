@@ -1,23 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  TextInput,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { calculateUserBalanceForExpense, calculateExpenseTotal } from '../utils/balanceCalculator';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
+import AnimatedSearchHeader from '../components/AnimatedSearchHeader';
 
 const HomeScreen = ({ navigation }) => {
-  const { expenses, loading } = useExpenseData();
+  const { expenses, loading, loadingMore, hasMore, loadMoreExpenses, balances } = useExpenseData();
   const [searchQuery, setSearchQuery] = useState('');
+  const searchHeaderRef = useRef(null);
   const calculateExpenseBalance = (expense) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -258,6 +260,35 @@ const HomeScreen = ({ navigation }) => {
     </View>
   );
 
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    
+    return (
+      <View style={styles.footerLoader}>
+        <Text style={styles.footerLoaderText}>Loading more expenses...</Text>
+      </View>
+    );
+  };
+
+  const handleEndReached = () => {
+    // Only load more if not searching and there are more expenses to load
+    if (!searchQuery.trim() && hasMore && !loadingMore) {
+      loadMoreExpenses();
+    }
+  };
+
+  // Close search when screen loses focus (user navigates away or switches tabs)
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Screen is blurring, close search if open
+        if (searchHeaderRef.current) {
+          searchHeaderRef.current.close();
+        }
+      };
+    }, [])
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -268,29 +299,12 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={20} color={Colors.textSecondary} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search expenses or members..."
-            placeholderTextColor={Colors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              style={styles.clearButton}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      <AnimatedSearchHeader
+        ref={searchHeaderRef}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchClose={() => setSearchQuery('')}
+      />
 
       <FlatList
         data={filteredExpenses}
@@ -298,8 +312,12 @@ const HomeScreen = ({ navigation }) => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={filteredExpenses.length === 0 ? styles.emptyContainer : styles.listContainer}
         ListEmptyComponent={renderEmptyState}
+        ListFooterComponent={renderFooter}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="none"
+        style={styles.list}
       />
 
     </View>
@@ -311,37 +329,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  searchContainer: {
-    paddingTop: 60,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-  },
-  searchIcon: {
-    marginRight: Spacing.sm,
-  },
-  searchInput: {
+  list: {
     flex: 1,
-    ...Typography.body,
-    color: Colors.textPrimary,
-    paddingVertical: 0,
-    fontSize: 16,
-  },
-  clearButton: {
-    marginLeft: Spacing.sm,
-    padding: Spacing.xs,
   },
   listContainer: {
     padding: Spacing.lg,
@@ -691,6 +680,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: Typography.familySemiBold,
     fontWeight: '700',
+  },
+  footerLoader: {
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerLoaderText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: 14,
   },
 
 });

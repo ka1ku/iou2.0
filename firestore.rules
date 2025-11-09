@@ -1,33 +1,9 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read/write their own data
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-
-      // Allow access to receipt scan data
-      match /receiptScans/{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-    
-    // Expenses - users can read/write their own expenses
-    match /expenses/{expenseId} {
-      allow read, write: if request.auth != null && 
-        (resource.data.createdBy == request.auth.uid || 
-         request.auth.uid in resource.data.participants);
-    }
-    
-    // Allow users to read public expense join codes
-    match /expenses/{expenseId} {
-      allow read: if request.auth != null && 
-        resource.data.join.enabled == true;
-    }
-    
-    // Default deny all
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,20 @@ import {
   ScrollView,
   Linking,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { signOutUser } from '../services/authService';
+import { signOutUser, getCurrentUser } from '../services/authService';
+import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
+import { useExpenseData } from '../contexts/ExpenseDataContext';
 
 const SettingsScreen = ({ navigation }) => {
+  const { userProfile } = useExpenseData();
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingFunction, setLoadingFunction] = useState(null);
+
   const handleSignOut = () => {
     Alert.alert(
       'Sign Out',
@@ -72,6 +79,148 @@ const SettingsScreen = ({ navigation }) => {
     Linking.openURL(url);
   };
 
+  // Firebase Functions handlers
+  const handleSendTestNotification = async () => {
+    setIsLoading(true);
+    setLoadingFunction('testNotification');
+    try {
+      const functions = getFunctions();
+      const sendTestNotification = httpsCallable(functions, 'sendTestNotification');
+      const result = await sendTestNotification();
+      Alert.alert('Success', result.data.message || 'Test notification sent successfully!');
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      const errorMessage = error.message || error.details || 'Failed to send test notification';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
+      setLoadingFunction(null);
+    }
+  };
+
+  const createSyntheticDataWithCount = async (userCount) => {
+    setIsLoading(true);
+    setLoadingFunction('createSynthetic');
+    try {
+      const functions = getFunctions();
+      const createSyntheticData = httpsCallable(functions, 'createSyntheticData');
+      const result = await createSyntheticData({ numUsers: userCount });
+      Alert.alert(
+        'Success',
+        `Successfully created ${result.data.usersCreated} users and ${result.data.expensesCreated} expenses!`
+      );
+    } catch (error) {
+      console.error('Error creating synthetic data:', error);
+      const errorMessage = error.message || error.details || 'Failed to create synthetic data';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
+      setLoadingFunction(null);
+    }
+  };
+
+  const handleCreateSyntheticData = () => {
+    Alert.alert(
+      'Create Synthetic Data',
+      'Select the number of synthetic users to create:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: '10 users',
+          onPress: () => createSyntheticDataWithCount(10)
+        },
+        {
+          text: '25 users',
+          onPress: () => createSyntheticDataWithCount(25)
+        },
+        {
+          text: '50 users',
+          onPress: () => createSyntheticDataWithCount(50)
+        },
+        {
+          text: '100 users',
+          onPress: () => createSyntheticDataWithCount(100)
+        }
+      ]
+    );
+  };
+
+  const handleDeleteSyntheticData = () => {
+    Alert.alert(
+      'Delete Synthetic Data',
+      'Are you sure you want to delete all synthetic users and expenses? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setIsLoading(true);
+            setLoadingFunction('deleteSynthetic');
+            try {
+              const functions = getFunctions();
+              const deleteSyntheticData = httpsCallable(functions, 'deleteSyntheticData');
+              const result = await deleteSyntheticData();
+              Alert.alert(
+                'Success',
+                `Successfully deleted ${result.data.usersDeleted} users and ${result.data.expensesDeleted} expenses!`
+              );
+            } catch (error) {
+              console.error('Error deleting synthetic data:', error);
+              const errorMessage = error.message || error.details || 'Failed to delete synthetic data';
+              Alert.alert('Error', errorMessage);
+            } finally {
+              setIsLoading(false);
+              setLoadingFunction(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleUpdateUserInExpenses = async () => {
+    const user = getCurrentUser();
+    if (!user || !userProfile) {
+      Alert.alert('Error', 'User profile not found');
+      return;
+    }
+
+    Alert.alert(
+      'Update User in Expenses',
+      'This will update your name and profile information across all your expenses. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Update',
+          onPress: async () => {
+            setIsLoading(true);
+            setLoadingFunction('updateUser');
+            try {
+              const functions = getFunctions();
+              const updateUserInExpenses = httpsCallable(functions, 'updateUserInExpenses');
+              const result = await updateUserInExpenses({
+                userId: user.uid,
+                firstName: userProfile.firstName,
+                lastName: userProfile.lastName,
+                username: userProfile.username,
+                profilePhoto: userProfile.profilePhoto
+              });
+              Alert.alert('Success', result.data.message || 'User information updated in all expenses!');
+            } catch (error) {
+              console.error('Error updating user in expenses:', error);
+              const errorMessage = error.message || error.details || 'Failed to update user in expenses';
+              Alert.alert('Error', errorMessage);
+            } finally {
+              setIsLoading(false);
+              setLoadingFunction(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -123,11 +272,11 @@ const SettingsScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={styles.settingItem}
               onPress={() => navigation.navigate('Profile', {
-                screen: 'VenmoTest'
+                screen: 'ChangeVenmo'
               })}
             >
               <Ionicons name="card-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Venmo Test</Text>
+              <Text style={styles.settingText}>Change Venmo</Text>
               <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -160,6 +309,64 @@ const SettingsScreen = ({ navigation }) => {
               <Ionicons name="star-outline" size={24} color={Colors.textSecondary} />
               <Text style={styles.settingText}>Rate the App</Text>
               <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.settingsSection}>
+          <Text style={styles.sectionTitle}>Developer Tools</Text>
+          <View style={styles.settingsList}>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleSendTestNotification}
+              disabled={isLoading}
+            >
+              <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Send Test Notification</Text>
+              {isLoading && loadingFunction === 'testNotification' ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleUpdateUserInExpenses}
+              disabled={isLoading}
+            >
+              <Ionicons name="sync-outline" size={24} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Update User in Expenses</Text>
+              {isLoading && loadingFunction === 'updateUser' ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleCreateSyntheticData}
+              disabled={isLoading}
+            >
+              <Ionicons name="add-circle-outline" size={24} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Create Synthetic Data</Text>
+              {isLoading && loadingFunction === 'createSynthetic' ? (
+                <ActivityIndicator size="small" color={Colors.accent} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleDeleteSyntheticData}
+              disabled={isLoading}
+            >
+              <Ionicons name="trash-outline" size={24} color={Colors.danger} />
+              <Text style={[styles.settingText, { color: Colors.danger }]}>Delete Synthetic Data</Text>
+              {isLoading && loadingFunction === 'deleteSynthetic' ? (
+                <ActivityIndicator size="small" color={Colors.danger} />
+              ) : (
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              )}
             </TouchableOpacity>
           </View>
         </View>

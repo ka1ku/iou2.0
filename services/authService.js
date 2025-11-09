@@ -7,6 +7,7 @@ import {
   serverTimestamp,
   doc,
   setDoc,
+  getDoc,
   query,
   where,
   getDocs
@@ -471,6 +472,93 @@ export const updateUserProfile = async (profileData) => {
       console.log('Successfully updated user information in expenses');
     } catch (expenseUpdateError) {
       // Log error but don't fail the profile update
+      console.error('Failed to update user information in expenses:', expenseUpdateError);
+    }
+    
+    return {
+      ...updateData,
+      id: user.uid
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Update Venmo profile
+export const updateVenmoProfile = async (venmoData) => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      throw new Error('No authenticated user');
+    }
+
+    const firestoreInstance = getFirestore(getApp());
+    const userDocRef = doc(firestoreInstance, 'users', user.uid);
+    
+    // Get current user profile
+    const userDocSnap = await getDoc(userDocRef);
+    let currentProfile = null;
+    if (userDocSnap.exists()) {
+      currentProfile = userDocSnap.data();
+    }
+    
+    // Prepare update data
+    const updateData = {
+      venmoUsername: venmoData.venmoUsername ? venmoData.venmoUsername.trim() : null,
+      updatedAt: serverTimestamp()
+    };
+
+    // Handle profile photo
+    if (venmoData.venmoProfilePic) {
+      try {
+        // Check if this is a real Venmo profile picture (not a fallback avatar)
+        const isRealVenmoProfile = !venmoData.venmoProfilePic.includes('ui-avatars.com');
+        
+        if (isRealVenmoProfile) {
+          // This is a real Venmo profile picture - download and upload to Firebase Storage
+          try {
+            updateData.profilePhoto = await downloadAndUploadImage(venmoData.venmoProfilePic.trim(), user.uid);
+          } catch (uploadError) {
+            // If upload fails, fallback to the original Venmo URL
+            updateData.profilePhoto = venmoData.venmoProfilePic.trim();
+          }
+        } else {
+          // This is a fallback avatar - generate a new one based on user's name
+          const firstName = currentProfile?.firstName || '';
+          const lastName = currentProfile?.lastName || '';
+          updateData.profilePhoto = generateFallbackAvatar(firstName, lastName, 'User');
+        }
+      } catch (urlError) {
+        // Fallback to generated avatar if Venmo URL parsing fails
+        const firstName = currentProfile?.firstName || '';
+        const lastName = currentProfile?.lastName || '';
+        updateData.profilePhoto = generateFallbackAvatar(firstName, lastName, 'User');
+      }
+    } else if (venmoData.venmoUsername === null) {
+      // User is removing Venmo, generate fallback avatar
+      const firstName = currentProfile?.firstName || '';
+      const lastName = currentProfile?.lastName || '';
+      updateData.profilePhoto = generateFallbackAvatar(firstName, lastName, 'User');
+    }
+
+    await setDoc(userDocRef, updateData, { merge: true });
+    
+    // Call cloud function to update user info in all expenses (background operation)
+    try {
+      const functions = getFunctions();
+      const updateUserInExpenses = httpsCallable(functions, 'updateUserInExpenses');
+      
+      await updateUserInExpenses({
+        userId: user.uid,
+        firstName: currentProfile?.firstName || '',
+        lastName: currentProfile?.lastName || '',
+        username: currentProfile?.username || '',
+        profilePhoto: updateData.profilePhoto || currentProfile?.profilePhoto
+      });
+      
+      console.log('Successfully updated user information in expenses');
+    } catch (expenseUpdateError) {
+      // Log error but don't fail the Venmo update
       console.error('Failed to update user information in expenses:', expenseUpdateError);
     }
     

@@ -417,7 +417,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           style={styles.content}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: insets.top + 80,
+            paddingTop: insets.top + 90,
             paddingBottom: 120,
           }}
         >
