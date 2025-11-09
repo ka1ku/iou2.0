@@ -1,26 +1,52 @@
 // Centralized design tokens for consistent styling across the app
 
 export const Colors = {
-  background: '#F5F1E8', // Warm cream background
-  surface: '#FFFFFF',
-  white: '#FFFFFF', // Pure white for text and icons
-  card: '#FFF8F0', // Slightly warmer card background
-  surfaceLight: '#FEFCF8', // Very light surface color for subtle backgrounds
-  textPrimary: '#2C2C2C',
-  textSecondary: '#8A8A8A',
-  accent: '#DAA340', // Warm gold/amber accent
-  accentDark: '#B8935F',
-  success: '#7FB069',
-  error: '#E56B6F', // Error color for validation messages
-  danger: '#E56B6F',
-  warning: '#F39C12', // Warning color for unallocated amounts
-  blue: '#4A90E2', // Blue for receipt scanning button
-  divider: '#E8E0D5',
-  border: '#E8E0D5', // Border color for inputs
-  tabActive: '#2C2C2C',
-  tabInactive: '#B8935F',
-  green: '#4CAF50',
-  red: '#ff4444',};
+  // Background & Surface Colors
+  background: '#F5F1E8', // Warm cream app background
+  surface: '#FFFFFF', // Primary surface (cards, modals, headers)
+  surfaceElevated: '#FFF8F0', // Elevated surface (cards with more warmth)
+  surfaceSubdued: '#FEFCF8', // Subtle background for nested surfaces
+  white: '#FFFFFF', // Pure white for text and icons on colored backgrounds
+  
+  // Text Colors
+  textPrimary: '#2C2C2C', // Primary text color
+  textSecondary: '#8A8A8A', // Secondary text, hints, labels
+  
+  // Brand Colors (Primary Actions & Highlights)
+  brand: '#F4C645', // Warm gold/amber - primary brand color
+  brandMuted: '#B8935F', // Muted brand color for inactive states
+  
+  // Financial State Colors
+  settled: '#7FB069', // Green - settled expenses, positive balances, "you're owed"
+  debt: '#E56B6F', // Red - debt states, "you owe", negative balances
+  pending: '#F39C12', // Orange - pending settlements, unallocated amounts, warnings
+  
+  // Feature-Specific Colors
+  receipt: '#4A90E2', // Blue - receipt scanning, receipt badges
+  
+  // Border & Divider Colors
+  border: '#E8E0D5', // Border color for inputs, cards, dividers
+  divider: '#E8E0D5', // Divider between sections (alias for border)
+  
+  // Navigation Colors
+  navActive: '#2C2C2C', // Active tab/text color
+  navInactive: '#B8935F', // Inactive tab/text color (uses brandMuted)
+  
+  // Semantic Color Aliases (for backward compatibility)
+  accent: '#F4C645', // Alias for brand
+  accentDark: '#B8935F', // Alias for brandMuted
+  success: '#7FB069', // Alias for settled
+  error: '#E56B6F', // Alias for debt
+  danger: '#E56B6F', // Alias for debt
+  warning: '#F39C12', // Alias for pending
+  blue: '#4A90E2', // Alias for receipt
+  card: '#FFF8F0', // Alias for surfaceElevated
+  surfaceLight: '#FEFCF8', // Alias for surfaceSubdued
+  tabActive: '#2C2C2C', // Alias for navActive
+  tabInactive: '#B8935F', // Alias for navInactive
+  green: '#4CAF50', // Chart/data visualization color (legacy - prefer settled)
+  red: '#ff4444', // Chart/data visualization color (legacy - prefer debt)
+};
 
 export const Spacing = {
   xs: 4,

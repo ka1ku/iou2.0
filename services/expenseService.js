@@ -31,11 +31,12 @@ const generateJoinCode = () => {
 export const createExpense = async (expenseData, userId) => {
   try {
     
-    const participantsMap = {};
+    // Create participantIds array for efficient array-contains queries
+    const participantIds = [];
     if (expenseData.participants) {
       expenseData.participants.forEach((participant) => {
-        if (participant.userId) {
-          participantsMap[participant.userId] = true;
+        if (participant.userId && !participantIds.includes(participant.userId)) {
+          participantIds.push(participant.userId);
         }
       });
     }
@@ -46,7 +47,7 @@ export const createExpense = async (expenseData, userId) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       items: expenseData.items || [],
-      participantsMap,
+      participantIds,
       join: {
         enabled: true,
         code: generateJoinCode(),
@@ -73,14 +74,15 @@ export const updateExpense = async (expenseId, updateData, userId) => {
     
     let finalUpdateData = { ...updateData };
     
+    // Create participantIds array for efficient array-contains queries
     if (updateData.participants) {
-      const participantsMap = {};
+      const participantIds = [];
       updateData.participants.forEach((participant) => {
-        if (participant.userId) {
-          participantsMap[participant.userId] = true;
+        if (participant.userId && !participantIds.includes(participant.userId)) {
+          participantIds.push(participant.userId);
         }
       });
-      finalUpdateData.participantsMap = participantsMap;
+      finalUpdateData.participantIds = participantIds;
     }
     
     // Add updatedBy field
@@ -250,16 +252,17 @@ export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
 export const updateExpenseParticipants = async (expenseId, participants, userId) => {
   try {
     
-    const participantsMap = {};
+    // Create participantIds array for efficient array-contains queries
+    const participantIds = [];
     participants.forEach((participant) => {
-      if (participant.userId) {
-        participantsMap[participant.userId] = true;
+      if (participant.userId && !participantIds.includes(participant.userId)) {
+        participantIds.push(participant.userId);
       }
     });
     
     await updateExpense(expenseId, {
       participants,
-      participantsMap
+      participantIds
     }, userId);
     
     return true;
@@ -429,12 +432,16 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
     };
 
     const updatedParticipants = [...(expenseData.participants || []), newParticipant];
-    const participantsMap = { ...(expenseData.participantsMap || {}) };
-    participantsMap[userId] = true;
+    
+    // Create participantIds array for efficient array-contains queries
+    const participantIds = [...(expenseData.participantIds || [])];
+    if (!participantIds.includes(userId)) {
+      participantIds.push(userId);
+    }
 
     await updateDoc(expenseRef, {
       participants: updatedParticipants,
-      participantsMap,
+      participantIds,
       updatedAt: serverTimestamp()
     });
 

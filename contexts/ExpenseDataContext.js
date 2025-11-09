@@ -40,18 +40,6 @@ const mergeAndSortExpenses = (existingExpenses, newExpenses) => {
   });
 };
 
-// Helper function to filter user expenses (for fallback query)
-const filterUserExpenses = (expenses, userId) => {
-  return expenses.filter(expense => {
-    if (expense.createdBy === userId) return true;
-    if (expense.participantsMap && expense.participantsMap[userId]) return true;
-    if (expense.participants && Array.isArray(expense.participants)) {
-      return expense.participants.some(p => p.userId === userId);
-    }
-    return false;
-  });
-};
-
 export const ExpenseDataProvider = ({ children }) => {
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState({
@@ -100,10 +88,10 @@ export const ExpenseDataProvider = ({ children }) => {
 
     const firestoreInstance = getFirestore(getApp());
     
-    // Build the optimized query using participantsMap
+    // Build the optimized query using participantIds array
     const buildQuery = () => query(
       collection(firestoreInstance, 'expenses'),
-      where(`participantsMap.${currentUser.uid}`, '==', true),
+      where('participantIds', 'array-contains', currentUser.uid),
       orderBy('createdAt', 'desc'),
       limit(PAGE_SIZE)
     );
@@ -135,51 +123,17 @@ export const ExpenseDataProvider = ({ children }) => {
       setLoading(false);
     };
 
-    // Try optimized query first
+    // Set up the query with array-contains
     const expensesQuery = buildQuery();
     const unsubscribeExpenses = onSnapshot(
       expensesQuery,
       handleSnapshot,
       (error) => {
-        // Fallback: query all expenses and filter client-side
-        console.warn('Optimized query failed, using fallback:', error);
-        const fallbackQuery = query(
-          collection(firestoreInstance, 'expenses'),
-          orderBy('createdAt', 'desc'),
-          limit(PAGE_SIZE * 3) // Fetch more to account for filtering
-        );
-        
-        const unsubscribeFallback = onSnapshot(
-          fallbackQuery,
-          (snapshot) => {
-            const allExpenses = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-            const userExpenses = filterUserExpenses(allExpenses, currentUser.uid);
-            
-            // Create a filtered snapshot-like object
-            const filteredDocs = userExpenses
-              .map(e => snapshot.docs.find(d => d.id === e.id))
-              .filter(Boolean)
-              .slice(0, PAGE_SIZE);
-            
-            handleSnapshot({
-              docs: filteredDocs,
-              empty: filteredDocs.length === 0
-            });
-          },
-          (fallbackError) => {
-            console.error('Fallback query also failed:', fallbackError);
-            setExpenses([]);
-            setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
-            setLoading(false);
-            setHasMore(false);
-          }
-        );
-        
-        unsubscribeExpensesRef.current = unsubscribeFallback;
-        return unsubscribeFallback;
+        console.error('Expenses query failed:', error);
+        setExpenses([]);
+        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
+        setLoading(false);
+        setHasMore(false);
       }
     );
 
@@ -205,7 +159,7 @@ export const ExpenseDataProvider = ({ children }) => {
       // Build query with pagination
       const expensesQuery = query(
         collection(firestoreInstance, 'expenses'),
-        where(`participantsMap.${currentUser.uid}`, '==', true),
+        where('participantIds', 'array-contains', currentUser.uid),
         orderBy('createdAt', 'desc'),
         startAfter(lastDocRef.current),
         limit(PAGE_SIZE)

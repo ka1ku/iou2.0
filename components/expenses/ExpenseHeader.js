@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
+import { Colors, Spacing, Typography } from '../../design/tokens';
 
 const ExpenseHeader = ({ 
   title, 
@@ -16,10 +16,12 @@ const ExpenseHeader = ({
   return (
     <View style={[styles.header, { paddingTop: insets.top + Spacing.lg }]}>
       <TouchableOpacity 
-        style={styles.backButton}
+        style={styles.iconButton}
         onPress={onBackPress}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        activeOpacity={0.6}
       >
-        <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+        <Ionicons name="arrow-back" size={26} color={Colors.textPrimary} />
       </TouchableOpacity>
       
       <Text
@@ -30,13 +32,17 @@ const ExpenseHeader = ({
         {title || (isEditing ? 'Edit' : 'Add')}
       </Text>
       
-      {!hideSettings && (
+      {!hideSettings ? (
         <TouchableOpacity 
-          style={styles.settingsButton}
+          style={styles.iconButton}
           onPress={onSettingsPress}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.6}
         >
-          <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
+          <Ionicons name="ellipsis-horizontal" size={26} color={Colors.textPrimary} />
         </TouchableOpacity>
+      ) : (
+        <View style={styles.iconButton} />
       )}
     </View>
   );
@@ -53,40 +59,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
+    paddingBottom: Spacing.lg,
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.background,
+  iconButton: {
+    width: 44,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.divider,
   },
   headerTitle: {
     ...Typography.h2,
     color: Colors.textPrimary,
     flex: 1,
     textAlign: 'center',
-    marginHorizontal: Spacing.md,
+    marginHorizontal: Spacing.sm,
+    fontWeight: '600',
+    letterSpacing: -0.3,
   },
   headerTitleCentered: {
-    marginRight: 40, // Balance the back button width to truly center the title
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.divider,
+    marginRight: 44, // Balance the back button width to truly center the title
   },
 });
 
