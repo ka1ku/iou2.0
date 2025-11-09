@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,15 @@ import { calculateUserBalanceForExpense, calculateExpenseTotal } from '../utils/
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 import AnimatedSearchHeader from '../components/AnimatedSearchHeader';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { searchExpensesWithDetails } from '../services/expenseSearchService';
 
 const HomeScreen = ({ navigation }) => {
   const { expenses, loading, loadingMore, hasMore, loadMoreExpenses, balances } = useExpenseData();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const searchHeaderRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
   const calculateExpenseBalance = (expense) => {
     const currentUser = getCurrentUser();
     if (!currentUser) {
@@ -121,27 +125,53 @@ const HomeScreen = ({ navigation }) => {
     return 'needsSettlement';
   };
 
-  // Filter expenses based on search query
-  const filteredExpenses = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return expenses;
+  // Search expenses using Algolia when query changes
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
     }
 
-    const query = searchQuery.toLowerCase().trim();
-    
-    return expenses.filter(expense => {
-      // Search by expense title
-      const titleMatch = expense.title?.toLowerCase().includes(query);
-      
-      // Search by participant names
-      const participantMatch = expense.participants?.some(participant => 
-        participant.name?.toLowerCase().includes(query) ||
-        participant.username?.toLowerCase().includes(query)
-      );
-      
-      return titleMatch || participantMatch;
-    });
-  }, [expenses, searchQuery]);
+    // If search query is empty, clear search results
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    // Set loading state
+    setSearchLoading(true);
+
+    // Debounce search by 300ms
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const results = await searchExpensesWithDetails(searchQuery.trim(), 3);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Error searching expenses:', error);
+        setSearchResults([]);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+
+    // Cleanup function
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Determine which expenses to display
+  const filteredExpenses = useMemo(() => {
+    // If searching, use search results
+    if (searchQuery.trim()) {
+      return searchResults;
+    }
+    // Otherwise, use regular expenses
+    return expenses;
+  }, [expenses, searchQuery, searchResults]);
 
   const renderExpenseItem = ({ item }) => {
     const totalItems = item.items?.length || 0;
@@ -373,6 +403,7 @@ const HomeScreen = ({ navigation }) => {
     if (!searchQuery.trim() && hasMore && !loadingMore) {
       loadMoreExpenses();
     }
+    // Don't load more when searching - Algolia returns limited results
   };
 
   // Close search when screen loses focus (user navigates away or switches tabs)
@@ -387,7 +418,8 @@ const HomeScreen = ({ navigation }) => {
     }, [])
   );
 
-  if (loading) {
+  // Show loading spinner only on initial load (not when searching)
+  if (loading && !searchQuery.trim()) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <LoadingSpinner size="large" />
@@ -395,34 +427,46 @@ const HomeScreen = ({ navigation }) => {
     );
   }
 
+  // Show search loading indicator
+  const showSearchLoading = searchQuery.trim() && searchLoading;
+
   return (
     <View style={styles.container}>
       <AnimatedSearchHeader
         ref={searchHeaderRef}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onSearchClose={() => setSearchQuery('')}
+        onSearchClose={() => {
+          setSearchQuery('');
+          setSearchResults([]);
+        }}
       />
 
-      <FlatList
-        data={filteredExpenses}
-        renderItem={renderExpenseItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={filteredExpenses.length === 0 ? styles.emptyContainer : styles.listContainer}
-        ListEmptyComponent={renderEmptyState}
-        ListFooterComponent={renderFooter}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.5}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        onScrollBeginDrag={() => {
-          // Close search when user starts scrolling
-          if (searchHeaderRef.current) {
-            searchHeaderRef.current.close();
-          }
-        }}
-        style={styles.list}
-      />
+      {showSearchLoading ? (
+        <View style={styles.searchLoadingContainer}>
+          <LoadingSpinner size="large" />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredExpenses}
+          renderItem={renderExpenseItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={filteredExpenses.length === 0 ? styles.emptyContainer : styles.listContainer}
+          ListEmptyComponent={renderEmptyState}
+          ListFooterComponent={renderFooter}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          onScrollBeginDrag={() => {
+            // Close search when user starts scrolling
+            if (searchHeaderRef.current) {
+              searchHeaderRef.current.close();
+            }
+          }}
+          style={styles.list}
+        />
+      )}
 
     </View>
   );
@@ -441,8 +485,9 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingTop: Spacing.xxl,
   },
   emptyState: {
     alignItems: 'center',
@@ -723,6 +768,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  searchLoadingContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: Spacing.xxl,
   },
   receiptIndicator: {
     position: 'absolute',

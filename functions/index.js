@@ -6,6 +6,7 @@ admin.initializeApp();
 
 const algoliaClient = algoliasearch('I0T07P5NB6', 'fb4e3327d2030d4c281cdc6fa64f7984');
 const usersIndex = algoliaClient.initIndex('users');
+const expensesIndex = algoliaClient.initIndex('expenses');
 
 exports.syncUserToAlgolia = functions.firestore
   .document('users/{userId}')
@@ -35,6 +36,85 @@ exports.syncUserToAlgolia = functions.firestore
         await usersIndex.deleteObject(userId);
       }
     } catch (error) {
+      throw error;
+    }
+  });
+
+exports.syncExpenseToAlgolia = functions.firestore
+  .document('expenses/{expenseId}')
+  .onWrite(async (change, context) => {
+    const expenseId = context.params.expenseId;
+    const expenseData = change.after.exists ? change.after.data() : null;
+    
+    try {
+      if (change.after.exists && expenseData) {
+        // Extract searchable fields
+        const title = expenseData.title || '';
+        const expenseType = expenseData.expenseType || '';
+        
+        // Extract participant names and usernames
+        const participantNames = (expenseData.participants || []).map(p => p.name || '').filter(Boolean);
+        const participantUsernames = (expenseData.participants || []).map(p => p.username || '').filter(Boolean);
+        
+        // Extract item names
+        const itemNames = (expenseData.items || []).map(item => item.name || '').filter(Boolean);
+        
+        // Create searchable text combining all searchable fields
+        const searchableText = [
+          title,
+          expenseType,
+          ...participantNames,
+          ...participantUsernames,
+          ...itemNames
+        ].filter(Boolean).join(' ').toLowerCase();
+        
+        // Get timestamps for sorting
+        let createdAt = 0;
+        let updatedAt = 0;
+        
+        if (expenseData.createdAt) {
+          if (expenseData.createdAt.toMillis) {
+            createdAt = expenseData.createdAt.toMillis();
+          } else if (expenseData.createdAt.seconds) {
+            createdAt = expenseData.createdAt.seconds * 1000;
+          } else if (expenseData.createdAt instanceof Date) {
+            createdAt = expenseData.createdAt.getTime();
+          }
+        }
+        
+        if (expenseData.updatedAt) {
+          if (expenseData.updatedAt.toMillis) {
+            updatedAt = expenseData.updatedAt.toMillis();
+          } else if (expenseData.updatedAt.seconds) {
+            updatedAt = expenseData.updatedAt.seconds * 1000;
+          } else if (expenseData.updatedAt instanceof Date) {
+            updatedAt = expenseData.updatedAt.getTime();
+          }
+        }
+        
+        const searchableExpense = {
+          objectID: expenseId,
+          title: title,
+          expenseType: expenseType,
+          participantIds: expenseData.participantIds || [],
+          participantNames: participantNames,
+          participantUsernames: participantUsernames,
+          itemNames: itemNames,
+          searchableText: searchableText,
+          createdBy: expenseData.createdBy || '',
+          createdAt: createdAt,
+          updatedAt: updatedAt,
+          settled: expenseData.settled || false,
+          // Include full expense data for retrieval (or minimal fields)
+          total: expenseData.total || 0,
+        };
+        
+        await expensesIndex.saveObject(searchableExpense);
+      } else {
+        await expensesIndex.deleteObject(expenseId);
+      }
+    } catch (error) {
+      console.error('Error syncing expense to Algolia:', error);
       throw error;
     }
   });

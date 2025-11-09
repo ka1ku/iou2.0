@@ -720,11 +720,11 @@ const GroupMembersModal = ({
     <Modal 
       visible={visible} 
       animationType="slide" 
-      presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
+      presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>
-        <View style={[styles.modalHeader, { paddingTop: Platform.OS === 'ios' ? 0 : insets.top + Spacing.md }]}>
+        <View style={[styles.modalHeader, { paddingTop: insets.top + Spacing.md }]}>
           {Platform.OS === 'android' && <View style={styles.modalHandle} />}
           <View style={styles.headerRow}>
             <TouchableOpacity 
