@@ -1265,6 +1265,24 @@ const SettleUpScreen = ({ route, navigation }) => {
     }
   }, [participants, expense?.title, expense?.receiptTitle, getSettlementKey, updateSettlementStatus, name, animateActionCompleted]);
 
+  const handleConfirmPaymentMade = useCallback((settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setRequestSentStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+    handleMarkAsPaid(settlement);
+  }, [getSettlementKey, handleMarkAsPaid]);
+
+  const handleConfirmPaymentReceived = useCallback((settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setPaymentMadeStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+    handleMarkAsPaid(settlement);
+  }, [getSettlementKey, handleMarkAsPaid]);
+
   const handleUndoPaymentMade = useCallback(async (settlement) => {
     const settlementId = getSettlementKey(settlement);
     console.log('[handleUndoPaymentMade] Undoing payment made for:', settlementId);
@@ -1350,7 +1368,9 @@ const SettleUpScreen = ({ route, navigation }) => {
     // Use consistent key format for settlement IDs
     const settlementId = getSettlementKey(settlement);
     const requestId = settlementId; // Use same ID for consistency
-    const isSpectator = settlement.from !== name && settlement.to !== name;
+    const isDebtor = settlement.from === name;
+    const isCreditor = settlement.to === name;
+    const isSpectator = !isDebtor && !isCreditor;
     
     // Check if a request has been sent for this settlement
     const hasRequestBeenSent = requestSentStates[requestId] === true || settlement.status === 'paymentRequested';
@@ -1363,9 +1383,12 @@ const SettleUpScreen = ({ route, navigation }) => {
     
     // Determine button text and styling
     const getButtonText = () => {
-      if (settlement.from === name) {
-        return 'Make Payment';
-      } else if (settlement.to === name) {
+      if (isDebtor) {
+        return hasRequestBeenSent ? 'Confirm payment made' : 'Make Payment';
+      } else if (isCreditor) {
+        if (isPaymentMade) {
+          return 'Confirm payment received';
+        }
         return hasRequestBeenSent ? 'Request Sent' : 'Request Payment';
       } else {
         return hasReminderBeenSent ? 'Reminder Sent' : 'Send Reminder';
@@ -1374,7 +1397,10 @@ const SettleUpScreen = ({ route, navigation }) => {
     
     const getButtonStyle = () => {
       const baseStyle = styles.requestPaymentButton;
-      if (settlement.to === name && hasRequestBeenSent) {
+      if ((isDebtor && hasRequestBeenSent) || (isCreditor && isPaymentMade)) {
+        return [baseStyle, styles.confirmActionButton];
+      }
+      if (isCreditor && hasRequestBeenSent) {
         return [baseStyle, styles.requestSentButton];
       }
       if (isSpectator && hasReminderBeenSent) {
@@ -1385,7 +1411,10 @@ const SettleUpScreen = ({ route, navigation }) => {
     
     const getButtonTextStyle = () => {
       const baseStyle = styles.requestPaymentButtonText;
-      if (settlement.to === name && hasRequestBeenSent) {
+      if ((isDebtor && hasRequestBeenSent) || (isCreditor && isPaymentMade)) {
+        return [baseStyle, styles.confirmActionButtonText];
+      }
+      if (isCreditor && hasRequestBeenSent) {
         return [baseStyle, styles.requestSentButtonText];
       }
       if (isSpectator && hasReminderBeenSent) {
@@ -1394,13 +1423,16 @@ const SettleUpScreen = ({ route, navigation }) => {
       return baseStyle;
     };
 
-    const combinedState = isSettled
-      ? 'settled'
-      : isPaymentMade
-        ? 'paymentMade'
-        : hasRequestBeenSent
-          ? 'paymentRequested'
-          : (isSpectator && hasReminderBeenSent ? 'reminderSent' : null);
+    let combinedState = null;
+    if (isSettled) {
+      combinedState = 'settled';
+    } else if (isPaymentMade && isDebtor) {
+      combinedState = 'paymentMade';
+    } else if (hasRequestBeenSent && isCreditor) {
+      combinedState = 'paymentRequested';
+    } else if (isSpectator && hasReminderBeenSent) {
+      combinedState = 'reminderSent';
+    }
 
     const combinedTextMap = {
       settled: 'Settled Up',
@@ -1679,26 +1711,35 @@ const SettleUpScreen = ({ route, navigation }) => {
                 style={getButtonStyle()}
                 onPress={() => {
                   console.log('[Action Button] Pressed for settlement:', settlement, 'buttonText:', getButtonText());
-                  if (settlement.from === name) {
-                    console.log('[Action Button] Calling handleMakePayment');
-                    handleMakePayment(settlement,true);
-                  } else if (settlement.to === name && !hasRequestBeenSent) {
-                    console.log('[Action Button] Calling handleRequestPayment');
-                    handleRequestPayment(settlement, true);
-                  } else if (settlement.to === name && hasRequestBeenSent) {
-                    console.log('[Action Button] Request already sent, doing nothing');
-                    // Request already sent, maybe show a message or do nothing
-                } else {
-                  if (hasReminderBeenSent) {
-                    console.log('[Action Button] Reminder already sent, ignoring press');
-                    return;
-                  }
-                  console.log('[Action Button] Send reminder');
-                  handleSendReminder(settlement);
+                  if (isDebtor) {
+                    if (hasRequestBeenSent) {
+                      console.log('[Action Button] Confirming payment made');
+                      handleConfirmPaymentMade(settlement);
+                    } else {
+                      console.log('[Action Button] Calling handleMakePayment');
+                      handleMakePayment(settlement, true);
+                    }
+                  } else if (isCreditor) {
+                    if (isPaymentMade) {
+                      console.log('[Action Button] Confirming payment received');
+                      handleConfirmPaymentReceived(settlement);
+                    } else if (!hasRequestBeenSent) {
+                      console.log('[Action Button] Calling handleRequestPayment');
+                      handleRequestPayment(settlement, true);
+                    } else {
+                      console.log('[Action Button] Request already sent, doing nothing');
+                    }
+                  } else {
+                    if (hasReminderBeenSent) {
+                      console.log('[Action Button] Reminder already sent, ignoring press');
+                      return;
+                    }
+                    console.log('[Action Button] Send reminder');
+                    handleSendReminder(settlement);
                   }
                 }}
                 activeOpacity={0.8}
-              disabled={(settlement.to === name && hasRequestBeenSent) || (isSpectator && hasReminderBeenSent)}
+                disabled={(isSpectator && hasReminderBeenSent)}
               >
                 <Text style={getButtonTextStyle()}>
                   {getButtonText()}
@@ -1709,7 +1750,7 @@ const SettleUpScreen = ({ route, navigation }) => {
         </View>
       </View>
     );
-  }, [participants, name, requestSentStates, paymentMadeStates, settledStates, reminderSentStates, animationStates, getSettlementKey, handleMarkAsPaid, handleMakePayment, handleRequestPayment, handleSendReminder, handleUndoMarkAsPaid, handleUndoPaymentMade, handleUndoPaymentRequested, handleUndoReminderSent, expense]);
+  }, [participants, name, requestSentStates, paymentMadeStates, settledStates, reminderSentStates, animationStates, getSettlementKey, handleMarkAsPaid, handleMakePayment, handleRequestPayment, handleSendReminder, handleConfirmPaymentMade, handleConfirmPaymentReceived, handleUndoMarkAsPaid, handleUndoPaymentMade, handleUndoPaymentRequested, handleUndoReminderSent, expense]);
 
   return (
     <View style={styles.container}>
@@ -2088,6 +2129,16 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   requestSentButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  confirmActionButton: {
+    backgroundColor: Colors.success,
+    opacity: 0.9,
+  },
+  confirmActionButtonText: {
     ...Typography.label,
     color: Colors.surface,
     fontWeight: '600',

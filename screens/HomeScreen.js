@@ -40,7 +40,19 @@ const HomeScreen = ({ navigation }) => {
       settlement.status === 'markedAsPaid'
     );
 
-    return allSettled ? 'settled' : 'needsSettlement';
+    if (allSettled) {
+      return 'settled';
+    }
+
+    const hasPendingConfirmation = expense.settlements.some(settlement =>
+      settlement.status === 'paymentRequested' || settlement.status === 'paymentMade'
+    );
+
+    if (hasPendingConfirmation) {
+      return 'pendingConfirmation';
+    }
+
+    return 'needsSettlement';
   };
 
   // Filter expenses based on search query
@@ -131,6 +143,13 @@ const HomeScreen = ({ navigation }) => {
                     <View style={styles.evenContainer}>
                       <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
                       <Text style={styles.evenText}>Settled up</Text>
+                    </View>
+                  );
+                } else if (settlementStatus === 'pendingConfirmation') {
+                  return (
+                    <View style={styles.pendingConfirmationContainer}>
+                      <Ionicons name="time-outline" size={16} color={Colors.warning} />
+                      <Text style={styles.pendingConfirmationText}>Pending confirmation</Text>
                     </View>
                   );
                 } else {
@@ -452,6 +471,22 @@ const styles = StyleSheet.create({
   owedText: {
     ...Typography.label,
     color: Colors.success,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  pendingConfirmationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.warning + '15',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.warning + '30',
+  },
+  pendingConfirmationText: {
+    ...Typography.label,
+    color: Colors.warning,
     fontWeight: '600',
     marginLeft: 4,
   },
