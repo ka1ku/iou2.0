@@ -70,10 +70,6 @@ const SettingsScreen = ({ navigation }) => {
     });
   };
 
-  const handleHelpSupport = () => {
-    Linking.openURL('mailto:support@your-app.com?subject=IOU App Support');
-  };
-
   const handleRateApp = () => {
     const url = Platform.OS === 'ios' 
       ? 'https://apps.apple.com/app/id123456789' 
@@ -254,16 +250,6 @@ const SettingsScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={styles.settingItem}
               onPress={() => navigation.navigate('Profile', {
-                screen: 'ConnectedAccounts'
-              })}
-            >
-              <Ionicons name="link-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Connected Accounts</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => navigation.navigate('Profile', {
                 screen: 'NotificationSettings'
               })}
             >
@@ -292,14 +278,6 @@ const SettingsScreen = ({ navigation }) => {
             >
               <Ionicons name="document-text-outline" size={24} color={Colors.textSecondary} />
               <Text style={styles.settingText}>Terms of Service</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleHelpSupport}
-            >
-              <Ionicons name="help-circle-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Help & Support</Text>
               <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity 

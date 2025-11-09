@@ -34,7 +34,6 @@ import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
 import NotificationSettingsScreen from './screens/settings/NotificationSettingsScreen';
 import VenmoTestScreen from './screens/settings/VenmoTest';
 import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
-import ConnectedAccountsScreen from './screens/settings/ConnectedAccountsScreen';
 import TermsOfServiceScreen from './screens/settings/TermsOfServiceScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
@@ -98,7 +97,6 @@ const ProfileStack = () => (
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="ConnectedAccounts" component={ConnectedAccountsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
     <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
@@ -199,7 +197,7 @@ const MainTabs = () => {
     const hiddenRoutes = [
       'AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 
       'NotificationSettings', 'VenmoTest', 'FriendProfile', 'Settings',
-      'ProfileSettings', 'ConnectedAccounts', 'TermsOfService'
+      'ProfileSettings', 'TermsOfService'
     ];
 
     return {

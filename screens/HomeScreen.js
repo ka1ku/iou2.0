@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: Spacing.xxl,
+    paddingTop: Spacing.xxl * 3,
   },
   emptyState: {
     alignItems: 'center',
@@ -773,7 +773,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: Spacing.xxl,
+    paddingTop: Spacing.xxl * 3,
   },
   receiptIndicator: {
     position: 'absolute',
