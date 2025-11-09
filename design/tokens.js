@@ -1,51 +1,53 @@
 // Centralized design tokens for consistent styling across the app
 
 export const Colors = {
-  // Background & Surface Colors
-  background: '#F5F1E8', // Warm cream app background
-  surface: '#FFFFFF', // Primary surface (cards, modals, headers)
-  surfaceElevated: '#FFF8F0', // Elevated surface (cards with more warmth)
-  surfaceSubdued: '#FEFCF8', // Subtle background for nested surfaces
+  // Background & Surface Colors (clean, polished palette)
+  background: '#FAF8F3', // Soft warm beige - lighter and more modern, works beautifully with gold
+  surface: '#FFFFFF', // Pure white for cards, modals, headers - crisp contrast
+  surfaceElevated: '#FFFFFF', // Keep white for elevated surfaces
+  surfaceSubdued: '#F8F6F1', // Very subtle warm tint for nested surfaces
   white: '#FFFFFF', // Pure white for text and icons on colored backgrounds
   
-  // Text Colors
-  textPrimary: '#2C2C2C', // Primary text color
-  textSecondary: '#8A8A8A', // Secondary text, hints, labels
+  // Text Colors (crisp and readable)
+  textPrimary: '#1F1F1F', // Deep charcoal - excellent readability
+  textSecondary: '#757575', // Medium gray - clear secondary text
   
   // Brand Colors (Primary Actions & Highlights)
-  brand: '#F4C645', // Warm gold/amber - primary brand color
-  brandMuted: '#B8935F', // Muted brand color for inactive states
+  brand: '#F4C645', // Vibrant gold/amber - primary brand color
+  brandMuted: '#F4C645', // Same gold for inactive (will use opacity instead)
+  brandDark: '#E5B735', // Slightly deeper gold for hover/pressed states
+  brandLight: '#FFF4D6', // Very light gold tint for backgrounds
   
-  // Financial State Colors
-  settled: '#7FB069', // Green - settled expenses, positive balances, "you're owed"
-  debt: '#E56B6F', // Red - debt states, "you owe", negative balances
-  pending: '#F39C12', // Orange - pending settlements, unallocated amounts, warnings
+  // Financial State Colors (bright, clear, professional)
+  settled: '#4CAF50', // Material green - clear positive state
+  debt: '#F44336', // Material red - clear negative state
+  pending: '#FF9800', // Material orange - clear warning state
   
   // Feature-Specific Colors
-  receipt: '#4A90E2', // Blue - receipt scanning, receipt badges
+  receipt: '#2196F3', // Material blue - clean and professional for receipts
   
-  // Border & Divider Colors
-  border: '#E8E0D5', // Border color for inputs, cards, dividers
-  divider: '#E8E0D5', // Divider between sections (alias for border)
+  // Border & Divider Colors (subtle but defined)
+  border: '#E8E4DC', // Warm light beige border - subtle but visible
+  divider: '#F0EDE6', // Even lighter warm divider
   
   // Navigation Colors
-  navActive: '#2C2C2C', // Active tab/text color
-  navInactive: '#B8935F', // Inactive tab/text color (uses brandMuted)
+  navActive: '#1F1F1F', // Active tab/text color (deep charcoal)
+  navInactive: '#BDBDBD', // Inactive tab/text color (light gray - clean look)
   
   // Semantic Color Aliases (for backward compatibility)
   accent: '#F4C645', // Alias for brand
-  accentDark: '#B8935F', // Alias for brandMuted
-  success: '#7FB069', // Alias for settled
-  error: '#E56B6F', // Alias for debt
-  danger: '#E56B6F', // Alias for debt
-  warning: '#F39C12', // Alias for pending
-  blue: '#4A90E2', // Alias for receipt
-  card: '#FFF8F0', // Alias for surfaceElevated
-  surfaceLight: '#FEFCF8', // Alias for surfaceSubdued
-  tabActive: '#2C2C2C', // Alias for navActive
-  tabInactive: '#B8935F', // Alias for navInactive
-  green: '#4CAF50', // Chart/data visualization color (legacy - prefer settled)
-  red: '#ff4444', // Chart/data visualization color (legacy - prefer debt)
+  accentDark: '#E5B735', // Alias for brandDark
+  success: '#4CAF50', // Alias for settled
+  error: '#F44336', // Alias for debt
+  danger: '#F44336', // Alias for debt
+  warning: '#FF9800', // Alias for pending
+  blue: '#2196F3', // Alias for receipt
+  card: '#FFFFFF', // Alias for surfaceElevated
+  surfaceLight: '#F8F6F1', // Alias for surfaceSubdued
+  tabActive: '#1F1F1F', // Alias for navActive
+  tabInactive: '#BDBDBD', // Alias for navInactive
+  green: '#4CAF50', // Chart/data visualization color (material green)
+  red: '#F44336', // Chart/data visualization color (material red)
 };
 
 export const Spacing = {

@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,32 +12,53 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import Button from '../../components/Button';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const LINE_SPACING = 28; // Spacing between lines for notebook paper
+const LINE_COLOR = '#90CAF9'; // Light blue for notebook lines (Material Blue 300)
+const PAPER_BACKGROUND = '#FFFEFB'; // Very subtle off-white cream
+
+// Component to render lined paper background
+const LinedPaperBackground = () => {
+  const numberOfLines = Math.ceil(SCREEN_HEIGHT / LINE_SPACING) + 10; // Extra lines for scrolling
+  
+  return (
+    <View style={styles.linedPaperContainer}>
+      {Array.from({ length: numberOfLines }).map((_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.line,
+            { top: index * LINE_SPACING },
+          ]}
+        />
+      ))}
+    </View>
+  );
+};
+
 const WelcomeScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Colors.background} />
+      <StatusBar barStyle="dark-content" backgroundColor={PAPER_BACKGROUND} />
+      
+      {/* Lined Paper Background */}
+      <LinedPaperBackground />
       
       {/* Header Section */}
-      <View style={styles.header}>
+      <View style={[styles.header, { zIndex: 1 }]}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('../../assets/appstore.png')} 
+            source={require('../../assets/transparent_logo.png')} 
             style={styles.logoImage}
             contentFit="contain"
             transition={200}
           />
         </View>
-        <Text style={styles.title}>Welcome to IOU</Text>
-        <Text style={styles.subtitle}>
-          Split expenses easily with friends and family
-        </Text>
+        <Text style={styles.title}>Welcome to IOU!</Text>
+
       </View>
 
-      {/* Background Accent */}
-      <View style={styles.backgroundAccent} />
-
-      {/* Features Section */}
-      <View style={styles.featuresContainer}>
+      <View style={[styles.featuresContainer, { zIndex: 1 }]}>
         <View style={styles.feature}>
           <View style={styles.iconContainer}>
             <Ionicons name="people-outline" size={28} color={Colors.accent} />
@@ -57,11 +79,9 @@ const WelcomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Visual Separator */}
-      <View style={styles.separator} />
+      <View style={[styles.separator, { zIndex: 1 }]} />
 
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
+      <View style={[styles.buttonContainer, { zIndex: 1 }]}>
         <Button
           title="Create Account"
           onPress={() => navigation.navigate('SignUp')}
@@ -87,7 +107,23 @@ const WelcomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: PAPER_BACKGROUND,
+  },
+  linedPaperContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  line: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: LINE_COLOR,
+    opacity: 0.25,
   },
   header: {
     flex: 1,
@@ -98,17 +134,13 @@ const styles = StyleSheet.create({
   logoContainer: {
     width: 120,
     height: 120,
-    borderRadius: Radius.xl,
-    backgroundColor: Colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: Spacing.xl,
-    overflow: 'hidden',
   },
   logoImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: Radius.xl,
+    width: '150%',
+    height: '150%',
   },
   title: {
     ...Typography.h1,
@@ -167,20 +199,16 @@ const styles = StyleSheet.create({
   },
   button: {
     marginBottom: Spacing.md,
-  },
-  backgroundAccent: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 150,
-    backgroundColor: Colors.accent + '05', // A very subtle accent background
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
+    backgroundColor: PAPER_BACKGROUND,
+    shadowOpacity: 0,
+    elevation: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    shadowColor: 'transparent',
   },
   separator: {
     height: Spacing.md,
-    backgroundColor: Colors.background,
+    backgroundColor: 'transparent',
     marginVertical: Spacing.md,
   },
 
