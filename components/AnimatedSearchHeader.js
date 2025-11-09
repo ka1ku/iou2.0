@@ -149,7 +149,7 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
       <View
         style={[
           styles.headerContainer,
-          { paddingTop: insets.top + Spacing.xs },
+          { paddingTop: insets.top + Spacing.sm },
           { zIndex: 1000 },
         ]}
       >
@@ -238,20 +238,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    minHeight: 44,
+    paddingBottom: Spacing.md,
+    minHeight: 48,
     position: 'relative',
   },
   leftSection: {
     flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     ...Typography.h3,
-    fontSize: 24,
+    fontSize: 26,
     color: Colors.textPrimary,
     fontWeight: '700',
+    lineHeight: 32,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -265,6 +267,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     position: 'absolute',
     right: Spacing.lg,
+    top: '50%',
+    transform: [{ translateY: -SEARCH_BUTTON_SIZE / 2 }],
   },
   searchContainerExpanded: {
     zIndex: 10,

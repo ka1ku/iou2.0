@@ -67,7 +67,7 @@ const ProfileScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('Settings')} 
           style={styles.settingsButton}
         >
-          <Ionicons name="settings-outline" size={26} color={Colors.textPrimary} />
+          <Ionicons name="menu-outline" size={26} color={Colors.textPrimary} />
         </TouchableOpacity>
       </View>
 

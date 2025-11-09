@@ -232,11 +232,14 @@ const SearchPane = React.memo(({
   }, [hits, currentUserId]);
 
   // Filter out starred users from search results (they show in Recommended)
+  // Limit to 5 results
   const searchHits = useMemo(() => {
-    return filteredHits.filter(hit => {
-      const userId = hit.objectID || hit.id;
-      return !starredUserIds.includes(userId);
-    });
+    return filteredHits
+      .filter(hit => {
+        const userId = hit.objectID || hit.id;
+        return !starredUserIds.includes(userId);
+      })
+      .slice(0, 5);
   }, [filteredHits, starredUserIds]);
 
   const renderFriendItem = useCallback(({ item }) => {
@@ -372,7 +375,7 @@ const MemoizedSearchResults = React.memo(({ searchPaneProps }) => (
       stalledSearchDelay={500}
     >
       <Configure 
-        hitsPerPage={10} 
+        hitsPerPage={5} 
         attributesToRetrieve={[ 'objectID','firstName','lastName','username','profilePhoto','fullName' ]} 
       />
       <SearchPane {...searchPaneProps} />
