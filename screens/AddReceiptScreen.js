@@ -37,6 +37,9 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   const isFocused = useIsFocused();
 
   const { state, actions, total } = useExpense();
+  
+  // Validation errors state for items
+  const [itemValidationErrors, setItemValidationErrors] = useState({});
 
   // Tips & Fees state
   const [newlyAddedFee, setNewlyAddedFee] = useState(null);
@@ -224,6 +227,43 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       );
       return false;
     }
+    
+    // Check for items with no assigned people or zero price
+    const errors = {};
+    let hasErrors = false;
+    
+    state.items.forEach((item, index) => {
+      const itemErrors = {};
+      
+      // Check if item has zero or negative price
+      const amount = parseFloat(item.amount);
+      if (!amount || amount <= 0 || isNaN(amount)) {
+        itemErrors.amount = true;
+        hasErrors = true;
+      }
+      
+      // Check if item has no assigned consumers
+      if (!item.selectedConsumers || item.selectedConsumers.length === 0) {
+        itemErrors.consumers = true;
+        hasErrors = true;
+      }
+      
+      if (Object.keys(itemErrors).length > 0) {
+        errors[item.id] = itemErrors;
+      }
+    });
+    
+    if (hasErrors) {
+      setItemValidationErrors(errors);
+      Alert.alert(
+        "Incomplete Items",
+        "Please ensure all items have a price greater than zero and at least one person assigned to split the cost."
+      );
+      return false;
+    }
+    
+    // Clear any previous validation errors
+    setItemValidationErrors({});
     return true;
   };
 
@@ -609,6 +649,22 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             onRemoveItem={handleRemoveItem}
             scrollRef={scrollRef}
             isFocused={isFocused}
+            validationErrors={itemValidationErrors}
+            onClearValidationError={(itemId, field) => {
+              setItemValidationErrors(prev => {
+                const newErrors = { ...prev };
+                if (newErrors[itemId]) {
+                  const itemErrors = { ...newErrors[itemId] };
+                  delete itemErrors[field];
+                  if (Object.keys(itemErrors).length === 0) {
+                    delete newErrors[itemId];
+                  } else {
+                    newErrors[itemId] = itemErrors;
+                  }
+                }
+                return newErrors;
+              });
+            }}
           />
 
           {/* Tips & Fees Section */}

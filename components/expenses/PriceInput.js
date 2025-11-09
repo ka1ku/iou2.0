@@ -11,6 +11,7 @@ const PriceInput = ({
   showCurrency = true,
   maxDecimals = 2,
   selected = false, // New prop to control selection styling
+  error = false, // New prop to control error styling
   ...props
 }) => {
   const [displayValue, setDisplayValue] = useState('');
@@ -116,14 +117,16 @@ const PriceInput = ({
     <View style={[
       styles.container, 
       style, 
-      selected && styles.containerSelected,
-      isFocused && styles.containerFocused
+      selected && !error && styles.containerSelected,
+      isFocused && !error && styles.containerFocused,
+      error && styles.containerError
     ]}>
       {showCurrency && (
         <Text style={[
           styles.currencySymbol, 
-          selected && styles.currencySymbolSelected,
-          isFocused && styles.currencySymbolFocused
+          selected && !error && styles.currencySymbolSelected,
+          isFocused && !error && styles.currencySymbolFocused,
+          error && styles.currencySymbolError
         ]}>
           $
         </Text>
@@ -174,6 +177,13 @@ const styles = StyleSheet.create({
   },
   containerSelected: { borderColor: Colors.accent },
   containerFocused: { borderColor: Colors.accent },
+  containerError: { 
+    borderColor: Colors.danger,
+    borderWidth: 2,
+  },
+  currencySymbolError: {
+    color: Colors.danger,
+  },
   inputDisabled: {
     backgroundColor: Colors.background,
     color: Colors.textSecondary,

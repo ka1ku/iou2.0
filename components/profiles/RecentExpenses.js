@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import { calculateUserBalanceForExpense, getFormattedBalanceString, getBalanceColor, calculateExpenseTotal } from '../../utils/balanceCalculator';
 import LoadingSpinner from '../LoadingSpinner';
+import { getCurrentUser } from '../../services/authService';
 
 const RecentExpenses = ({ 
   expenses, 
@@ -33,12 +34,105 @@ const RecentExpenses = ({
     if (!userProfile || !userProfile.userId) {
       return { netBalance: 0, status: 'even' };
     }
-    return calculateUserBalanceForExpense(expense, userProfile.userId);
+    
+    const balance = calculateUserBalanceForExpense(expense, userProfile.userId);
+    
+    // Calculate pending confirmation amounts to subtract from the balance
+    let pendingAmount = 0;
+    if (expense.settlements && expense.settlements.length > 0) {
+      const currentUserParticipant = expense.participants?.find(p => p.userId === userProfile.userId);
+      const currentUserName = currentUserParticipant?.name;
+      
+      expense.settlements.forEach(settlement => {
+        // Check if settlement is in paymentRequested or paymentMade status
+        if (settlement.status === 'paymentRequested' || settlement.status === 'paymentMade') {
+          const isDebtor = settlement.debtor === currentUserName || settlement.from === currentUserName;
+          const isCreditor = settlement.creditor === currentUserName || settlement.to === currentUserName;
+          
+          if (isDebtor) {
+            // User owes this amount, but it's pending confirmation
+            pendingAmount += settlement.amount;
+          } else if (isCreditor) {
+            // User is owed this amount, but it's pending confirmation
+            pendingAmount -= settlement.amount;
+          }
+        }
+      });
+    }
+    
+    // Subtract pending amounts from the balance
+    const adjustedBalance = balance.netBalance - pendingAmount;
+    
+    return { ...balance, netBalance: adjustedBalance };
   }, [userProfile]);
+
+  const getSettlementStatus = useCallback((expense) => {
+    if (!expense.settlements || expense.settlements.length === 0) {
+      const balance = getUserBalanceForExpense(expense);
+      return Math.abs(balance.netBalance) < 0.01 ? 'settled' : 'needsSettlement';
+    }
+
+    const currentUserId = userProfile?.userId;
+    const currentUserParticipant = expense.participants?.find(p => p.userId === currentUserId);
+    const currentUserName = currentUserParticipant?.name;
+
+    const allSettled = expense.settlements.every(settlement => 
+      settlement.status === 'markedAsPaid'
+    );
+
+    if (allSettled) {
+      return 'settled';
+    }
+
+    // Check settlement statuses to determine badge
+    // User needs to confirm if:
+    // 1) paymentRequested status AND user is debtor (creditor requested payment)
+    // 2) paymentMade status AND user is creditor (debtor made payment)
+    // User is awaiting confirmation if:
+    // 1) paymentRequested status AND user is creditor (user requested payment)
+    // 2) paymentMade status AND user is debtor (user made payment)
+    
+    let needsConfirmation = false;
+    let awaitingConfirmation = false;
+
+    expense.settlements.forEach(settlement => {
+      const isDebtor = settlement.debtor === currentUserName || settlement.from === currentUserName;
+      const isCreditor = settlement.creditor === currentUserName || settlement.to === currentUserName;
+      
+      if (settlement.status === 'paymentRequested') {
+        if (isDebtor) {
+          // Creditor requested payment, debtor needs to confirm
+          needsConfirmation = true;
+        } else if (isCreditor) {
+          // User is creditor who requested payment, awaiting debtor confirmation
+          awaitingConfirmation = true;
+        }
+      } else if (settlement.status === 'paymentMade') {
+        if (isCreditor) {
+          // Debtor made payment, creditor needs to confirm
+          needsConfirmation = true;
+        } else if (isDebtor) {
+          // User is debtor who made payment, awaiting creditor confirmation
+          awaitingConfirmation = true;
+        }
+      }
+    });
+
+    if (needsConfirmation) {
+      return 'confirmPayment';
+    }
+
+    if (awaitingConfirmation) {
+      return 'awaitingConfirmation';
+    }
+
+    return 'needsSettlement';
+  }, [userProfile, getUserBalanceForExpense]);
 
   const renderExpenseSummary = useCallback((expense) => {
     // Calculate user's balance for this expense
     const userBalance = getUserBalanceForExpense(expense);
+    const settlementStatus = getSettlementStatus(expense);
     
     // Calculate the expense total from items and fees
     const calculatedTotal = calculateExpenseTotal(expense);
@@ -86,21 +180,68 @@ const RecentExpenses = ({
           </View>
           
           <View style={styles.expenseSummaryDetails}>
-            <View style={[styles.balancePill, { backgroundColor: `${balanceColor}15` }]}>
-              <Ionicons 
-                name={userBalance.status === 'owed' ? 'arrow-up-outline' : userBalance.status === 'owes' ? 'arrow-down-outline' : 'checkmark-outline'} 
-                size={14} 
-                color={balanceColor} 
-              />
-              <Text style={[styles.balanceText, { color: balanceColor }]}>
-                {getFormattedBalanceString(userBalance)}
-              </Text>
-            </View>
+            {(() => {
+              // Priority 1: Show settled status
+              if (settlementStatus === 'settled') {
+                return (
+                  <View style={styles.statusBadge}>
+                    <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                    <Text style={[styles.statusText, { color: Colors.success }]}>Settled up</Text>
+                  </View>
+                );
+              }
+              
+              // Priority 2: Show owe/owed amounts (takes precedence over confirmation badges)
+              if (userBalance.netBalance > 0.01) {
+                return (
+                  <View style={styles.statusBadge}>
+                    <Ionicons name="arrow-up-circle" size={14} color={Colors.danger} />
+                    <Text style={[styles.statusText, { color: Colors.danger }]}>
+                      You owe ${userBalance.netBalance.toFixed(2)}
+                    </Text>
+                  </View>
+                );
+              } else if (userBalance.netBalance < -0.01) {
+                return (
+                  <View style={styles.statusBadge}>
+                    <Ionicons name="arrow-down-circle" size={14} color={Colors.success} />
+                    <Text style={[styles.statusText, { color: Colors.success }]}>
+                      You're owed ${Math.abs(userBalance.netBalance).toFixed(2)}
+                    </Text>
+                  </View>
+                );
+              }
+              
+              // Priority 3: Show confirmation badges only if balance is zero
+              if (settlementStatus === 'confirmPayment') {
+                return (
+                  <View style={styles.statusBadge}>
+                    <Ionicons name="alert-circle" size={14} color={Colors.accent} />
+                    <Text style={[styles.statusText, { color: Colors.accent }]}>Confirm payment</Text>
+                  </View>
+                );
+              } else if (settlementStatus === 'awaitingConfirmation') {
+                return (
+                  <View style={styles.statusBadge}>
+                    <Ionicons name="time-outline" size={14} color={Colors.warning} />
+                    <Text style={[styles.statusText, { color: Colors.warning }]}>Awaiting confirmation</Text>
+                  </View>
+                );
+              }
+              
+              // Priority 4: Needs settlement (fallback)
+              return (
+                <View style={styles.statusBadge}>
+                  <Ionicons name="time-outline" size={14} color={Colors.warning} />
+                  <Text style={[styles.statusText, { color: Colors.warning }]}>Needs settlement</Text>
+                </View>
+              );
+            })()}
           </View>
         </View>
       </TouchableOpacity>
     );
-  }, [getUserBalanceForExpense, onExpensePress]);
+  }, [getUserBalanceForExpense, getSettlementStatus, onExpensePress]);
 
   if (loading) {
     return (
@@ -341,6 +482,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     alignItems: 'center',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    backgroundColor: `${Colors.textSecondary}10`,
+  },
+  statusText: {
+    ...Typography.body,
+    fontSize: 13,
+    fontFamily: Typography.familySemiBold,
+    marginLeft: Spacing.xs,
   },
   balancePill: {
     flexDirection: 'row',

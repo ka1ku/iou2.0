@@ -67,15 +67,53 @@ const ItemRow = memo(({
   onSave,
   onCancel,
   onUpdate,
-  onRemove
+  onRemove,
+  validationErrors,
+  onClearValidationError
 }) => {
+  const itemErrors = validationErrors?.[item.id] || {};
+  const [localValidationErrors, setLocalValidationErrors] = useState({});
+  
+  // Clear local errors when exiting edit mode
+  useEffect(() => {
+    if (!isEditing) {
+      setLocalValidationErrors({});
+    }
+  }, [isEditing]);
+  
   // Stable callback for participant selection
   const handleParticipantPress = useCallback((pIndex) => {
     const isSelected = item.selectedConsumers?.includes(pIndex);
     const current = item.selectedConsumers || [];
     const newConsumers = isSelected ? current.filter(i => i !== pIndex) : [...current, pIndex];
     onUpdate('item', index, 'selectedConsumers', newConsumers);
-  }, [item.selectedConsumers, index, onUpdate]);
+    
+    // Clear validation error when user starts fixing
+    if (onClearValidationError && newConsumers.length > 0) {
+      onClearValidationError(item.id, 'consumers');
+    }
+  }, [item.selectedConsumers, item.id, index, onUpdate, onClearValidationError]);
+
+  // Handle save with local validation
+  const handleSaveClick = useCallback(() => {
+    const errors = {};
+    
+    // Check if price is zero or invalid
+    const amount = parseFloat(item.amount);
+    if (!amount || amount <= 0 || isNaN(amount)) {
+      errors.amount = true;
+    }
+    
+    // If there are validation errors, show them and don't save
+    if (Object.keys(errors).length > 0) {
+      setLocalValidationErrors(errors);
+      return;
+    }
+    
+    // Clear local errors and proceed with save
+    setLocalValidationErrors({});
+    onSave(index);
+  }, [item.amount, index, onSave]);
 
   // Animated styles for edit mode card - Slide down when opening, slide up when closing
   const editCardAnimatedStyle = useAnimatedStyle(() => {
@@ -123,18 +161,30 @@ const ItemRow = memo(({
 
           {/* Price Input */}
           <View style={styles.editField}>
-            <Text style={styles.editLabel}>Price</Text>
+            <Text style={[styles.editLabel, (itemErrors.amount || localValidationErrors.amount) && styles.errorLabel]}>
+              Price{(itemErrors.amount || localValidationErrors.amount) && " *"}
+            </Text>
             <PriceInput
               value={item.amount || 0}
-              onChangeText={(value) => onUpdate('item', index, 'amount', value)}
+              onChangeText={(value) => {
+                onUpdate('item', index, 'amount', value);
+                // Clear validation errors when user starts fixing
+                if (onClearValidationError && parseFloat(value) > 0) {
+                  onClearValidationError(item.id, 'amount');
+                }
+                if (parseFloat(value) > 0) {
+                  setLocalValidationErrors(prev => ({ ...prev, amount: false }));
+                }
+              }}
               placeholder="0.00"
+              error={!!(itemErrors.amount || localValidationErrors.amount)}
             />
           </View>
 
           {/* Action Buttons */}
           <View style={styles.editActions}>
             <TouchableOpacity
-              onPress={() => onSave(index)}
+              onPress={handleSaveClick}
               style={[styles.editActionButton, styles.saveActionButton, styles.editActionButtonFirst]}
               activeOpacity={0.8}
             >
@@ -161,7 +211,10 @@ const ItemRow = memo(({
         </View>
 
         {/* Participant Selection */}
-        <View style={styles.participantChipContainer}>
+        <View style={[
+          styles.participantChipContainer,
+          itemErrors.consumers && styles.participantChipContainerError
+        ]}>
           {participants.map((participant, pIndex) => {
             const isSelected = item.selectedConsumers?.includes(pIndex);
             return (
@@ -174,6 +227,11 @@ const ItemRow = memo(({
             );
           })}
         </View>
+        {itemErrors.consumers && (
+          <Text style={styles.errorHelperText}>
+            Please assign at least one person
+          </Text>
+        )}
       </Animated.View>
 
       {/* View Mode - Animated */}
@@ -203,7 +261,10 @@ const ItemRow = memo(({
         </TouchableOpacity>
 
         {/* Participant Selection */}
-        <View style={styles.participantChipContainer}>
+        <View style={[
+          styles.participantChipContainer,
+          itemErrors.consumers && styles.participantChipContainerError
+        ]}>
           {participants.map((participant, pIndex) => {
             const isSelected = item.selectedConsumers?.includes(pIndex);
             return (
@@ -216,11 +277,19 @@ const ItemRow = memo(({
             );
           })}
         </View>
+        {itemErrors.consumers && (
+          <Text style={styles.errorHelperText}>
+            Please assign at least one person
+          </Text>
+        )}
       </Animated.View>
     </View>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison to prevent unnecessary re-renders
+  const prevErrors = prevProps.validationErrors?.[prevProps.item.id] || {};
+  const nextErrors = nextProps.validationErrors?.[nextProps.item.id] || {};
+  
   return (
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.name === nextProps.item.name &&
@@ -233,7 +302,8 @@ const ItemRow = memo(({
     prevProps.onSave === nextProps.onSave &&
     prevProps.onCancel === nextProps.onCancel &&
     prevProps.onUpdate === nextProps.onUpdate &&
-    prevProps.onRemove === nextProps.onRemove
+    prevProps.onRemove === nextProps.onRemove &&
+    JSON.stringify(prevErrors) === JSON.stringify(nextErrors)
   );
 });
 
@@ -245,6 +315,8 @@ const ReceiptBreakdown = ({
   onRemoveItem,
   scrollRef,
   isFocused,
+  validationErrors = {},
+  onClearValidationError,
 }) => {
   const [editingItemId, setEditingItemId] = useState(null); // Only one item in edit mode
   const prevItemsLengthRef = useRef(items.length);
@@ -402,6 +474,8 @@ const ReceiptBreakdown = ({
                 onCancel={cancelEdit}
                 onUpdate={handleUpdate}
                 onRemove={onRemoveItem}
+                validationErrors={validationErrors}
+                onClearValidationError={onClearValidationError}
               />
             </View>
           ))}
@@ -711,6 +785,27 @@ const styles = StyleSheet.create({
   tornCircle: {
     backgroundColor: Colors.background,
     borderRadius: 999,
+  },
+  errorLabel: {
+    color: Colors.danger,
+  },
+  inputError: {
+    borderColor: Colors.danger,
+    borderWidth: 2,
+  },
+  participantChipContainerError: {
+    borderWidth: 2,
+    borderColor: Colors.danger,
+    borderRadius: Radius.md,
+    padding: Spacing.xs,
+    backgroundColor: `${Colors.danger}10`,
+  },
+  errorHelperText: {
+    ...Typography.caption,
+    color: Colors.danger,
+    marginTop: Spacing.xs,
+    marginLeft: Spacing.sm,
+    fontWeight: '600',
   },
 });
 
