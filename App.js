@@ -9,6 +9,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -24,7 +25,7 @@ import '@react-native-firebase/ai';
 
 import { onAuthStateChange } from './services/authService';
 import deepLinkService from './services/deepLinkService';
-import notificationService from './services/notificationService';
+import expoNotificationService from './services/expoNotificationService';
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SetupExpenseScreen from './screens/SetupExpenseScreen';
@@ -32,7 +33,7 @@ import AddExpenseScreen from './screens/AddExpenseScreen';
 import AddReceiptScreen from './screens/AddReceiptScreen';
 import SettleUpScreen from './screens/SettleUpScreen';
 import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
-import NotificationSettingsScreen from './screens/settings/NotificationSettingsScreen';
+import NotificationTestScreen from './screens/settings/NotificationTestScreen';
 import VenmoTestScreen from './screens/settings/VenmoTest';
 import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
 import TermsOfServiceScreen from './screens/settings/TermsOfServiceScreen';
@@ -99,7 +100,7 @@ const ProfileStack = () => (
     <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} options={{ headerShown: false }} />
     <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="NotificationTest" component={NotificationTestScreen} options={{ headerShown: false }} />
     <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
     <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
     <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} options={{ headerShown: false }} />
@@ -109,65 +110,73 @@ const ProfileStack = () => (
   </Stack.Navigator>
 );
 
-// Component to handle notification navigation
-const NotificationNavigationHandler = () => {
+// Component to set up notification navigation handler
+const NotificationNavigationSetup = () => {
   const navigation = useNavigation();
   const { isInitialized } = useNotifications();
 
   useEffect(() => {
     if (!isInitialized) return;
 
-    const unsubscribe = notificationService.onMessage((message) => {
-      if (message.type === 'navigation' && message.data) {
-        handleNotificationNavigation(message.data);
+    // Create navigation handler
+    const handleNotificationNavigation = (data) => {
+      if (!data) return;
+      
+      const { route, expenseId, userId, screen } = data;
+      
+      try {
+        switch (route) {
+          case 'expense':
+            if (expenseId) {
+              navigation.navigate('Home', {
+                screen: 'ExpenseSettings',
+                params: { expenseId }
+              });
+            }
+            break;
+          case 'friend':
+            if (userId) {
+              navigation.navigate('Profile', {
+                screen: 'FriendProfile',
+                params: { userId }
+              });
+            }
+            break;
+          case 'settle':
+            navigation.navigate('Home', {
+              screen: 'SettleUp'
+            });
+            break;
+          case 'profile':
+            navigation.navigate('Profile');
+            break;
+          case 'home':
+            navigation.navigate('Home');
+            break;
+          default:
+            if (screen) {
+              navigation.navigate(screen);
+            }
+            break;
+        }
+      } catch (error) {
+        console.error('Failed to navigate from notification:', error);
+      }
+    };
+
+    // Update notification service with navigation handler
+    expoNotificationService.setNavigationHandler(handleNotificationNavigation);
+
+    // Check for notification that opened the app
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) {
+        const data = response.notification.request.content.data;
+        if (data) {
+          handleNotificationNavigation(data);
+        }
       }
     });
-
-    return unsubscribe;
   }, [isInitialized, navigation]);
-
-  const handleNotificationNavigation = (data) => {
-    const { route, expenseId, userId, screen } = data;
-    
-    try {
-      switch (route) {
-        case 'expense':
-          if (expenseId) {
-            navigation.navigate('Home', {
-              screen: 'ExpenseSettings',
-              params: { expenseId }
-            });
-          }
-          break;
-        case 'friend':
-          if (userId) {
-            navigation.navigate('Profile', {
-              screen: 'FriendProfile',
-              params: { userId }
-            });
-          }
-          break;
-        case 'settle':
-          navigation.navigate('Home', {
-            screen: 'SettleUp'
-          });
-          break;
-        case 'profile':
-          navigation.navigate('Profile');
-          break;
-        case 'home':
-          navigation.navigate('Home');
-          break;
-        default:
-          if (screen) {
-            navigation.navigate(screen);
-          }
-          break;
-      }
-    } catch (error) {
-      console.error('Failed to navigate from notification:', error);
-    }
-  };
 
   return null;
 };
@@ -197,7 +206,7 @@ const MainTabs = () => {
     const routeName = getFocusedRouteNameFromRoute(route);
     const hiddenRoutes = [
       'AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 
-      'NotificationSettings', 'VenmoTest', 'FriendProfile', 'Settings',
+      'NotificationTest', 'VenmoTest', 'FriendProfile', 'Settings',
       'ProfileSettings', 'TermsOfService'
     ];
 
@@ -270,8 +279,6 @@ const MainTabs = () => {
         ref={bottomSheetRef}
         navigation={navigation}
       />
-      
-      <NotificationNavigationHandler />
       
       {isReceiptScanning && (
         <View style={[StyleSheet.absoluteFillObject, { zIndex: 1000, backgroundColor: 'white' }]} />
@@ -395,6 +402,7 @@ export default function App() {
                 <ReceiptScanningProvider>
                   {user ? <MainTabs /> : <AuthStack />}
                   <ExpenseJoinHandler />
+                  {user && <NotificationNavigationSetup />}
                 </ReceiptScanningProvider>
               </NotificationProvider>
             </ExpenseDataProvider>

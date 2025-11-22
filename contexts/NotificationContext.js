@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
-import notificationService from '../services/notificationService';
+import expoNotificationService from '../services/expoNotificationService';
 import { getCurrentUser } from '../services/authService';
 
 const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
   const [isInitialized, setIsInitialized] = useState(false);
-  const [fcmToken, setFcmToken] = useState(null);
+  const [expoPushToken, setExpoPushToken] = useState(null);
   const [notificationPreferences, setNotificationPreferences] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUser, setCurrentUser] = useState(null);
@@ -19,18 +19,20 @@ export const NotificationProvider = ({ children }) => {
         const user = getCurrentUser();
         if (user) {
           setCurrentUser(user);
-          await notificationService.initialize(user.uid);
-          setFcmToken(notificationService.getToken());
+          await expoNotificationService.initialize(user.uid);
+          setExpoPushToken(expoNotificationService.getToken());
           setIsInitialized(true);
           
           // Load user preferences
-          const preferences = await notificationService.getUserNotificationPreferences(user.uid);
+          const preferences = await expoNotificationService.getUserNotificationPreferences(user.uid);
           setNotificationPreferences(preferences);
         } else {
           setCurrentUser(null);
           setIsInitialized(false);
-          setFcmToken(null);
+          setExpoPushToken(null);
           setNotificationPreferences(null);
+          // Cleanup listeners when user logs out
+          expoNotificationService.cleanupListeners();
         }
       } catch (error) {
         console.error('Failed to initialize notifications:', error);
@@ -43,60 +45,41 @@ export const NotificationProvider = ({ children }) => {
     initializeNotifications();
   }, []);
 
-  // Set up message handlers
+  // Set up notification listeners
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || !currentUser) return;
 
-    const unsubscribe = notificationService.onMessage((message) => {
-      if (message.type === 'navigation') {
-        // Handle navigation from notification tap
-        handleNotificationNavigation(message);
-      } else {
-        // Handle foreground message
-        handleForegroundMessage(message);
+    const cleanup = expoNotificationService.setupListeners(
+      // Notification received handler
+      (notification) => {
+        console.log('Notification received in context:', notification);
+        // Increment unread count
+        setUnreadCount(prev => prev + 1);
+        
+        // Show alert for foreground notifications (optional - Expo handles this automatically)
+        // You can customize this behavior
+      },
+      // Notification response handler (when user taps notification)
+      (response) => {
+        console.log('Notification tapped:', response);
+        const { notification } = response;
+        const data = notification.request.content.data;
+        
+        // Navigation will be handled by the navigation handler set in App.js
+        if (data) {
+          expoNotificationService.handleNotificationResponse(data);
+        }
       }
-    });
+    );
 
-    return unsubscribe;
-  }, [isInitialized]);
-
-  const handleNotificationNavigation = useCallback((message) => {
-    const { data } = message;
-    
-    if (data && data.route) {
-      // This will be handled by the navigation system
-      // The actual navigation logic will be implemented in App.js
-      console.log('Navigation requested:', data.route, data);
-    }
-  }, []);
-
-  const handleForegroundMessage = useCallback((message) => {
-    const { notification, data } = message;
-    
-    // Show alert for foreground messages
-    if (notification) {
-      Alert.alert(
-        notification.title || 'New Notification',
-        notification.body || 'You have a new notification',
-        [
-          { text: 'Dismiss', style: 'cancel' },
-          { 
-            text: 'View', 
-            onPress: () => handleNotificationNavigation(message)
-          }
-        ]
-      );
-    }
-    
-    // Increment unread count
-    setUnreadCount(prev => prev + 1);
-  }, []);
+    return cleanup;
+  }, [isInitialized, currentUser]);
 
   const updateNotificationPreferences = useCallback(async (preferences) => {
     if (!currentUser) return;
     
     try {
-      await notificationService.updateUserNotificationPreferences(currentUser.uid, preferences);
+      await expoNotificationService.updateUserNotificationPreferences(currentUser.uid, preferences);
       setNotificationPreferences(preferences);
     } catch (error) {
       console.error('Failed to update notification preferences:', error);
@@ -108,7 +91,7 @@ export const NotificationProvider = ({ children }) => {
     if (!currentUser) return;
     
     try {
-      const result = await notificationService.sendTestNotification(currentUser.uid);
+      const result = await expoNotificationService.sendTestNotification(currentUser.uid);
       Alert.alert('Success', result.message || 'Test notification sent!');
     } catch (error) {
       console.error('Failed to send test notification:', error);
@@ -118,8 +101,17 @@ export const NotificationProvider = ({ children }) => {
 
   const sendNotificationToUser = useCallback(async (targetUserId, title, body, data = {}) => {
     try {
-      const result = await notificationService.sendNotificationToUser(targetUserId, title, body, data);
-      return result;
+      const { getFunctions, httpsCallable } = require('@react-native-firebase/functions');
+      const functions = getFunctions();
+      const sendNotificationToUser = httpsCallable(functions, 'sendNotificationToUser');
+      
+      const result = await sendNotificationToUser({
+        targetUserId,
+        title,
+        body,
+        data
+      });
+      return result.data;
     } catch (error) {
       console.error('Failed to send notification to user:', error);
       throw error;
@@ -130,7 +122,7 @@ export const NotificationProvider = ({ children }) => {
     if (!currentUser) return false;
     
     try {
-      return await notificationService.shouldReceiveNotification(currentUser.uid, type);
+      return await expoNotificationService.shouldReceiveNotification(currentUser.uid, type);
     } catch (error) {
       console.error('Failed to check notification preferences:', error);
       return true; // Default to allowing notifications on error
@@ -145,16 +137,16 @@ export const NotificationProvider = ({ children }) => {
     if (!currentUser) return;
     
     try {
-      const newToken = await notificationService.getFCMToken(currentUser.uid);
-      setFcmToken(newToken);
+      await expoNotificationService.initialize(currentUser.uid);
+      setExpoPushToken(expoNotificationService.getToken());
     } catch (error) {
-      console.error('Failed to refresh FCM token:', error);
+      console.error('Failed to refresh Expo push token:', error);
     }
   }, [currentUser]);
 
   const checkNotificationPermissions = useCallback(async () => {
     try {
-      return await notificationService.areNotificationsEnabled();
+      return await expoNotificationService.areNotificationsEnabled();
     } catch (error) {
       console.error('Failed to check notification permissions:', error);
       return false;
@@ -164,7 +156,7 @@ export const NotificationProvider = ({ children }) => {
   const value = {
     // State
     isInitialized,
-    fcmToken,
+    expoPushToken,
     notificationPreferences,
     unreadCount,
     currentUser,
@@ -179,7 +171,7 @@ export const NotificationProvider = ({ children }) => {
     checkNotificationPermissions,
     
     // Default preferences
-    getDefaultPreferences: notificationService.getDefaultPreferences
+    getDefaultPreferences: expoNotificationService.getDefaultPreferences
   };
 
   return (

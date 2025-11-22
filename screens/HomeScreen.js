@@ -515,11 +515,16 @@ const styles = StyleSheet.create({
   receiptCard: {
     backgroundColor: Colors.surface,
     borderWidth: 1.5,
-    borderColor: Colors.blue + '30',
+    borderColor: Colors.blue + '40',
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
-    ...Shadows.card,
+    // Cyberpunk blue glow effect - subtle circular glow
+    shadowColor: '#00D4FF', // Bright cyan-blue for cyberpunk feel
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25, // Faint glow
+    shadowRadius: 16, // Larger radius for more circular glow
+    elevation: 6, // Android elevation with glow
     overflow: 'hidden',
   },
   expenseHeader: {

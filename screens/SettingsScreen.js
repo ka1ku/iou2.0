@@ -15,11 +15,13 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
 import { signOutUser, getCurrentUser } from '../services/authService';
 import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ChangeVenmoBottomSheet from '../components/ChangeVenmoBottomSheet';
 
 const SettingsScreen = ({ navigation }) => {
   const { userProfile } = useExpenseData();
+  const { sendTestNotification, expoPushToken } = useNotifications();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingFunction, setLoadingFunction] = useState(null);
   const changeVenmoBottomSheetRef = useRef(null);
@@ -83,8 +85,8 @@ const SettingsScreen = ({ navigation }) => {
     setLoadingFunction('testNotification');
     try {
       const functions = getFunctions();
-      const sendTestNotification = httpsCallable(functions, 'sendTestNotification');
-      const result = await sendTestNotification();
+      const sendExpoTestNotification = httpsCallable(functions, 'sendExpoTestNotification');
+      const result = await sendExpoTestNotification();
       Alert.alert('Success', result.data.message || 'Test notification sent successfully!');
     } catch (error) {
       console.error('Error sending test notification:', error);
@@ -93,6 +95,24 @@ const SettingsScreen = ({ navigation }) => {
     } finally {
       setIsLoading(false);
       setLoadingFunction(null);
+    }
+  };
+
+  const handleSendTestNotificationViaContext = async () => {
+    if (!expoPushToken) {
+      Alert.alert(
+        'No Push Token',
+        'Push token not available. Please make sure you\'re on a physical device and have granted notification permissions.'
+      );
+      return;
+    }
+
+    try {
+      await sendTestNotification();
+      // The context method already shows an alert
+    } catch (error) {
+      console.error('Error sending test notification via context:', error);
+      Alert.alert('Error', 'Failed to send test notification');
     }
   };
 
@@ -249,16 +269,6 @@ const SettingsScreen = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.settingItem}
-              onPress={() => navigation.navigate('Profile', {
-                screen: 'NotificationSettings'
-              })}
-            >
-              <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Notifications</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
               onPress={() => changeVenmoBottomSheetRef.current?.open()}
             >
               <Ionicons name="card-outline" size={24} color={Colors.textSecondary} />
@@ -296,15 +306,38 @@ const SettingsScreen = ({ navigation }) => {
           <View style={styles.settingsList}>
             <TouchableOpacity 
               style={styles.settingItem}
+              onPress={() => navigation.navigate('Profile', {
+                screen: 'NotificationTest'
+              })}
+            >
+              <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Test Notifications (Expo)</Text>
+              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.settingItem}
               onPress={handleSendTestNotification}
               disabled={isLoading}
             >
-              <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Send Test Notification</Text>
+              <Ionicons name="send-outline" size={24} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Send Test Notification (Cloud Function)</Text>
               {isLoading && loadingFunction === 'testNotification' ? (
                 <LoadingSpinner size="small" />
               ) : (
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.settingItem}
+              onPress={handleSendTestNotificationViaContext}
+              disabled={!expoPushToken}
+            >
+              <Ionicons name="paper-plane-outline" size={24} color={Colors.textSecondary} />
+              <Text style={styles.settingText}>Send Test (Via Context)</Text>
+              {expoPushToken ? (
+                <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
+              ) : (
+                <Ionicons name="close-circle" size={20} color={Colors.danger} />
               )}
             </TouchableOpacity>
             <TouchableOpacity 

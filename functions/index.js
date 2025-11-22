@@ -4,6 +4,9 @@ const algoliasearch = require('algoliasearch');
 
 admin.initializeApp();
 
+// Expo Push Notification API endpoint
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
 const algoliaClient = algoliasearch('I0T07P5NB6', 'fb4e3327d2030d4c281cdc6fa64f7984');
 const usersIndex = algoliaClient.initIndex('users');
 const expensesIndex = algoliaClient.initIndex('expenses');
@@ -218,7 +221,47 @@ exports.syncExpenseToAlgolia = functions.firestore
     }
   });
 
-exports.sendTestNotification = functions.https.onCall(async (data, context) => {
+// Helper function to send Expo push notifications
+async function sendExpoPushNotification(pushToken, title, body, data = {}) {
+  try {
+    const message = {
+      to: pushToken,
+      sound: 'default',
+      title: title,
+      body: body,
+      data: {
+        ...data,
+        timestamp: Date.now().toString(),
+      },
+      badge: 1,
+    };
+
+    const response = await fetch(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Accept-encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+
+    const result = await response.json();
+    
+    if (result.data && result.data.status === 'ok') {
+      return { success: true, id: result.data.id };
+    } else {
+      console.error('Expo push notification failed:', result);
+      return { success: false, error: result };
+    }
+  } catch (error) {
+    console.error('Error sending Expo push notification:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Send Expo test notification
+exports.sendExpoTestNotification = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
@@ -233,36 +276,42 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
     }
 
     const userData = userDoc.data();
-    const fcmToken = userData.fcmToken;
+    const expoPushToken = userData.expoPushToken;
 
-    if (!fcmToken) {
-      throw new functions.https.HttpsError('failed-precondition', 'FCM token not found');
+    if (!expoPushToken) {
+      throw new functions.https.HttpsError('failed-precondition', 'Expo push token not found');
     }
 
-    const message = {
-      notification: {
-        title: 'Test Push Notification',
-        body: 'This is a test push notification from IOU App! 🎉',
-      },
-      data: {
+    const result = await sendExpoPushNotification(
+      expoPushToken,
+      'Test Push Notification',
+      'This is a test push notification from IOU App! 🎉',
+      {
         type: 'test_notification',
-        timestamp: Date.now().toString(),
         route: 'Profile',
-      },
-      token: fcmToken,
-    };
+      }
+    );
 
-    const response = await admin.messaging().send(message);
-
-    return {
-      success: true,
-      messageId: response,
-      message: 'Test push notification sent successfully!'
-    };
+    if (result.success) {
+      return {
+        success: true,
+        messageId: result.id,
+        message: 'Test push notification sent successfully!'
+      };
+    } else {
+      throw new functions.https.HttpsError('internal', 'Failed to send notification: ' + (result.error || 'Unknown error'));
+    }
 
   } catch (error) {
-    throw new functions.https.HttpsError('internal', 'Failed to send test notification');
+    console.error('Error sending test notification:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to send test notification: ' + error.message);
   }
+});
+
+// Legacy FCM test notification (kept for backwards compatibility)
+exports.sendTestNotification = functions.https.onCall(async (data, context) => {
+  // Redirect to Expo test notification
+  return exports.sendExpoTestNotification(data, context);
 });
 
 exports.sendNotificationToUser = functions.https.onCall(async (data, context) => {
@@ -284,51 +333,49 @@ exports.sendNotificationToUser = functions.https.onCall(async (data, context) =>
     }
 
     const userData = userDoc.data();
-    const fcmToken = userData.fcmToken;
+    const expoPushToken = userData.expoPushToken;
 
-    if (!fcmToken) {
-      throw new functions.https.HttpsError('failed-precondition', 'Target user has no FCM token');
+    if (!expoPushToken) {
+      throw new functions.https.HttpsError('failed-precondition', 'Target user has no Expo push token');
     }
 
-    const message = {
-      notification: {
-        title,
-        body,
-      },
-      data: {
-        ...notificationData,
-        timestamp: Date.now().toString(),
-      },
-      token: fcmToken,
-    };
+    const result = await sendExpoPushNotification(
+      expoPushToken,
+      title,
+      body,
+      notificationData || {}
+    );
 
-    const response = await admin.messaging().send(message);
-
-    return {
-      success: true,
-      messageId: response,
-      message: 'Notification sent successfully!'
-    };
+    if (result.success) {
+      return {
+        success: true,
+        messageId: result.id,
+        message: 'Notification sent successfully!'
+      };
+    } else {
+      throw new functions.https.HttpsError('internal', 'Failed to send notification: ' + (result.error || 'Unknown error'));
+    }
 
   } catch (error) {
-    throw new functions.https.HttpsError('internal', 'Failed to send notification');
+    console.error('Error sending notification:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to send notification: ' + error.message);
   }
 });
 
 // Helper function to send notifications to multiple users
 async function sendNotificationsToUsers(userIds, title, body, notificationData = {}) {
-  const batch = admin.firestore().batch();
-  const messages = [];
+  const notifications = [];
+  const db = admin.firestore();
 
   for (const userId of userIds) {
     try {
-      const userDoc = await admin.firestore().collection('users').doc(userId).get();
+      const userDoc = await db.collection('users').doc(userId).get();
       
       if (userDoc.exists) {
         const userData = userDoc.data();
-        const fcmToken = userData.fcmToken;
+        const expoPushToken = userData.expoPushToken;
         
-        if (fcmToken) {
+        if (expoPushToken) {
           // Check user notification preferences
           const preferences = userData.notificationPreferences || {
             expenses: true,
@@ -339,18 +386,41 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
           
           const notificationType = notificationData.type || 'expenses';
           
+          // Check if user wants to receive this type of notification
           if (preferences[notificationType] !== false) {
-            messages.push({
-              notification: {
+            // Check do not disturb
+            let shouldSend = true;
+            if (preferences.doNotDisturb && preferences.doNotDisturb.enabled) {
+              const now = new Date();
+              const currentTime = now.getHours() * 60 + now.getMinutes();
+              
+              const [startHour, startMin] = preferences.doNotDisturb.start.split(':').map(Number);
+              const [endHour, endMin] = preferences.doNotDisturb.end.split(':').map(Number);
+              
+              const startTime = startHour * 60 + startMin;
+              const endTime = endHour * 60 + endMin;
+              
+              if (startTime > endTime) {
+                // Overnight DND
+                if (currentTime >= startTime || currentTime <= endTime) {
+                  shouldSend = false;
+                }
+              } else {
+                // Same day DND
+                if (currentTime >= startTime && currentTime <= endTime) {
+                  shouldSend = false;
+                }
+              }
+            }
+            
+            if (shouldSend) {
+              notifications.push({
+                token: expoPushToken,
                 title,
                 body,
-              },
-              data: {
-                ...notificationData,
-                timestamp: Date.now().toString(),
-              },
-              token: fcmToken,
-            });
+                data: notificationData
+              });
+            }
           }
         }
       }
@@ -359,18 +429,67 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
     }
   }
 
-  if (messages.length > 0) {
+  if (notifications.length === 0) {
+    return { successCount: 0, failureCount: 0 };
+  }
+
+  // Send notifications in batches (Expo recommends batching)
+  const batchSize = 100;
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (let i = 0; i < notifications.length; i += batchSize) {
+    const batch = notifications.slice(i, i + batchSize);
+    
     try {
-      const response = await admin.messaging().sendAll(messages);
-      console.log(`Successfully sent ${response.successCount} notifications`);
-      return response;
+      // Send batch to Expo
+      const messages = batch.map(notif => ({
+        to: notif.token,
+        sound: 'default',
+        title: notif.title,
+        body: notif.body,
+        data: {
+          ...notif.data,
+          timestamp: Date.now().toString(),
+        },
+        badge: 1,
+      }));
+
+      const response = await fetch(EXPO_PUSH_URL, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Accept-encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messages),
+      });
+
+      const result = await response.json();
+      
+      if (Array.isArray(result.data)) {
+        result.data.forEach((item, index) => {
+          if (item.status === 'ok') {
+            successCount++;
+          } else {
+            failureCount++;
+            console.error(`Failed to send notification ${i + index}:`, item);
+          }
+        });
+      } else if (result.data && result.data.status === 'ok') {
+        successCount += batch.length;
+      } else {
+        failureCount += batch.length;
+        console.error('Batch notification failed:', result);
+      }
     } catch (error) {
-      console.error('Failed to send batch notifications:', error);
-      throw error;
+      console.error('Error sending batch notifications:', error);
+      failureCount += batch.length;
     }
   }
-  
-  return { successCount: 0, failureCount: 0 };
+
+  console.log(`Sent ${successCount} notifications successfully, ${failureCount} failed`);
+  return { successCount, failureCount };
 }
 
 // Trigger: New expense created

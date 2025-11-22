@@ -670,157 +670,156 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
           {/* Tips & Fees Section */}
           <View style={styles.addFeesSection}>
             <View style={styles.sectionHeaderRow}>
-              <Ionicons name="cash-outline" size={20} color={Colors.accent} />
-              <Text style={styles.addFeesTitle}>Add Tips & Fees</Text>
+              <View style={styles.sectionIconContainer}>
+                <Ionicons name="pricetags" size={16} color={Colors.white} />
+              </View>
+              <Text style={styles.addFeesTitle}>Extra Charges</Text>
             </View>
             
-            {/* Unified Custom Fee/Tip Input */}
-            <View style={styles.customFeeContainer}>
-              <Text style={styles.sectionLabel}>Add Custom Fee or Tip</Text>
-              
-              {/* Fee Type Selector */}
-              <View style={styles.feeTypeSelector}>
-                {['Tip', 'Tax', 'Service', 'Custom'].map((type) => (
+            {/* Fee Type Selector - Premium Segmented Style */}
+            <View style={styles.feeTypeContainer}>
+              {['Tip', 'Tax', 'Service', 'Custom'].map((type) => {
+                const isSelected = selectedFeeType === type;
+                let iconName = 'cash-outline';
+                if (type === 'Tax') iconName = 'receipt-outline';
+                if (type === 'Service') iconName = 'people-outline';
+                if (type === 'Custom') iconName = 'create-outline';
+
+                return (
                   <TouchableOpacity
                     key={type}
                     style={[
-                      styles.feeTypeChip,
-                      selectedFeeType === type && styles.feeTypeChipSelected
+                      styles.feeTypeButton,
+                      isSelected && styles.feeTypeButtonSelected
                     ]}
                     onPress={() => setSelectedFeeType(type)}
                     activeOpacity={0.7}
                   >
+                    <Ionicons 
+                      name={iconName} 
+                      size={20} 
+                      color={isSelected ? Colors.accent : Colors.textSecondary} 
+                    />
                     <Text style={[
-                      styles.feeTypeChipText,
-                      selectedFeeType === type && styles.feeTypeChipTextSelected
+                      styles.feeTypeLabel,
+                      isSelected && styles.feeTypeLabelSelected
                     ]}>
                       {type}
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
+                );
+              })}
+            </View>
 
-              {/* Custom Name Input (only for Custom type) */}
+            {/* Input Area */}
+            <View style={styles.feeInputCard}>
+              {/* Custom Name Input */}
               {selectedFeeType === 'Custom' && (
-                <TextInput
-                  style={styles.customNameInput}
-                  placeholder="Fee name (e.g., Corkage)"
-                  placeholderTextColor="#B8B8B8"
-                  value={customFeeName}
-                  onChangeText={setCustomFeeName}
-                  returnKeyType="next"
-                  keyboardType="default"
-                  autoCorrect={false}
-                />
+                <View style={styles.customNameContainer}>
+                  <Text style={styles.inputLabel}>Fee Name</Text>
+                  <TextInput
+                    style={styles.premiumInput}
+                    placeholder="e.g. Corkage Fee"
+                    placeholderTextColor={Colors.textSecondary}
+                    value={customFeeName}
+                    onChangeText={setCustomFeeName}
+                    autoCorrect={false}
+                  />
+                </View>
               )}
 
-              {/* Amount Input Row */}
-              <View style={styles.customFeeRow}>
-                <View style={styles.customFeeInputWrapper}>
-                  <Text style={styles.customFeePrefix}>
-                    {customFeeMode === 'percentage' ? '' : '$'}
+              <Text style={styles.inputLabel}>
+                {selectedFeeType === 'Tip' ? 'Tip Amount' : 'Amount'}
+              </Text>
+              
+              <View style={styles.amountInputRow}>
+                <View style={styles.amountInputWrapper}>
+                  <Text style={styles.currencyPrefix}>
+                    {customFeeMode === 'fixed' ? '$' : ''}
                   </Text>
                   <TextInput
-                    style={styles.customFeeInput}
-                    placeholder={customFeeMode === 'percentage' ? '10' : '5.00'}
-                    placeholderTextColor="#B8B8B8"
+                    style={styles.largeAmountInput}
+                    placeholder="0.00"
+                    placeholderTextColor={Colors.textSecondary + '40'}
                     keyboardType="decimal-pad"
                     value={customFeeInput}
                     onChangeText={setCustomFeeInput}
-                    returnKeyType="next"
-                    blurOnSubmit={false}
+                    returnKeyType="done"
                   />
-                  <Text style={styles.customFeeSuffix}>
+                  <Text style={styles.currencySuffix}>
                     {customFeeMode === 'percentage' ? '%' : ''}
                   </Text>
                 </View>
-                
-                <View style={styles.modeSwitchContainer}>
+
+                {/* Type Toggle */}
+                <View style={styles.toggleContainer}>
                   <TouchableOpacity 
-                    style={[
-                      styles.modeSwitchOption,
-                      customFeeMode === 'percentage' && styles.modeSwitchOptionActive
-                    ]}
-                    onPress={() => {
-                      setCustomFeeMode('percentage');
-                      setCustomFeeInput('');
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[
-                      styles.modeSwitchLabel,
-                      customFeeMode === 'percentage' && styles.modeSwitchLabelActive
-                    ]}>
-                      %
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[
-                      styles.modeSwitchOption,
-                      customFeeMode === 'fixed' && styles.modeSwitchOptionActive
-                    ]}
+                    style={[styles.toggleBtn, customFeeMode === 'fixed' && styles.toggleBtnActive]}
                     onPress={() => {
                       setCustomFeeMode('fixed');
                       setCustomFeeInput('');
                     }}
-                    activeOpacity={0.7}
                   >
-                    <Text style={[
-                      styles.modeSwitchLabel,
-                      customFeeMode === 'fixed' && styles.modeSwitchLabelActive
-                    ]}>
-                      $
-                    </Text>
+                    <Text style={[styles.toggleText, customFeeMode === 'fixed' && styles.toggleTextActive]}>$</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.toggleBtn, customFeeMode === 'percentage' && styles.toggleBtnActive]}
+                    onPress={() => {
+                      setCustomFeeMode('percentage');
+                      setCustomFeeInput('');
+                    }}
+                  >
+                    <Text style={[styles.toggleText, customFeeMode === 'percentage' && styles.toggleTextActive]}>%</Text>
                   </TouchableOpacity>
                 </View>
-                
-                <TouchableOpacity 
-                  style={[
-                    styles.addCustomButton,
-                    (!customFeeInput || parseFloat(customFeeInput) <= 0 || 
-                    (selectedFeeType === 'Custom' && !customFeeName.trim())) && styles.addCustomButtonDisabled
-                  ]}
-                  onPress={handleCustomFeeAdd}
-                  disabled={!customFeeInput || parseFloat(customFeeInput) <= 0 || 
-                    (selectedFeeType === 'Custom' && !customFeeName.trim())}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="add" size={20} color={Colors.white} />
-                </TouchableOpacity>
               </View>
+
+              <TouchableOpacity 
+                style={[
+                  styles.addFeeButton,
+                  (!customFeeInput || parseFloat(customFeeInput) <= 0 || 
+                  (selectedFeeType === 'Custom' && !customFeeName.trim())) && styles.addFeeButtonDisabled
+                ]}
+                onPress={handleCustomFeeAdd}
+                disabled={!customFeeInput || parseFloat(customFeeInput) <= 0 || 
+                  (selectedFeeType === 'Custom' && !customFeeName.trim())}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add" size={20} color={Colors.white} />
+                <Text style={styles.addFeeButtonText}>Add {selectedFeeType}</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Added Fees List */}
             {state.fees.length > 0 && (
-              <View style={styles.addedFeesContainer}>
-                <Text style={styles.sectionLabel}>Current Fees & Tips</Text>
+              <View style={styles.addedFeesList}>
                 {state.fees.map((fee, index) => (
                   <View key={fee.id} style={[
-                    styles.compactFeeItem,
-                    newlyAddedFee === fee.id && styles.compactFeeItemHighlighted
+                    styles.feeRow,
+                    newlyAddedFee === fee.id && styles.feeRowHighlighted
                   ]}>
-                    <View style={styles.compactFeeLeft}>
+                    <View style={styles.feeIconCircle}>
                       <Ionicons 
-                        name={fee.type === 'percentage' ? 'cash-outline' : 'receipt-outline'} 
-                        size={16} 
-                        color={fee.type === 'percentage' ? Colors.accent : Colors.textSecondary} 
+                        name={fee.type === 'percentage' ? 'pricetag' : 'cash'} 
+                        size={14} 
+                        color={Colors.accent} 
                       />
-                      <Text style={styles.compactFeeName}>
-                        {fee.name}
+                    </View>
+                    <View style={styles.feeInfo}>
+                      <Text style={styles.feeName}>{fee.name}</Text>
+                      <Text style={styles.feeSubtitle}>
+                        {fee.type === 'percentage' ? `${(fee.percentage * 100).toFixed(0)}%` : 'Fixed amount'}
                       </Text>
                     </View>
-                    <View style={styles.compactFeeRight}>
-                      <Text style={styles.compactFeeAmount}>
-                        ${(parseFloat(fee.amount) || 0).toFixed(2)}
-                      </Text>
-                      <TouchableOpacity 
-                        onPress={() => handleRemoveFee(index)} 
-                        style={styles.compactFeeRemove}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <Ionicons name="close-circle-outline" size={20} color={Colors.textSecondary} />
-                      </TouchableOpacity>
-                    </View>
+                    <Text style={styles.feeAmount}>
+                      +${(parseFloat(fee.amount) || 0).toFixed(2)}
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => handleRemoveFee(index)} 
+                      style={styles.removeFeeBtn}
+                    >
+                      <Ionicons name="close" size={16} color={Colors.textSecondary} />
+                    </TouchableOpacity>
                   </View>
                 ))}
               </View>
@@ -901,198 +900,222 @@ const styles = StyleSheet.create({
   },
   // Tips & Fees Section Styles
   addFeesSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    marginHorizontal: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.divider,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.xxl,
+    paddingHorizontal: Spacing.lg,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
     marginBottom: Spacing.md,
+  },
+  sectionIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
   },
   addFeesTitle: {
-    ...Typography.body1,
+    fontSize: 16,
+    fontFamily: Typography.familyBold,
     color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
-  },
-  sectionLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    fontFamily: Typography.familySemiBold,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  customFeeContainer: {
-    marginBottom: Spacing.sm,
-  },
-  feeTypeSelector: {
+  
+  // Fee Type Selector
+  feeTypeContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  feeTypeButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  feeTypeButtonSelected: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.brandLight,
+  },
+  feeTypeLabel: {
+    ...Typography.caption,
+    marginTop: Spacing.xs,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  feeTypeLabelSelected: {
+    color: Colors.accentDark,
+  },
+
+  // Input Card
+  feeInputCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  customNameContainer: {
     marginBottom: Spacing.md,
   },
-  feeTypeChip: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.pill,
-    backgroundColor: Colors.background,
-    borderWidth: 1.5,
-    borderColor: Colors.divider,
-  },
-  feeTypeChipSelected: {
-    backgroundColor: `${Colors.accent}20`,
-    borderColor: Colors.accent,
-  },
-  feeTypeChipText: {
-    ...Typography.label,
+  inputLabel: {
+    ...Typography.caption,
     color: Colors.textSecondary,
-    fontFamily: Typography.familySemiBold,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    fontSize: 10,
   },
-  feeTypeChipTextSelected: {
-    color: Colors.accent,
-    fontFamily: Typography.familyBold,
-  },
-  customNameInput: {
-    ...Typography.body1,
+  premiumInput: {
     backgroundColor: Colors.background,
     borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.divider,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
-    color: Colors.textPrimary,
+    fontSize: 14,
     fontFamily: Typography.familyMedium,
-    marginBottom: Spacing.md,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
-  customFeeRow: {
+  amountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
   },
-  customFeeInputWrapper: {
+  amountInputWrapper: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.background,
     borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.divider,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-  },
-  customFeePrefix: {
-    ...Typography.body1,
-    color: '#B8B8B8',
-    fontFamily: Typography.familySemiBold,
-    marginRight: Spacing.xs,
-  },
-  customFeeInput: {
-    ...Typography.body1,
-    flex: 1,
-    color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
-    padding: 0,
-    minHeight: 24,
-  },
-  customFeeSuffix: {
-    ...Typography.body1,
-    color: '#B8B8B8',
-    fontFamily: Typography.familySemiBold,
-    marginLeft: Spacing.xs,
-  },
-  modeSwitchContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.background,
-    borderRadius: Radius.pill,
+    height: 50,
     borderWidth: 1,
     borderColor: Colors.divider,
-    padding: 2,
   },
-  modeSwitchOption: {
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.pill,
-    justifyContent: 'center',
+  currencyPrefix: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginRight: 4,
+  },
+  currencySuffix: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginLeft: 4,
+  },
+  largeAmountInput: {
+    flex: 1,
+    fontSize: 20,
+    fontFamily: Typography.familyBold,
+    color: Colors.textPrimary,
+    height: '100%',
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+  },
+  toggleBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
-    minWidth: 36,
+    justifyContent: 'center',
+    borderRadius: Radius.sm,
   },
-  modeSwitchOptionActive: {
+  toggleBtnActive: {
     backgroundColor: Colors.accent,
   },
-  modeSwitchLabel: {
-    fontSize: 14,
+  toggleText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: Colors.textSecondary,
-    fontFamily: Typography.familyBold,
   },
-  modeSwitchLabelActive: {
+  toggleTextActive: {
     color: Colors.white,
   },
-  addCustomButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.pill,
-    padding: Spacing.xs,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 36,
-    height: 36,
-  },
-  addCustomButtonDisabled: {
-    backgroundColor: Colors.textSecondary,
-    opacity: 0.4,
-  },
-  addedFeesContainer: {
-    marginTop: Spacing.sm,
-  },
-  compactFeeItem: {
+  addFeeButton: {
+    backgroundColor: Colors.textPrimary,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Radius.md,
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  addFeeButtonDisabled: {
+    backgroundColor: Colors.divider,
+    opacity: 0.7,
+  },
+  addFeeButtonText: {
+    color: Colors.white,
+    fontFamily: Typography.familySemiBold,
+    fontSize: 14,
+  },
+
+  // Added Fees List
+  addedFeesList: {
+    marginTop: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  feeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
     padding: Spacing.md,
-    marginBottom: Spacing.sm,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.divider,
   },
-  compactFeeItemHighlighted: {
+  feeRowHighlighted: {
     borderColor: Colors.accent,
-    backgroundColor: `${Colors.accent}15`,
-    borderWidth: 1.5,
+    backgroundColor: Colors.brandLight,
   },
-  compactFeeLeft: {
-    flex: 1,
-    flexDirection: 'row',
+  feeIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.brandLight,
     alignItems: 'center',
-    gap: Spacing.sm,
+    justifyContent: 'center',
+    marginRight: Spacing.md,
   },
-  compactFeeName: {
-    ...Typography.body1,
-    color: Colors.textPrimary,
+  feeInfo: {
     flex: 1,
-    fontFamily: Typography.familySemiBold,
   },
-  compactFeeAmount: {
-    ...Typography.body1,
+  feeName: {
+    fontSize: 14,
+    fontFamily: Typography.familySemiBold,
     color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
-    minWidth: 80,
-    maxWidth: 120,
-    textAlign: 'right',
   },
-  compactFeeRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+  feeSubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
-  compactFeeRemove: {
-    marginLeft: Spacing.sm,
-    padding: Spacing.xs,
-    flexShrink: 0,
+  feeAmount: {
+    fontSize: 14,
+    fontFamily: Typography.familyBold,
+    color: Colors.textPrimary,
+    marginRight: Spacing.sm,
+  },
+  removeFeeBtn: {
+    padding: 4,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
   },
   // Totals Section Styles
   totalsContainer: {

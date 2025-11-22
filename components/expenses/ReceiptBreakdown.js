@@ -27,8 +27,9 @@ const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
   <TouchableOpacity
     style={[styles.chip, isSelected && styles.chipSelected]}
     onPress={onPress}
+    activeOpacity={0.7}
   >
-    <View>
+    <View style={styles.chipAvatarContainer}>
       {participant.profilePhoto ? (
         <Image source={{ uri: participant.profilePhoto }} style={styles.chipAvatar} contentFit="cover" transition={200} />
       ) : (
@@ -38,16 +39,15 @@ const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
       )}
       {isSelected && (
         <View style={styles.checkmarkOverlay}>
-           <Ionicons name="checkmark-circle" size={16} color={Colors.white} />
+           <Ionicons name="checkmark" size={10} color={Colors.white} />
         </View>
       )}
     </View>
-    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
-      {participant.name === 'Me' ? 'You' : participant.name}
+    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]} numberOfLines={1}>
+      {participant.name === 'Me' ? 'You' : participant.name.split(' ')[0]}
     </Text>
   </TouchableOpacity>
 ), (prevProps, nextProps) => {
-  // Custom comparison to prevent unnecessary re-renders
   return (
     prevProps.participant.id === nextProps.participant.id &&
     prevProps.participant.name === nextProps.participant.name &&
@@ -115,24 +115,29 @@ const ItemRow = memo(({
     onSave(index);
   }, [item.amount, index, onSave]);
 
-  // Animated styles for edit mode card - Slide down when opening, slide up when closing
+  // Animated styles for edit mode card
   const editCardAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: withTiming(isEditing ? 1 : 0, { duration: 300 }),
       transform: [
         { 
-          translateY: withTiming(isEditing ? 0 : -30, { duration: 300 })
+          translateY: withTiming(isEditing ? 0 : -10, { duration: 300 })
         }
       ],
     };
   }, [isEditing]);
 
-  // Animated styles for view mode - Fade in/out (stays in place)
+  // Animated styles for view mode
   const viewModeAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: withTiming(isEditing ? 0 : 1, { duration: 300 }),
     };
   }, [isEditing]);
+
+  // Get selected participants for view mode
+  const selectedParticipants = useMemo(() => {
+    return (item.selectedConsumers || []).map(idx => participants[idx]).filter(Boolean);
+  }, [item.selectedConsumers, participants]);
 
   // Render both modes and animate between them
   return (
@@ -141,104 +146,109 @@ const ItemRow = memo(({
       <Animated.View 
         style={[
           editCardAnimatedStyle,
-          { position: isEditing ? 'relative' : 'absolute', width: '100%' }
+          { position: isEditing ? 'relative' : 'absolute', width: '100%', zIndex: isEditing ? 10 : 0 }
         ]}
         pointerEvents={isEditing ? 'auto' : 'none'}
       >
         <View style={styles.editCard}>
-          {/* Item Name Input */}
-          <View style={styles.editField}>
-            <Text style={styles.editLabel}>Item Name</Text>
-            <TextInput
-              style={styles.editInput}
-              value={item.name || `Item ${index + 1}`}
-              onChangeText={(value) => onUpdate('item', index, 'name', value)}
-              placeholder="Enter item name"
-              keyboardType="default"
-              autoCorrect={false}
-            />
+          <View style={styles.editHeader}>
+            <Text style={styles.editTitle}>Edit Item</Text>
+            <TouchableOpacity onPress={() => onRemove(index)} style={styles.deleteIconBtn}>
+               <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+            </TouchableOpacity>
           </View>
 
-          {/* Price Input */}
-          <View style={styles.editField}>
-            <Text style={[styles.editLabel, (itemErrors.amount || localValidationErrors.amount) && styles.errorLabel]}>
-              Price{(itemErrors.amount || localValidationErrors.amount) && " *"}
+          <View style={styles.editFormRow}>
+            {/* Item Name Input */}
+            <View style={styles.editFieldFlex}>
+              <Text style={styles.editLabel}>Item Name</Text>
+              <TextInput
+                style={styles.editInput}
+                value={item.name || `Item ${index + 1}`}
+                onChangeText={(value) => onUpdate('item', index, 'name', value)}
+                placeholder="Enter item name"
+                keyboardType="default"
+                autoCorrect={false}
+              />
+            </View>
+
+            {/* Price Input */}
+            <View style={styles.editFieldFixed}>
+              <Text style={[styles.editLabel, (itemErrors.amount || localValidationErrors.amount) && styles.errorLabel]}>
+                Price
+              </Text>
+              <PriceInput
+                value={item.amount || 0}
+                onChangeText={(value) => {
+                  onUpdate('item', index, 'amount', value);
+                  if (onClearValidationError && parseFloat(value) > 0) {
+                    onClearValidationError(item.id, 'amount');
+                  }
+                  if (parseFloat(value) > 0) {
+                    setLocalValidationErrors(prev => ({ ...prev, amount: false }));
+                  }
+                }}
+                placeholder="0.00"
+                error={!!(itemErrors.amount || localValidationErrors.amount)}
+                style={styles.priceInputStyle}
+              />
+            </View>
+          </View>
+
+          {/* Participant Selection */}
+          <View style={styles.participantsSection}>
+            <Text style={[styles.editLabel, itemErrors.consumers && styles.errorLabel]}>
+              Split with
             </Text>
-            <PriceInput
-              value={item.amount || 0}
-              onChangeText={(value) => {
-                onUpdate('item', index, 'amount', value);
-                // Clear validation errors when user starts fixing
-                if (onClearValidationError && parseFloat(value) > 0) {
-                  onClearValidationError(item.id, 'amount');
-                }
-                if (parseFloat(value) > 0) {
-                  setLocalValidationErrors(prev => ({ ...prev, amount: false }));
-                }
-              }}
-              placeholder="0.00"
-              error={!!(itemErrors.amount || localValidationErrors.amount)}
-            />
+            <View style={[
+              styles.participantChipContainer,
+              itemErrors.consumers && styles.participantChipContainerError
+            ]}>
+              {participants.map((participant, pIndex) => {
+                const isSelected = item.selectedConsumers?.includes(pIndex);
+                return (
+                  <ParticipantChip
+                    key={participant.id}
+                    participant={participant}
+                    isSelected={isSelected}
+                    onPress={() => handleParticipantPress(pIndex)}
+                  />
+                );
+              })}
+            </View>
+            {itemErrors.consumers && (
+              <Text style={styles.errorHelperText}>
+                Select at least one person
+              </Text>
+            )}
           </View>
 
           {/* Action Buttons */}
           <View style={styles.editActions}>
             <TouchableOpacity
-              onPress={handleSaveClick}
-              style={[styles.editActionButton, styles.saveActionButton, styles.editActionButtonFirst]}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="checkmark" size={18} color={Colors.white} />
-              <Text style={styles.editActionText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               onPress={() => onCancel(item.id)}
               style={[styles.editActionButton, styles.cancelActionButton]}
               activeOpacity={0.8}
             >
-              <Ionicons name="close" size={18} color={Colors.textSecondary} />
               <Text style={styles.cancelActionText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => onRemove(index)}
-              style={[styles.editActionButton, styles.deleteActionButton]}
+              onPress={handleSaveClick}
+              style={[styles.editActionButton, styles.saveActionButton]}
               activeOpacity={0.8}
             >
-              <Ionicons name="trash" size={16} color={Colors.white} />
-              <Text style={styles.editActionText}>Delete</Text>
+              <Ionicons name="checkmark" size={18} color={Colors.white} style={{ marginRight: 4 }} />
+              <Text style={styles.editActionText}>Save Changes</Text>
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Participant Selection */}
-        <View style={[
-          styles.participantChipContainer,
-          itemErrors.consumers && styles.participantChipContainerError
-        ]}>
-          {participants.map((participant, pIndex) => {
-            const isSelected = item.selectedConsumers?.includes(pIndex);
-            return (
-              <ParticipantChip
-                key={participant.id}
-                participant={participant}
-                isSelected={isSelected}
-                onPress={() => handleParticipantPress(pIndex)}
-              />
-            );
-          })}
-        </View>
-        {itemErrors.consumers && (
-          <Text style={styles.errorHelperText}>
-            Please assign at least one person
-          </Text>
-        )}
       </Animated.View>
 
       {/* View Mode - Animated */}
       <Animated.View 
         style={[
           viewModeAnimatedStyle,
-          { position: isEditing ? 'absolute' : 'relative', width: '100%' }
+          { position: isEditing ? 'absolute' : 'relative', width: '100%', zIndex: isEditing ? 0 : 10 }
         ]}
         pointerEvents={isEditing ? 'none' : 'auto'}
       >
@@ -247,46 +257,57 @@ const ItemRow = memo(({
           onPress={() => onToggleEdit(item.id)}
           activeOpacity={0.6}
         >
-          <View style={styles.viewModeContent}>
-            <Text style={styles.viewModeName} numberOfLines={1}>
-              {item.name || `Item ${index + 1}`}
-            </Text>
-            <View style={styles.viewModeAmountContainer}>
+          <View style={styles.viewModeMain}>
+            <View style={styles.viewModeHeader}>
+              <Text style={styles.viewModeName} numberOfLines={1}>
+                {item.name || `Item ${index + 1}`}
+              </Text>
               <Text style={styles.viewModeAmount}>
                 ${(parseFloat(item.amount) || 0).toFixed(2)}
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} style={styles.chevronIcon} />
+            </View>
+            
+            <View style={styles.viewModeFooter}>
+              <View style={styles.assignedAvatars}>
+                {selectedParticipants.length > 0 ? (
+                  selectedParticipants.slice(0, 5).map((p, i) => (
+                    <View key={p.id} style={[styles.miniAvatarContainer, { zIndex: 5 - i, marginLeft: i > 0 ? -8 : 0 }]}>
+                      {p.profilePhoto ? (
+                        <Image source={{ uri: p.profilePhoto }} style={styles.miniAvatar} />
+                      ) : (
+                        <View style={[styles.miniAvatar, styles.miniAvatarInitials]}>
+                          <Text style={styles.miniAvatarText}>{(p.name?.[0] || 'U').toUpperCase()}</Text>
+                        </View>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.unassignedText}>No one assigned</Text>
+                )}
+                {selectedParticipants.length > 5 && (
+                  <View style={[styles.miniAvatarContainer, { zIndex: 0, marginLeft: -8 }]}>
+                    <View style={[styles.miniAvatar, styles.miniAvatarMore]}>
+                      <Text style={styles.miniAvatarMoreText}>+{selectedParticipants.length - 5}</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+              
+              {itemErrors.consumers && (
+                <View style={styles.errorBadge}>
+                   <Ionicons name="alert-circle" size={12} color={Colors.danger} />
+                   <Text style={styles.errorBadgeText}>Assign</Text>
+                </View>
+              )}
             </View>
           </View>
+          
+          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} style={styles.chevronIcon} />
         </TouchableOpacity>
-
-        {/* Participant Selection */}
-        <View style={[
-          styles.participantChipContainer,
-          itemErrors.consumers && styles.participantChipContainerError
-        ]}>
-          {participants.map((participant, pIndex) => {
-            const isSelected = item.selectedConsumers?.includes(pIndex);
-            return (
-              <ParticipantChip
-                key={participant.id}
-                participant={participant}
-                isSelected={isSelected}
-                onPress={() => handleParticipantPress(pIndex)}
-              />
-            );
-          })}
-        </View>
-        {itemErrors.consumers && (
-          <Text style={styles.errorHelperText}>
-            Please assign at least one person
-          </Text>
-        )}
       </Animated.View>
     </View>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison to prevent unnecessary re-renders
   const prevErrors = prevProps.validationErrors?.[prevProps.item.id] || {};
   const nextErrors = nextProps.validationErrors?.[nextProps.item.id] || {};
   
@@ -318,37 +339,33 @@ const ReceiptBreakdown = ({
   validationErrors = {},
   onClearValidationError,
 }) => {
-  const [editingItemId, setEditingItemId] = useState(null); // Only one item in edit mode
+  const [editingItemId, setEditingItemId] = useState(null); 
   const prevItemsLengthRef = useRef(items.length);
   const itemLayoutMapRef = useRef({});
-  const hasMountedRef = useRef(false);
-  const skipNextAutoOpenRef = useRef(false);
-  const newlyAddedItemIdsRef = useRef(new Set()); // Track items that were just added
+  const userManualAddRef = useRef(false); // Track if user explicitly clicked add button
+  const newlyAddedItemIdsRef = useRef(new Set()); 
 
-  // Scroll item to just below header
   const scrollItemToTop = (itemId, delay = 0) => {
     setTimeout(() => {
       const y = itemLayoutMapRef.current[itemId];
       if (y != null && scrollRef?.current?.scrollTo) {
-        const headerOffset = -340; // Space for header at top
+        const headerOffset = -340; 
         scrollRef.current.scrollTo({ y: Math.max(0, y - headerOffset), animated: true });
       }
     }, delay);
   };
 
-  // Reset edit state and prevent auto-open on screen focus
+  // Reset edit state on screen focus
   useEffect(() => {
     if (isFocused === true) {
       setEditingItemId(null);
       prevItemsLengthRef.current = items.length;
-      skipNextAutoOpenRef.current = true;
+      userManualAddRef.current = false;
     } else {
-      // Clean up tracking when screen loses focus
       newlyAddedItemIdsRef.current.clear();
     }
   }, [isFocused]);
 
-  // Clean up tracking for items that no longer exist
   useEffect(() => {
     const existingItemIds = new Set(items.map(item => item.id));
     newlyAddedItemIdsRef.current.forEach(itemId => {
@@ -358,37 +375,23 @@ const ReceiptBreakdown = ({
     });
   }, [items]);
 
-  // Auto-open newly added items in edit mode
+  // Auto-open newly added items in edit mode ONLY if user manually added them
   useEffect(() => {
-    // Skip auto-open only if this is the initial focus (not a manual add)
-    if (skipNextAutoOpenRef.current && items.length === prevItemsLengthRef.current) {
-      skipNextAutoOpenRef.current = false;
-      return;
-    }
-    
     const itemsAdded = items.length - prevItemsLengthRef.current;
     
-    // Only auto-open if exactly ONE item was added (manual add)
-    // Skip auto-open if multiple items were added at once (bulk load from scanning)
-    if (itemsAdded === 1) {
+    if (itemsAdded === 1 && userManualAddRef.current) {
       const newItem = items[items.length - 1];
       if (newItem?.id) {
-        // Reset skip flag so future adds work
-        skipNextAutoOpenRef.current = false;
-        // Track this as a newly added item
+        userManualAddRef.current = false; // Reset flag
         newlyAddedItemIdsRef.current.add(newItem.id);
         setEditingItemId(newItem.id);
         scrollItemToTop(newItem.id, 50);
       }
-    } else if (itemsAdded > 1) {
-      // Multiple items added (bulk load) - don't auto-open any
-      skipNextAutoOpenRef.current = false;
     }
     
     prevItemsLengthRef.current = items.length;
   }, [items]);
 
-  // Get the current date in a friendly format
   const currentDate = useMemo(() => new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -413,17 +416,14 @@ const ReceiptBreakdown = ({
   }, []);
 
   const saveItemChanges = useCallback((index) => {
-    // For now, just exit edit mode since changes are saved in real-time
     const item = items[index];
     if (item) {
-      // Remove from newly added tracking since it's been saved
       newlyAddedItemIdsRef.current.delete(item.id);
       setEditingItemId(null);
     }
   }, [items]);
 
   const cancelEdit = useCallback((itemId) => {
-    // If this is a newly added item, delete it instead of just closing edit mode
     if (newlyAddedItemIdsRef.current.has(itemId)) {
       const itemIndex = items.findIndex(item => item.id === itemId);
       if (itemIndex !== -1) {
@@ -431,7 +431,6 @@ const ReceiptBreakdown = ({
         onRemoveItem(itemIndex);
       }
     } else {
-      // Just close edit mode for existing items
       setEditingItemId(prev => (prev === itemId ? null : prev));
     }
   }, [items, onRemoveItem]);
@@ -444,12 +443,13 @@ const ReceiptBreakdown = ({
     return null;
   }
 
-  const circleSize = Spacing.lg; // diameter of each scallop
-  const circleCount = 20; // Fixed number of circles for consistent performance
+  const circleSize = 12; 
+  const circleCount = 25; 
 
   return (
     <View style={styles.container}>
       <View style={styles.receiptContainer}>
+        {/* Top Torn Edge */}
         <View pointerEvents="none" style={[styles.tornEdgeContainer, { top: -(circleSize / 2) }]}>
           {Array.from({ length: circleCount }).map((_, i) => (
             <View key={`top-${i}`} style={[styles.tornCircle, { width: circleSize, height: circleSize }]} />
@@ -457,7 +457,10 @@ const ReceiptBreakdown = ({
         </View>
         
         <View style={styles.scrollViewContent}>
-          <Text style={styles.headerTitle}>YOUR BREAKDOWN</Text>
+          <View style={styles.headerContainer}>
+            <Text style={styles.headerTitle}>RECEIPT BREAKDOWN</Text>
+            <View style={styles.headerDivider} />
+          </View>
 
           {items.map((item, index) => (
             <View
@@ -479,19 +482,26 @@ const ReceiptBreakdown = ({
               />
             </View>
           ))}
-          <TouchableOpacity style={styles.addItemButtonSmall} onPress={onAddItem} activeOpacity={0.8}>
-            <View style={styles.addItemIconSmall}>
-              <Ionicons name="add" size={16} color={Colors.accent} />
-            </View>
-            <Text style={styles.addItemTextSmall}>Add item</Text>
+          
+          <TouchableOpacity 
+            style={styles.addItemButton} 
+            onPress={() => {
+              userManualAddRef.current = true;
+              onAddItem();
+            }} 
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add-circle" size={20} color={Colors.accent} />
+            <Text style={styles.addItemText}>Add another item</Text>
           </TouchableOpacity>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>Thank you!</Text>
-            <Text style={styles.footerText}>{currentDate}</Text>
+            <Text style={styles.footerDate}>{currentDate}</Text>
           </View>
         </View>
         
+        {/* Bottom Torn Edge */}
         <View pointerEvents="none" style={[styles.tornEdgeContainer, { bottom: -(circleSize / 2) }]}>
           {Array.from({ length: circleCount }).map((_, i) => (
             <View key={`bottom-${i}`} style={[styles.tornCircle, { width: circleSize, height: circleSize }]} />
@@ -510,269 +520,334 @@ const styles = StyleSheet.create({
   },
   receiptContainer: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
+    borderRadius: 0, // Sharp edges for receipt feel, but maybe slight radius
     flex: 1,
+    marginVertical: Spacing.xs,
   },
   scrollViewContent: {
       padding: Spacing.xl,
+      paddingTop: Spacing.xxl,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
   },
   headerTitle: {
-      ...Typography.h3,
-      color: Colors.textPrimary,
+      ...Typography.label,
+      fontSize: 14,
+      color: Colors.textSecondary,
       textAlign: 'center',
-      marginBottom: Spacing.xl,
-      letterSpacing: 1.5,
+      letterSpacing: 2,
+      fontWeight: '600',
+  },
+  headerDivider: {
+    height: 2,
+    width: 40,
+    backgroundColor: Colors.accent,
+    marginTop: Spacing.sm,
+    borderRadius: Radius.pill,
   },
   itemContainer: {
-    marginBottom: Spacing.lg,
+    marginBottom: 0,
   },
-  itemName: {
-    ...Typography.body1,
-    color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
-    flexShrink: 1,
-    marginRight: Spacing.sm,
-  },
-  itemAmount: {
-    ...Typography.body1,
-    color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
-    marginLeft: Spacing.sm,
-  },
-  amountInput: {
-    minWidth: 120,
-    maxWidth: 180,
-    textAlign: 'right',
-    flexShrink: 0,
-  },
-  inputField: {
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Spacing.sm,
+  
+  // View Mode Styles
+  viewModeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.lg,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
+  },
+  viewModeMain: {
+    flex: 1,
+    marginRight: Spacing.md,
+  },
+  viewModeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xs,
+  },
+  viewModeName: {
+    ...Typography.body1,
+    color: Colors.textPrimary,
+    fontFamily: Typography.familyMedium,
+    flex: 1,
+    marginRight: Spacing.md,
+    fontSize: 16,
+  },
+  viewModeAmount: {
+    ...Typography.body1,
+    color: Colors.textPrimary,
+    fontFamily: Typography.familySemiBold,
+    fontSize: 16,
+  },
+  viewModeFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  assignedAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 24,
+  },
+  miniAvatarContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.surface,
+    backgroundColor: Colors.surface,
+    overflow: 'hidden',
+  },
+  miniAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  miniAvatarInitials: {
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniAvatarText: {
+    fontSize: 10,
+    fontFamily: Typography.familyBold,
+    color: Colors.textSecondary,
+  },
+  miniAvatarMore: {
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  miniAvatarMoreText: {
+    fontSize: 9,
+    fontFamily: Typography.familyBold,
+    color: Colors.textSecondary,
+  },
+  unassignedText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  chevronIcon: {
+    opacity: 0.3,
+  },
+  errorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+  },
+  errorBadgeText: {
+    ...Typography.caption,
+    color: Colors.danger,
+    marginLeft: 4,
+    fontWeight: '600',
+  },
+
+  // Edit Mode Styles
+  editCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.accent,
+    marginVertical: Spacing.md,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  editTitle: {
+    ...Typography.label,
+    color: Colors.accent,
+    fontWeight: '600',
+  },
+  deleteIconBtn: {
+    padding: Spacing.xs,
+  },
+  editFormRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  editFieldFlex: {
+    flex: 1,
+  },
+  editFieldFixed: {
+    width: 100,
+  },
+  editLabel: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '500',
+  },
+  editInput: {
+    ...Typography.body1,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm, // Reduced padding
+    height: 40, // Fixed height to match PriceInput
+    color: Colors.textPrimary,
+    fontFamily: Typography.familyMedium,
+    fontSize: 15,
+  },
+  priceInputStyle: {
+    backgroundColor: Colors.surfaceLight,
+    height: 40,
+  },
+  participantsSection: {
+    marginBottom: Spacing.lg,
   },
   participantChipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.sm,
-    marginTop: Spacing.md,
-    paddingLeft: Spacing.xs,
   },
+  participantChipContainerError: {
+    borderColor: Colors.danger,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: Spacing.xs,
+    borderRadius: Radius.sm,
+  },
+  
+  // Chip Styles
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
     borderRadius: Radius.pill,
-    padding: Spacing.xs,
-    paddingRight: Spacing.md,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    padding: 4,
+    paddingRight: 12,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
   chipSelected: {
-    backgroundColor: `${Colors.accent}33`,
+    backgroundColor: Colors.brandLight,
     borderColor: Colors.accent,
   },
+  chipAvatarContainer: {
+    position: 'relative',
+    marginRight: 8,
+  },
   chipAvatar: {
-    width: 24, height: 24, borderRadius: 12,
-    marginRight: Spacing.sm,
+    width: 28, 
+    height: 28, 
+    borderRadius: 14,
   },
   chipInitialsWrapper: {
-    backgroundColor: Colors.divider,
+    backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
   chipInitials: {
-    ...Typography.label,
+    ...Typography.caption,
     color: Colors.textSecondary,
-    fontFamily: Typography.familyBold,
-  },
-  chipLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-  },
-  chipLabelSelected: {
-    color: Colors.accentDark,
-    fontFamily: Typography.familySemiBold,
+    fontWeight: '700',
   },
   checkmarkOverlay: {
     position: 'absolute',
-    right: Spacing.xs,
-    bottom: -Spacing.xs,
+    right: -2,
+    bottom: -2,
     backgroundColor: Colors.accent,
-    borderRadius: Radius.pill,
-    width: 18,
-    height: 18,
+    borderRadius: 10,
+    width: 14,
+    height: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.surface,
-  },
-  addItemButtonSmall: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
     borderWidth: 1.5,
-    borderColor: Colors.accent,
-    borderStyle: 'dashed',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.lg,
+    borderColor: Colors.white,
   },
-  addItemIconSmall: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    marginRight: Spacing.xs,
-  },
-  addItemTextSmall: {
-    ...Typography.body,
-    fontFamily: Typography.familySemiBold,
-    color: Colors.accent,
-  },
-  // View Mode Styles
-  viewModeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    marginBottom: Spacing.sm,
-  },
-  viewModeContent: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  viewModeName: {
-    ...Typography.body1,
-    color: Colors.textPrimary,
-    fontFamily: Typography.familySemiBold,
-    flex: 1,
-    marginRight: Spacing.lg,
-    fontSize: 16,
-  },
-  viewModeAmountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  viewModeAmount: {
-    ...Typography.body1,
-    color: Colors.accent,
-    fontFamily: Typography.familyBold,
-    fontSize: 16,
-  },
-  chevronIcon: {
-    opacity: 0.3,
-    marginLeft: Spacing.sm,
-  },
-  // Edit Mode Card Styles
-  editCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    marginBottom: Spacing.md,
-    ...Shadows.card,
-  },
-  editField: {
-    marginBottom: Spacing.lg,
-  },
-  editLabel: {
-    ...Typography.label,
+  chipLabel: {
+    ...Typography.caption,
     color: Colors.textSecondary,
-    fontFamily: Typography.familySemiBold,
-    marginBottom: Spacing.sm,
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '500',
+    maxWidth: 80,
   },
-  editInput: {
-    ...Typography.body1,
-    backgroundColor: Colors.background,
-    borderRadius: Radius.md,
-    borderWidth: 1.5,
-    borderColor: Colors.divider,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+  chipLabelSelected: {
     color: Colors.textPrimary,
-    fontFamily: Typography.familyMedium,
+    fontWeight: '600',
   },
+
+  // Action Buttons
   editActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: Spacing.sm,
+    gap: Spacing.md,
   },
   editActionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.md,
-    marginLeft: Spacing.xs,
-  },
-  editActionButtonFirst: {
-    marginLeft: 0,
+    paddingVertical: 10,
+    borderRadius: Radius.sm,
   },
   saveActionButton: {
-    backgroundColor: Colors.success,
+    backgroundColor: Colors.accent,
   },
   cancelActionButton: {
     backgroundColor: Colors.surface,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: Colors.divider,
-  },
-  deleteActionButton: {
-    backgroundColor: Colors.danger,
   },
   editActionText: {
     ...Typography.label,
     color: Colors.white,
-    fontFamily: Typography.familySemiBold,
-    fontSize: 12,
+    fontWeight: '600',
   },
   cancelActionText: {
     ...Typography.label,
     color: Colors.textSecondary,
+  },
+  
+  // Footer & Misc
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.lg,
+    marginTop: Spacing.sm,
+  },
+  addItemText: {
+    ...Typography.body2,
+    color: Colors.accent,
     fontFamily: Typography.familySemiBold,
-    fontSize: 12,
-  },
-  dashedSeparator: {
-    height: 1,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.divider,
-    borderStyle: 'dashed',
-    marginVertical: Spacing.md,
-  },
-  removeButton: {
-    marginLeft: Spacing.sm,
-    padding: Spacing.xs,
-    flexShrink: 0,
+    marginLeft: Spacing.xs,
   },
   footer: {
     alignItems: 'center',
-    marginTop: Spacing.xxl,
+    marginTop: Spacing.xl,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+    borderStyle: 'dashed',
+    paddingTop: Spacing.lg,
   },
   footerText: {
     ...Typography.caption,
     color: Colors.textSecondary,
+    fontFamily: Typography.familyMedium,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  footerDate: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    opacity: 0.7,
   },
   tornEdgeContainer: {
     position: 'absolute',
@@ -781,6 +856,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
+    overflow: 'hidden',
   },
   tornCircle: {
     backgroundColor: Colors.background,
@@ -789,23 +865,10 @@ const styles = StyleSheet.create({
   errorLabel: {
     color: Colors.danger,
   },
-  inputError: {
-    borderColor: Colors.danger,
-    borderWidth: 2,
-  },
-  participantChipContainerError: {
-    borderWidth: 2,
-    borderColor: Colors.danger,
-    borderRadius: Radius.md,
-    padding: Spacing.xs,
-    backgroundColor: `${Colors.danger}10`,
-  },
   errorHelperText: {
     ...Typography.caption,
     color: Colors.danger,
     marginTop: Spacing.xs,
-    marginLeft: Spacing.sm,
-    fontWeight: '600',
   },
 });
 
