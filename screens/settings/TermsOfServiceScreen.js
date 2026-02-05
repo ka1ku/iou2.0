@@ -146,7 +146,7 @@ const TermsOfServiceScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   scrollView: {
     flex: 1,
@@ -161,17 +161,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    backgroundColor: Colors.background, // Seamless header
   },
   backButton: {
     padding: Spacing.sm,
+    marginLeft: -Spacing.sm,
   },
   headerTitle: {
-    ...Typography.h2,
+    ...Typography.h3,
     color: Colors.textPrimary,
-    textAlign: 'center',
   },
   placeholder: {
     width: 40,
@@ -215,11 +213,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   footer: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
+    backgroundColor: Colors.surface, // Clean flat surface for footer instead of elevated card
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
     padding: Spacing.lg,
     marginTop: Spacing.xl,
-    ...Shadows.card,
   },
   footerText: {
     ...Typography.body,

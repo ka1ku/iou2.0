@@ -1,0 +1,21 @@
+{
+    "settings": {
+        "title": "Einstellungen",
+        "account": "Konto",
+        "profile": "Profileinstellungen",
+        "venmo": "Venmo Integration",
+        "preferences": "Präferenzen",
+        "language": "Sprache",
+        "region": "Region",
+        "currency": "Währung",
+        "support": "Support",
+        "terms": "Nutzungsbedingungen",
+        "rate": "App bewerten",
+        "signOut": "Abmelden",
+        "deleteAccount": "Konto löschen"
+    },
+    "common": {
+        "cancel": "Abbrechen",
+        "save": "Speichern"
+    }
+}

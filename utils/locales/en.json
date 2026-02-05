@@ -1,0 +1,21 @@
+{
+    "settings": {
+        "title": "Settings",
+        "account": "Account",
+        "profile": "Profile Settings",
+        "venmo": "Venmo Integration",
+        "preferences": "Preferences",
+        "language": "Language",
+        "region": "Region",
+        "currency": "Currency",
+        "support": "Support",
+        "terms": "Terms of Service",
+        "rate": "Rate the App",
+        "signOut": "Sign Out",
+        "deleteAccount": "Delete Account"
+    },
+    "common": {
+        "cancel": "Cancel",
+        "save": "Save"
+    }
+}

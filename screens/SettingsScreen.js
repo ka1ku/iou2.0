@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -12,33 +12,58 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { signOutUser, getCurrentUser } from '../services/authService';
-import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
-import { useExpenseData } from '../contexts/ExpenseDataContext';
-import { useNotifications } from '../contexts/NotificationContext';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { signOutUser } from '../services/authService';
 import ChangeVenmoBottomSheet from '../components/ChangeVenmoBottomSheet';
+import i18n from '../utils/i18n';
+import { useSettingsStore } from '../stores/useSettingsStore';
+
+const SectionHeader = ({ title }) => (
+  <View style={styles.sectionHeader}>
+    <Text style={styles.sectionHeaderText}>{title}</Text>
+  </View>
+);
+
+const SettingItem = ({ 
+  icon, 
+  title, 
+  onPress, 
+  showChevron = true, 
+  textColor = Colors.textPrimary,
+  rightElement,
+  danger = false
+}) => (
+  <TouchableOpacity 
+    style={styles.settingItem}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <View style={[styles.iconContainer, danger && styles.iconContainerDanger]}>
+      <Ionicons name={icon} size={20} color={danger ? Colors.danger : (Colors.textPrimary === '#FFFFFF' ? Colors.textPrimary : '#555')} />
+    </View>
+    <Text style={[styles.settingText, { color: textColor }]}>{title}</Text>
+    {rightElement}
+    {showChevron && !rightElement && (
+      <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+    )}
+  </TouchableOpacity>
+);
 
 const SettingsScreen = ({ navigation }) => {
-  const { userProfile } = useExpenseData();
-  const { sendTestNotification, expoPushToken } = useNotifications();
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingFunction, setLoadingFunction] = useState(null);
   const changeVenmoBottomSheetRef = useRef(null);
+  const { language, currency, region } = useSettingsStore();
 
   const handleSignOut = () => {
     Alert.alert(
-      'Sign Out',
+      i18n.t('settings.signOut'),
       'Are you sure you want to sign out?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: i18n.t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sign Out',
+          text: i18n.t('settings.signOut'),
           style: 'destructive',
           onPress: async () => {
             try {
               await signOutUser();
-              // Navigation will be handled by auth state change
             } catch (error) {
               Alert.alert('Error', 'Failed to sign out');
             }
@@ -50,15 +75,14 @@ const SettingsScreen = ({ navigation }) => {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'Are you sure you want to permanently delete your account? This action cannot be undone and will delete all your expenses and data.',
+      i18n.t('settings.deleteAccount'),
+      'Are you sure you want to permanently delete your account? This action cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: i18n.t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete Account',
+          text: i18n.t('settings.deleteAccount'),
           style: 'destructive',
           onPress: () => {
-            // TODO: Implement delete account functionality
             Alert.alert('Coming Soon', 'Account deletion feature will be available soon.');
           }
         }
@@ -67,9 +91,7 @@ const SettingsScreen = ({ navigation }) => {
   };
 
   const handleTermsOfService = () => {
-    navigation.navigate('Profile', {
-      screen: 'TermsOfService'
-    });
+    navigation.navigate('TermsOfService');
   };
 
   const handleRateApp = () => {
@@ -78,167 +100,6 @@ const SettingsScreen = ({ navigation }) => {
       : 'https://play.google.com/store/apps/details?id=com.yourapp.iou';
     Linking.openURL(url);
   };
-
-  // Firebase Functions handlers
-  const handleSendTestNotification = async () => {
-    setIsLoading(true);
-    setLoadingFunction('testNotification');
-    try {
-      const functions = getFunctions();
-      const sendExpoTestNotification = httpsCallable(functions, 'sendExpoTestNotification');
-      const result = await sendExpoTestNotification();
-      Alert.alert('Success', result.data.message || 'Test notification sent successfully!');
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      const errorMessage = error.message || error.details || 'Failed to send test notification';
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setIsLoading(false);
-      setLoadingFunction(null);
-    }
-  };
-
-  const handleSendTestNotificationViaContext = async () => {
-    if (!expoPushToken) {
-      Alert.alert(
-        'No Push Token',
-        'Push token not available. Please make sure you\'re on a physical device and have granted notification permissions.'
-      );
-      return;
-    }
-
-    try {
-      await sendTestNotification();
-      // The context method already shows an alert
-    } catch (error) {
-      console.error('Error sending test notification via context:', error);
-      Alert.alert('Error', 'Failed to send test notification');
-    }
-  };
-
-  const createSyntheticDataWithCount = async (userCount) => {
-    setIsLoading(true);
-    setLoadingFunction('createSynthetic');
-    try {
-      const functions = getFunctions();
-      const createSyntheticData = httpsCallable(functions, 'createSyntheticData');
-      const result = await createSyntheticData({ numUsers: userCount });
-      Alert.alert(
-        'Success',
-        `Successfully created ${result.data.usersCreated} users and ${result.data.expensesCreated} expenses!`
-      );
-    } catch (error) {
-      console.error('Error creating synthetic data:', error);
-      const errorMessage = error.message || error.details || 'Failed to create synthetic data';
-      Alert.alert('Error', errorMessage);
-    } finally {
-      setIsLoading(false);
-      setLoadingFunction(null);
-    }
-  };
-
-  const handleCreateSyntheticData = () => {
-    Alert.alert(
-      'Create Synthetic Data',
-      'Select the number of synthetic users to create:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: '10 users',
-          onPress: () => createSyntheticDataWithCount(10)
-        },
-        {
-          text: '25 users',
-          onPress: () => createSyntheticDataWithCount(25)
-        },
-        {
-          text: '50 users',
-          onPress: () => createSyntheticDataWithCount(50)
-        },
-        {
-          text: '100 users',
-          onPress: () => createSyntheticDataWithCount(100)
-        }
-      ]
-    );
-  };
-
-  const handleDeleteSyntheticData = () => {
-    Alert.alert(
-      'Delete Synthetic Data',
-      'Are you sure you want to delete all synthetic users and expenses? This action cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setIsLoading(true);
-            setLoadingFunction('deleteSynthetic');
-            try {
-              const functions = getFunctions();
-              const deleteSyntheticData = httpsCallable(functions, 'deleteSyntheticData');
-              const result = await deleteSyntheticData();
-              Alert.alert(
-                'Success',
-                `Successfully deleted ${result.data.usersDeleted} users and ${result.data.expensesDeleted} expenses!`
-              );
-            } catch (error) {
-              console.error('Error deleting synthetic data:', error);
-              const errorMessage = error.message || error.details || 'Failed to delete synthetic data';
-              Alert.alert('Error', errorMessage);
-            } finally {
-              setIsLoading(false);
-              setLoadingFunction(null);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleUpdateUserInExpenses = async () => {
-    const user = getCurrentUser();
-    if (!user || !userProfile) {
-      Alert.alert('Error', 'User profile not found');
-      return;
-    }
-
-    Alert.alert(
-      'Update User in Expenses',
-      'This will update your name and profile information across all your expenses. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Update',
-          onPress: async () => {
-            setIsLoading(true);
-            setLoadingFunction('updateUser');
-            try {
-              const functions = getFunctions();
-              const updateUserInExpenses = httpsCallable(functions, 'updateUserInExpenses');
-              const result = await updateUserInExpenses({
-                userId: user.uid,
-                firstName: userProfile.firstName,
-                lastName: userProfile.lastName,
-                username: userProfile.username,
-                profilePhoto: userProfile.profilePhoto
-              });
-              Alert.alert('Success', result.data.message || 'User information updated in all expenses!');
-            } catch (error) {
-              console.error('Error updating user in expenses:', error);
-              const errorMessage = error.message || error.details || 'Failed to update user in expenses';
-              Alert.alert('Error', errorMessage);
-            } finally {
-              setIsLoading(false);
-              setLoadingFunction(null);
-            }
-          }
-        }
-      ]
-    );
-  };
-
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -249,149 +110,74 @@ const SettingsScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{i18n.t('settings.title')}</Text>
         <View style={styles.placeholder} />
       </View>
       
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <View style={styles.settingsList}>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => navigation.navigate('Profile', {
-                screen: 'ProfileSettings'
-              })}
-            >
-              <Ionicons name="person-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Profile Settings</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => changeVenmoBottomSheetRef.current?.open()}
-            >
-              <Ionicons name="card-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Change Venmo</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        <SectionHeader title={i18n.t('settings.account')} />
+        <View style={styles.sectionContainer}>
+          <SettingItem 
+            icon="person-outline" 
+            title={i18n.t('settings.profile')} 
+            onPress={() => navigation.navigate('ProfileSettings')} 
+          />
+          <View style={styles.separator} />
+          <SettingItem 
+            icon="card-outline" 
+            title={i18n.t('settings.venmo')} 
+            onPress={() => changeVenmoBottomSheetRef.current?.open()} 
+          />
         </View>
 
-
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <View style={styles.settingsList}>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleTermsOfService}
-            >
-              <Ionicons name="document-text-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Terms of Service</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleRateApp}
-            >
-              <Ionicons name="star-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Rate the App</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+        <SectionHeader title={i18n.t('settings.preferences')} />
+        <View style={styles.sectionContainer}>
+          <SettingItem 
+            icon="globe-outline" 
+            title={i18n.t('settings.language')} 
+            rightElement={<Text style={styles.rightValueText}>{language.toUpperCase()} • {region} • {currency}</Text>}
+            onPress={() => navigation.navigate('LanguageRegion')} 
+          />
         </View>
 
-        <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Developer Tools</Text>
-          <View style={styles.settingsList}>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={() => navigation.navigate('Profile', {
-                screen: 'NotificationTest'
-              })}
-            >
-              <Ionicons name="notifications-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Test Notifications (Expo)</Text>
-              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleSendTestNotification}
-              disabled={isLoading}
-            >
-              <Ionicons name="send-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Send Test Notification (Cloud Function)</Text>
-              {isLoading && loadingFunction === 'testNotification' ? (
-                <LoadingSpinner size="small" />
-              ) : (
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleSendTestNotificationViaContext}
-              disabled={!expoPushToken}
-            >
-              <Ionicons name="paper-plane-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Send Test (Via Context)</Text>
-              {expoPushToken ? (
-                <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
-              ) : (
-                <Ionicons name="close-circle" size={20} color={Colors.danger} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleUpdateUserInExpenses}
-              disabled={isLoading}
-            >
-              <Ionicons name="sync-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Update User in Expenses</Text>
-              {isLoading && loadingFunction === 'updateUser' ? (
-                <LoadingSpinner size="small" />
-              ) : (
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleCreateSyntheticData}
-              disabled={isLoading}
-            >
-              <Ionicons name="add-circle-outline" size={24} color={Colors.textSecondary} />
-              <Text style={styles.settingText}>Create Synthetic Data</Text>
-              {isLoading && loadingFunction === 'createSynthetic' ? (
-                <LoadingSpinner size="small" />
-              ) : (
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.settingItem}
-              onPress={handleDeleteSyntheticData}
-              disabled={isLoading}
-            >
-              <Ionicons name="trash-outline" size={24} color={Colors.danger} />
-              <Text style={[styles.settingText, { color: Colors.danger }]}>Delete Synthetic Data</Text>
-              {isLoading && loadingFunction === 'deleteSynthetic' ? (
-                <LoadingSpinner size="small" color={Colors.danger} />
-              ) : (
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              )}
-            </TouchableOpacity>
-          </View>
+        <SectionHeader title={i18n.t('settings.support')} />
+        <View style={styles.sectionContainer}>
+          <SettingItem 
+            icon="document-text-outline" 
+            title={i18n.t('settings.terms')} 
+            onPress={handleTermsOfService} 
+          />
+          <View style={styles.separator} />
+          <SettingItem 
+            icon="star-outline" 
+            title={i18n.t('settings.rate')} 
+            onPress={handleRateApp} 
+          />
         </View>
 
-        <View style={styles.logoutSection}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={24} color={Colors.danger} />
-            <Text style={styles.logoutText}>Sign Out</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteAccount}>
-            <Ionicons name="trash-outline" size={24} color={Colors.danger} />
-            <Text style={styles.deleteText}>Delete Account</Text>
-          </TouchableOpacity>
+        <View style={styles.sectionSpacing} />
+        
+        <View style={styles.sectionContainer}>
+          <SettingItem 
+            icon="log-out-outline" 
+            title={i18n.t('settings.signOut')} 
+            onPress={handleSignOut}
+            danger
+            showChevron={false}
+          />
+          <View style={styles.separator} />
+          <SettingItem 
+            icon="close-circle-outline" 
+            title={i18n.t('settings.deleteAccount')} 
+            onPress={handleDeleteAccount}
+            danger
+            showChevron={false}
+          />
         </View>
+
+        <Text style={styles.versionText}>Version 1.0.0</Text>
+
       </ScrollView>
       <ChangeVenmoBottomSheet ref={changeVenmoBottomSheetRef} />
     </SafeAreaView>
@@ -401,14 +187,7 @@ const SettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  scrollView: {
-    flex: 1,
     backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    paddingBottom: 100, // Extra padding for home bar area
   },
   header: {
     flexDirection: 'row',
@@ -416,86 +195,92 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    backgroundColor: Colors.background, // Seamless header
   },
   backButton: {
     padding: Spacing.sm,
+    marginLeft: -Spacing.sm, // Align with content
   },
   headerTitle: {
-    ...Typography.h2,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 40, // Same width as back button to center the title
-  },
-  settingsSection: {
-    margin: Spacing.lg,
-    marginBottom: Spacing.xl,
-  },
-  sectionTitle: {
     ...Typography.h3,
     color: Colors.textPrimary,
-    marginBottom: Spacing.md,
   },
-  settingsList: {
-    backgroundColor: Colors.card,
+  placeholder: {
+    width: 40,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: Spacing.xxl,
+    paddingHorizontal: Spacing.lg,
+  },
+  sectionHeader: {
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+  },
+  sectionHeaderText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionContainer: {
+    backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
+    overflow: 'hidden',
     ...Shadows.card,
+    elevation: 2, 
+    shadowOpacity: 0.05,
+    borderWidth: 1,
+    borderColor: Colors.surface, // Or transparent if using shadow
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    backgroundColor: Colors.surface,
+    minHeight: 56,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginLeft: 16 + 32 + 12, // padding + icon width + icon margin (approx)
+  },
+  iconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.sm, // Slightly rounded square for iOS look
+    backgroundColor: Colors.background, // or subtle grey
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  iconContainerDanger: {
+    backgroundColor: '#FFE5E5',
+    // color handled in icon prop
   },
   settingText: {
-    ...Typography.body,
-    color: Colors.textPrimary,
+    ...Typography.body1,
     flex: 1,
-    marginLeft: Spacing.md,
+    fontFamily: Typography.familyMedium,
+    color: Colors.textPrimary,
   },
-  logoutSection: {
-    margin: Spacing.lg,
-    marginTop: Spacing.xxl,
+  sectionSpacing: {
+    height: Spacing.lg,
   },
-  logoutButton: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.danger,
-    marginBottom: Spacing.md,
-    ...Shadows.card,
+  versionText: {
+    ...Typography.caption,
+    textAlign: 'center',
+    color: Colors.textSecondary,
+    marginTop: Spacing.xl,
+    marginBottom: Spacing.xxl,
   },
-  logoutText: {
-    ...Typography.body,
-    color: Colors.danger,
-    fontFamily: Typography.familySemiBold,
-    marginLeft: Spacing.sm,
-  },
-  deleteButton: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.danger,
-    ...Shadows.card,
-  },
-  deleteText: {
-    ...Typography.body,
-    color: Colors.danger,
-    fontFamily: Typography.familySemiBold,
-    marginLeft: Spacing.sm,
+  rightValueText: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    marginRight: Spacing.xs,
   },
 });
 

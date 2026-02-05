@@ -1,0 +1,21 @@
+{
+    "settings": {
+        "title": "设定",
+        "account": "账户",
+        "profile": "个人资料设置",
+        "venmo": "Venmo 集成",
+        "preferences": "偏好设置",
+        "language": "语言",
+        "region": "地区",
+        "currency": "货币",
+        "support": "支持",
+        "terms": "服务条款",
+        "rate": "评价应用",
+        "signOut": "登出",
+        "deleteAccount": "注销账户"
+    },
+    "common": {
+        "cancel": "取消",
+        "save": "保存"
+    }
+}

@@ -1,0 +1,21 @@
+{
+    "settings": {
+        "title": "설정",
+        "account": "계정",
+        "profile": "프로필 설정",
+        "venmo": "Venmo 연동",
+        "preferences": "기본 설정",
+        "language": "언어",
+        "region": "지역",
+        "currency": "통화",
+        "support": "고객 지원",
+        "terms": "서비스 약관",
+        "rate": "앱 평가하기",
+        "signOut": "로그아웃",
+        "deleteAccount": "계정 삭제"
+    },
+    "common": {
+        "cancel": "취소",
+        "save": "저장"
+    }
+}

@@ -37,7 +37,7 @@ const ParticipantsGrid = forwardRef(({
       <TouchableOpacity
         style={styles.participantSnapshotContainer}
         onPress={() => setShowModal(true)}
-        activeOpacity={0.8}
+        activeOpacity={0.6}
       >
         <View style={styles.avatarStackContainer}>
           {displayParticipants.slice(0, 4).map((participant, index) => (
@@ -45,7 +45,7 @@ const ParticipantsGrid = forwardRef(({
               key={participant.id}
               style={[
                 styles.avatarStackItem,
-                { zIndex: displayParticipants.length - index }
+                { zIndex: displayParticipants.length - index, marginLeft: index === 0 ? 0 : -10 }
               ]}
             >
               {participant.profilePhoto ? (
@@ -61,14 +61,18 @@ const ParticipantsGrid = forwardRef(({
           ))}
 
           {displayParticipants.length > 4 && (
-            <View style={styles.overflowContainer}>
+            <View style={[styles.overflowContainer, { zIndex: 0, marginLeft: -10 }]}>
               <Text style={styles.overflowText}>+{displayParticipants.length - 4}</Text>
             </View>
+          )}
+
+          {displayParticipants.length === 0 && (
+             <Text style={styles.emptyText}>Add friends</Text>
           )}
         </View>
 
         <View style={styles.actionContainer}>
-          <Text style={styles.actionText}>Manage group</Text>
+          <Text style={styles.actionText}>Manage</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
@@ -86,66 +90,69 @@ ParticipantsGrid.displayName = 'ParticipantsGrid';
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: Spacing.sm,
+    // No margin, handled by parent
   },
   participantSnapshotContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
+    // Transparent background to fit in parent card
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    position: 'relative',
+    paddingVertical: Spacing.sm, 
   },
   avatarStackContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: Spacing.lg,
+    paddingLeft: 4, // For the first negative margin adjustment if needed, or just 0
   },
   avatarStackItem: {
-    width: 40,
-    height: 40,
-    marginLeft: -6,
+    width: 32, // Slightly smaller to fit nicely
+    height: 32,
+    borderRadius: 16,
     borderWidth: 2,
-    borderColor: Colors.surface,
-    borderRadius: 20,
+    borderColor: Colors.surface, // Matches the card background
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.surface,
   },
   avatarStackImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   avatarStackPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarStackInitials: {
     color: Colors.white,
-    fontSize: 14,
+    fontSize: 10,
     fontFamily: Typography.familySemiBold,
   },
   overflowContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: Colors.surfaceLight,
     borderWidth: 2,
     borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: -8,
   },
   overflowText: {
     ...Typography.caption,
+    fontSize: 10,
     color: Colors.textSecondary,
     fontWeight: '600',
+  },
+  emptyText: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    fontStyle: 'italic',
   },
   actionContainer: {
     flexDirection: 'row',
@@ -156,7 +163,7 @@ const styles = StyleSheet.create({
   actionText: {
     ...Typography.body2,
     color: Colors.textSecondary,
-    marginRight: Spacing.xs,
+    marginRight: 4,
   },
 });
 

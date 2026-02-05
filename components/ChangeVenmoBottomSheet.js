@@ -380,14 +380,15 @@ ChangeVenmoBottomSheet.displayName = 'ChangeVenmoBottomSheet';
 const styles = StyleSheet.create({
   bottomSheetBackground: {
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
     ...Shadows.card,
   },
   handleIndicator: {
     backgroundColor: Colors.divider,
     width: 40,
     height: 4,
+    marginTop: Spacing.sm,
   },
   contentContainer: {
     flex: 1,
@@ -400,11 +401,11 @@ const styles = StyleSheet.create({
   },
   venmoIconContainer: {
     marginBottom: Spacing.md,
+    // Eliminated heavy shadow for simpler look
   },
   venmoLogo: {
     width: 48,
     height: 48,
-    ...Shadows.card,
   },
   title: {
     ...Typography.h2,
@@ -430,12 +431,13 @@ const styles = StyleSheet.create({
   profileContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.background, // Flat background instead of card
+    borderRadius: Radius.lg,
     padding: Spacing.md,
     marginBottom: Spacing.md,
     width: '100%',
-    ...Shadows.card,
+    borderWidth: 1,
+    borderColor: Colors.divider,
   },
   profilePic: {
     marginRight: Spacing.md,
@@ -447,10 +449,10 @@ const styles = StyleSheet.create({
     ...Typography.title,
     color: Colors.textPrimary,
     marginBottom: Spacing.xs,
-    fontSize: 15,
+    fontSize: 16,
   },
   profileStatus: {
-    ...Typography.body,
+    ...Typography.caption,
     fontSize: 12,
   },
   changeButton: {
@@ -459,7 +461,7 @@ const styles = StyleSheet.create({
   },
   changeButtonText: {
     ...Typography.body,
-    color: Colors.accent,
+    color: Colors.brand,
     fontWeight: '600',
     fontSize: 14,
   },
@@ -469,7 +471,7 @@ const styles = StyleSheet.create({
   },
   venmoInputLabel: {
     ...Typography.label,
-    color: Colors.textPrimary,
+    color: Colors.textSecondary,
     marginBottom: Spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -478,14 +480,14 @@ const styles = StyleSheet.create({
   venmoInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    backgroundColor: Colors.background,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.divider,
-    overflow: 'hidden',
+    borderColor: Colors.divider, // Use cleaner border instead of shadow
   },
   atSymbol: {
-    paddingLeft: Spacing.md,
+    paddingLeft: Spacing.sm,
     ...Typography.body,
     color: Colors.textSecondary,
     fontSize: 16,
@@ -493,27 +495,25 @@ const styles = StyleSheet.create({
   },
   venmoInput: {
     flex: 1,
-    height: 52,
-    paddingHorizontal: Spacing.md,
+    height: 56,
+    paddingHorizontal: Spacing.sm,
     ...Typography.body,
     color: Colors.textPrimary,
     fontSize: 16,
   },
   venmoInputRightIcon: {
-    paddingRight: Spacing.md,
-    width: 24,
+    paddingRight: Spacing.sm,
+    width: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.error + '08',
-    padding: Spacing.sm,
+    backgroundColor: '#FFF5F5', // Lighter error bg
+    padding: Spacing.md,
     borderRadius: Radius.md,
     marginTop: Spacing.xs,
-    borderWidth: 1,
-    borderColor: Colors.error + '20',
   },
   errorText: {
     ...Typography.body,
@@ -528,31 +528,31 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: Spacing.xs,
     textAlign: 'center',
-    fontStyle: 'italic',
     fontSize: 12,
   },
   saveButton: {
-    height: 52,
-    backgroundColor: Colors.accent,
-    borderRadius: Radius.md,
+    height: 56,
+    backgroundColor: Colors.brand,
+    borderRadius: Radius.pill, // Modern pill shape button
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: Spacing.md,
-    ...Shadows.card,
+    ...Shadows.button,
   },
   saveButtonDisabled: {
     opacity: 0.6,
   },
   saveButtonText: {
     ...Typography.title,
-    color: 'white',
+    color: Colors.surface,
     fontSize: 16,
+    fontWeight: '600',
   },
   buttonIcon: {
     marginLeft: Spacing.xs,
+    color: Colors.surface,
   },
 });
 
 export default ChangeVenmoBottomSheet;
-

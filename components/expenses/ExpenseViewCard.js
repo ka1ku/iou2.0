@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import Card from "../Card";
 const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
   const { state } = useExpense();
   const { participants } = state;
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const totalAmount = parseFloat(item.amount) || 0;
 
@@ -45,15 +46,20 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
     const splits = item.splits || [];
     if (consumers.length === 0) return [];
 
-    return consumers.map((consumerIndex, i) => {
-      const consumer = participants[consumerIndex];
-      const splitAmount = parseFloat(splits[i]) || 0;
-      return {
-        name: consumer?.name || `Person ${consumerIndex + 1}`,
-        profilePhoto: consumer?.profilePhoto,
-        amount: splitAmount,
-      };
-    });
+    return consumers
+      .map((consumerIndex, i) => {
+        const consumer = participants[consumerIndex];
+        // Skip current user
+        if (consumer?.name === 'Me') return null;
+        
+        const splitAmount = parseFloat(splits[i]) || 0;
+        return {
+          name: consumer?.name || `Person ${consumerIndex + 1}`,
+          profilePhoto: consumer?.profilePhoto,
+          amount: splitAmount,
+        };
+      })
+      .filter(Boolean); // Remove null entries
   }, [item.selectedConsumers, item.splits, participants]);
 
   const handleMenuPress = () => {
@@ -97,22 +103,68 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
       </View>
 
       <View style={styles.splitSection}>
-        <Text style={styles.sectionTitle}>Split Details</Text>
-        <View style={styles.splitList}>
-          {splitInfo.map((split, index) => (
-            <View key={index} style={styles.splitItem}>
-              <View style={styles.participantInfo}>
-                <ProfilePicture
-                  source={split.profilePhoto}
-                  size={28}
-                  username={split.name}
-                />
-                <Text style={styles.participantName}>{split.name}</Text>
+        <View style={styles.sectionDivider} />
+        
+        <TouchableOpacity 
+          style={styles.splitHeader}
+          onPress={() => setIsExpanded(!isExpanded)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.headerLeft}>
+            <Text style={styles.sectionTitle}>Split with</Text>
+            {!isExpanded && (
+              <View style={styles.previewContainer}>
+                {splitInfo.slice(0, 3).map((split, index) => (
+                  <View 
+                    key={index} 
+                    style={[
+                      styles.previewAvatarContainer, 
+                      { zIndex: index, marginLeft: index > 0 ? -8 : 0 }
+                    ]}
+                  >
+                    <ProfilePicture
+                      source={split.profilePhoto}
+                      size={24}
+                      username={split.name}
+                    />
+                  </View>
+                ))}
+                {splitInfo.length > 3 && (
+                   <View style={[styles.previewAvatarContainer, styles.moreAvatar, { zIndex: 10, marginLeft: -8 }]}>
+                      <Text style={styles.moreAvatarText}>+{splitInfo.length - 3}</Text>
+                   </View>
+                )}
               </View>
-              <Text style={styles.splitAmount}>${split.amount.toFixed(2)}</Text>
-            </View>
-          ))}
-        </View>
+            )}
+          </View>
+          
+          <Ionicons 
+            name={isExpanded ? "chevron-down" : "chevron-forward"} 
+            size={16} 
+            color={Colors.textSecondary} 
+          />
+        </TouchableOpacity>
+        
+        {isExpanded && (
+          <View style={styles.splitList}>
+            {splitInfo.map((split, index) => (
+              <View 
+                key={index} 
+                style={styles.splitItem}
+              >
+                <View style={styles.participantInfo}>
+                  <ProfilePicture
+                    source={split.profilePhoto}
+                    size={28}
+                    username={split.name}
+                  />
+                  <Text style={styles.participantName}>{split.name}</Text>
+                </View>
+                <Text style={styles.splitAmount}>${split.amount.toFixed(2)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </Card>
   );
@@ -131,7 +183,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.md,
   },
   titleSection: {
     flex: 1,
@@ -157,41 +209,87 @@ const styles = StyleSheet.create({
   },
 
   menuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surfaceLight,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: Colors.divider,
+    marginTop: -4, 
+    marginRight: -4,
   },
 
   splitSection: {
-    marginTop: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginBottom: Spacing.md,
+  },
+  splitHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: Spacing.sm,
+    minHeight: 40,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+    flex: 1,
   },
   sectionTitle: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-    fontSize: 11,
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontSize: 14,
     fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+  },
+  previewContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  previewAvatarContainer: {
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    shadowColor: Colors.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  moreAvatar: {
+    width: 24,
+    height: 24,
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+  },
+  moreAvatarText: {
+    ...Typography.caption,
+    fontSize: 9,
+    fontWeight: "700",
+    color: Colors.textSecondary,
   },
   splitList: {
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    overflow: "hidden",
+    marginTop: Spacing.sm,
+    gap: Spacing.xs,
   },
   splitItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+  },
+  splitItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.divider,
   },
   participantInfo: {
     flexDirection: "row",
@@ -201,14 +299,16 @@ const styles = StyleSheet.create({
   participantName: {
     ...Typography.body,
     color: Colors.textPrimary,
-    marginLeft: Spacing.sm,
+    marginLeft: Spacing.md,
     fontWeight: "500",
+    fontSize: 15,
   },
   splitAmount: {
     ...Typography.body,
-    color: Colors.accent,
+    color: Colors.textPrimary,
     fontWeight: "600",
-    fontSize: 15,
+    fontSize: 16,
+    fontVariant: ['tabular-nums'],
   },
 });
 

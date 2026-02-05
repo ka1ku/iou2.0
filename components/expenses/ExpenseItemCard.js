@@ -21,6 +21,7 @@ import { getCurrentUser } from "../../services/authService";
 import Card from "../Card";
 import DeleteButton from "../DeleteButton";
 import PriceInput from "./PriceInput";
+import LoadingSpinner from "../LoadingSpinner";
 
 const smartRoundSplit = (total, count) => {
   if (count <= 0 || total <= 0) return new Array(count).fill(0);
@@ -312,7 +313,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       margin="none"
       style={{ marginBottom: 16, backgroundColor: Colors.surfaceLight }}
     >
-        <View style={styles.itemHeader}>
+      <View style={styles.itemHeader}>
           <View style={styles.itemNameSection}>
             <Text style={[styles.itemNameLabel, validationErrors.name && styles.errorLabel]}>
               Item Name{validationErrors.name && " *"}
@@ -335,34 +336,6 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
               autoCorrect={false}
             />
           </View>
-          {onCancelEdit && (
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={[styles.cancelButton, saving && styles.buttonDisabled]}
-                onPress={handleCancelPress}
-                disabled={saving}
-                activeOpacity={0.7}
-              >
-                <Ionicons 
-                  name="close" 
-                  size={20} 
-                  color={saving ? Colors.textSecondary : Colors.textPrimary} 
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.doneButton, saving && styles.buttonDisabled]}
-                onPress={handleDonePress}
-                disabled={saving}
-                activeOpacity={0.7}
-              >
-                <Ionicons 
-                  name="checkmark" 
-                  size={20} 
-                  color={saving ? Colors.textSecondary : Colors.white} 
-                />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
       <View style={styles.priceSection}>
@@ -411,7 +384,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
                       <Ionicons
                         name="checkmark"
                         size={12}
-                        color={Colors.surface}
+                        color={Colors.accent}
                       />
                     </View>
                   )}
@@ -519,6 +492,39 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
           })}
         </View>
       </View>
+
+      {onCancelEdit && (
+        <View style={styles.actionFooter}>
+          <TouchableOpacity
+            style={[styles.footerButton, styles.footerButtonCancel, saving && styles.buttonDisabled]}
+            onPress={handleCancelPress}
+            disabled={saving}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.footerButtonCancelText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.footerButton, styles.footerButtonSave]}
+            onPress={handleDonePress}
+            disabled={saving}
+            activeOpacity={0.7}
+          >
+            {saving ? (
+              <LoadingSpinner size="small" color={Colors.white} />
+            ) : (
+              <>
+                <Ionicons 
+                  name="checkmark" 
+                  size={18} 
+                  color={Colors.white} 
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={styles.footerButtonSaveText}>Save Changes</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </Card>
   );
 };
@@ -552,30 +558,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 48,
   },
-  actionButtons: {
+  actionFooter: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginTop: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
+  },
+  footerButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: Radius.sm,
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
-    marginTop: 20,
+    justifyContent: "center",
   },
-  cancelButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  footerButtonCancel: {
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.divider,
-    alignItems: "center",
-    justifyContent: "center",
   },
-  doneButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  footerButtonSave: {
     backgroundColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-    ...Shadows.button,
+  },
+  footerButtonCancelText: {
+    ...Typography.body,
+    fontWeight: "600",
+    color: Colors.textSecondary,
+  },
+  footerButtonSaveText: {
+    ...Typography.body,
+    fontWeight: "600",
+    color: Colors.white,
   },
   priceSection: { marginBottom: Spacing.md },
   priceLabel: {
@@ -627,7 +642,7 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: Colors.white,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,11 @@ import Button from '../../components/Button';
 import { useExpenseData } from '../../contexts/ExpenseDataContext';
 import { updateUserProfile } from '../../services/authService';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import ChangeVenmoBottomSheet from '../../components/ChangeVenmoBottomSheet';
 
 const ProfileSettingsScreen = ({ navigation }) => {
   const { userProfile, refreshUserProfile } = useExpenseData();
+  const venmoBottomSheetRef = useRef(null);
   
   const [localProfile, setLocalProfile] = useState({
     firstName: '',
@@ -86,7 +88,9 @@ const ProfileSettingsScreen = ({ navigation }) => {
       await updateUserProfile(localProfile);
       await refreshUserProfile();
       setHasChanges(false);
-      Alert.alert('Success', 'Profile updated successfully! Your changes have been applied to all your expenses.');
+      Alert.alert('Success', 'Profile updated successfully!', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
     } catch (error) {
       Alert.alert('Error', 'Failed to update profile');
     } finally {
@@ -114,7 +118,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile Settings</Text>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
         <View style={styles.placeholder} />
       </View>
       
@@ -130,73 +134,102 @@ const ProfileSettingsScreen = ({ navigation }) => {
           showsVerticalScrollIndicator={false}
         >
           {/* Profile Photo Section */}
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>Profile Photo</Text>
-            <View style={styles.photoCard}>
-              <TouchableOpacity 
-                style={styles.photoContainer}
-                onPress={pickImage}
-                activeOpacity={0.8}
-              >
-                {localProfile.profilePhoto ? (
-                  <Image 
-                    source={{ uri: localProfile.profilePhoto }} 
-                    style={styles.profileImage}
-                    contentFit="cover"
-                    transition={200}
-                  />
-                ) : (
-                  <View style={styles.profilePlaceholder}>
-                    <Ionicons name="person" size={48} color={Colors.white} />
-                  </View>
-                )}
-                <View style={styles.editPhotoButton}>
-                  <Ionicons name="camera" size={18} color={Colors.white} />
+          <View style={styles.photoSection}>
+            <TouchableOpacity 
+              style={styles.photoContainer}
+              onPress={pickImage}
+              activeOpacity={0.8}
+            >
+              {localProfile.profilePhoto ? (
+                <Image 
+                  source={{ uri: localProfile.profilePhoto }} 
+                  style={styles.profileImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+              ) : (
+                <View style={styles.profilePlaceholder}>
+                  <Ionicons name="person" size={48} color={Colors.white} />
                 </View>
-              </TouchableOpacity>
-              <Text style={styles.photoHint}>Tap to change photo</Text>
-            </View>
+              )}
+              <View style={styles.editIconBadge}>
+                <Ionicons name="camera" size={16} color={Colors.white} />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.photoHint}>Change Profile Photo</Text>
           </View>
 
           {/* Personal Information */}
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>Personal Information</Text>
-            <View style={styles.settingsList}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>FIRST NAME</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={localProfile.firstName}
-                  onChangeText={(value) => handleInputChange('firstName', value)}
-                  placeholder="Enter first name"
-                  placeholderTextColor={Colors.textSecondary}
-                />
-              </View>
+          <View style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>First Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={localProfile.firstName}
+                onChangeText={(value) => handleInputChange('firstName', value)}
+                placeholder="First Name"
+                placeholderTextColor={Colors.textSecondary}
+              />
+            </View>
 
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>LAST NAME</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={localProfile.lastName}
-                  onChangeText={(value) => handleInputChange('lastName', value)}
-                  placeholder="Enter last name"
-                  placeholderTextColor={Colors.textSecondary}
-                />
-              </View>
+            <View style={styles.separator} />
 
-              <View style={[styles.inputContainer, styles.lastInputContainer]}>
-                <Text style={styles.inputLabel}>USERNAME</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={localProfile.username}
-                  onChangeText={(value) => handleInputChange('username', value)}
-                  placeholder="Enter username"
-                  placeholderTextColor={Colors.textSecondary}
-                  autoCapitalize="none"
-                />
-              </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Last Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={localProfile.lastName}
+                onChangeText={(value) => handleInputChange('lastName', value)}
+                placeholder="Last Name"
+                placeholderTextColor={Colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.separator} />
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Username</Text>
+              <TextInput
+                style={styles.textInput}
+                value={localProfile.username}
+                onChangeText={(value) => handleInputChange('username', value)}
+                placeholder="@username"
+                placeholderTextColor={Colors.textSecondary}
+                autoCapitalize="none"
+              />
             </View>
           </View>
+
+          {/* Venmo Account Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Payment Methods</Text>
+            <TouchableOpacity 
+              style={styles.venmoRow}
+              onPress={() => venmoBottomSheetRef.current?.open()}
+              activeOpacity={0.6}
+            >
+              <View style={styles.venmoRowLeft}>
+                <View style={styles.venmoIconWrapper}>
+                  <Image
+                    source={require('../../assets/venmo.png')}
+                    style={styles.venmoIcon}
+                    contentFit="contain"
+                  />
+                </View>
+                <View style={styles.venmoTextContainer}>
+                  <Text style={styles.venmoLabel}>Venmo Account</Text>
+                  <Text style={styles.venmoValue}>
+                    {userProfile?.venmoUsername ? `@${userProfile.venmoUsername}` : 'Not Connected'}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.infoText}>
+            This information will be visible to your friends on IOU.
+          </Text>
 
           {/* Save Button */}
           {hasChanges && (
@@ -208,12 +241,13 @@ const ProfileSettingsScreen = ({ navigation }) => {
                 loading={isLoading}
                 variant="primary"
                 fullWidth
-                icon="checkmark-circle"
               />
             </View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ChangeVenmoBottomSheet ref={venmoBottomSheetRef} />
     </SafeAreaView>
   );
 };
@@ -221,7 +255,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
   keyboardAvoid: {
     flex: 1,
@@ -239,17 +273,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    backgroundColor: Colors.background,
+    // Seamless header
   },
   backButton: {
     padding: Spacing.sm,
+    marginLeft: -Spacing.sm,
   },
   headerTitle: {
-    ...Typography.h2,
+    ...Typography.h3,
     color: Colors.textPrimary,
-    textAlign: 'center',
   },
   placeholder: {
     width: 40,
@@ -264,21 +297,9 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: Spacing.md,
   },
-  settingsSection: {
-    margin: Spacing.lg,
-    marginBottom: Spacing.xl,
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.md,
-  },
-  photoCard: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
+  photoSection: {
     alignItems: 'center',
-    ...Shadows.card,
+    marginVertical: Spacing.xl,
   },
   photoContainer: {
     position: 'relative',
@@ -288,68 +309,141 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+    borderWidth: 4,
+    borderColor: Colors.surface,
   },
   profilePlaceholder: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.divider,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.avatar,
+    borderWidth: 4,
+    borderColor: Colors.surface,
   },
-  editPhotoButton: {
+  editIconBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.textPrimary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: Colors.card,
-    ...Shadows.button,
+    borderColor: Colors.background,
   },
   photoHint: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
+    ...Typography.label,
+    color: Colors.brand,
     marginTop: Spacing.xs,
   },
-  settingsList: {
-    backgroundColor: Colors.card,
+  formContainer: {
+    backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
-    padding: Spacing.lg,
+    marginHorizontal: Spacing.lg,
+    overflow: 'hidden',
     ...Shadows.card,
+    elevation: 2,
+    shadowOpacity: 0.05,
   },
-  inputContainer: {
-    marginBottom: Spacing.lg,
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    height: 56,
   },
-  lastInputContainer: {
-    marginBottom: 0,
+  separator: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginLeft: Spacing.lg,
   },
   inputLabel: {
-    ...Typography.label,
+    ...Typography.body1,
     color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    width: 100,
   },
   textInput: {
-    height: 56,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.divider,
-    paddingHorizontal: Spacing.lg,
-    ...Typography.body,
+    flex: 1,
+    ...Typography.body1,
+    color: Colors.textSecondary, // Input string color (often lighter if existing value, or dark)
+    // Actually standard input text should be primary
     color: Colors.textPrimary,
-    fontSize: 16,
+    height: '100%',
+    textAlign: 'right', // iOS style usually aligns right for values? Or left. Let's stick to standard left for now but iOS settings often puts Value on right.
+    // Let's keep it left for better editing experience, or right if it feels more like 'Detail' view. 
+    // Generally editable fields are left-aligned or right-aligned. Let's try right-aligned for 'settings' style but for text input left is safer for long names.
+    textAlign: 'left',
+  },
+  infoText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xl,
+    textAlign: 'center',
   },
   saveButtonContainer: {
     margin: Spacing.lg,
-    marginTop: Spacing.md,
+  },
+  sectionContainer: {
+    marginTop: Spacing.xl,
+    marginHorizontal: Spacing.lg,
+  },
+  sectionTitle: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    marginLeft: Spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontSize: 11,
+  },
+  venmoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    ...Shadows.card,
+    elevation: 2,
+    shadowOpacity: 0.05,
+  },
+  venmoRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  venmoIconWrapper: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: Spacing.md,
+  },
+  venmoIcon: {
+    width: 24,
+    height: 24,
+  },
+  venmoTextContainer: {
+    flex: 1,
+  },
+  venmoLabel: {
+    ...Typography.body1,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  venmoValue: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontSize: 13,
   },
 });
 

@@ -1,0 +1,21 @@
+{
+    "settings": {
+        "title": "Cài đặt",
+        "account": "Tài khoản",
+        "profile": "Cài đặt hồ sơ",
+        "venmo": "Tích hợp Venmo",
+        "preferences": "Tùy chọn",
+        "language": "Ngôn ngữ",
+        "region": "Khu vực",
+        "currency": "Tiền tệ",
+        "support": "Hỗ trợ",
+        "terms": "Điều khoản dịch vụ",
+        "rate": "Đánh giá ứng dụng",
+        "signOut": "Đăng xuất",
+        "deleteAccount": "Xóa tài khoản"
+    },
+    "common": {
+        "cancel": "Hủy",
+        "save": "Lưu"
+    }
+}

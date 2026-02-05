@@ -101,12 +101,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     }, [navigation, hasUnsavedChanges, loading, actions])
   );
 
-  useEffect(() => {
-    navigation.setOptions({
-      title: expenseType === 'receipt' ? 'Setup Receipt' : 'Setup Expense',
-      tabBarStyle: { display: 'none' },
-    });
-  }, [expenseType, navigation]);
+  // Tab bar hiding is handled centrally in App.js via getTabBarStyle
 
   const handleCreateExpense = async () => {
     const finalTitle = title.trim();

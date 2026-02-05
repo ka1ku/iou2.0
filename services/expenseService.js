@@ -501,3 +501,31 @@ export const settleExpense = async (expenseId, userId) => {
     throw error;
   }
 };
+// Function to create a payment request and trigger notification
+export const createPaymentRequest = async ({ fromUserId, toUserId, amount, expenseId, expenseTitle }) => {
+  try {
+    const firestoreInstance = getFirestore(getApp());
+    
+    const paymentRequest = {
+      fromUserId, // Person requesting payment
+      toUserId, // Person who should pay
+      amount,
+      expenseId,
+      expenseTitle,
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+    
+    // Creating this document will trigger the Cloud Function that sends the notification
+    const docRef = await addDoc(collection(firestoreInstance, 'paymentRequests'), paymentRequest);
+    
+    return {
+      success: true,
+      requestId: docRef.id
+    };
+  } catch (error) {
+    console.error('Error creating payment request:', error);
+    throw error;
+  }
+};

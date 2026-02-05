@@ -27,7 +27,6 @@ const EXPANDED_WIDTH = SCREEN_WIDTH - HEADER_PADDING;
 
 const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearchClose }, ref) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showInput, setShowInput] = useState(false);
   const insets = useSafeAreaInsets();
   const inputRef = useRef(null);
   const shouldCloseOnBlurRef = useRef(true);
@@ -51,43 +50,37 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
       // Reset blur flag when opening search
       shouldCloseOnBlurRef.current = true;
       
-      // Fade out left section (title)
-      leftSectionOpacity.value = withTiming(0, { duration: 200 });
+      // Fade out left section (title) immediately
+      leftSectionOpacity.value = withTiming(0, { duration: 150 });
       
-      // Expand search to cover entire header
+      // Expand search to cover entire header with synchronized timing
       searchWidth.value = withSpring(EXPANDED_WIDTH, {
-        damping: 18,
-        stiffness: 100,
+        damping: 20,
+        stiffness: 120,
       });
       
-      // Show input with slight delay for smoother animation
-      setTimeout(() => {
-        setShowInput(true);
-        inputOpacity.value = withTiming(1, { duration: 200 });
-      }, 100);
+      // Fade in input synchronized with width expansion
+      inputOpacity.value = withTiming(1, { duration: 250 });
       
-      // Focus input after animation
+      // Focus input after animation completes
       setTimeout(() => {
         inputRef.current?.focus();
-      }, 200);
+      }, 250);
     } else {
-      // Collapse search
+      // Fade out input immediately
       inputOpacity.value = withTiming(0, { duration: 150 });
-      
-      // Fade in left section (title)
-      leftSectionOpacity.value = withTiming(1, { duration: 200, delay: 100 });
       
       // Blur input
       inputRef.current?.blur();
       
-      // Hide input and collapse width
-      setTimeout(() => {
-        setShowInput(false);
-        searchWidth.value = withSpring(SEARCH_BUTTON_SIZE, {
-          damping: 18,
-          stiffness: 100,
-        });
-      }, 150);
+      // Collapse width with synchronized timing
+      searchWidth.value = withSpring(SEARCH_BUTTON_SIZE, {
+        damping: 20,
+        stiffness: 120,
+      });
+      
+      // Fade in left section (title) after collapse starts
+      leftSectionOpacity.value = withTiming(1, { duration: 200, delay: 50 });
       
       // Clear search
       onSearchChange('');
@@ -170,49 +163,50 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
             </TouchableOpacity>
 
             {/* Search Input */}
-            {showInput && (
-              <Animated.View style={[styles.inputContainer, inputStyle]}>
-                <TextInput
-                  ref={inputRef}
-                  style={styles.searchInput}
-                  placeholder="Search expenses or members..."
-                  placeholderTextColor={Colors.textSecondary}
-                  value={searchQuery}
-                  onChangeText={onSearchChange}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="search"
-                  onBlur={() => {
-                    // Close search when input loses focus (user taps outside)
-                    // Small delay to allow clear button presses to register
+            <Animated.View 
+              style={[styles.inputContainer, inputStyle]}
+              pointerEvents={isExpanded ? 'auto' : 'none'}
+            >
+              <TextInput
+                ref={inputRef}
+                style={styles.searchInput}
+                placeholder="Search expenses or members..."
+                placeholderTextColor={Colors.textSecondary}
+                value={searchQuery}
+                onChangeText={onSearchChange}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                onBlur={() => {
+                  // Close search when input loses focus (user taps outside)
+                  // Small delay to allow clear button presses to register
+                  setTimeout(() => {
+                    if (isExpanded && shouldCloseOnBlurRef.current) {
+                      handleCloseSearch();
+                    }
+                    // Reset the flag
+                    shouldCloseOnBlurRef.current = true;
+                  }, 150);
+                }}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => {
+                    // Prevent closing on blur when clearing text
+                    shouldCloseOnBlurRef.current = false;
+                    onSearchChange('');
+                    // Keep focus on input after clearing
                     setTimeout(() => {
-                      if (isExpanded && shouldCloseOnBlurRef.current) {
-                        handleCloseSearch();
-                      }
-                      // Reset the flag
-                      shouldCloseOnBlurRef.current = true;
-                    }, 150);
+                      inputRef.current?.focus();
+                    }, 50);
                   }}
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      // Prevent closing on blur when clearing text
-                      shouldCloseOnBlurRef.current = false;
-                      onSearchChange('');
-                      // Keep focus on input after clearing
-                      setTimeout(() => {
-                        inputRef.current?.focus();
-                      }, 50);
-                    }}
-                    style={styles.clearTextButton}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
-              </Animated.View>
-            )}
+                  style={styles.clearTextButton}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+                </TouchableOpacity>
+              )}
+            </Animated.View>
           </Animated.View>
         </View>
       </View>

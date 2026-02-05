@@ -258,7 +258,6 @@ class ExpoNotificationService {
   getDefaultPreferences() {
     return {
       expenses: true,
-      friends: true,
       payments: true,
       settlements: true,
       doNotDisturb: {

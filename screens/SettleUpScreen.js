@@ -21,7 +21,8 @@ import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { calculateSettlement, calculateSettlementWithPartialSettlements, getSettlementSummary } from '../utils/settlementCalculator';
 import { getCurrentUser } from '../services/authService';
 import { getUserProfile } from '../services/friendService';
-import { createExpense, updateExpense, getExpenseById } from '../services/expenseService';
+import { createExpense, updateExpense, getExpenseById, createPaymentRequest } from '../services/expenseService';
+import SettlementInterface from '../components/expenses/SettlementInterface';
 
 const AVATAR_SIZE = 48;
 
@@ -1109,6 +1110,29 @@ const SettleUpScreen = ({ route, navigation }) => {
       const note = `IOU Payment Request - ${expense.title || 'Expense'}`;
       const deeplink = `venmo://paycharge?txn=charge&recipients=${payerProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
       console.log('[handleRequestPayment] Venmo deeplink:', deeplink);
+
+      // Get current user (the person requesting payment)
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        Alert.alert('Error', 'You must be logged in to request payment');
+        return;
+      }
+
+      // Create payment request document in Firestore to trigger notification
+      try {
+        console.log('[handleRequestPayment] Creating payment request document');
+        await createPaymentRequest({
+          fromUserId: currentUser.uid, // Person requesting payment (creditor)
+          toUserId: payerParticipant.userId, // Person who should pay (debtor)
+          amount: settlement.amount,
+          expenseId: expense.id,
+          expenseTitle: expense.title || 'Untitled Expense'
+        });
+        console.log('[handleRequestPayment] Payment request document created - notification will be sent');
+      } catch (error) {
+        console.error('[handleRequestPayment] Failed to create payment request:', error);
+        // Don't block the Venmo flow if notification fails
+      }
 
       if (copyToClipboard) {
         // Copy to clipboard instead of opening

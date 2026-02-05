@@ -363,7 +363,15 @@ export const createUserProfile = async (userData, phoneNumber) => {
       profilePhoto: cleanUserData.profilePhoto,
       phoneVerified: true,
       accountStatus: 'active',
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
+      inviteStats: {
+        contactsInvited: 0,
+        friendsJoined: 0,
+        premiumUnlocked: false,
+        premiumUntil: null,
+        inviteHistory: []
+      },
+      onboardingCompleted: false
     };
 
     // Log what's being saved
@@ -553,5 +561,54 @@ export const deleteUserAccount = async () => {
     return true;
   } catch (error) {
     throw error;
+  }
+};
+
+// Update user preferences (language, region, currency)
+export const updateUserPreferences = async (preferences) => {
+  try {
+    const user = auth().currentUser;
+    if (!user) {
+      // If no user is logged in, we can only update local state which is handled by the store
+      return null;
+    }
+
+    const firestoreInstance = getFirestore(getApp());
+    const userDocRef = doc(firestoreInstance, 'users', user.uid);
+    
+    await setDoc(userDocRef, {
+      preferences: {
+        language: preferences.language,
+        region: preferences.region,
+        currency: preferences.currency,
+        updatedAt: serverTimestamp()
+      }
+    }, { merge: true });
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating user preferences:', error);
+    return false;
+  }
+};
+
+// Get user preferences
+export const getUserPreferences = async () => {
+  try {
+    const user = auth().currentUser;
+    if (!user) return null;
+
+    const firestoreInstance = getFirestore(getApp());
+    const userDocRef = doc(firestoreInstance, 'users', user.uid);
+    const docSnap = await getDoc(userDocRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      return data.preferences || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting user preferences:', error);
+    return null;
   }
 };

@@ -379,7 +379,6 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
           // Check user notification preferences
           const preferences = userData.notificationPreferences || {
             expenses: true,
-            friends: true,
             payments: true,
             settlements: true
           };
@@ -581,8 +580,9 @@ exports.onExpenseSettled = functions.firestore
     try {
       // Check if expense was just settled
       if (!before.settled && after.settled) {
-        // Get all participant user IDs
-        const participantIds = after.participantIds || [];
+        // Get all participant user IDs (excluding the person who settled it)
+        const settledBy = after.settledBy || after.updatedBy || after.createdBy;
+        const participantIds = (after.participantIds || []).filter(id => id !== settledBy);
         
         if (participantIds.length > 0) {
           const title = 'Expense Settled';
@@ -597,34 +597,6 @@ exports.onExpenseSettled = functions.firestore
       }
     } catch (error) {
       console.error('Error in onExpenseSettled:', error);
-    }
-  });
-
-// Trigger: Friend request sent
-exports.onFriendRequestSent = functions.firestore
-  .document('friendRequests/{requestId}')
-  .onCreate(async (snap, context) => {
-    const request = snap.data();
-    const requestId = context.params.requestId;
-    
-    try {
-      // Get sender info
-      const senderDoc = await admin.firestore().collection('users').doc(request.fromUserId).get();
-      const senderData = senderDoc.data();
-      const senderName = `${senderData.firstName} ${senderData.lastName}`.trim();
-      
-      // Send notification to recipient
-      const title = 'New Friend Request';
-      const body = `${senderName} sent you a friend request`;
-      
-      await sendNotificationsToUsers([request.toUserId], title, body, {
-        type: 'friends',
-        route: 'friend',
-        userId: request.fromUserId,
-        requestId: requestId
-      });
-    } catch (error) {
-      console.error('Error in onFriendRequestSent:', error);
     }
   });
 

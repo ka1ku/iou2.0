@@ -75,6 +75,7 @@
         }
       ],
       "expo-font",
+      "expo-localization",
       [
         "expo-image-picker",
         {

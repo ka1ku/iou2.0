@@ -98,14 +98,10 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     bottomSheetRef.current?.close();
     setTimeout(() => {
-      // Navigate to SetupExpense in the appropriate tab's stack
-      const targetTab = getTargetTab();
-      navigation.navigate(targetTab, {
-        screen: 'SetupExpense',
-        params: { expenseType: 'expense' },
-      });
+      // Navigate to SetupExpense directly as it's in the RootStack
+      navigation.navigate('SetupExpense', { expenseType: 'expense' });
     }, 300);
-  }, [navigation, getTargetTab]);
+  }, [navigation]);
 
   const handleScanReceipt = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -134,15 +130,11 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
             stopScanningAnimation();
           },
           (receiptData) => {
-            // Navigate to SetupExpense in the appropriate tab's stack
-            const targetTab = getTargetTab();
-            navigation.navigate(targetTab, {
-              screen: 'SetupExpense',
-              params: { 
-                expenseType: 'receipt',
-                scannedReceipt: receiptData,
-                fromReceiptScan: true 
-              }
+            // Navigate to SetupExpense directly as it's in the RootStack
+            navigation.navigate('SetupExpense', { 
+              expenseType: 'receipt',
+              scannedReceipt: receiptData,
+              fromReceiptScan: true 
             });
           },
           (errorMessage) => {
@@ -153,7 +145,7 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
         setIsReceiptScanning
       );
     }, 300);
-  }, [navigation, getTargetTab, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
+  }, [navigation, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
 
   const handlePickFromGallery = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -177,15 +169,11 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
             stopScanningAnimation();
           },
           (receiptData) => {
-            // Navigate to SetupExpense in the appropriate tab's stack
-            const targetTab = getTargetTab();
-            navigation.navigate(targetTab, {
-              screen: 'SetupExpense',
-              params: { 
-                expenseType: 'receipt',
-                scannedReceipt: receiptData,
-                fromReceiptScan: true 
-              }
+            // Navigate to SetupExpense directly as it's in the RootStack
+            navigation.navigate('SetupExpense', { 
+              expenseType: 'receipt',
+              scannedReceipt: receiptData,
+              fromReceiptScan: true 
             });
           },
           (errorMessage) => {
@@ -196,7 +184,7 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
         setIsReceiptScanning
       );
     }, 300);
-  }, [navigation, getTargetTab, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
+  }, [navigation, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
 
   const renderBackdrop = useCallback(
     (props) => (

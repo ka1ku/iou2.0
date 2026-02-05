@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors, Spacing, Radius } from "../design/tokens";
+import { Colors, Spacing, Radius, Typography, Shadows } from "../design/tokens";
 import { getCurrentUser } from "../services/authService";
 import { getUserProfile } from "../services/friendService";
 import {
@@ -20,13 +20,18 @@ import {
   updateExpenseParticipants,
   deleteItemFromExpense,
 } from "../services/expenseService";
-import { calculateSettlement } from "../utils/settlementCalculator";
+import {
+  calculateSettlement,
+  calculateSettlementWithPartialSettlements,
+} from "../utils/settlementCalculator";
 import { useExpense } from "../contexts/ExpenseContext";
 import ExpenseHeader from "../components/expenses/ExpenseHeader";
+import ExpenseTabNavigator from "../components/expenses/ExpenseTabNavigator";
 import ExpenseFooter from "../components/expenses/ExpenseFooter";
 import ExpenseItemCard from "../components/expenses/ExpenseItemCard";
 import ExpenseViewCard from "../components/expenses/ExpenseViewCard";
 import ParticipantsGrid from "../components/expenses/ParticipantsGrid";
+import SettlementInterface from "../components/expenses/SettlementInterface";
 
 const SPLIT_TOLERANCE = 0.01;
 
@@ -38,17 +43,96 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
   const { state, actions, total } = useExpense();
 
+  const [activeTab, setActiveTab] = useState('track');
   const [editingItems, setEditingItems] = useState(new Set());
   
   const [newlyAddedItems, setNewlyAddedItems] = useState(new Set());
   const itemSnapshotsRef = useRef(new Map());
 
+  // Track local settlement actions (mark paid, etc.)
+  const [localSettlementActions, setLocalSettlementActions] = useState({});
+
   useEffect(() => {
-    navigation.setOptions({
-      title: isEditing ? "Edit Expense" : "Add Expense",
-      tabBarStyle: { display: "none" },
+    // If we're editing an existing expense, initialize local actions from it
+    if (expense?.settlements) {
+        const initialActions = {};
+        expense.settlements.forEach(s => {
+            if (s.status && s.status !== 'noAction') {
+                const key = getSettlementKey(s);
+                initialActions[key] = {
+                    status: s.status,
+                    updatedAt: s.updatedAt
+                };
+            }
+        });
+        setLocalSettlementActions(initialActions);
+    }
+  }, [expense?.settlements]);
+
+  // Helper to generate key (duplicated here to avoid export issues, strictly formatted)
+  const getSettlementKey = (settlement) => {
+    const from = settlement.debtor || settlement.from;
+    const to = settlement.creditor || settlement.to;
+    const amount = settlement.amount;
+    const roundedAmount = Math.round(amount * 100) / 100;
+    return `${from}|||${to}|||${roundedAmount}`;
+  };
+
+  const handleSettlementAction = async (action, settlement) => {
+    const key = getSettlementKey(settlement);
+    let newStatus = 'noAction';
+    
+    if (action === 'markAsPaid') newStatus = 'markedAsPaid';
+    if (action === 'requestPayment') newStatus = 'paymentRequested';
+    if (action === 'paymentMade') newStatus = 'paymentMade';
+    if (action === 'sendReminder') newStatus = 'reminderSent';
+    if (action === 'undo') newStatus = 'noAction';
+
+    // Update local state immediately for UI responsiveness
+    setLocalSettlementActions(prev => {
+        if (newStatus === 'noAction') {
+            const newState = { ...prev };
+            delete newState[key];
+            return newState;
+        }
+        return {
+            ...prev,
+            [key]: { status: newStatus, updatedAt: new Date().toISOString() }
+        };
     });
 
+    // If editing, try to persist to Firestore immediately
+    if (isEditing && expense?.id) {
+        try {
+            // We need to construct the full settlements array to persist
+            // This requires recalculating optimal settlements and merging current state
+            const expenseData = await prepareExpenseData();
+            const settlementResult = calculateSettlement(expenseData);
+            let settlements = settlementResult.settlements || [];
+            
+            // Apply all local actions to the settlements
+            const updatedSettlements = settlements.map(s => {
+                const sKey = getSettlementKey(s);
+                // Check current action being applied OR existing local action
+                if (sKey === key) {
+                     return { ...s, status: newStatus, updatedAt: new Date().toISOString() };
+                }
+                const localAction = localSettlementActions[sKey];
+                if (localAction) {
+                    return { ...s, status: localAction.status, updatedAt: localAction.updatedAt };
+                }
+                return s;
+            });
+
+            await updateExpense(expense.id, { settlements: updatedSettlements }, getCurrentUser()?.uid);
+        } catch (error) {
+            console.error("Failed to persist settlement action:", error);
+        }
+    }
+  };
+
+  useEffect(() => {
+    // Tab bar hiding is handled centrally in App.js via getTabBarStyle
     if (expense && (isEditing || isNewExpense)) {
       actions.initializeFromExpense(expense, isEditing, isNewExpense);
     }
@@ -408,6 +492,11 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         isEditing={isEditing}
       />
 
+      <ExpenseTabNavigator
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -417,116 +506,182 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           style={styles.content}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: insets.top + 90,
-            paddingBottom: 120,
+            paddingTop: insets.top + 150,
+            paddingBottom: activeTab === 'split' ? 120 : Spacing.xl,
           }}
         >
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Participants</Text>
-              <View style={styles.memberCountContainer}>
-                <Text style={styles.memberCountNumber}>
-                  {state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length}
-                </Text>
-                <Ionicons name="people" size={12} color={Colors.surface} />
-              </View>
-            </View>
-
-            <ParticipantsGrid
-              onParticipantPress={(participant, index) => {
-                if (
-                  participant.userId &&
-                  participant.userId !== getCurrentUser()?.uid
-                ) {
-                  navigation.navigate("FriendProfile", {
-                    friendId: participant.userId,
-                  });
-                }
-              }}
-              expenseId={expense?.id}
-              currentUserId={getCurrentUser()?.uid}
-            />
-
-          <Text style={styles.sectionTitle}>Items</Text>
-
-          {state.items.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <View style={styles.emptyStateIconContainer}>
-                <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
-              </View>
-              <Text style={styles.emptyStateTitle}>No items yet</Text>
-              <Text style={styles.emptyStateDescription}>
-                Start by adding your first item to this expense
-              </Text>
-              
-              <TouchableOpacity
-                style={styles.emptyStateButton}
-                onPress={handleAddItem}
-                activeOpacity={0.7}
-              >
-                <View style={styles.emptyStateButtonIcon}>
-                  <Ionicons name="add" size={20} color={Colors.accent} />
-                </View>
-                <Text style={styles.emptyStateButtonText}>Add Your First Item</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
+          {activeTab === 'track' && (
             <>
-              {state.items.map((item, index) => {
-                const isItemEditing = editingItems.has(index);
-                const isNewlyAdded = newlyAddedItems.has(index);
-                const shouldDeleteOnCancel = !isEditing || isNewlyAdded;
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Participants</Text>
+                <View style={styles.memberCountContainer}>
+                  <Text style={styles.memberCountNumber}>
+                    {state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length}
+                  </Text>
+                  <Ionicons name="people" size={12} color={Colors.surface} />
+                </View>
+              </View>
 
-                if (isItemEditing) {
+              <ParticipantsGrid
+                onParticipantPress={(participant, index) => {
+                  if (
+                    participant.userId &&
+                    participant.userId !== getCurrentUser()?.uid
+                  ) {
+                    navigation.navigate("FriendProfile", {
+                      friendId: participant.userId,
+                    });
+                  }
+                }}
+                expenseId={expense?.id}
+                currentUserId={getCurrentUser()?.uid}
+              />
+
+              <Text style={styles.sectionTitle}>Items</Text>
+
+              {state.items.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <View style={styles.emptyStateIconContainer}>
+                    <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
+                  </View>
+                  <Text style={styles.emptyStateTitle}>No items yet</Text>
+                  <Text style={styles.emptyStateDescription}>
+                    Start by adding your first item to this expense
+                  </Text>
+                  
+                  <TouchableOpacity
+                    style={styles.emptyStateButton}
+                    onPress={handleAddItem}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.emptyStateButtonIcon}>
+                      <Ionicons name="add" size={20} color={Colors.accent} />
+                    </View>
+                    <Text style={styles.emptyStateButtonText}>Add Your First Item</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  {state.items.map((item, index) => {
+                    const isItemEditing = editingItems.has(index);
+                    const isNewlyAdded = newlyAddedItems.has(index);
+                    const shouldDeleteOnCancel = !isEditing || isNewlyAdded;
+
+                    if (isItemEditing) {
+                      return (
+                        <ExpenseItemCard
+                          key={item.id}
+                          item={item}
+                          index={index}
+                          expenseId={expense?.id}
+                          isEditing={isItemEditing}
+                          onCancelEdit={({ revertChanges } = { revertChanges: false }) =>
+                            exitItemEditMode(index, {
+                              revertChanges: shouldDeleteOnCancel ? false : revertChanges ?? false,
+                            })
+                          }
+                          onDelete={
+                            shouldDeleteOnCancel
+                              ? () => handleDeleteItem(index, !isEditing || newlyAddedItems.has(index))
+                              : undefined
+                          }
+                        />
+                      );
+                    } else {
+                      return (
+                        <ExpenseViewCard
+                          key={item.id}
+                          item={item}
+                          index={index}
+                          onEdit={() => handleEditItem(index)}
+                          onDelete={() => handleDeleteItem(index)}
+                        />
+                      );
+                    }
+                  })}
+
+                  <TouchableOpacity
+                    style={styles.addAnotherItemButton}
+                    onPress={handleAddItem}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.addAnotherItemIcon}>
+                      <Ionicons name="add" size={20} color={Colors.accent} />
+                    </View>
+                    <Text style={styles.addAnotherItemText}>Add Another Item</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </>
+          )}
+
+          {activeTab === 'split' && (
+            <View style={styles.splitViewContainer}>
+              {(() => {
+                // Calculate settlements on the fly
+                try {
+                  const expenseData = {
+                    title: state.title || 'Expense',
+                    total: total,
+                    participants: state.participants,
+                    items: state.items,
+                    fees: state.fees,
+                    selectedPayers: state.selectedPayers || [0],
+                  };
+                  
+                  // Calculate optimal settlements
+                  const settlementResult = calculateSettlement(expenseData);
+                  let settlements = settlementResult.settlements || [];
+                  const currentUserId = getCurrentUser()?.uid;
+                  
+                  // Merge with local actions/statuses
+                  // This effectively applies "partial settlements" logic locally
+                  settlements = settlements.map(s => {
+                      const key = getSettlementKey(s);
+                      const localAction = localSettlementActions[key];
+                      if (localAction) {
+                          return {
+                              ...s,
+                              status: localAction.status,
+                              updatedAt: localAction.updatedAt
+                          };
+                      }
+                      return s;
+                  });
+                  
                   return (
-                    <ExpenseItemCard
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      expenseId={expense?.id}
-                      isEditing={isItemEditing}
-                      onCancelEdit={({ revertChanges } = { revertChanges: false }) =>
-                        exitItemEditMode(index, {
-                          revertChanges: shouldDeleteOnCancel ? false : revertChanges ?? false,
-                        })
-                      }
-                      onDelete={
-                        shouldDeleteOnCancel
-                          ? () => handleDeleteItem(index, !isEditing || newlyAddedItems.has(index))
-                          : undefined
-                      }
+                    <SettlementInterface
+                        settlements={settlements}
+                        participants={state.participants}
+                        currentUserId={currentUserId}
+                        expenseTitle={state.title}
+                        onAction={handleSettlementAction}
+                        readOnly={false}
                     />
                   );
-                } else {
+                } catch (error) {
+                  console.error('Error calculating settlements:', error);
                   return (
-                    <ExpenseViewCard
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      onEdit={() => handleEditItem(index)}
-                      onDelete={() => handleDeleteItem(index)}
-                    />
+                    <View style={styles.emptySettlementContainer}>
+                      <Ionicons name="alert-circle" size={48} color={Colors.textSecondary} />
+                      <Text style={styles.emptySettlementText}>
+                        Add items to see settlement details
+                      </Text>
+                    </View>
                   );
                 }
-              })}
-
-              <TouchableOpacity
-                style={styles.addAnotherItemButton}
-                onPress={handleAddItem}
-                activeOpacity={0.7}
-              >
-                <View style={styles.addAnotherItemIcon}>
-                  <Ionicons name="add" size={20} color={Colors.accent} />
-                </View>
-                <Text style={styles.addAnotherItemText}>Add Another Item</Text>
-              </TouchableOpacity>
-            </>
+              })()}
+            </View>
           )}
         </ScrollView>
 
-        <ExpenseFooter
-          loading={state.loading}
-          onSettlePress={handleSettleNow}
-        />
+        {activeTab === 'split' && (
+          <ExpenseFooter
+            loading={state.loading}
+            onSettlePress={handleSettleNow}
+            settleButtonText="Settle Now"
+          />
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -660,6 +815,162 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontWeight: "600",
     fontSize: 16,
+  },
+  splitViewContainer: {
+    paddingTop: Spacing.md,
+  },
+  sectionTitle: {
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+  },
+  sectionSubtitle: {
+    ...Typography.body2,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+  },
+  settlementsList: {
+    gap: Spacing.md,
+  },
+  settlementItem: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.divider,
+    padding: Spacing.md,
+    ...Shadows.card,
+  },
+  settlementRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  participantColumn: {
+    alignItems: 'center',
+    width: 80,
+  },
+  participantAvatarContainer: {
+    position: 'relative',
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.xs,
+  },
+  participantAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    ...Shadows.avatar,
+  },
+  participantAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.accent,
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.avatar,
+  },
+  participantAvatarInitials: {
+    color: Colors.surface,
+    fontSize: Math.floor(48 / 2.5),
+    fontFamily: Typography.familySemiBold,
+  },
+  currentUserAvatar: {
+    borderColor: Colors.accent,
+    borderWidth: 3,
+    backgroundColor: Colors.accent,
+  },
+  currentUserInitials: {
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: Math.ceil(48 / 2.5),
+  },
+  participantName: {
+    ...Typography.caption,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    fontSize: Math.ceil(48 / 4),
+    fontWeight: '500',
+    maxWidth: 80,
+    marginBottom: 2,
+  },
+  participantUsername: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    fontSize: Math.ceil(48 / 5),
+  },
+  settlementTextContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.sm,
+  },
+  arrowLine: {
+    flex: 1,
+    height: 10,
+    backgroundColor: Colors.accent,
+    opacity: 0.4,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  arrowLineInner: {
+    height: 10,
+    backgroundColor: Colors.accent,
+  },
+  arrowHead: {
+    position: 'absolute',
+    right: -12,
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 24,
+    borderRightWidth: 0,
+    borderTopWidth: 18,
+    borderBottomWidth: 18,
+    borderLeftColor: Colors.accent,
+    borderRightColor: 'transparent',
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  textContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: Colors.surface,
+    zIndex: 1,
+  },
+  settlementAmount: {
+    ...Typography.h3,
+    color: Colors.accent,
+    fontWeight: '700',
+    fontSize: 20,
+    textAlign: 'center',
+  },
+  noSettlements: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+  },
+  noSettlementsText: {
+    ...Typography.h4,
+    color: Colors.success,
+    marginTop: Spacing.md,
+    fontWeight: '600',
+  },
+  noSettlementsSubtext: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginTop: Spacing.sm,
   },
 });
 

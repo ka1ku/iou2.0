@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { NavigationContainer, getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +23,7 @@ import '@react-native-firebase/auth';
 import '@react-native-firebase/firestore';
 import '@react-native-firebase/ai';
 
-import { onAuthStateChange } from './services/authService';
+import { onAuthStateChange, getUserPreferences } from './services/authService';
 import deepLinkService from './services/deepLinkService';
 import expoNotificationService from './services/expoNotificationService';
 import HomeScreen from './screens/HomeScreen';
@@ -33,10 +33,9 @@ import AddExpenseScreen from './screens/AddExpenseScreen';
 import AddReceiptScreen from './screens/AddReceiptScreen';
 import SettleUpScreen from './screens/SettleUpScreen';
 import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
-import NotificationTestScreen from './screens/settings/NotificationTestScreen';
-import VenmoTestScreen from './screens/settings/VenmoTest';
 import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
 import TermsOfServiceScreen from './screens/settings/TermsOfServiceScreen';
+import LanguageRegionSettingsScreen from './screens/settings/LanguageRegionSettingsScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 
@@ -44,6 +43,7 @@ import WelcomeScreen from './screens/auth/WelcomeScreen';
 import SignInScreen from './screens/auth/SignInScreen';
 import SignUpScreen from './screens/auth/SignUpScreen';
 import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
+import ContactInviteScreen from './screens/auth/ContactInviteScreen';
 
 import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
 import CreateBottomSheet from './components/CreateBottomSheet';
@@ -52,9 +52,11 @@ import { ExpenseProvider } from './contexts/ExpenseContext';
 import { ExpenseDataProvider, useExpenseData } from './contexts/ExpenseDataContext';
 import { NotificationProvider, useNotifications } from './contexts/NotificationContext';
 import { ReceiptScanningProvider, useReceiptScanning } from './contexts/ReceiptScanningContext';
+import { useSettingsStore } from './stores/useSettingsStore';
+import i18n from './utils/i18n';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 const SetupExpenseScreenWithProvider = (props) => {
   const { userProfile } = useExpenseData();
@@ -86,27 +88,12 @@ const AddReceiptScreenWithProvider = (props) => {
 const HomeStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="HomeMain" component={HomeScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="SetupExpense" component={SetupExpenseScreenWithProvider} options={{ headerShown: false }} />
-    <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} options={{ headerShown: false }} />
-    <Stack.Screen name="AddReceipt" component={AddReceiptScreenWithProvider} options={{ headerShown: false }} />
-    <Stack.Screen name="SettleUp" component={SettleUpScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="ExpenseSettings" component={ExpenseSettingsScreen} options={{ headerShown: false }} />
   </Stack.Navigator>
 );
 
 const ProfileStack = () => (
   <Stack.Navigator>
     <Stack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="NotificationTest" component={NotificationTestScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="VenmoTest" component={VenmoTestScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="FriendProfile" component={FriendProfileScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} options={{ headerShown: false }} />
-    <Stack.Screen name="AddReceipt" component={AddReceiptScreenWithProvider} options={{ headerShown: false }} />
-    <Stack.Screen name="SettleUp" component={SettleUpScreen} options={{ headerShown: false }} />
-    <Stack.Screen name="ExpenseSettings" component={ExpenseSettingsScreen} options={{ headerShown: false }} />
   </Stack.Navigator>
 );
 
@@ -128,24 +115,19 @@ const NotificationNavigationSetup = () => {
         switch (route) {
           case 'expense':
             if (expenseId) {
-              navigation.navigate('Home', {
-                screen: 'ExpenseSettings',
-                params: { expenseId }
-              });
+              // Navigate to the global ExpenseSettings screen
+              navigation.navigate('ExpenseSettings', { expenseId });
             }
             break;
           case 'friend':
             if (userId) {
-              navigation.navigate('Profile', {
-                screen: 'FriendProfile',
-                params: { userId }
-              });
+              // Navigate to the global FriendProfile screen
+              navigation.navigate('FriendProfile', { userId });
             }
             break;
           case 'settle':
-            navigation.navigate('Home', {
-              screen: 'SettleUp'
-            });
+            // Navigate to the global SettleUp screen
+            navigation.navigate('SettleUp');
             break;
           case 'profile':
             navigation.navigate('Profile');
@@ -202,26 +184,6 @@ const MainTabs = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const getTabBarStyle = (route) => {
-    const routeName = getFocusedRouteNameFromRoute(route);
-    const hiddenRoutes = [
-      'AddExpense', 'AddReceipt', 'SettleUp', 'SetupExpense', 'ExpenseSettings', 
-      'NotificationTest', 'VenmoTest', 'FriendProfile', 'Settings',
-      'ProfileSettings', 'TermsOfService'
-    ];
-
-    return {
-      backgroundColor: Colors.surface,
-      borderTopWidth: 0,
-      elevation: 0,
-      shadowOpacity: 0,
-      height: 90,
-      paddingBottom: 30,
-      paddingTop: 10,
-      display: hiddenRoutes.includes(routeName) ? 'none' : 'flex',
-    };
-  };
-
   return (
     <View style={{ flex: 1 }}>
       <Tab.Navigator
@@ -229,7 +191,16 @@ const MainTabs = () => {
           tabBarIcon: ({ focused, color, size }) => getTabBarIcon(route.name, focused, color, size),
           tabBarActiveTintColor: Colors.tabActive,
           tabBarInactiveTintColor: Colors.tabInactive,
-          tabBarStyle: getTabBarStyle(route),
+          
+          tabBarStyle: {
+            backgroundColor: Colors.surface,
+            borderTopWidth: 0,
+            elevation: 0,
+            shadowOpacity: 0,
+            height: 90,
+            paddingBottom: 30,
+            paddingTop: 10,
+          },
           tabBarLabelStyle: {
             fontSize: 12,
             fontFamily: Typography.familyMedium,
@@ -312,10 +283,63 @@ const AuthStack = () => (
     <Stack.Screen name="SignIn" component={SignInScreen} />
     <Stack.Screen name="SignUp" component={SignUpScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
+    <Stack.Screen name="ContactInvite" component={ContactInviteScreen} />
   </Stack.Navigator>
 );
 
 SplashScreen.preventAutoHideAsync();
+
+const OnboardingStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="ContactInvite" component={ContactInviteScreen} />
+  </Stack.Navigator>
+);
+
+const RootStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      
+      {/* Global Screens (Push over tabs) */}
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
+      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+      <Stack.Screen name="LanguageRegion" component={LanguageRegionSettingsScreen} />
+      <Stack.Screen name="FriendProfile" component={FriendProfileScreen} />
+      
+      {/* Expense Flow Screens */}
+      <Stack.Screen name="SetupExpense" component={SetupExpenseScreenWithProvider} />
+      <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} />
+      <Stack.Screen name="AddReceipt" component={AddReceiptScreenWithProvider} />
+      <Stack.Screen name="SettleUp" component={SettleUpScreen} />
+      <Stack.Screen name="ExpenseSettings" component={ExpenseSettingsScreen} />
+    </Stack.Navigator>
+  );
+};
+
+const AppContent = ({ user, loading }) => {
+  const { userProfile } = useExpenseData();
+
+  if (loading) {
+     return <LoadingScreen />;
+  }
+
+  if (user) {
+    // If we have a user but profile hasn't loaded yet, show loading
+    if (!userProfile) {
+       return <LoadingScreen />;
+    }
+    
+    // Check if onboarding is completed
+    if (userProfile.onboardingCompleted === false) {
+      return <OnboardingStack />;
+    }
+    
+    return <RootStack />;
+  }
+  
+  return <AuthStack />;
+};
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -327,6 +351,12 @@ export default function App() {
     Poppins_600SemiBold,
     Poppins_700Bold,
   });
+
+  const { language } = useSettingsStore();
+
+  useEffect(() => {
+    i18n.locale = language;
+  }, [language]);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
@@ -344,7 +374,7 @@ export default function App() {
         
         Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
         
-        const offerings = await Purchases.getOfferings();
+        await Purchases.getOfferings();
         
       } catch (error) {
       }
@@ -359,6 +389,27 @@ export default function App() {
       setUser(user);
       setLoading(false);
       
+      if (user?.uid) {
+        // Sync preferences from Firebase
+        try {
+          const preferences = await getUserPreferences();
+          if (preferences) {
+            const { language, region, currency } = preferences;
+            const store = useSettingsStore.getState();
+            
+            if (language) {
+               store.setLanguage(language);
+               i18n.locale = language;
+            }
+            if (region) store.setRegion(region);
+            if (currency) store.setCurrency(currency);
+          }
+        } catch (error) {
+           console.error('Failed to sync preferences:', error);
+        }
+
+      }
+
       if (user?.uid) {
         try {
           await Purchases.setAppUserID(user.uid);
@@ -375,7 +426,7 @@ export default function App() {
     };
   }, []);
 
-  if (loading || !fontsLoaded) {
+  if (!fontsLoaded && !fontError) {
     return <LoadingScreen />;
   }
 
@@ -400,7 +451,7 @@ export default function App() {
             <ExpenseDataProvider>
               <NotificationProvider>
                 <ReceiptScanningProvider>
-                  {user ? <MainTabs /> : <AuthStack />}
+                  <AppContent user={user} loading={loading} />
                   <ExpenseJoinHandler />
                   {user && <NotificationNavigationSetup />}
                 </ReceiptScanningProvider>

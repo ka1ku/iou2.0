@@ -19,10 +19,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// A simple component for the dashed line, styled with your tokens
-const DashedSeparator = () => <View style={styles.dashedSeparator} />;
-
-// Memoized participant chip component for better performance
 const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
   <TouchableOpacity
     style={[styles.chip, isSelected && styles.chipSelected]}
@@ -57,7 +53,6 @@ const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
   );
 });
 
-// Memoized item row component for better performance
 const ItemRow = memo(({
   item,
   index,
@@ -74,200 +69,170 @@ const ItemRow = memo(({
   const itemErrors = validationErrors?.[item.id] || {};
   const [localValidationErrors, setLocalValidationErrors] = useState({});
   
-  // Clear local errors when exiting edit mode
   useEffect(() => {
     if (!isEditing) {
       setLocalValidationErrors({});
     }
   }, [isEditing]);
   
-  // Stable callback for participant selection
   const handleParticipantPress = useCallback((pIndex) => {
     const isSelected = item.selectedConsumers?.includes(pIndex);
     const current = item.selectedConsumers || [];
     const newConsumers = isSelected ? current.filter(i => i !== pIndex) : [...current, pIndex];
     onUpdate('item', index, 'selectedConsumers', newConsumers);
     
-    // Clear validation error when user starts fixing
     if (onClearValidationError && newConsumers.length > 0) {
       onClearValidationError(item.id, 'consumers');
     }
   }, [item.selectedConsumers, item.id, index, onUpdate, onClearValidationError]);
 
-  // Handle save with local validation
   const handleSaveClick = useCallback(() => {
     const errors = {};
-    
-    // Check if price is zero or invalid
     const amount = parseFloat(item.amount);
     if (!amount || amount <= 0 || isNaN(amount)) {
       errors.amount = true;
     }
     
-    // If there are validation errors, show them and don't save
     if (Object.keys(errors).length > 0) {
       setLocalValidationErrors(errors);
       return;
     }
     
-    // Clear local errors and proceed with save
     setLocalValidationErrors({});
     onSave(index);
   }, [item.amount, index, onSave]);
 
-  // Animated styles for edit mode card
   const editCardAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: withTiming(isEditing ? 1 : 0, { duration: 300 }),
-      transform: [
-        { 
-          translateY: withTiming(isEditing ? 0 : -10, { duration: 300 })
-        }
-      ],
+      display: isEditing ? 'flex' : 'none',
+      overflow: 'hidden',
     };
   }, [isEditing]);
 
-  // Animated styles for view mode
   const viewModeAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: withTiming(isEditing ? 0 : 1, { duration: 300 }),
+      display: isEditing ? 'none' : 'flex',
     };
   }, [isEditing]);
 
-  // Get selected participants for view mode
   const selectedParticipants = useMemo(() => {
     return (item.selectedConsumers || []).map(idx => participants[idx]).filter(Boolean);
   }, [item.selectedConsumers, participants]);
 
-  // Render both modes and animate between them
   return (
-    <View style={styles.itemContainer}>
-      {/* Edit Mode - Animated */}
-      <Animated.View 
-        style={[
-          editCardAnimatedStyle,
-          { position: isEditing ? 'relative' : 'absolute', width: '100%', zIndex: isEditing ? 10 : 0 }
-        ]}
-        pointerEvents={isEditing ? 'auto' : 'none'}
-      >
-        <View style={styles.editCard}>
-          <View style={styles.editHeader}>
-            <Text style={styles.editTitle}>Edit Item</Text>
-            <TouchableOpacity onPress={() => onRemove(index)} style={styles.deleteIconBtn}>
-               <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.editFormRow}>
-            {/* Item Name Input */}
-            <View style={styles.editFieldFlex}>
-              <Text style={styles.editLabel}>Item Name</Text>
-              <TextInput
-                style={styles.editInput}
-                value={item.name || `Item ${index + 1}`}
-                onChangeText={(value) => onUpdate('item', index, 'name', value)}
-                placeholder="Enter item name"
-                keyboardType="default"
-                autoCorrect={false}
-              />
+    <View style={styles.itemWrapper}>
+      {/* Edit Mode */}
+      {isEditing && (
+        <Animated.View style={editCardAnimatedStyle}>
+          <View style={styles.editCard}>
+            <View style={styles.editHeader}>
+              <Text style={styles.editTitle}>Edit Item</Text>
+              <TouchableOpacity onPress={() => onRemove(index)} style={styles.deleteIconBtn}>
+                 <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+              </TouchableOpacity>
             </View>
 
-            {/* Price Input */}
-            <View style={styles.editFieldFixed}>
-              <Text style={[styles.editLabel, (itemErrors.amount || localValidationErrors.amount) && styles.errorLabel]}>
-                Price
+            <View style={styles.editFormRow}>
+              <View style={styles.editFieldFlex}>
+                <Text style={styles.editLabel}>Item Name</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={item.name || `Item ${index + 1}`}
+                  onChangeText={(value) => onUpdate('item', index, 'name', value)}
+                  placeholder="Enter item name"
+                  keyboardType="default"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View style={styles.editFieldFixed}>
+                <Text style={[styles.editLabel, (itemErrors.amount || localValidationErrors.amount) && styles.errorLabel]}>
+                  Price
+                </Text>
+                <PriceInput
+                  value={item.amount || 0}
+                  onChangeText={(value) => {
+                    onUpdate('item', index, 'amount', value);
+                    if (onClearValidationError && parseFloat(value) > 0) {
+                      onClearValidationError(item.id, 'amount');
+                    }
+                    if (parseFloat(value) > 0) {
+                      setLocalValidationErrors(prev => ({ ...prev, amount: false }));
+                    }
+                  }}
+                  placeholder="0.00"
+                  error={!!(itemErrors.amount || localValidationErrors.amount)}
+                  style={styles.priceInputStyle}
+                />
+              </View>
+            </View>
+
+            <View style={styles.participantsSection}>
+              <Text style={[styles.editLabel, itemErrors.consumers && styles.errorLabel]}>
+                Split with
               </Text>
-              <PriceInput
-                value={item.amount || 0}
-                onChangeText={(value) => {
-                  onUpdate('item', index, 'amount', value);
-                  if (onClearValidationError && parseFloat(value) > 0) {
-                    onClearValidationError(item.id, 'amount');
-                  }
-                  if (parseFloat(value) > 0) {
-                    setLocalValidationErrors(prev => ({ ...prev, amount: false }));
-                  }
-                }}
-                placeholder="0.00"
-                error={!!(itemErrors.amount || localValidationErrors.amount)}
-                style={styles.priceInputStyle}
-              />
+              <View style={[
+                styles.participantChipContainer,
+                itemErrors.consumers && styles.participantChipContainerError
+              ]}>
+                {participants.map((participant, pIndex) => {
+                  const isSelected = item.selectedConsumers?.includes(pIndex);
+                  return (
+                    <ParticipantChip
+                      key={participant.id}
+                      participant={participant}
+                      isSelected={isSelected}
+                      onPress={() => handleParticipantPress(pIndex)}
+                    />
+                  );
+                })}
+              </View>
+              {itemErrors.consumers && (
+                <Text style={styles.errorHelperText}>
+                  Select at least one person
+                </Text>
+              )}
+            </View>
+
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                onPress={() => onCancel(item.id)}
+                style={[styles.editActionButton, styles.cancelActionButton]}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.cancelActionText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveClick}
+                style={[styles.editActionButton, styles.saveActionButton]}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="checkmark" size={18} color={Colors.white} style={{ marginRight: 4 }} />
+                <Text style={styles.editActionText}>Save Changes</Text>
+              </TouchableOpacity>
             </View>
           </View>
+        </Animated.View>
+      )}
 
-          {/* Participant Selection */}
-          <View style={styles.participantsSection}>
-            <Text style={[styles.editLabel, itemErrors.consumers && styles.errorLabel]}>
-              Split with
-            </Text>
-            <View style={[
-              styles.participantChipContainer,
-              itemErrors.consumers && styles.participantChipContainerError
-            ]}>
-              {participants.map((participant, pIndex) => {
-                const isSelected = item.selectedConsumers?.includes(pIndex);
-                return (
-                  <ParticipantChip
-                    key={participant.id}
-                    participant={participant}
-                    isSelected={isSelected}
-                    onPress={() => handleParticipantPress(pIndex)}
-                  />
-                );
-              })}
+      {/* View Mode */}
+      {!isEditing && (
+        <Animated.View style={viewModeAnimatedStyle}>
+          <TouchableOpacity
+            style={styles.viewModeRow}
+            onPress={() => onToggleEdit(item.id)}
+            activeOpacity={0.6}
+          >
+            <View style={styles.itemIconContainer}>
+               <Ionicons name="receipt-outline" size={20} color={Colors.textPrimary} />
             </View>
-            {itemErrors.consumers && (
-              <Text style={styles.errorHelperText}>
-                Select at least one person
-              </Text>
-            )}
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.editActions}>
-            <TouchableOpacity
-              onPress={() => onCancel(item.id)}
-              style={[styles.editActionButton, styles.cancelActionButton]}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.cancelActionText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleSaveClick}
-              style={[styles.editActionButton, styles.saveActionButton]}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="checkmark" size={18} color={Colors.white} style={{ marginRight: 4 }} />
-              <Text style={styles.editActionText}>Save Changes</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Animated.View>
-
-      {/* View Mode - Animated */}
-      <Animated.View 
-        style={[
-          viewModeAnimatedStyle,
-          { position: isEditing ? 'absolute' : 'relative', width: '100%', zIndex: isEditing ? 0 : 10 }
-        ]}
-        pointerEvents={isEditing ? 'none' : 'auto'}
-      >
-        <TouchableOpacity
-          style={styles.viewModeRow}
-          onPress={() => onToggleEdit(item.id)}
-          activeOpacity={0.6}
-        >
-          <View style={styles.viewModeMain}>
-            <View style={styles.viewModeHeader}>
+            
+            <View style={styles.viewModeMain}>
               <Text style={styles.viewModeName} numberOfLines={1}>
                 {item.name || `Item ${index + 1}`}
               </Text>
-              <Text style={styles.viewModeAmount}>
-                ${(parseFloat(item.amount) || 0).toFixed(2)}
-              </Text>
-            </View>
-            
-            <View style={styles.viewModeFooter}>
               <View style={styles.assignedAvatars}>
                 {selectedParticipants.length > 0 ? (
                   selectedParticipants.slice(0, 5).map((p, i) => (
@@ -282,7 +247,9 @@ const ItemRow = memo(({
                     </View>
                   ))
                 ) : (
-                  <Text style={styles.unassignedText}>No one assigned</Text>
+                   <Text style={[styles.unassignedText, itemErrors.consumers && { color: Colors.danger }]}>
+                     {itemErrors.consumers ? 'Assign someone' : 'No one assigned'}
+                   </Text>
                 )}
                 {selectedParticipants.length > 5 && (
                   <View style={[styles.miniAvatarContainer, { zIndex: 0, marginLeft: -8 }]}>
@@ -292,19 +259,19 @@ const ItemRow = memo(({
                   </View>
                 )}
               </View>
-              
-              {itemErrors.consumers && (
-                <View style={styles.errorBadge}>
-                   <Ionicons name="alert-circle" size={12} color={Colors.danger} />
-                   <Text style={styles.errorBadgeText}>Assign</Text>
-                </View>
-              )}
             </View>
-          </View>
-          
-          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} style={styles.chevronIcon} />
-        </TouchableOpacity>
-      </Animated.View>
+            
+            <View style={styles.amountContainer}>
+               <Text style={styles.viewModeAmount}>
+                ${(parseFloat(item.amount) || 0).toFixed(2)}
+               </Text>
+            </View>
+            
+            <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} style={{ marginLeft: Spacing.sm }} />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+      <View style={styles.separator} />
     </View>
   );
 }, (prevProps, nextProps) => {
@@ -342,7 +309,7 @@ const ReceiptBreakdown = ({
   const [editingItemId, setEditingItemId] = useState(null); 
   const prevItemsLengthRef = useRef(items.length);
   const itemLayoutMapRef = useRef({});
-  const userManualAddRef = useRef(false); // Track if user explicitly clicked add button
+  const userManualAddRef = useRef(false);
   const newlyAddedItemIdsRef = useRef(new Set()); 
 
   const scrollItemToTop = (itemId, delay = 0) => {
@@ -355,7 +322,6 @@ const ReceiptBreakdown = ({
     }, delay);
   };
 
-  // Reset edit state on screen focus
   useEffect(() => {
     if (isFocused === true) {
       setEditingItemId(null);
@@ -375,29 +341,19 @@ const ReceiptBreakdown = ({
     });
   }, [items]);
 
-  // Auto-open newly added items in edit mode ONLY if user manually added them
   useEffect(() => {
     const itemsAdded = items.length - prevItemsLengthRef.current;
-    
     if (itemsAdded === 1 && userManualAddRef.current) {
       const newItem = items[items.length - 1];
       if (newItem?.id) {
-        userManualAddRef.current = false; // Reset flag
+        userManualAddRef.current = false;
         newlyAddedItemIdsRef.current.add(newItem.id);
         setEditingItemId(newItem.id);
         scrollItemToTop(newItem.id, 50);
       }
     }
-    
     prevItemsLengthRef.current = items.length;
   }, [items]);
-
-  const currentDate = useMemo(() => new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }), []);
-
 
   const handleUpdate = useCallback((type, index, field, value) => {
     if (type === 'item') {
@@ -443,25 +399,13 @@ const ReceiptBreakdown = ({
     return null;
   }
 
-  const circleSize = 12; 
-  const circleCount = 25; 
-
   return (
     <View style={styles.container}>
-      <View style={styles.receiptContainer}>
-        {/* Top Torn Edge */}
-        <View pointerEvents="none" style={[styles.tornEdgeContainer, { top: -(circleSize / 2) }]}>
-          {Array.from({ length: circleCount }).map((_, i) => (
-            <View key={`top-${i}`} style={[styles.tornCircle, { width: circleSize, height: circleSize }]} />
-          ))}
-        </View>
-        
-        <View style={styles.scrollViewContent}>
-          <View style={styles.headerContainer}>
-            <Text style={styles.headerTitle}>RECEIPT BREAKDOWN</Text>
-            <View style={styles.headerDivider} />
-          </View>
+      <View style={styles.headerContainer}>
+        <Text style={styles.sectionHeaderText}>Receipt Items</Text>
+      </View>
 
+      <View style={styles.cardContainer}>
           {items.map((item, index) => (
             <View
               key={item.id}
@@ -489,24 +433,13 @@ const ReceiptBreakdown = ({
               userManualAddRef.current = true;
               onAddItem();
             }} 
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
-            <Ionicons name="add-circle" size={20} color={Colors.accent} />
-            <Text style={styles.addItemText}>Add another item</Text>
+            <View style={styles.addItemIconContainer}>
+                <Ionicons name="add" size={20} color={Colors.accent} />
+            </View>
+            <Text style={styles.addItemText}>Add Item</Text>
           </TouchableOpacity>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Thank you!</Text>
-            <Text style={styles.footerDate}>{currentDate}</Text>
-          </View>
-        </View>
-        
-        {/* Bottom Torn Edge */}
-        <View pointerEvents="none" style={[styles.tornEdgeContainer, { bottom: -(circleSize / 2) }]}>
-          {Array.from({ length: circleCount }).map((_, i) => (
-            <View key={`bottom-${i}`} style={[styles.tornCircle, { width: circleSize, height: circleSize }]} />
-          ))}
-        </View>
       </View>
     </View>
   );
@@ -514,91 +447,91 @@ const ReceiptBreakdown = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    padding: Spacing.lg,
-  },
-  receiptContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 0, // Sharp edges for receipt feel, but maybe slight radius
-    flex: 1,
-    marginVertical: Spacing.xs,
-  },
-  scrollViewContent: {
-      padding: Spacing.xl,
-      paddingTop: Spacing.xxl,
+    marginBottom: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
   },
   headerContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
   },
-  headerTitle: {
-      ...Typography.label,
-      fontSize: 14,
-      color: Colors.textSecondary,
-      textAlign: 'center',
-      letterSpacing: 2,
-      fontWeight: '600',
+  sectionHeaderText: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  headerDivider: {
-    height: 2,
-    width: 40,
-    backgroundColor: Colors.accent,
-    marginTop: Spacing.sm,
-    borderRadius: Radius.pill,
-  },
-  itemContainer: {
-    marginBottom: 0,
+  cardContainer: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    ...Shadows.card,
+    elevation: 2, 
+    shadowOpacity: 0.05,
+    borderWidth: 1,
+    borderColor: Colors.surface,
   },
   
-  // View Mode Styles
+  // Item Row
+  itemWrapper: {
+    backgroundColor: Colors.surface,
+  },
   viewModeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.sm,
+    padding: Spacing.lg,
     backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    minHeight: 56,
+  },
+  itemIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
   },
   viewModeMain: {
     flex: 1,
-    marginRight: Spacing.md,
-  },
-  viewModeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.xs,
+    justifyContent: 'center',
   },
   viewModeName: {
     ...Typography.body1,
-    color: Colors.textPrimary,
     fontFamily: Typography.familyMedium,
-    flex: 1,
-    marginRight: Spacing.md,
-    fontSize: 16,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  unassignedText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+  },
+  amountContainer: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   viewModeAmount: {
-    ...Typography.body1,
-    color: Colors.textPrimary,
+    ...Typography.body2,
+    color: Colors.textSecondary,
     fontFamily: Typography.familySemiBold,
-    fontSize: 16,
   },
-  viewModeFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  
+  separator: {
+    height: 1,
+    backgroundColor: Colors.divider,
+    marginLeft: 16 + 32 + 12, // Align with text
   },
+
+  // Avatars in view mode
   assignedAvatars: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 24,
+    height: 20,
+    marginTop: 2,
   },
   miniAvatarContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: Colors.surface,
     backgroundColor: Colors.surface,
@@ -612,9 +545,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   miniAvatarText: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: Typography.familyBold,
     color: Colors.textSecondary,
   },
@@ -622,43 +557,41 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   miniAvatarMoreText: {
-    fontSize: 9,
+    fontSize: 8,
     fontFamily: Typography.familyBold,
     color: Colors.textSecondary,
   },
-  unassignedText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  chevronIcon: {
-    opacity: 0.3,
-  },
-  errorBadge: {
+
+  // Add Item Button
+  addItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFE5E5',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
+    padding: Spacing.lg,
+    backgroundColor: Colors.surface,
   },
-  errorBadgeText: {
-    ...Typography.caption,
-    color: Colors.danger,
-    marginLeft: 4,
-    fontWeight: '600',
+  addItemIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.accent + '15', // Transparent accent
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  addItemText: {
+    ...Typography.body1,
+    color: Colors.accent,
+    fontFamily: Typography.familyMedium,
   },
 
-  // Edit Mode Styles
+  // Edit Mode Styles (kept mostly similar but inside the card context)
   editCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    marginVertical: Spacing.md,
+    backgroundColor: Colors.surface, // Matches container now
   },
   editHeader: {
     flexDirection: 'row',
@@ -667,9 +600,10 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   editTitle: {
-    ...Typography.label,
+    ...Typography.caption,
     color: Colors.accent,
     fontWeight: '600',
+    textTransform: 'uppercase',
   },
   deleteIconBtn: {
     padding: Spacing.xs,
@@ -698,8 +632,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.divider,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm, // Reduced padding
-    height: 40, // Fixed height to match PriceInput
+    paddingVertical: Spacing.sm, 
+    height: 40,
     color: Colors.textPrimary,
     fontFamily: Typography.familyMedium,
     fontSize: 15,
@@ -801,66 +735,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
   },
   cancelActionButton: {
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceLight,
     borderWidth: 1,
     borderColor: Colors.divider,
   },
   editActionText: {
-    ...Typography.label,
+    ...Typography.body2,
     color: Colors.white,
     fontWeight: '600',
   },
   cancelActionText: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-  },
-  
-  // Footer & Misc
-  addItemButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.lg,
-    marginTop: Spacing.sm,
-  },
-  addItemText: {
     ...Typography.body2,
-    color: Colors.accent,
-    fontFamily: Typography.familySemiBold,
-    marginLeft: Spacing.xs,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: Spacing.xl,
-    borderTopWidth: 1,
-    borderTopColor: Colors.divider,
-    borderStyle: 'dashed',
-    paddingTop: Spacing.lg,
-  },
-  footerText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    fontFamily: Typography.familyMedium,
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  footerDate: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    opacity: 0.7,
-  },
-  tornEdgeContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'transparent',
-    overflow: 'hidden',
-  },
-  tornCircle: {
-    backgroundColor: Colors.background,
-    borderRadius: 999,
+    color: Colors.textPrimary,
+    fontWeight: '600',
   },
   errorLabel: {
     color: Colors.danger,
@@ -868,7 +755,7 @@ const styles = StyleSheet.create({
   errorHelperText: {
     ...Typography.caption,
     color: Colors.danger,
-    marginTop: Spacing.xs,
+    marginTop: 4,
   },
 });
 

@@ -44,7 +44,7 @@ const DonutChart = ({
       if (!netBalanceValue) return '$0.00';
       const netBalance = netBalanceValue.value;
       if (Math.abs(netBalance) < 0.01) return '$0.00';
-      return `$${netBalance >= 0 ? '+' : ''}${netBalance.toFixed(2)}`;
+      return `${netBalance >= 0 ? '+' : '-'}$${Math.abs(netBalance).toFixed(2)}`;
     },
     (text) => {
       runOnJS(setAnimatedText)(text);

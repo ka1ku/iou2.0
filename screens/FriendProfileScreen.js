@@ -15,8 +15,8 @@ import { getCurrentUser } from '../services/authService';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 
 const FriendProfileScreen = ({ route, navigation }) => {
-  const { friend } = route.params;
-  const [friendProfile, setFriendProfile] = useState(null);
+  const { friend: initialFriend, userId, friendId } = route.params || {};
+  const [friendProfile, setFriendProfile] = useState(initialFriend || null);
   const [friendBalances, setFriendBalances] = useState({
     totalOwed: 0,
     totalOwes: 0,
@@ -28,29 +28,59 @@ const FriendProfileScreen = ({ route, navigation }) => {
   const { expenses } = useExpenseData();
 
   useEffect(() => {
-    if (friend) {
-      loadFriendData();
-    }
-  }, [friend, expenses]);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const currentUser = getCurrentUser();
+        if (!currentUser) return;
 
-  const loadFriendData = async () => {
-    try {
-      setLoading(true);
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        const calculatedBalances = calculateFriendBalances(expenses, currentUser.uid, friend.friendId);
-        setFriendBalances(calculatedBalances);
+        // Determine the target friend ID
+        const targetFriendId = initialFriend?.friendId || initialFriend?.userId || userId || friendId;
         
-        setFriendProfile({
-          ...friend,
-        });
+        if (!targetFriendId) {
+          Alert.alert('Error', 'No friend information found');
+          navigation.goBack();
+          return;
+        }
+
+        // If we only have an ID but no profile, try to find it in participants
+        if (!friendProfile) {
+          let foundFriend = null;
+          for (const expense of expenses) {
+            const participant = expense.participants?.find(p => p.userId === targetFriendId || p.friendId === targetFriendId);
+            if (participant) {
+              foundFriend = {
+                firstName: participant.firstName,
+                lastName: participant.lastName,
+                name: participant.name,
+                username: participant.username,
+                profilePhoto: participant.profilePhoto,
+                friendId: targetFriendId,
+                userId: targetFriendId
+              };
+              break;
+            }
+          }
+          
+          if (foundFriend) {
+            setFriendProfile(foundFriend);
+          } else {
+             // Basic fallback if we can't find them
+             setFriendProfile({ friendId: targetFriendId, name: 'Friend' });
+          }
+        }
+
+        const calculatedBalances = calculateFriendBalances(expenses, currentUser.uid, targetFriendId);
+        setFriendBalances(calculatedBalances);
+      } catch (error) {
+        Alert.alert('Error', 'Failed to load friend data');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to load friend data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    loadData();
+  }, [initialFriend, userId, friendId, expenses]);
 
   const calculateFriendBalances = (userExpenses, currentUserId, friendId) => {
     let totalOwed = 0;
@@ -136,8 +166,8 @@ const FriendProfileScreen = ({ route, navigation }) => {
   };
 
   const handleVenmoPayment = () => {
-    if (friend.username) {
-      const venmoUrl = `https://venmo.com/${friend.username}`;
+    if (friendProfile.username) {
+      const venmoUrl = `https://venmo.com/${friendProfile.username}`;
       Linking.openURL(venmoUrl);
     } else {
       Alert.alert('No Username', 'This friend doesn\'t have a username');
@@ -209,19 +239,19 @@ const FriendProfileScreen = ({ route, navigation }) => {
         <View style={styles.section}>
           <View style={styles.friendInfo}>
             <ProfilePicture
-              source={friend.profilePhoto}
+              source={friendProfile.profilePhoto}
               size={80}
-              username={friend.username || friend.name}
+              username={friendProfile.username || friendProfile.name}
             />
             <View style={styles.friendDetails}>
               <Text style={styles.friendName}>
-                {friend.firstName && friend.lastName 
-                  ? `${friend.firstName} ${friend.lastName}`
-                  : friend.name
+                {friendProfile.firstName && friendProfile.lastName 
+                  ? `${friendProfile.firstName} ${friendProfile.lastName}`
+                  : friendProfile.name
                 }
               </Text>
-              {friend.username && (
-                <Text style={styles.venmoUsername}>@{friend.username}</Text>
+              {friendProfile.username && (
+                <Text style={styles.venmoUsername}>@{friendProfile.username}</Text>
               )}
             </View>
           </View>
@@ -236,7 +266,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
               styles.netBalanceAmount,
               { color: friendBalances.netBalance >= 0 ? Colors.success : Colors.danger }
             ]}>
-              {friendBalances.netBalance >= 0 ? '+' : ''}${friendBalances.netBalance.toFixed(2)}
+              {friendBalances.netBalance >= 0 ? '+' : '-'}${Math.abs(friendBalances.netBalance).toFixed(2)}
             </Text>
             <Text style={styles.netBalanceSubtext}>
               {friendBalances.netBalance >= 0 
@@ -266,20 +296,20 @@ const FriendProfileScreen = ({ route, navigation }) => {
           <Text style={styles.sectionTitle}>Payment Methods</Text>
           
           <View style={styles.paymentMethods}>
-            {friend.username && (
+            {friendProfile.username && (
               <TouchableOpacity style={styles.paymentMethod} onPress={handleVenmoPayment}>
                 <View style={styles.paymentMethodIcon}>
                   <Ionicons name="card-outline" size={24} color={Colors.accent} />
                 </View>
                 <View style={styles.paymentMethodInfo}>
                   <Text style={styles.paymentMethodTitle}>Venmo</Text>
-                  <Text style={styles.paymentMethodDetail}>@{friend.username}</Text>
+                  <Text style={styles.paymentMethodDetail}>@{friendProfile.username}</Text>
                 </View>
                 <Ionicons name="open-outline" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
             )}
             
-            {!friend.username && (
+            {!friendProfile.username && (
               <View style={styles.noPaymentMethod}>
                 <Ionicons name="information-circle-outline" size={24} color={Colors.textSecondary} />
                 <Text style={styles.noPaymentMethodText}>No payment method available</Text>
@@ -300,7 +330,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
               <TouchableOpacity 
                 style={styles.addExpenseButton}
                 onPress={() => navigation.navigate('AddExpense', { 
-                  selectedFriends: [friend],
+                  selectedFriends: [friendProfile],
                   fromFriendProfile: true 
                 })}
               >

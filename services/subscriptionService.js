@@ -6,6 +6,7 @@ import {
   getCustomerInfo,
   ENTITLEMENTS
 } from './revenueCatService';
+import { checkPremiumStatus } from './contactInviteService';
 
 
 export const initializeSubscriptions = async (userId = null) => {
@@ -25,7 +26,9 @@ export const setSubscriptionUser = async (userId) => {
 };
 
 export const canAccessReceiptScanning = async () => {
-  return await hasReceiptScanningAccess();
+  const hasSub = await hasReceiptScanningAccess();
+  if (hasSub) return true;
+  return await checkPremiumStatus();
 };
 
 export const requestReceiptScanningAccess = async () => {
@@ -36,8 +39,11 @@ export const getSubscriptionStatus = async () => {
   try {
     const customerInfo = await getCustomerInfo();
     
+    const isInvitePremium = await checkPremiumStatus();
+    
     return {
-      isActive: customerInfo.entitlements.active[ENTITLEMENTS.RECEIPT_SCANNING] !== undefined,
+      isActive: customerInfo.entitlements.active[ENTITLEMENTS.RECEIPT_SCANNING] !== undefined || isInvitePremium,
+      isInvitePremium,
       activeEntitlements: Object.keys(customerInfo.entitlements.active),
       allEntitlements: Object.keys(customerInfo.entitlements.all),
       originalAppUserId: customerInfo.originalAppUserId,
@@ -47,8 +53,10 @@ export const getSubscriptionStatus = async () => {
       nonSubscriptionTransactions: customerInfo.nonSubscriptionTransactions,
     };
   } catch (error) {
+    const isInvitePremium = await checkPremiumStatus();
     return {
-      isActive: false,
+      isActive: isInvitePremium,
+      isInvitePremium,
       activeEntitlements: [],
       allEntitlements: [],
       error: error.message
