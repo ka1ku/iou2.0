@@ -439,6 +439,27 @@ export const updateUserProfile = async (profileData) => {
     const firestoreInstance = getFirestore(getApp());
     const userDocRef = doc(firestoreInstance, 'users', user.uid);
     
+    // Check for cooldown
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists()) {
+      const userData = userDocSnap.data();
+      // Check if updatedAt exists and is within the last hour
+      if (userData.preferences?.updatedAt) {
+          // This seems to be in user preferences in one place and on the user doc in another.
+          // Let's check the user doc helper first.
+      }
+      
+      if (userData.updatedAt) {
+        const lastUpdate = userData.updatedAt.toDate ? userData.updatedAt.toDate() : new Date(userData.updatedAt.seconds * 1000);
+        const now = new Date();
+        const oneHour = 60 * 60 * 1000;
+        
+        if (now - lastUpdate < oneHour) {
+          throw new Error('You can only update your profile once every hour.');
+        }
+      }
+    }
+
     // Prepare update data
     const updateData = {
       firstName: profileData.firstName,

@@ -828,8 +828,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     });
     if (hasSplitMismatch) {
       Alert.alert(
-        "Split Mismatch",
-        "Each item's split amounts must add up to the item total before saving the expense."
+        "Uneven Split",
+        "One or more items have split amounts that don't match their totals. Please check your items."
       );
       return false;
     }

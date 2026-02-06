@@ -210,8 +210,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       if (errors.consumers) missingFields.push("at least one person in the split");
       
       Alert.alert(
-        "Missing Information",
-        `Please provide: ${missingFields.join(", ")}`
+        "Incomplete Item",
+        `Please check the following: ${missingFields.join(", ")}`
       );
       return false;
     }
@@ -225,8 +225,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     if (Math.abs(totalAmount - allocatedTotal) > SPLIT_TOLERANCE) {
       setValidationErrors(prev => ({ ...prev, splitMismatch: true }));
       Alert.alert(
-        "Split Mismatch",
-        "Split amounts must add up to the item total before you can save this item."
+        "Uneven Split",
+        "The split amounts don't match the item total. Please adjust the splits or the total amount."
       );
       return false;
     }

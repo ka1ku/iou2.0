@@ -22,7 +22,7 @@ import LoadingSpinner from '../../components/LoadingSpinner';
 import ChangeVenmoBottomSheet from '../../components/ChangeVenmoBottomSheet';
 
 const ProfileSettingsScreen = ({ navigation }) => {
-  const { userProfile, refreshUserProfile } = useExpenseData();
+  const { userProfile } = useExpenseData();
   const venmoBottomSheetRef = useRef(null);
   
   const [localProfile, setLocalProfile] = useState({
@@ -86,13 +86,13 @@ const ProfileSettingsScreen = ({ navigation }) => {
     setIsLoading(true);
     try {
       await updateUserProfile(localProfile);
-      await refreshUserProfile();
+
       setHasChanges(false);
       Alert.alert('Success', 'Profile updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+      Alert.alert('Error', error.message || 'Failed to update profile');
     } finally {
       setIsLoading(false);
     }
