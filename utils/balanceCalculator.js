@@ -1,3 +1,4 @@
+import { calculateParticipantBalances } from './settlementCalculator';
 
 export const calculateUserBalanceForExpense = (expense, userId) => {
   if (!expense || !userId) {
@@ -11,39 +12,20 @@ export const calculateUserBalanceForExpense = (expense, userId) => {
     return { youPaid: 0, youOwe: 0, netBalance: 0, status: 'even' };
   }
 
-  let youPaid = 0;
-  let youOwe = 0;
+  const items = expense.items || [];
+  const fees = expense.fees || [];
   
-  expense.items?.forEach(item => {
-    const itemAmount = parseFloat(item.amount) || 0;
-    const itemPayers = item.selectedPayers || expense.selectedPayers || [0];
-    const itemConsumers = item.selectedConsumers || [0];
-    const itemSplits = item.splits || [];
-    
-    if (itemPayers.includes(currentUserIndex)) {
-      const amountPerPayer = itemAmount / itemPayers.length;
-      youPaid += amountPerPayer;
-    }
-    
-    const yourConsumerIndex = itemConsumers.indexOf(currentUserIndex);
-    if (yourConsumerIndex !== -1 && itemSplits[yourConsumerIndex]) {
-      const yourAmount = parseFloat(itemSplits[yourConsumerIndex]) || 0;
-      youOwe += yourAmount;
-    }
-  });
+  // Calculate balances using the centralized logic
+  // Pass 0 for total since it's not currently used in the calculation logic
+  const allBalances = calculateParticipantBalances(expense, participants, items, fees, 0);
   
-  expense.fees?.forEach(fee => {
-    const feeAmount = parseFloat(fee.amount) || 0;
-    const feeSplits = fee.splits || [];
-    
-    const yourFeeSplit = feeSplits.find(split => split.participantIndex === currentUserIndex);
-    if (yourFeeSplit) {
-      const yourFeeAmount = parseFloat(yourFeeSplit.amount) || 0;
-      youOwe += yourFeeAmount;
-    }
-  });
+  const userBalance = allBalances[currentUserIndex];
   
-  const netBalance = youOwe - youPaid;
+  if (!userBalance) {
+    return { youPaid: 0, youOwe: 0, netBalance: 0, status: 'even' };
+  }
+
+  const netBalance = userBalance.balance;
 
   let status = 'even';
   if (Math.abs(netBalance) >= 0.01) {
@@ -51,9 +33,9 @@ export const calculateUserBalanceForExpense = (expense, userId) => {
   }
 
   return {
-    youPaid: Math.round(youPaid * 100) / 100,
-    youOwe: Math.round(youOwe * 100) / 100,
-    netBalance: Math.round(netBalance * 100) / 100,
+    youPaid: userBalance.paid,
+    youOwe: userBalance.owed,
+    netBalance: netBalance,
     status
   };
 };

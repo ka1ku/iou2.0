@@ -18,10 +18,12 @@ export const calculateSettlement = (expense) => {
   };
 };
 
-const calculateParticipantBalances = (expense, participants, items, fees, total) => {
+export const calculateParticipantBalances = (expense, participants, items, fees, total) => {
   const balances = participants.map((participant, index) => ({
     name: participant.name,
     index,
+    paid: 0,
+    owed: 0,
     balance: 0
   }));
   
@@ -38,6 +40,7 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
       const amountPerPayer = Math.round((itemAmount / payersToUse.length) * 100) / 100;
       payersToUse.forEach(payerIndex => {
         if (payerIndex < balances.length) {
+          balances[payerIndex].paid += amountPerPayer;
           balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
         }
       });
@@ -56,10 +59,12 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
           ? parseFloat(itemSplits[splitIndex].amount) || 0
           : parseFloat(itemSplits[splitIndex]) || 0;
         const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
+        balances[consumerIndex].owed += roundedSplitAmount;
         balances[consumerIndex].balance += roundedSplitAmount; // Positive because they owe
       } else {
         const itemAmount = parseFloat(item.amount) || 0;
         const amountPerConsumer = Math.round((itemAmount / itemConsumers.length) * 100) / 100;
+        balances[consumerIndex].owed += amountPerConsumer;
         balances[consumerIndex].balance += amountPerConsumer;
       }
     });
@@ -74,6 +79,7 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
       const amountPerPayer = Math.round((totalFeeAmount / feePayers.length) * 100) / 100;
       feePayers.forEach(payerIndex => {
         if (payerIndex < balances.length) {
+          balances[payerIndex].paid += amountPerPayer;
           balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
         }
       });
@@ -85,6 +91,7 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
       const splitAmount = parseFloat(split.amount) || 0;
       const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
       if (participantIndex !== undefined && participantIndex < balances.length) {
+        balances[participantIndex].owed += roundedSplitAmount;
         balances[participantIndex].balance += roundedSplitAmount; // Positive because they owe
       }
     });
@@ -92,6 +99,8 @@ const calculateParticipantBalances = (expense, participants, items, fees, total)
 
   const roundedBalances = balances.map(balance => ({
     ...balance,
+    paid: Math.round(balance.paid * 100) / 100,
+    owed: Math.round(balance.owed * 100) / 100,
     balance: Math.round(balance.balance * 100) / 100
   }));
   
