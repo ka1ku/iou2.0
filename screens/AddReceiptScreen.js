@@ -96,7 +96,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
           id: Date.now().toString(),
           name: '',
           amount: 0,
-          selectedConsumers: [],
+          selectedConsumers: state.participants.map((_, i) => i),
           splits: [],
           selectedPayers: payersToUse,
         };
