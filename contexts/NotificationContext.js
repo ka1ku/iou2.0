@@ -52,7 +52,6 @@ export const NotificationProvider = ({ children }) => {
     const cleanup = expoNotificationService.setupListeners(
       // Notification received handler
       (notification) => {
-        console.log('Notification received in context:', notification);
         // Increment unread count
         setUnreadCount(prev => prev + 1);
         
@@ -61,7 +60,6 @@ export const NotificationProvider = ({ children }) => {
       },
       // Notification response handler (when user taps notification)
       (response) => {
-        console.log('Notification tapped:', response);
         const { notification } = response;
         const data = notification.request.content.data;
         

@@ -74,11 +74,9 @@ exports.onUserProfileUpdate = functions.firestore
       const expensesSnapshot = await expensesQuery.get();
       
       if (expensesSnapshot.empty) {
-        console.log(`No expenses found for user ${userId}`);
         return null;
       }
       
-      console.log(`Updating user info in ${expensesSnapshot.size} expenses for user ${userId}`);
       
       // Batch write updates (Firestore allows up to 500 operations per batch)
       const batchSize = 500;
@@ -129,10 +127,8 @@ exports.onUserProfileUpdate = functions.firestore
         
         // Commit this batch
         await batch.commit();
-        console.log(`Updated batch ${Math.floor(i / batchSize) + 1} of expenses`);
       }
       
-      console.log(`Successfully updated user info in all expenses for user ${userId}`);
       return null;
     } catch (error) {
       console.error(`Error updating user info in expenses for user ${userId}:`, error);
@@ -487,7 +483,6 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
     }
   }
 
-  console.log(`Sent ${successCount} notifications successfully, ${failureCount} failed`);
   return { successCount, failureCount };
 }
 
@@ -823,7 +818,6 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
       await userBatch.commit();
     }
     
-    console.log(`Created ${userIds.length} synthetic users`);
 
     // Create synthetic expenses
     const expenseTitles = [
@@ -937,7 +931,6 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
       expensesCreated.push(expenseRef.id);
     }
 
-    console.log(`Created ${expensesCreated.length} synthetic expenses`);
 
     return {
       success: true,
@@ -989,7 +982,6 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
       await expenseBatch.commit();
     }
 
-    console.log(`Deleted ${expensesDeleted} synthetic expenses`);
 
     // Delete synthetic users (both Firestore and Auth)
     const usersQuery = db.collection('users').where('synthetic', '==', true);
@@ -1020,7 +1012,6 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
       await userBatch.commit();
     }
 
-    console.log(`Deleted ${usersDeleted} synthetic users from Firestore`);
 
     // Delete Auth users (batch delete up to 1000 at a time)
     // Firebase Auth allows deleting up to 1000 users per batch
@@ -1030,7 +1021,6 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
       try {
         const deleteResult = await admin.auth().deleteUsers(batch);
         authUsersDeleted += deleteResult.successCount;
-        console.log(`Deleted ${deleteResult.successCount} Auth users (batch ${Math.floor(i / authBatchSize) + 1})`);
         
         if (deleteResult.errors && deleteResult.errors.length > 0) {
           console.error('Errors deleting Auth users:', deleteResult.errors);

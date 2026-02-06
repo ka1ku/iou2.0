@@ -16,6 +16,7 @@ import { signOutUser } from '../services/authService';
 import ChangeVenmoBottomSheet from '../components/ChangeVenmoBottomSheet';
 import i18n from '../utils/i18n';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { presentPaywall } from '../services/revenueCatService';
 
 const SectionHeader = ({ title }) => (
   <View style={styles.sectionHeader}>
@@ -101,6 +102,14 @@ const SettingsScreen = ({ navigation }) => {
     Linking.openURL(url);
   };
 
+  const handleManageSubscription = async () => {
+    try {
+      await presentPaywall();
+    } catch (error) {
+      Alert.alert('Error', 'Unable to open subscription management');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -128,6 +137,12 @@ const SettingsScreen = ({ navigation }) => {
             icon="card-outline" 
             title={i18n.t('settings.venmo')} 
             onPress={() => changeVenmoBottomSheetRef.current?.open()} 
+          />
+          <View style={styles.separator} />
+          <SettingItem 
+            icon="diamond-outline" 
+            title="Manage Subscription" 
+            onPress={handleManageSubscription} 
           />
         </View>
 

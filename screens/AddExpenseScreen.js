@@ -1,16 +1,24 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   Alert,
+  Animated,
+  Easing,
+  AppState,
+  Linking,
+  Clipboard,
+  Share,
 } from "react-native";
+import { KeyboardAwareScrollView, KeyboardToolbar } from "react-native-keyboard-controller";
+import { Image } from 'expo-image';
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Spacing, Radius, Typography, Shadows } from "../design/tokens";
 import { getCurrentUser } from "../services/authService";
 import { getUserProfile } from "../services/friendService";
@@ -19,6 +27,8 @@ import {
   updateExpense,
   updateExpenseParticipants,
   deleteItemFromExpense,
+  getExpenseById,
+  createPaymentRequest,
 } from "../services/expenseService";
 import {
   calculateSettlement,
@@ -26,11 +36,11 @@ import {
 } from "../utils/settlementCalculator";
 import { useExpense } from "../contexts/ExpenseContext";
 import ExpenseHeader from "../components/expenses/ExpenseHeader";
-import ExpenseTabNavigator from "../components/expenses/ExpenseTabNavigator";
 import ExpenseFooter from "../components/expenses/ExpenseFooter";
 import ExpenseItemCard from "../components/expenses/ExpenseItemCard";
 import ExpenseViewCard from "../components/expenses/ExpenseViewCard";
 import ParticipantsGrid from "../components/expenses/ParticipantsGrid";
+import GroupMembersModal from "../components/expenses/GroupMembersModal";
 import SettlementInterface from "../components/expenses/SettlementInterface";
 
 const SPLIT_TOLERANCE = 0.01;
@@ -44,92 +54,630 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
   const { state, actions, total } = useExpense();
 
   const [activeTab, setActiveTab] = useState('track');
+  const [showMembersModal, setShowMembersModal] = useState(false);
   const [editingItems, setEditingItems] = useState(new Set());
   
   const [newlyAddedItems, setNewlyAddedItems] = useState(new Set());
   const itemSnapshotsRef = useRef(new Map());
 
-  // Track local settlement actions (mark paid, etc.)
-  const [localSettlementActions, setLocalSettlementActions] = useState({});
+  // Settlement-related state from SettleUpScreen
+  const [requestSentStates, setRequestSentStates] = useState({});
+  const [isVenmoAppActive, setIsVenmoAppActive] = useState(false);
+  const [settledStates, setSettledStates] = useState({});
+  const [paymentMadeStates, setPaymentMadeStates] = useState({});
+  const [reminderSentStates, setReminderSentStates] = useState({});
+  const [animationStates, setAnimationStates] = useState({});
+  const [settlementRecalculated, setSettlementRecalculated] = useState(false);
+  const [recalculationInfo, setRecalculationInfo] = useState(null);
 
+  // Initialize settlement states from existing settlements
   useEffect(() => {
-    // If we're editing an existing expense, initialize local actions from it
-    if (expense?.settlements) {
-        const initialActions = {};
-        expense.settlements.forEach(s => {
-            if (s.status && s.status !== 'noAction') {
-                const key = getSettlementKey(s);
-                initialActions[key] = {
-                    status: s.status,
-                    updatedAt: s.updatedAt
-                };
-            }
-        });
-        setLocalSettlementActions(initialActions);
+    if (expense?.settlements && expense.settlements.length > 0) {
+      const initialSettledStates = {};
+      const initialRequestSentStates = {};
+      const initialPaymentMadeStates = {};
+      const initialReminderSentStates = {};
+      expense.settlements.forEach(settlement => {
+        const from = settlement.debtor || settlement.from;
+        const to = settlement.creditor || settlement.to;
+        const roundedAmount = Math.round(settlement.amount * 100) / 100;
+        const settlementId = `${from}|||${to}|||${roundedAmount}`;
+        
+        if (settlement.status === 'markedAsPaid') {
+          initialSettledStates[settlementId] = true;
+        }
+        if (settlement.status === 'paymentRequested') {
+          initialRequestSentStates[settlementId] = true;
+        }
+        if (settlement.status === 'paymentMade') {
+          initialPaymentMadeStates[settlementId] = true;
+        }
+        if (settlement.status === 'reminderSent') {
+          initialReminderSentStates[settlementId] = true;
+        }
+      });
+      
+      setSettledStates(initialSettledStates);
+      setRequestSentStates(initialRequestSentStates);
+      setPaymentMadeStates(initialPaymentMadeStates);
+      setReminderSentStates(initialReminderSentStates);
     }
   }, [expense?.settlements]);
 
-  // Helper to generate key (duplicated here to avoid export issues, strictly formatted)
-  const getSettlementKey = (settlement) => {
+  // Calculate settlements reactively when expense data changes
+  const calculatedSettlements = useMemo(() => {
+    try {
+      // If editing and we have settlements from Firestore, use those with current state
+      if (expense?.settlements && expense.settlements.length > 0) {
+        return expense.settlements.map(s => ({
+          from: s.debtor,
+          to: s.creditor,
+          amount: s.amount,
+          status: s.status || 'noAction',
+          debtor: s.debtor,
+          creditor: s.creditor
+        }));
+      }
+      
+      // Otherwise calculate from current expense data
+      const expenseData = {
+        title: state.title || 'Expense',
+        total: total,
+        participants: state.participants,
+        items: state.items,
+        fees: state.fees,
+        selectedPayers: state.selectedPayers || [0],
+      };
+      
+      const settlementResult = calculateSettlement(expenseData);
+      return (settlementResult.settlements || []).map(s => ({
+        from: s.from,
+        to: s.to,
+        amount: s.amount,
+        status: 'noAction',
+        debtor: s.from,
+        creditor: s.to
+      }));
+    } catch (error) {
+      console.error('Error calculating settlements:', error);
+      return [];
+    }
+  }, [expense?.settlements, state.title, total, state.participants, state.items, state.fees, state.selectedPayers]);
+
+  // Animation function for settled up state (from SettleUpScreen)
+  const animateSettledUp = useCallback((settlementId) => {
+    const checkmarkScale = new Animated.Value(0);
+    const checkmarkOpacity = new Animated.Value(0);
+    const settledTextOpacity = new Animated.Value(0);
+    const buttonCombinationScale = new Animated.Value(1);
+
+    setAnimationStates(prev => ({
+      ...prev,
+      [settlementId]: {
+        checkmarkScale,
+        checkmarkOpacity,
+        settledTextOpacity,
+        buttonCombinationScale,
+      }
+    }));
+
+    Animated.sequence([
+      Animated.timing(buttonCombinationScale, {
+        toValue: 0.95,
+        duration: 150,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonCombinationScale, {
+        toValue: 1,
+        duration: 150,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(checkmarkScale, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(checkmarkOpacity, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(settledTextOpacity, {
+          toValue: 1,
+          duration: 400,
+          delay: 200,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 200);
+  }, []);
+
+  const animateActionCompleted = useCallback((settlementId) => {
+    const buttonCombinationScale = new Animated.Value(1);
+    const checkmarkScale = new Animated.Value(0);
+    const checkmarkOpacity = new Animated.Value(0);
+    const settledTextOpacity = new Animated.Value(0);
+
+    setAnimationStates(prev => ({
+      ...prev,
+      [settlementId]: {
+        ...prev[settlementId],
+        buttonCombinationScale,
+        checkmarkScale,
+        checkmarkOpacity,
+        settledTextOpacity,
+      }
+    }));
+
+    Animated.sequence([
+      Animated.timing(buttonCombinationScale, {
+        toValue: 0.95,
+        duration: 150,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(buttonCombinationScale, {
+        toValue: 1,
+        duration: 150,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(checkmarkScale, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(checkmarkOpacity, {
+          toValue: 1,
+          duration: 250,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(settledTextOpacity, {
+          toValue: 1,
+          duration: 350,
+          delay: 100,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 150);
+  }, []);
+
+  // Helper functions from SettleUpScreen
+  const getSettlementKey = useCallback((settlement) => {
     const from = settlement.debtor || settlement.from;
     const to = settlement.creditor || settlement.to;
     const amount = settlement.amount;
     const roundedAmount = Math.round(amount * 100) / 100;
     return `${from}|||${to}|||${roundedAmount}`;
-  };
+  }, []);
 
-  const handleSettlementAction = async (action, settlement) => {
-    const key = getSettlementKey(settlement);
-    let newStatus = 'noAction';
+  const settlementsMatch = useCallback((settlement1, settlement2) => {
+    const key1 = getSettlementKey(settlement1);
+    const key2 = getSettlementKey(settlement2);
+    return key1 === key2;
+  }, [getSettlementKey]);
+
+  // Update settlement status in Firestore (from SettleUpScreen)
+  const updateSettlementStatus = useCallback(async (settlementToUpdate, newStatus) => {
+    try {
+      if (!expense?.id) {
+        console.error('[AddExpenseScreen] Expense ID is missing');
+        throw new Error('Expense ID is missing');
+      }
+
+      const latestExpense = await getExpenseById(expense.id);
+      if (!latestExpense) {
+        throw new Error('Expense not found in Firestore');
+      }
+      
+      const currentSettlements = latestExpense.settlements || [];
+      
+      let settlementFound = false;
+      const updatedSettlements = currentSettlements.map((s) => {
+        const matches = settlementsMatch(s, settlementToUpdate);
+        
+        if (matches) {
+          settlementFound = true;
+          return {
+            ...s,
+            status: newStatus,
+            updatedAt: new Date().toISOString()
+          };
+        }
+        return s;
+      });
+
+      if (!settlementFound) {
+        console.error('[AddExpenseScreen] No matching settlement found');
+        throw new Error('No matching settlement found');
+      }
+
+      const currentUser = getCurrentUser();
+      await updateExpense(expense.id, { settlements: updatedSettlements }, currentUser?.uid);
+      
+    } catch (error) {
+      console.error('[AddExpenseScreen] Error updating settlement status:', error);
+      throw error;
+    }
+  }, [expense, settlementsMatch]);
+
+  // Mark settlement as paid (from SettleUpScreen)
+  const handleMarkAsPaid = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
     
-    if (action === 'markAsPaid') newStatus = 'markedAsPaid';
-    if (action === 'requestPayment') newStatus = 'paymentRequested';
-    if (action === 'paymentMade') newStatus = 'paymentMade';
-    if (action === 'sendReminder') newStatus = 'reminderSent';
-    if (action === 'undo') newStatus = 'noAction';
+    setSettledStates(prev => ({
+      ...prev,
+      [settlementId]: true
+    }));
+    
+    animateSettledUp(settlementId);
+    
+    try {
+      await updateSettlementStatus(settlement, 'markedAsPaid');
+    } catch (error) {
+      console.error('[AddExpenseScreen] Failed to save settlement status:', error);
+      setSettledStates(prev => ({
+        ...prev,
+        [settlementId]: false
+      }));
+      Alert.alert('Error', 'Failed to save status. Please try again.');
+    }
+  }, [animateSettledUp, updateSettlementStatus, getSettlementKey]);
 
-    // Update local state immediately for UI responsiveness
-    setLocalSettlementActions(prev => {
-        if (newStatus === 'noAction') {
-            const newState = { ...prev };
-            delete newState[key];
-            return newState;
+  // Make payment via Venmo (from SettleUpScreen)
+  const handleMakePayment = async (settlement, copyToClipboard = false) => {
+    try {
+      const recipientParticipant = state.participants.find(p => p.name === settlement.to);
+      
+      if (!recipientParticipant?.userId) {
+        Alert.alert('Error', 'Unable to find recipient information');
+        return;
+      }
+
+      const recipientProfile = await getUserProfile(recipientParticipant.userId);
+      
+      if (!recipientProfile?.venmoUsername) {
+        Alert.alert('Error', 'Recipient does not have a Venmo username set up');
+        return;
+      }
+      
+      const settlementId = getSettlementKey(settlement);
+      setPaymentMadeStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+
+      animateActionCompleted(settlementId);
+      
+      try {
+        await updateSettlementStatus(settlement, 'paymentMade');
+      } catch (error) {
+        console.error('[AddExpenseScreen] Failed to save settlement status:', error);
+        setPaymentMadeStates(prev => ({
+          ...prev,
+          [settlementId]: false
+        }));
+        setAnimationStates(prev => {
+          const updated = { ...prev };
+          delete updated[settlementId];
+          return updated;
+        });
+        Alert.alert('Error', 'Failed to save status. Please try again.');
+        return;
+      }
+      
+      const amount = settlement.amount.toFixed(2);
+      const note = `IOU Payment - ${state.title || 'Expense'}`;
+      const deeplink = `venmo://paycharge?txn=pay&recipients=${recipientProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
+      
+      if (copyToClipboard) {
+        Clipboard.setString(deeplink);
+      } else {
+        const supported = await Linking.canOpenURL(deeplink);
+        if (supported) {
+          await Linking.openURL(deeplink);
+        } else {
+          Alert.alert('Error', 'Venmo is not installed on this device');
         }
-        return {
-            ...prev,
-            [key]: { status: newStatus, updatedAt: new Date().toISOString() }
-        };
-    });
-
-    // If editing, try to persist to Firestore immediately
-    if (isEditing && expense?.id) {
-        try {
-            // We need to construct the full settlements array to persist
-            // This requires recalculating optimal settlements and merging current state
-            const expenseData = await prepareExpenseData();
-            const settlementResult = calculateSettlement(expenseData);
-            let settlements = settlementResult.settlements || [];
-            
-            // Apply all local actions to the settlements
-            const updatedSettlements = settlements.map(s => {
-                const sKey = getSettlementKey(s);
-                // Check current action being applied OR existing local action
-                if (sKey === key) {
-                     return { ...s, status: newStatus, updatedAt: new Date().toISOString() };
-                }
-                const localAction = localSettlementActions[sKey];
-                if (localAction) {
-                    return { ...s, status: localAction.status, updatedAt: localAction.updatedAt };
-                }
-                return s;
-            });
-
-            await updateExpense(expense.id, { settlements: updatedSettlements }, getCurrentUser()?.uid);
-        } catch (error) {
-            console.error("Failed to persist settlement action:", error);
-        }
+      }
+    } catch (error) {
+      console.error('[AddExpenseScreen] Error in handleMakePayment:', error);
+      Alert.alert('Error', 'Failed to process payment. Please try again.');
     }
   };
+
+  // Request payment via Venmo (from SettleUpScreen)
+  const handleRequestPayment = async (settlement, copyToClipboard = false) => {
+    try {
+      const payerParticipant = state.participants.find(p => p.name === settlement.from);
+      
+      if (!payerParticipant?.userId) {
+        Alert.alert('Error', 'Unable to find payer information');
+        return;
+      }
+
+      const payerProfile = await getUserProfile(payerParticipant.userId);
+      
+      if (!payerProfile?.venmoUsername) {
+        Alert.alert('Error', 'Payer does not have a Venmo username set up');
+        return;
+      }
+
+      const currentUser = getCurrentUser();
+      if (!currentUser) {
+        Alert.alert('Error', 'You must be logged in to request payment');
+        return;
+      }
+
+      try {
+        await createPaymentRequest({
+          fromUserId: currentUser.uid,
+          toUserId: payerParticipant.userId,
+          amount: settlement.amount,
+          expenseId: expense?.id,
+          expenseTitle: state.title || 'Untitled Expense'
+        });
+      } catch (error) {
+        console.error('[AddExpenseScreen] Failed to create payment request:', error);
+      }
+
+      const amount = settlement.amount.toFixed(2);
+      const note = `IOU Payment Request - ${state.title || 'Expense'}`;
+      const deeplink = `venmo://paycharge?txn=charge&recipients=${payerProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
+
+      if (copyToClipboard) {
+        Clipboard.setString(deeplink);
+        const requestId = getSettlementKey(settlement);
+        setRequestSentStates(prev => ({
+          ...prev,
+          [requestId]: true
+        }));
+        animateActionCompleted(requestId);
+        
+        try {
+          await updateSettlementStatus(settlement, 'paymentRequested');
+        } catch (error) {
+          console.error('[AddExpenseScreen] Failed to save payment request status:', error);
+          setRequestSentStates(prev => ({
+            ...prev,
+            [requestId]: false
+          }));
+          setAnimationStates(prev => {
+            const updated = { ...prev };
+            delete updated[requestId];
+            return updated;
+          });
+        }
+      } else {
+        const supported = await Linking.canOpenURL(deeplink);
+        if (supported) {
+          setIsVenmoAppActive(true);
+          const requestId = getSettlementKey(settlement);
+          setRequestSentStates(prev => ({
+            ...prev,
+            [requestId]: false
+          }));
+          
+          await Linking.openURL(deeplink);
+        } else {
+          Alert.alert('Error', 'Venmo is not installed on this device');
+        }
+      }
+    } catch (error) {
+      console.error('[AddExpenseScreen] Error in handleRequestPayment:', error);
+      Alert.alert('Error', 'Failed to request payment. Please try again.');
+    }
+  };
+
+  // Send reminder (from SettleUpScreen)
+  const handleSendReminder = useCallback(async (settlement) => {
+    console. log('[AddExpenseScreen] handleSendReminder - settlement:', settlement);
+    try {
+      const debtorName = settlement.debtor || settlement.from;
+      const creditorName = settlement.creditor || settlement.to;
+
+      const currentUserId = getCurrentUser()?.uid;
+      const currentUserParticipant = state.participants.find(p => p.userId === currentUserId);
+      const name = currentUserParticipant?.name;
+
+      if (debtorName === name || creditorName === name) {
+        return;
+      }
+
+      const debtorParticipant = state.participants.find((p) => p.name === debtorName);
+      const creditorParticipant = state.participants.find((p) => p.name === creditorName);
+
+      if (!debtorParticipant || !creditorParticipant?.userId) {
+        Alert.alert('Error', 'Unable to find participant information');
+        return;
+      }
+
+      const creditorProfile = await getUserProfile(creditorParticipant.userId);
+
+      if (!creditorProfile?.venmoUsername) {
+        Alert.alert('Error', 'Creditor does not have a Venmo username set up');
+        return;
+      }
+
+      const amount = settlement.amount.toFixed(2);
+      const note = `IOU Payment - ${state.title || 'Expense'}`;
+      const venmoLink = `venmo://paycharge?txn=pay&recipients=${creditorProfile.venmoUsername}&amount=${amount}&note=${encodeURIComponent(note)}`;
+      const expenseTitle = state.title || 'this expense';
+      const message = `${debtorName} you owe ${creditorName} $${amount} for ${expenseTitle}.\n${venmoLink}`;
+
+      const result = await Share.share({
+        title: 'Send Reminder',
+        message,
+        url: venmoLink,
+      });
+
+      if (result && result.action === Share.dismissedAction) {
+        return;
+      }
+
+      const settlementId = getSettlementKey(settlement);
+      setReminderSentStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      animateActionCompleted(settlementId);
+
+      try {
+        await updateSettlementStatus(settlement, 'reminderSent');
+      } catch (statusError) {
+        console.error('[AddExpenseScreen] Failed to save reminderSent status:', statusError);
+        setReminderSentStates(prev => ({
+          ...prev,
+          [settlementId]: false
+        }));
+        setAnimationStates(prev => {
+          const updated = { ...prev };
+          delete updated[settlementId];
+          return updated;
+        });
+        throw statusError;
+      }
+    } catch (error) {
+      console.error('[AddExpenseScreen] Error in handleSendReminder:', error);
+      Alert.alert('Error', 'Failed to share reminder. Please try again.');
+    }
+  }, [state.participants, state.title, getSettlementKey, updateSettlementStatus, animateActionCompleted]);
+
+  // Confirm payment made (from SettleUpScreen)
+  const handleConfirmPaymentMade = useCallback((settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setRequestSentStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+    handleMarkAsPaid(settlement);
+  }, [getSettlementKey, handleMarkAsPaid]);
+
+  // Confirm payment received (from SettleUpScreen)
+  const handleConfirmPaymentReceived = useCallback((settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setPaymentMadeStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+    handleMarkAsPaid(settlement);
+  }, [getSettlementKey, handleMarkAsPaid]);
+
+  // Undo payment made (from SettleUpScreen)
+  const handleUndoPaymentMade = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setPaymentMadeStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+
+    try {
+      await updateSettlementStatus(settlement, 'noAction');
+      setAnimationStates(prev => {
+        const updated = { ...prev };
+        delete updated[settlementId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('[AddExpenseScreen] Failed to revert status:', error);
+      setPaymentMadeStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to undo payment. Please try again.');
+    }
+  }, [updateSettlementStatus, getSettlementKey]);
+
+  // Undo payment requested (from SettleUpScreen)
+  const handleUndoPaymentRequested = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setRequestSentStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+
+    try {
+      await updateSettlementStatus(settlement, 'noAction');
+      setAnimationStates(prev => {
+        const updated = { ...prev };
+        delete updated[settlementId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('[AddExpenseScreen] Failed to revert status:', error);
+      setRequestSentStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to undo request. Please try again.');
+    }
+  }, [updateSettlementStatus, getSettlementKey]);
+
+  // Undo reminder sent (from SettleUpScreen)
+  const handleUndoReminderSent = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setReminderSentStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+
+    try {
+      await updateSettlementStatus(settlement, 'noAction');
+      setAnimationStates(prev => {
+        const updated = { ...prev };
+        delete updated[settlementId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('[AddExpenseScreen] Failed to revert status:', error);
+      setReminderSentStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to undo reminder. Please try again.');
+    }
+  }, [updateSettlementStatus, getSettlementKey]);
+
+  // Undo mark as paid (from SettleUpScreen)
+  const handleUndoMarkAsPaid = useCallback(async (settlement) => {
+    const settlementId = getSettlementKey(settlement);
+    setSettledStates(prev => ({
+      ...prev,
+      [settlementId]: false
+    }));
+
+    try {
+      await updateSettlementStatus(settlement, 'noAction');
+      setAnimationStates(prev => {
+        const updated = { ...prev };
+        delete updated[settlementId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('[AddExpenseScreen] Failed to revert status:', error);
+      setSettledStates(prev => ({
+        ...prev,
+        [settlementId]: true
+      }));
+      Alert.alert('Error', 'Failed to undo settlement. Please try again.');
+    }
+  }, [updateSettlementStatus, getSettlementKey]);
 
   useEffect(() => {
     // Tab bar hiding is handled centrally in App.js via getTabBarStyle
@@ -332,48 +880,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     }
   };
 
-  const handleSettleNow = async () => {
-    if (!validateExpense()) return;
-
-    actions.setLoading(true);
-    try {
-      const expenseData = await prepareExpenseData();
-      const currentUser = getCurrentUser();
-
-      if (isEditing || isNewExpense) {
-        await updateExpenseParticipants(
-          expense.id,
-          expenseData.participants,
-          currentUser.uid
-        );
-        const { participants, ...otherFields } = expenseData;
-        await updateExpense(expense.id, otherFields, currentUser.uid);
-      } else {
-        await createExpense(expenseData, currentUser.uid);
-      }
-
-      const settlements = await calculateSettlements();
-
-      navigation.navigate("SettleUp", {
-        expense: {
-          ...expense,
-          settlements: settlements.map((settlement) => ({
-            debtor: settlement.from,
-            creditor: settlement.to,
-            amount: settlement.amount,
-            status: "noAction",
-            updatedAt: new Date().toISOString(),
-            associatedItems: [],
-          })),
-        },
-      });
-    } catch (error) {
-      Alert.alert("Error", "Failed to save expense: " + error.message);
-    } finally {
-      actions.setLoading(false);
-    }
-  };
-
   const handleEditItem = (index) => {
     const item = state.items[index];
     if (item && isEditing && !newlyAddedItems.has(index)) {
@@ -471,6 +977,375 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     }, 100);
   };
 
+  // Render settlement item (from SettleUpScreen) - Custom UI rendering
+  const renderSettlementItem = useCallback((settlement, index) => {
+    const fromParticipant = state.participants.find(p => p.name === settlement.from);
+    const toParticipant = state.participants.find(p => p.name === settlement.to);
+    
+    const settlementId = getSettlementKey(settlement);
+    const requestId = settlementId;
+    
+    const currentUserId = getCurrentUser()?.uid;
+    const currentUserParticipant = state.participants.find(p => p.userId === currentUserId);
+    const name = currentUserParticipant?.name;
+    
+    const isDebtor = settlement.from === name;
+    const isCreditor = settlement.to === name;
+    const isSpectator = !isDebtor && !isCreditor;
+    
+    const hasRequestBeenSent = requestSentStates[requestId] === true || settlement.status === 'paymentRequested';
+    const isPaymentMade = paymentMadeStates[settlementId] === true || settlement.status === 'paymentMade';
+    const hasReminderBeenSent = reminderSentStates[settlementId] === true || settlement.status === 'reminderSent';
+    const isSettled = settledStates[settlementId] === true || settlement.status === 'markedAsPaid';
+    const animationState = animationStates[settlementId] || null;
+    
+    const getButtonText = () => {
+      if (isDebtor) {
+        return hasRequestBeenSent ? 'Confirm payment made' : 'Make Payment';
+      } else if (isCreditor) {
+        if (isPaymentMade) {
+          return 'Confirm payment received';
+        }
+        return hasRequestBeenSent ? 'Request Sent' : 'Request Payment';
+      } else {
+        return hasReminderBeenSent ? 'Reminder Sent' : 'Send Reminder';
+      }
+    };
+    
+    const getButtonStyle = () => {
+      const baseStyle = styles.requestPaymentButton;
+      if ((isDebtor && hasRequestBeenSent) || (isCreditor && isPaymentMade)) {
+        return [baseStyle, styles.confirmActionButton];
+      }
+      if (isCreditor && hasRequestBeenSent) {
+        return [baseStyle, styles.requestSentButton];
+      }
+      if (isSpectator && hasReminderBeenSent) {
+        return [baseStyle, styles.reminderSentButton];
+      }
+      return baseStyle;
+    };
+    
+    const getButtonTextStyle = () => {
+      const baseStyle = styles.requestPaymentButtonText;
+      if ((isDebtor && hasRequestBeenSent) || (isCreditor && isPaymentMade)) {
+        return [baseStyle, styles.confirmActionButtonText];
+      }
+      if (isCreditor && hasRequestBeenSent) {
+        return [baseStyle, styles.requestSentButtonText];
+      }
+      if (isSpectator && hasReminderBeenSent) {
+        return [baseStyle, styles.reminderSentButtonText];
+      }
+      return baseStyle;
+    };
+
+    let combinedState = null;
+    if (isSettled) {
+      combinedState = 'settled';
+    } else if (isPaymentMade && isDebtor) {
+      combinedState = 'paymentMade';
+    } else if (hasRequestBeenSent && isCreditor) {
+      combinedState = 'paymentRequested';
+    } else if (isSpectator && hasReminderBeenSent) {
+      combinedState = 'reminderSent';
+    }
+
+    const combinedTextMap = {
+      settled: 'Settled Up',
+      paymentMade: 'Payment Made',
+      paymentRequested: 'Payment Requested',
+      reminderSent: 'Reminder Sent'
+    };
+
+    const combinedIconMap = {
+      settled: 'checkmark',
+      paymentMade: 'checkmark-done',
+      paymentRequested: 'paper-plane',
+      reminderSent: 'notifications'
+    };
+
+    const combinedBackgroundMap = {
+      settled: Colors.success,
+      paymentMade: Colors.accent,
+      paymentRequested: Colors.accent,
+      reminderSent: Colors.accent
+    };
+
+    const combinedUndoHandlers = {
+      settled: () => handleUndoMarkAsPaid(settlement),
+      paymentMade: () => handleUndoPaymentMade(settlement),
+      paymentRequested: () => handleUndoPaymentRequested(settlement),
+      reminderSent: () => handleUndoReminderSent(settlement)
+    };
+
+    return (
+      <View key={index} style={styles.settlementItem}>
+        <View style={styles.settlementRow}>
+          {/* Payer */}
+          <View style={styles.participantColumn}>
+            <View style={styles.participantAvatarContainer}>
+              {fromParticipant?.profilePhoto ? (
+                <Image source={{ uri: fromParticipant.profilePhoto }} style={styles.participantAvatar} contentFit="cover" transition={200} />
+              ) : (
+                <View style={[
+                  styles.participantAvatarPlaceholder,
+                  fromParticipant?.name === name && styles.currentUserAvatar
+                ]}>
+                  <Text style={[
+                    styles.participantAvatarInitials,
+                    fromParticipant?.name === name && styles.currentUserInitials
+                  ]}>
+                    {fromParticipant?.name === name ? 'M' : (fromParticipant?.name[0] || 'U').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.participantName} numberOfLines={1}>
+              {settlement.from === name ? 'Me': settlement.from}
+            </Text>
+            {fromParticipant?.username && (
+              <Text style={styles.participantUsername} numberOfLines={1}>
+                @{fromParticipant.username}
+              </Text>
+            )}
+          </View>
+
+          {/* Settlement Text with Arrows */}
+          <View style={styles.settlementTextContainer}>
+            <View style={styles.arrowLine}>
+              <View style={styles.arrowLineInner} />
+            </View>
+            
+            <View style={styles.textContent}>
+              <Text style={styles.settlementAmount}>
+                ${settlement.amount.toFixed(2)}
+              </Text>
+            </View>
+            
+            <View style={styles.arrowLine}>
+              <View style={styles.arrowLineInner} />
+              <View style={styles.arrowHead} />
+            </View>
+          </View>
+
+          {/* Receiver */}
+          <View style={styles.participantColumn}>
+            <View style={styles.participantAvatarContainer}>
+              {toParticipant?.profilePhoto ? (
+                <Image source={{ uri: toParticipant.profilePhoto }} style={styles.participantAvatar} contentFit="cover" transition={200} />
+              ) : (
+                <View style={[
+                  styles.participantAvatarPlaceholder,
+                  toParticipant?.name === name && styles.currentUserAvatar
+                ]}>
+                  <Text style={[
+                    styles.participantAvatarInitials,
+                    toParticipant?.name === name && styles.currentUserInitials
+                  ]}>
+                    {toParticipant?.name === name ? 'M' : (toParticipant?.name[0] || 'U').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.participantName} numberOfLines={1}>
+              {toParticipant?.name === name ? 'Me': settlement.to}
+            </Text>
+            {toParticipant?.username && (
+              <Text style={styles.participantUsername} numberOfLines={1}>
+                @{toParticipant.username}
+              </Text>
+            )}
+          </View>
+        </View>
+        
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
+          {combinedState === 'settled' ? (
+            <Animated.View 
+              style={[
+                styles.settledUpContainer,
+                animationState?.buttonCombinationScale ? { transform: [{ scale: animationState.buttonCombinationScale }] } : {}
+              ]}
+            >
+              <Animated.View 
+                style={[
+                  styles.settledUpButton,
+                  animationState?.settledUpOpacity ? { opacity: animationState.settledUpOpacity } : {}
+                ]}
+              >
+                <View style={styles.settledUpCenter}>
+                  <Animated.View
+                    style={[
+                      styles.checkmarkContainer,
+                      animationState?.checkmarkOpacity && animationState?.checkmarkScale ? {
+                        opacity: animationState.checkmarkOpacity,
+                        transform: [{ scale: animationState.checkmarkScale }]
+                      } : {}
+                    ]}
+                  >
+                    <Ionicons name="checkmark" size={16} color={Colors.surface} />
+                  </Animated.View>
+                  <Animated.Text
+                    style={[
+                      styles.settledUpText,
+                      animationState?.settledTextOpacity ? { opacity: animationState.settledTextOpacity } : {}
+                    ]}
+                  >
+                    Settled Up
+                  </Animated.Text>
+                </View>
+                <Animated.View
+                  style={animationState?.undoScale ? { transform: [{ scale: animationState.undoScale }] } : {}}
+                >
+                  <TouchableOpacity
+                    style={styles.undoButton}
+                    onPress={() => handleUndoMarkAsPaid(settlement)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="arrow-undo" size={16} color={Colors.surface} />
+                  </TouchableOpacity>
+                </Animated.View>
+              </Animated.View>
+              
+              <Animated.View
+                style={[
+                  styles.originalButtonsContainer,
+                  animationState?.buttonsOpacity && animationState?.buttonsScale ? {
+                    opacity: animationState.buttonsOpacity,
+                    transform: [{ scale: animationState.buttonsScale }]
+                  } : { opacity: 0 }
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.markAsPaidButton}
+                  onPress={() => handleMarkAsPaid(settlement)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={getButtonStyle()}
+                  onPress={() => {
+                    if (settlement.from === name) {
+                      handleMakePayment(settlement, true);
+                    } else if (settlement.to === name && !hasRequestBeenSent) {
+                      handleRequestPayment(settlement, true);
+                    } else if (!isSpectator) {
+                      // Do nothing if request already sent
+                    } else {
+                      if (hasReminderBeenSent) return;
+                      handleSendReminder(settlement);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                  disabled={(settlement.to === name && hasRequestBeenSent) || (isSpectator && hasReminderBeenSent)}
+                >
+                  <Text style={getButtonTextStyle()}>
+                    {getButtonText()}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </Animated.View>
+          ) : combinedState ? (
+            <Animated.View
+              style={[
+                styles.combinedActionContainer,
+                { backgroundColor: combinedBackgroundMap[combinedState] },
+                animationState?.buttonCombinationScale ? { transform: [{ scale: animationState.buttonCombinationScale }] } : {}
+              ]}
+            >
+              <Animated.View
+                style={[
+                  styles.combinedActionCenter,
+                  animationState?.settledTextOpacity ? { opacity: animationState.settledTextOpacity } : {}
+                ]}
+              >
+                <Animated.View
+                  style={[
+                    styles.combinedIconWrapper,
+                    animationState?.checkmarkOpacity ? { opacity: animationState.checkmarkOpacity } : {},
+                    animationState?.checkmarkScale ? { transform: [{ scale: animationState.checkmarkScale }] } : {}
+                  ]}
+                >
+                  <Ionicons name={combinedIconMap[combinedState]} size={16} color={Colors.surface} style={styles.combinedActionIcon} />
+                </Animated.View>
+                <Animated.Text
+                  style={[
+                    styles.combinedActionText,
+                    animationState?.settledTextOpacity ? { opacity: animationState.settledTextOpacity } : {}
+                  ]}
+                >
+                  {combinedTextMap[combinedState]}
+                </Animated.Text>
+              </Animated.View>
+              <TouchableOpacity
+                style={styles.undoButton}
+                onPress={combinedUndoHandlers[combinedState]}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="arrow-undo" size={16} color={Colors.surface} />
+              </TouchableOpacity>
+            </Animated.View>
+          ) : (
+            <>
+              {(isDebtor && hasRequestBeenSent) || (isCreditor && isPaymentMade) ? (
+                <TouchableOpacity
+                  style={[styles.requestPaymentButton, styles.confirmActionButton]}
+                  onPress={() => {
+                    if (isDebtor && hasRequestBeenSent) {
+                      handleConfirmPaymentMade(settlement);
+                    } else if (isCreditor && isPaymentMade) {
+                      handleConfirmPaymentReceived(settlement);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.confirmActionButtonText}>
+                    {isDebtor && hasRequestBeenSent ? 'Confirm payment made' : 'Confirm payment received'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.markAsPaidButton}
+                    onPress={() => handleMarkAsPaid(settlement)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.markAsPaidButtonText}>Mark as Paid</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={getButtonStyle()}
+                    onPress={() => {
+                      if (isDebtor) {
+                        handleMakePayment(settlement, true);
+                      } else if (isCreditor) {
+                        if (!hasRequestBeenSent) {
+                          handleRequestPayment(settlement, true);
+                        }
+                      } else {
+                        if (hasReminderBeenSent) return;
+                        handleSendReminder(settlement);
+                      }
+                    }}
+                    activeOpacity={0.8}
+                    disabled={(isSpectator && hasReminderBeenSent)}
+                  >
+                    <Text style={getButtonTextStyle()}>
+                      {getButtonText()}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }, [state.participants, requestSentStates, paymentMadeStates, settledStates, reminderSentStates, animationStates, getSettlementKey, handleMarkAsPaid, handleMakePayment, handleRequestPayment, handleSendReminder, handleConfirmPaymentMade, handleConfirmPaymentReceived, handleUndoMarkAsPaid, handleUndoPaymentMade, handleUndoPaymentRequested, handleUndoReminderSent]);
+
   return (
     <View style={styles.container}>
       <ExpenseHeader
@@ -490,55 +1365,25 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           })
         }
         isEditing={isEditing}
-      />
-
-      <ExpenseTabNavigator
+        onPeoplePress={() => setShowMembersModal(true)}
+        participantCount={state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
 
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+
+      <KeyboardAwareScrollView
+        ref={scrollViewRef}
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingTop: insets.top + 140, // Increased spacing for more breathing room under header
+          paddingBottom: activeTab === 'split' ? 120 : Spacing.xl,
+        }}
+        bottomOffset={100}
       >
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.content}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingTop: insets.top + 150,
-            paddingBottom: activeTab === 'split' ? 120 : Spacing.xl,
-          }}
-        >
           {activeTab === 'track' && (
             <>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Participants</Text>
-                <View style={styles.memberCountContainer}>
-                  <Text style={styles.memberCountNumber}>
-                    {state.participants.filter(p => p.userId !== getCurrentUser()?.uid).length}
-                  </Text>
-                  <Ionicons name="people" size={12} color={Colors.surface} />
-                </View>
-              </View>
-
-              <ParticipantsGrid
-                onParticipantPress={(participant, index) => {
-                  if (
-                    participant.userId &&
-                    participant.userId !== getCurrentUser()?.uid
-                  ) {
-                    navigation.navigate("FriendProfile", {
-                      friendId: participant.userId,
-                    });
-                  }
-                }}
-                expenseId={expense?.id}
-                currentUserId={getCurrentUser()?.uid}
-              />
-
-              <Text style={styles.sectionTitle}>Items</Text>
-
               {state.items.length === 0 ? (
                 <View style={styles.emptyStateContainer}>
                   <View style={styles.emptyStateIconContainer}>
@@ -555,7 +1400,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                     activeOpacity={0.7}
                   >
                     <View style={styles.emptyStateButtonIcon}>
-                      <Ionicons name="add" size={20} color={Colors.accent} />
+                      <Ionicons name="add" size={20} color={Colors.white} />
                     </View>
                     <Text style={styles.emptyStateButtonText}>Add Your First Item</Text>
                   </TouchableOpacity>
@@ -606,7 +1451,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                     activeOpacity={0.7}
                   >
                     <View style={styles.addAnotherItemIcon}>
-                      <Ionicons name="add" size={20} color={Colors.accent} />
+                      <Ionicons name="add" size={20} color={Colors.white} />
                     </View>
                     <Text style={styles.addAnotherItemText}>Add Another Item</Text>
                   </TouchableOpacity>
@@ -617,72 +1462,56 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
           {activeTab === 'split' && (
             <View style={styles.splitViewContainer}>
-              {(() => {
-                // Calculate settlements on the fly
-                try {
-                  const expenseData = {
-                    title: state.title || 'Expense',
-                    total: total,
-                    participants: state.participants,
-                    items: state.items,
-                    fees: state.fees,
-                    selectedPayers: state.selectedPayers || [0],
-                  };
-                  
-                  // Calculate optimal settlements
-                  const settlementResult = calculateSettlement(expenseData);
-                  let settlements = settlementResult.settlements || [];
-                  const currentUserId = getCurrentUser()?.uid;
-                  
-                  // Merge with local actions/statuses
-                  // This effectively applies "partial settlements" logic locally
-                  settlements = settlements.map(s => {
-                      const key = getSettlementKey(s);
-                      const localAction = localSettlementActions[key];
-                      if (localAction) {
-                          return {
-                              ...s,
-                              status: localAction.status,
-                              updatedAt: localAction.updatedAt
-                          };
-                      }
-                      return s;
-                  });
-                  
-                  return (
-                    <SettlementInterface
-                        settlements={settlements}
-                        participants={state.participants}
-                        currentUserId={currentUserId}
-                        expenseTitle={state.title}
-                        onAction={handleSettlementAction}
-                        readOnly={false}
-                    />
-                  );
-                } catch (error) {
-                  console.error('Error calculating settlements:', error);
-                  return (
-                    <View style={styles.emptySettlementContainer}>
-                      <Ionicons name="alert-circle" size={48} color={Colors.textSecondary} />
-                      <Text style={styles.emptySettlementText}>
-                        Add items to see settlement details
-                      </Text>
+              {state.participants.length <= 1 ? (
+                <View style={styles.emptyStateContainer}>
+                  <View style={styles.emptyStateIconContainer}>
+                    <Ionicons name="people-outline" size={48} color={Colors.textSecondary} />
+                    <View style={styles.emptyStateIconBadge}>
+                      <Ionicons name="add" size={16} color={Colors.white} />
                     </View>
-                  );
-                }
-              })()}
+                  </View>
+                  <Text style={styles.emptyStateTitle}>Split with friends</Text>
+                  <Text style={styles.emptyStateDescription}>
+                    Add people to this expense to automatically calculate who owes what.
+                  </Text>
+                  
+                  <TouchableOpacity
+                    style={styles.emptyStateButton}
+                    onPress={() => setShowMembersModal(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.emptyStateButtonIcon}>
+                      <Ionicons name="person-add" size={18} color={Colors.white} />
+                    </View>
+                    <Text style={styles.emptyStateButtonText}>Add People</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : calculatedSettlements.length === 0 ? (
+                <View style={styles.emptyStateContainer}>
+                  <View style={[styles.emptyStateIconContainer, { backgroundColor: Colors.success + '10' }]}>
+                    <Ionicons name="checkmark-circle" size={48} color={Colors.success} />
+                  </View>
+                  <Text style={[styles.emptyStateTitle, { color: Colors.success }]}>All settled up!</Text>
+                  <Text style={styles.emptyStateDescription}>
+                    No payments needed - everyone is already balanced.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.settlementsList}>
+                  {calculatedSettlements.map((settlement, index) => 
+                    renderSettlementItem(settlement, index)
+                  )}
+                </View>
+              )}
             </View>
           )}
-        </ScrollView>
+      </KeyboardAwareScrollView>
 
-        {activeTab === 'split' && (
-          <ExpenseFooter
-            loading={state.loading}
-            onSettlePress={handleSettleNow}
-            settleButtonText="Settle Now"
-          />
-        )}
-      </KeyboardAvoidingView>
+      <GroupMembersModal
+        visible={showMembersModal}
+        onClose={() => setShowMembersModal(false)}
+        expenseId={expense?.id}
+      />
     </View>
   );
 };
@@ -697,8 +1526,8 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: Spacing.xl,
-    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -769,7 +1598,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.accent,
     borderStyle: "dashed",
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     alignSelf: "stretch",
     marginHorizontal: Spacing.md,
@@ -778,7 +1607,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.sm,
@@ -793,11 +1622,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Colors.accent + "10",
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1.5,
     borderColor: Colors.accent,
-    borderStyle: "dashed",
-    paddingVertical: Spacing.lg,
+    borderStyle: "solid",
+    paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.lg,
     marginTop: Spacing.md,
     marginBottom: Spacing.lg,
@@ -806,7 +1635,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
     marginRight: Spacing.sm,
@@ -817,7 +1646,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   splitViewContainer: {
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
+  },
+  emptySettlementContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    marginTop: Spacing.md,
+  },
+  emptySettlementTitle: {
+    marginTop: Spacing.md,
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  emptySettlementText: {
+    marginTop: Spacing.xs,
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   sectionTitle: {
     ...Typography.h3,
@@ -831,15 +1680,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   settlementsList: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   settlementItem: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Colors.divider,
-    padding: Spacing.md,
-    ...Shadows.card,
+    padding: Spacing.sm,
   },
   settlementRow: {
     flexDirection: 'row',
@@ -864,7 +1712,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 2,
     borderColor: Colors.surface,
-    ...Shadows.avatar,
   },
   participantAvatarPlaceholder: {
     width: 48,
@@ -875,7 +1722,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.avatar,
   },
   participantAvatarInitials: {
     color: Colors.surface,
@@ -956,21 +1802,173 @@ const styles = StyleSheet.create({
     fontSize: 20,
     textAlign: 'center',
   },
-  noSettlements: {
+  emptyStateIconBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: Colors.accent,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingVertical: Spacing.xl,
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.surface,
+    zIndex: 1,
   },
-  noSettlementsText: {
-    ...Typography.h4,
-    color: Colors.success,
-    marginTop: Spacing.md,
-    fontWeight: '600',
-  },
-  noSettlementsSubtext: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
+  actionButtonsContainer: {
+    flexDirection: 'row',
     marginTop: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  requestPaymentButton: {
+    flex: 1,
+    backgroundColor: Colors.accent,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  requestPaymentButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  requestSentButton: {
+    backgroundColor: Colors.success,
+    opacity: 0.8,
+  },
+  requestSentButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  confirmActionButton: {
+    backgroundColor: Colors.success,
+    opacity: 0.9,
+  },
+  confirmActionButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  reminderSentButton: {
+    backgroundColor: Colors.accent,
+    opacity: 0.85,
+  },
+  reminderSentButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  settledUpContainer: {
+    flex: 1,
+    marginHorizontal: Spacing.xs,
+  },
+  settledUpButton: {
+    backgroundColor: Colors.success,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    minHeight: 44,
+  },
+  settledUpCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  originalButtonsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  checkmarkContainer: {
+    marginRight: Spacing.xs,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settledUpText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  undoButton: {
+    padding: Spacing.xs,
+    borderRadius: Radius.sm,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 28,
+    minHeight: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  markAsPaidButton: {
+    flex: 1,
+    backgroundColor: Colors.success,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  markAsPaidButtonText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  combinedActionContainer: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  combinedActionCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  combinedActionIcon: {
+    marginRight: Spacing.xs,
+  },
+  combinedActionText: {
+    ...Typography.label,
+    color: Colors.surface,
+    fontWeight: '600',
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  combinedIconWrapper: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.xs,
   },
 });
 

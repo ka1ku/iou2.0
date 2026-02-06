@@ -58,7 +58,6 @@ class NotificationService {
       this.setupMessageHandlers();
       
       this.isInitialized = true;
-      console.log('NotificationService initialized successfully');
     } catch (error) {
       console.error('Failed to initialize NotificationService:', error);
       // Don't throw - allow app to continue without notifications
@@ -111,7 +110,6 @@ class NotificationService {
         await registerDeviceForRemoteMessages(messaging);
       } catch (registerError) {
         // This might fail if already registered, which is fine
-        console.log('Device registration note:', registerError.message);
       }
       
       this.fcmToken = await getToken(messaging);
@@ -150,7 +148,6 @@ class NotificationService {
         lastTokenUpdate: new Date().toISOString()
       });
       
-      console.log('FCM token updated for user:', userId);
     } catch (error) {
       console.error('Failed to update FCM token:', error);
     }
@@ -165,7 +162,6 @@ class NotificationService {
       
       // Handle foreground messages
       const unsubscribeForeground = onMessage(messaging, async (remoteMessage) => {
-        console.log('Foreground message received:', remoteMessage);
         
         // Notify all registered handlers
         this.messageHandlers.forEach(handler => {
@@ -179,13 +175,11 @@ class NotificationService {
 
       // Handle background messages
       setBackgroundMessageHandler(messaging, async (remoteMessage) => {
-        console.log('Background message received:', remoteMessage);
         // Background messages are handled automatically by the system
       });
 
       // Handle notification tap when app is in background/quit
       onNotificationOpenedApp(messaging, remoteMessage => {
-        console.log('Notification opened app:', remoteMessage);
         this.handleNotificationTap(remoteMessage);
       });
 
@@ -193,7 +187,6 @@ class NotificationService {
       getInitialNotification(messaging)
         .then(remoteMessage => {
           if (remoteMessage) {
-            console.log('Notification opened app from quit state:', remoteMessage);
             this.handleNotificationTap(remoteMessage);
           }
         });
@@ -337,7 +330,6 @@ class NotificationService {
         preferencesUpdatedAt: new Date().toISOString()
       });
       
-      console.log('Notification preferences updated for user:', userId);
     } catch (error) {
       console.error('Failed to update notification preferences:', error);
       throw error;

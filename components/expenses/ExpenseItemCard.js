@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -40,6 +43,13 @@ const smartRoundSplit = (total, count) => {
 };
 
 const SPLIT_TOLERANCE = 0.01;
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEditing = false }) => {
   const { state, actions } = useExpense();
@@ -250,6 +260,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     }
 
     setSaving(true);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     try {
       const currentUser = getCurrentUser();
       if (!currentUser) {
@@ -308,16 +319,13 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
   return (
     <Card
       key={item.id}
-      variant="default"
+      variant="flat"
       padding="large"
       margin="none"
       style={{ marginBottom: 16, backgroundColor: Colors.surfaceLight }}
     >
       <View style={styles.itemHeader}>
           <View style={styles.itemNameSection}>
-            <Text style={[styles.itemNameLabel, validationErrors.name && styles.errorLabel]}>
-              Item Name{validationErrors.name && " *"}
-            </Text>
             <TextInput
               style={[
                 styles.itemNameInput,
@@ -339,9 +347,6 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
         </View>
 
       <View style={styles.priceSection}>
-        <Text style={[styles.priceLabel, validationErrors.amount && styles.errorLabel]}>
-          Price{validationErrors.amount && " *"}
-        </Text>
         <PriceInput
           value={item.amount}
           onChangeText={(amount) => {
@@ -495,14 +500,20 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
 
       {onCancelEdit && (
         <View style={styles.actionFooter}>
-          <TouchableOpacity
-            style={[styles.footerButton, styles.footerButtonCancel, saving && styles.buttonDisabled]}
-            onPress={handleCancelPress}
-            disabled={saving}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.footerButtonCancelText}>Cancel</Text>
-          </TouchableOpacity>
+          {!saving && (
+            <TouchableOpacity
+              style={[
+                styles.footerButton,
+                styles.footerButtonCancel,
+                saving && styles.buttonDisabled,
+              ]}
+              onPress={handleCancelPress}
+              disabled={saving}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.footerButtonCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.footerButton, styles.footerButtonSave]}
             onPress={handleDonePress}
@@ -539,14 +550,7 @@ const styles = StyleSheet.create({
   itemNameSection: {
     flex: 1,
   },
-  itemNameLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
+
   itemNameInput: {
     borderWidth: 1,
     borderColor: Colors.divider,
@@ -593,14 +597,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   priceSection: { marginBottom: Spacing.md },
-  priceLabel: {
-    ...Typography.label,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
+
   amountInput: { minHeight: 48 },
   whoPaidSection: { marginTop: Spacing.md },
   whoPaidLabel: {

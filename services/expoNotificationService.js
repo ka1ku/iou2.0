@@ -69,7 +69,6 @@ class ExpoNotificationService {
         }
 
         this.isInitialized = true;
-        console.log('ExpoNotificationService initialized successfully');
       } else {
         console.warn('Must use physical device for push notifications');
       }
@@ -114,7 +113,6 @@ class ExpoNotificationService {
         lastTokenUpdate: new Date().toISOString()
       });
       
-      console.log('Expo push token updated for user:', userId);
     } catch (error) {
       console.error('Failed to update Expo push token:', error);
       throw error;
@@ -154,7 +152,6 @@ class ExpoNotificationService {
     // Add notification received listener
     const receivedSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {
-        console.log('Notification received:', notification);
         if (onNotificationReceived) {
           onNotificationReceived(notification);
         }
@@ -164,7 +161,6 @@ class ExpoNotificationService {
     // Add notification response listener (when user taps notification)
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(
       (response) => {
-        console.log('Notification response:', response);
         if (onNotificationResponse) {
           onNotificationResponse(response);
         }
@@ -245,7 +241,6 @@ class ExpoNotificationService {
         preferencesUpdatedAt: new Date().toISOString()
       });
       
-      console.log('Notification preferences updated for user:', userId);
     } catch (error) {
       console.error('Failed to update notification preferences:', error);
       throw error;

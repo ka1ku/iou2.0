@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import deepLinkService from '../../services/deepLinkService';
 import { getCurrentUser } from '../../services/authService';
@@ -10,27 +11,28 @@ const ExpenseJoinHandler = () => {
   const [joinData, setJoinData] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const navigation = useNavigation();
 
   // Helper function to format phone number nicely
   const formatPhoneNumber = (phone) => {
     if (!phone) return '';
-    
+
     // Decode URL encoding first
     const decoded = decodeURIComponent(phone);
-    
+
     // Remove all non-digits
     const digits = decoded.replace(/\D/g, '');
-    
+
     // Format as (XXX) XXX-XXXX for US numbers
     if (digits.length === 10) {
       return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
     }
-    
+
     // Format as +X (XXX) XXX-XXXX for international numbers
     if (digits.length === 11 && digits[0] === '1') {
       return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
     }
-    
+
     // Return decoded version if can't format
     return decoded;
   };
@@ -41,25 +43,23 @@ const ExpenseJoinHandler = () => {
         // Enrich data with expense details and pre-check membership
         const user = getCurrentUser();
         let alreadyInRoom = false;
+        let expenseTitle = null;
         if (data?.expenseId) {
           const expense = await getExpenseById(data.expenseId);
-          if (expense && user?.uid) {
-            alreadyInRoom = !!expense.participants?.some(p => p.userId === user.uid);
+          if (expense) {
+            expenseTitle = expense.title || null;
+            if (user?.uid) {
+              alreadyInRoom = !!expense.participants?.some(p => p.userId === user.uid);
+            }
           }
         }
-        setJoinData({ ...data, alreadyInRoom });
+        setJoinData({ ...data, alreadyInRoom, expenseTitle });
         setShowModal(true);
       } catch (e) {
         setJoinData(data);
         setShowModal(true);
       }
     });
-
-    const initialURL = deepLinkService.getInitialURL();
-    if (initialURL) {
-      // Handled by deep link service already
-      deepLinkService.clearInitialURL();
-    }
 
     return unsubscribe;
   }, []);
@@ -80,17 +80,23 @@ const ExpenseJoinHandler = () => {
         userId: user.uid,
         userPhone: user.phoneNumber,
       });
-      if (result?.message === 'Already a participant') {
-        Alert.alert('Already in this room', 'You are already a participant in this expense.');
-      } else {
-        Alert.alert('Joined', 'You have joined the expense.');
-      }
+
       setShowModal(false);
       setJoinData(null);
+
+      if (result?.message === 'Already a participant') {
+        // Already in — just navigate to the expense
+        navigateToExpense(joinData.expenseId);
+      } else {
+        Alert.alert('Joined!', 'You have joined the expense.', [
+          { text: 'View Expense', onPress: () => navigateToExpense(joinData.expenseId) },
+          { text: 'OK' },
+        ]);
+      }
     } catch (error) {
       let errorTitle = 'Error';
       let errorMessage = error.message || 'Failed to join';
-      
+
       // Handle specific phone validation errors
       if (error.message.includes('Phone number mismatch')) {
         errorTitle = 'Phone Number Mismatch';
@@ -99,10 +105,23 @@ const ExpenseJoinHandler = () => {
         errorTitle = 'Phone Number Required';
         errorMessage = 'Please add your phone number to your profile before joining expenses.';
       }
-      
+
       Alert.alert(errorTitle, errorMessage);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const navigateToExpense = async (expenseId) => {
+    try {
+      const expense = await getExpenseById(expenseId);
+      if (!expense) return;
+
+      const screenName = expense.expenseType === 'receipt' ? 'AddReceipt' : 'AddExpense';
+      navigation.navigate(screenName, { expense, isNewExpense: false });
+    } catch (error) {
+      // Fallback: go home so user can find the expense
+      navigation.navigate('MainTabs');
     }
   };
 
@@ -122,10 +141,15 @@ const ExpenseJoinHandler = () => {
               <Ionicons name="people" size={28} color={Colors.accent} />
             </View>
             <Text style={styles.modalTitle}>
-              {joinData.alreadyInRoom ? 'Already in this room' : 'Would you like to join this room as...'}
+              {joinData.alreadyInRoom ? 'Already in this room' : 'Join Expense'}
             </Text>
+            {joinData.expenseTitle && (
+              <Text style={styles.expenseTitle} numberOfLines={2}>
+                "{joinData.expenseTitle}"
+              </Text>
+            )}
             <Text style={styles.modalSubtitle}>
-              {joinData.alreadyInRoom ? 'You are already a participant in this room.' : 'Tap join to start splitting expenses'}
+              {joinData.alreadyInRoom ? 'You are already a participant in this expense.' : 'Tap join to start splitting expenses'}
             </Text>
           </View>
 
@@ -152,12 +176,16 @@ const ExpenseJoinHandler = () => {
           </View>
 
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={[styles.actionButton, styles.declineButton]} onPress={() => setShowModal(false)} disabled={processing}>
+            <TouchableOpacity style={[styles.actionButton, styles.declineButton]} onPress={() => { setShowModal(false); setJoinData(null); }} disabled={processing}>
               <Text style={styles.declineText}>Dismiss</Text>
             </TouchableOpacity>
-            {!joinData.alreadyInRoom && (
+            {joinData.alreadyInRoom ? (
+              <TouchableOpacity style={[styles.actionButton, styles.joinButton]} onPress={() => { setShowModal(false); navigateToExpense(joinData.expenseId); setJoinData(null); }}>
+                <Text style={styles.joinText}>View Expense</Text>
+              </TouchableOpacity>
+            ) : (
               <TouchableOpacity style={[styles.actionButton, styles.joinButton]} onPress={handleJoin} disabled={processing}>
-                <Text style={styles.joinText}>{processing ? 'Joining...' : 'Join expense'}</Text>
+                <Text style={styles.joinText}>{processing ? 'Joining...' : 'Join Expense'}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -193,13 +221,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: Spacing.md,
   },
-  modalTitle: { ...Typography.h2, color: Colors.textPrimary, marginBottom: Spacing.xs },
-  modalSubtitle: { ...Typography.body, color: Colors.textSecondary },
-  detailsBox: { 
-    backgroundColor: Colors.background, 
-    borderRadius: Radius.md, 
-    padding: Spacing.lg, 
-    marginBottom: Spacing.xl 
+  modalTitle: { ...Typography.h2, color: Colors.textPrimary, marginBottom: Spacing.xs, textAlign: 'center' },
+  expenseTitle: { ...Typography.body, color: Colors.accent, fontWeight: '600', marginBottom: Spacing.xs, textAlign: 'center' },
+  modalSubtitle: { ...Typography.body, color: Colors.textSecondary, textAlign: 'center' },
+  detailsBox: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl
   },
   inviteInfo: {
     flexDirection: 'row',
@@ -215,13 +244,13 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: Spacing.sm,
   },
-  phoneLabel: { 
-    ...Typography.label, 
+  phoneLabel: {
+    ...Typography.label,
     color: Colors.textSecondary,
     marginBottom: 2,
   },
-  phoneNumber: { 
-    ...Typography.title, 
+  phoneNumber: {
+    ...Typography.title,
     color: Colors.textPrimary,
     fontFamily: Typography.familyMedium,
   },
@@ -244,8 +273,8 @@ const styles = StyleSheet.create({
   infoIcon: {
     marginRight: Spacing.sm,
   },
-  inviteText: { 
-    ...Typography.body, 
+  inviteText: {
+    ...Typography.body,
     color: Colors.textPrimary,
     flex: 1,
   },
@@ -258,5 +287,3 @@ const styles = StyleSheet.create({
 });
 
 export default ExpenseJoinHandler;
-
-

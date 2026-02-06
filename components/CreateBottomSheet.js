@@ -5,6 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  TextInput,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +17,8 @@ import { handleTakePhoto as takePhoto, handlePickImage as pickImage } from '../s
 import { processReceiptImage } from '../services/receiptScanner';
 import { requestReceiptScanningAccess } from '../services/subscriptionService';
 import { useReceiptScanning } from '../contexts/ReceiptScanningContext';
+import deepLinkService from '../services/deepLinkService';
+import { parseExpenseJoinLink } from '../services/expenseService';
 
 const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => {
   const insets = useSafeAreaInsets();
@@ -23,6 +27,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
   const [index, setIndex] = useState(-1);
   const [scanningReceipt, setScanningReceipt] = useState(false);
   const [showScanOptions, setShowScanOptions] = useState(false);
+  const [showJoinOptions, setShowJoinOptions] = useState(false);
+  const [joinInput, setJoinInput] = useState('');
   const { setIsReceiptScanning, startScanningAnimation, stopScanningAnimation } = useReceiptScanning();
 
   // Get the target tab - prefer last active tab, fallback to checking navigation state
@@ -78,14 +84,19 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
   useImperativeHandle(ref, () => ({
     open: () => {
       setShowScanOptions(false);
+      setShowJoinOptions(false);
+      setJoinInput('');
       bottomSheetRef.current?.snapToIndex(0);
     },
     close: () => {
       setShowScanOptions(false);
+      setShowJoinOptions(false);
+      Keyboard.dismiss();
       bottomSheetRef.current?.close();
     },
     snapToIndex: (idx) => {
       setShowScanOptions(false);
+      setShowJoinOptions(false);
       bottomSheetRef.current?.snapToIndex(idx);
     },
   }));
@@ -146,6 +157,41 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
       );
     }, 300);
   }, [navigation, startScanningAnimation, stopScanningAnimation, setIsReceiptScanning]);
+
+  const handleJoinExpense = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setShowJoinOptions(true);
+  }, []);
+
+  const handleProcessJoin = useCallback(() => {
+    const input = joinInput.trim();
+    if (!input) {
+      Alert.alert('Error', 'Please enter an invite link or code');
+      return;
+    }
+
+    Keyboard.dismiss();
+    bottomSheetRef.current?.close();
+
+    // Check if it's a link or just a code
+    // Try to parse as link first
+    const parsed = parseExpenseJoinLink(input);
+    
+    if (parsed) {
+      // It's a valid link
+      deepLinkService.notifyListeners('expenseJoin', parsed);
+    } else {
+      // Treat as code
+      deepLinkService.notifyListeners('expenseJoin', { code: input });
+    }
+    
+    // Reset state after slight delay
+    setTimeout(() => {
+      setShowJoinOptions(false);
+      setJoinInput('');
+    }, 500);
+
+  }, [joinInput]);
 
   const handlePickFromGallery = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -210,45 +256,7 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
       handleIndicatorStyle={styles.handleIndicator}
     >
       <BottomSheetView style={[styles.contentContainer, { paddingBottom: insets.bottom + Spacing.lg }]}>
-        {!showScanOptions ? (
-          <>
-            <View style={styles.headerRow}>
-              <Text style={styles.title}>Create New</Text>
-            </View>
-            
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity
-                style={styles.option}
-                onPress={handleAddExpense}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.brandLight }]}>
-                  <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Add Expense</Text>
-                  <Text style={styles.optionSubtitle}>Manually add an expense</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.option, { marginTop: Spacing.md }]}
-                onPress={handleScanReceipt}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '10' }]}>
-                  <Ionicons name="camera-outline" size={28} color={Colors.blue} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Scan Receipt</Text>
-                  <Text style={styles.optionSubtitle}>Scan a receipt to extract items</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
+        {showScanOptions ? (
           <>
             <View style={styles.headerRow}>
               <TouchableOpacity
@@ -289,6 +297,94 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
                 <View style={styles.optionContent}>
                   <Text style={styles.optionTitle}>Choose from Gallery</Text>
                   <Text style={styles.optionSubtitle}>Select an existing photo</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : showJoinOptions ? (
+          <>
+             <View style={styles.headerRow}>
+              <TouchableOpacity
+                onPress={() => { setShowJoinOptions(false); Keyboard.dismiss(); }}
+                style={styles.backButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={styles.title}>Join Expense</Text>
+              <View style={styles.backButtonPlaceholder} />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Enter Invite Link or Code</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Paste link or code here..."
+                value={joinInput}
+                onChangeText={setJoinInput}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholderTextColor={Colors.textSecondary}
+              />
+              
+              <TouchableOpacity
+                style={[styles.actionButton, !joinInput.trim() && styles.disabledButton]}
+                onPress={handleProcessJoin}
+                disabled={!joinInput.trim()}
+              >
+                <Text style={styles.actionButtonText}>Join</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>Create New</Text>
+            </View>
+            
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity
+                style={styles.option}
+                onPress={handleAddExpense}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: Colors.brandLight }]}>
+                  <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Add Expense</Text>
+                  <Text style={styles.optionSubtitle}>Manually add an expense</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.option, { marginTop: Spacing.md }]}
+                onPress={handleScanReceipt}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '10' }]}>
+                  <Ionicons name="camera-outline" size={28} color={Colors.blue} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Scan Receipt</Text>
+                  <Text style={styles.optionSubtitle}>Scan a receipt to extract items</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.option, { marginTop: Spacing.md }]}
+                onPress={handleJoinExpense}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: Colors.accent + '10' }]}>
+                  <Ionicons name="enter-outline" size={28} color={Colors.accent} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={styles.optionTitle}>Join Expense</Text>
+                  <Text style={styles.optionSubtitle}>Use a link or code to join</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -368,6 +464,41 @@ const styles = StyleSheet.create({
   optionSubtitle: {
     ...Typography.body,
     color: Colors.textSecondary,
+  },
+  inputContainer: {
+    paddingHorizontal: Spacing.sm,
+  },
+  inputLabel: {
+    ...Typography.label,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.sm,
+    marginLeft: Spacing.xs,
+  },
+  input: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    fontSize: 16,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.xl,
+  },
+  actionButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.full,
+    padding: Spacing.lg,
+    alignItems: 'center',
+    ...Shadows.card,
+  },
+  disabledButton: {
+    backgroundColor: Colors.disabled,
+    opacity: 0.7,
+  },
+  actionButtonText: {
+    ...Typography.title,
+    color: Colors.surface,
+    fontWeight: '600',
   },
 });
 

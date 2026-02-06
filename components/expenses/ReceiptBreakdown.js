@@ -13,6 +13,7 @@ import Animated, { useAnimatedStyle, withTiming, withSpring } from 'react-native
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import PriceInput from './PriceInput'; 
+import LoadingSpinner from '../LoadingSpinner';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -63,6 +64,7 @@ const ItemRow = memo(({
   onCancel,
   onUpdate,
   onRemove,
+  isSaving,
   validationErrors,
   onClearValidationError
 }) => {
@@ -206,11 +208,18 @@ const ItemRow = memo(({
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSaveClick}
-                style={[styles.editActionButton, styles.saveActionButton]}
+                style={[styles.editActionButton, styles.saveActionButton, isSaving && styles.disabledButton]}
                 activeOpacity={0.8}
+                disabled={isSaving}
               >
-                <Ionicons name="checkmark" size={18} color={Colors.white} style={{ marginRight: 4 }} />
-                <Text style={styles.editActionText}>Save Changes</Text>
+                {isSaving ? (
+                   <LoadingSpinner size="small" color={Colors.white} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={18} color={Colors.white} style={{ marginRight: 4 }} />
+                    <Text style={styles.editActionText}>Save Changes</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -301,6 +310,8 @@ const ReceiptBreakdown = ({
   onAddItem,
   onUpdateItem,
   onRemoveItem,
+  onSaveItem,
+  isSavingItemId,
   scrollRef,
   isFocused,
   validationErrors = {},
@@ -371,13 +382,16 @@ const ReceiptBreakdown = ({
     });
   }, []);
 
-  const saveItemChanges = useCallback((index) => {
+  const saveItemChanges = useCallback(async (index) => {
     const item = items[index];
     if (item) {
+      if (onSaveItem) {
+        await onSaveItem(index);
+      }
       newlyAddedItemIdsRef.current.delete(item.id);
       setEditingItemId(null);
     }
-  }, [items]);
+  }, [items, onSaveItem]);
 
   const cancelEdit = useCallback((itemId) => {
     if (newlyAddedItemIdsRef.current.has(itemId)) {
@@ -415,6 +429,7 @@ const ReceiptBreakdown = ({
                 item={item}
                 index={index}
                 isEditing={editingItemId === item.id}
+                isSaving={isSavingItemId === item.id}
                 participants={participants}
                 onToggleEdit={toggleEditMode}
                 onSave={saveItemChanges}
@@ -756,6 +771,23 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.danger,
     marginTop: 4,
+  },
+  spinnerContainer: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingSpinner: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: Colors.white,
+    borderTopColor: 'transparent',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
 });
 

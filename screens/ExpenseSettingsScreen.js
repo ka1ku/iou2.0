@@ -120,7 +120,7 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         });
 
         await Share.share({
-          message: `Join my expense "${expenseTitle}" on IOU: ${inviteLink}`,
+          message: `Join my expense "${expenseTitle}" on IOU.\n\nTap to join:\n${inviteLink}`,
           title: "Join Expense",
           url: inviteLink,
         });
@@ -287,7 +287,7 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
       Alert.alert(
         "Success",
         "You have left the expense successfully",
-        [{ text: "OK", onPress: () => navigation.navigate("HomeMain") }]
+        [{ text: "OK", onPress: () => navigation.navigate("MainTabs") }]
       );
     } catch (error) {
       Alert.alert("Error", "Failed to leave expense");

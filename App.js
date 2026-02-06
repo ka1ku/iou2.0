@@ -14,6 +14,7 @@ import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 import { Colors, Typography, Shadows, Radius } from './design/tokens';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -31,7 +32,6 @@ import ProfileScreen from './screens/ProfileScreen';
 import SetupExpenseScreen from './screens/SetupExpenseScreen';
 import AddExpenseScreen from './screens/AddExpenseScreen';
 import AddReceiptScreen from './screens/AddReceiptScreen';
-import SettleUpScreen from './screens/SettleUpScreen';
 import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
 import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
 import TermsOfServiceScreen from './screens/settings/TermsOfServiceScreen';
@@ -126,8 +126,9 @@ const NotificationNavigationSetup = () => {
             }
             break;
           case 'settle':
-            // Navigate to the global SettleUp screen
-            navigation.navigate('SettleUp');
+            // Settlement is now handled in AddExpenseScreen's Split tab
+            // Navigate to home instead
+            navigation.navigate('Home');
             break;
           case 'profile':
             navigation.navigate('Profile');
@@ -311,7 +312,6 @@ const RootStack = () => {
       <Stack.Screen name="SetupExpense" component={SetupExpenseScreenWithProvider} />
       <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} />
       <Stack.Screen name="AddReceipt" component={AddReceiptScreenWithProvider} />
-      <Stack.Screen name="SettleUp" component={SettleUpScreen} />
       <Stack.Screen name="ExpenseSettings" component={ExpenseSettingsScreen} />
     </Stack.Navigator>
   );
@@ -445,20 +445,22 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <BottomSheetModalProvider>
-          <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
-            <StatusBar style="dark" />
-            <ExpenseDataProvider>
-              <NotificationProvider>
-                <ReceiptScanningProvider>
-                  <AppContent user={user} loading={loading} />
-                  <ExpenseJoinHandler />
-                  {user && <NotificationNavigationSetup />}
-                </ReceiptScanningProvider>
-              </NotificationProvider>
-            </ExpenseDataProvider>
-          </NavigationContainer>
-        </BottomSheetModalProvider>
+        <KeyboardProvider>
+          <BottomSheetModalProvider>
+            <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
+              <StatusBar style="dark" />
+              <ExpenseDataProvider>
+                <NotificationProvider>
+                  <ReceiptScanningProvider>
+                    <AppContent user={user} loading={loading} />
+                    <ExpenseJoinHandler />
+                    {user && <NotificationNavigationSetup />}
+                  </ReceiptScanningProvider>
+                </NotificationProvider>
+              </ExpenseDataProvider>
+            </NavigationContainer>
+          </BottomSheetModalProvider>
+        </KeyboardProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );

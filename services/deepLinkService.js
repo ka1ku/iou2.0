@@ -6,7 +6,8 @@ import { getCurrentUser } from './authService';
 class DeepLinkService {
   constructor() {
     this.initialURL = null;
-    this.listeners = new Set();
+    this.listeners = [];
+    this.pendingEvents = [];
   }
 
   async initialize() {
@@ -25,7 +26,6 @@ class DeepLinkService {
   }
 
   handleDeepLink(url) {
-    
     if (!url) return;
 
     const friendInvite = parseFriendInviteLink(url);
@@ -39,13 +39,12 @@ class DeepLinkService {
       this.handleExpenseJoin(expenseJoin);
       return;
     }
-
   }
 
   async handleFriendInvite(inviteData) {
     try {
       const currentUser = getCurrentUser();
-      
+
       if (!currentUser) {
         this.storePendingInvite(inviteData);
         return;
@@ -56,7 +55,6 @@ class DeepLinkService {
       }
 
       this.notifyListeners('friendInvite', inviteData);
-      
     } catch (error) {
     }
   }
@@ -75,24 +73,50 @@ class DeepLinkService {
   }
 
   addListener(event, callback) {
-    this.listeners.add({ event, callback });
-    
+    const listener = { event, callback };
+    this.listeners.push(listener);
+
+    // Deliver any pending events for this event type
+    const remaining = [];
+    for (const pending of this.pendingEvents) {
+      if (pending.event === event) {
+        try {
+          callback(pending.data);
+        } catch (error) {
+        }
+      } else {
+        remaining.push(pending);
+      }
+    }
+    this.pendingEvents = remaining;
+
     return () => {
-      this.listeners.delete({ event, callback });
+      const index = this.listeners.indexOf(listener);
+      if (index !== -1) {
+        this.listeners.splice(index, 1);
+      }
     };
   }
 
   removeListener(event, callback) {
-    this.listeners.delete({ event, callback });
+    const index = this.listeners.findIndex(l => l.event === event && l.callback === callback);
+    if (index !== -1) {
+      this.listeners.splice(index, 1);
+    }
   }
 
   notifyListeners(event, data) {
-    this.listeners.forEach(listener => {
-      if (listener.event === event) {
-        try {
-          listener.callback(data);
-        } catch (error) {
-        }
+    const matching = this.listeners.filter(l => l.event === event);
+    if (matching.length === 0) {
+      // No listeners yet — queue the event for when a listener registers
+      this.pendingEvents.push({ event, data });
+      return;
+    }
+
+    matching.forEach(listener => {
+      try {
+        listener.callback(data);
+      } catch (error) {
       }
     });
   }
@@ -131,8 +155,8 @@ class DeepLinkService {
   }
 
   cleanup() {
-    this.listeners.clear();
-    
+    this.listeners = [];
+    this.pendingEvents = [];
   }
 }
 
