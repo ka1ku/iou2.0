@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { handleTakePhoto as takePhoto, handlePickImage as pickImage } from '../services/imageHandler';
 import { processReceiptImage } from '../services/receiptScanner';
-import { requestReceiptScanningAccess } from '../services/subscriptionService';
+import { requestReceiptScanningAccess, incrementScanUsage } from '../services/subscriptionService';
 import { useReceiptScanning } from '../contexts/ReceiptScanningContext';
 import deepLinkService from '../services/deepLinkService';
 import { parseExpenseJoinLink } from '../services/expenseService';
@@ -141,6 +141,9 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
             stopScanningAnimation();
           },
           (receiptData) => {
+            // Increment usage count on success
+            incrementScanUsage();
+            
             // Navigate to SetupExpense directly as it's in the RootStack
             navigation.navigate('SetupExpense', { 
               expenseType: 'receipt',
@@ -215,6 +218,9 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
             stopScanningAnimation();
           },
           (receiptData) => {
+            // Increment usage count on success
+            incrementScanUsage();
+
             // Navigate to SetupExpense directly as it's in the RootStack
             navigation.navigate('SetupExpense', { 
               expenseType: 'receipt',

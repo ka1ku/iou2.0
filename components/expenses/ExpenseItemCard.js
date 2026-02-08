@@ -51,7 +51,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEditing = false }) => {
+const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEditing = false, isLocked = false }) => {
   const { state, actions } = useExpense();
   const { participants } = state;
 
@@ -249,22 +249,20 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       splitMismatch: false,
     });
 
-    if (!isEditing) {
-      onCancelEdit && onCancelEdit({ revertChanges: false });
-      return;
-    }
-
+    // If no expenseId, just update local state and exit edit mode
     if (!expenseId) {
       onCancelEdit && onCancelEdit({ revertChanges: false });
       return;
     }
 
+    // If editing existing expense, persist to Firestore
     setSaving(true);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     try {
       const currentUser = getCurrentUser();
       if (!currentUser) {
         Alert.alert("Error", "User not authenticated");
+        setSaving(false);
         return;
       }
 
@@ -524,16 +522,26 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
               <LoadingSpinner size="small" color={Colors.white} />
             ) : (
               <>
-                <Ionicons 
-                  name="checkmark" 
-                  size={18} 
-                  color={Colors.white} 
+                <Ionicons
+                  name="checkmark"
+                  size={18}
+                  color={Colors.white}
                   style={{ marginRight: 6 }}
                 />
                 <Text style={styles.footerButtonSaveText}>Save Changes</Text>
               </>
             )}
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Locked Overlay */}
+      {isLocked && (
+        <View style={styles.lockedOverlay}>
+          <View style={styles.lockedContent}>
+            <Ionicons name="lock-closed" size={20} color={Colors.warning} />
+            <Text style={styles.lockedText}>Settled in payment</Text>
+          </View>
         </View>
       )}
     </Card>
@@ -722,6 +730,34 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: Radius.sm,
     padding: Spacing.xs,
+  },
+  lockedOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.surface + "DD",
+    borderRadius: Radius.md,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  lockedContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    backgroundColor: Colors.warning + "15",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Colors.warning + "40",
+  },
+  lockedText: {
+    fontSize: 14,
+    color: Colors.warning,
+    fontFamily: Typography.familyMedium,
+    fontWeight: "600",
   },
 });
 

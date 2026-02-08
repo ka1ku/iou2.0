@@ -16,6 +16,7 @@ import { getApp } from '@react-native-firebase/app';
 import { Linking, Platform } from 'react-native';
 import { calculateSettlementWithPartialSettlements, calculateSettlement } from '../utils/settlementCalculator';
 import { getUserProfile } from './friendService';
+import { arrayUnion } from '@react-native-firebase/firestore';
 
 const generateInviteToken = () => Math.random().toString(36).slice(2, 12);
 const generateJoinCode = () => {
@@ -91,13 +92,21 @@ export const updateExpense = async (expenseId, updateData, userId) => {
     // Check if we need to recalculate settlements
     // Only recalculate if items, participants, or fees are being updated
     // AND settlements are not being explicitly updated (to avoid infinite loops)
-    const shouldRecalculateSettlements = 
+    const shouldRecalculateSettlements =
       !updateData.settlements && // Don't recalculate if settlements are being explicitly set
-      (updateData.items !== undefined || 
-       updateData.participants !== undefined || 
+      (updateData.items !== undefined ||
+       updateData.participants !== undefined ||
        updateData.fees !== undefined);
-    
-    if (shouldRecalculateSettlements) {
+
+    // Track whether we need to log changes (price/item/participant changes)
+    const shouldLogChanges =
+      !updateData.settlements && // Don't log for pure settlement status changes
+      (updateData.items !== undefined ||
+       updateData.participants !== undefined ||
+       updateData.fees !== undefined ||
+       updateData.total !== undefined);
+
+    if (shouldRecalculateSettlements || shouldLogChanges) {
       try {
         // Fetch the current expense to get existing settlements and all expense data
         const firestoreInstance = getFirestore(getApp());
@@ -183,7 +192,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                   amount: s.amount,
                   status: 'noAction', // New settlements start with noAction
                   updatedAt: new Date().toISOString(),
-                  associatedItems: [],
+                  associatedItems: s.associatedItems || [],
                 };
               }
             });
@@ -191,9 +200,221 @@ export const updateExpense = async (expenseId, updateData, userId) => {
             // Add recalculated settlements to update data
             finalUpdateData.settlements = recalculatedSettlements;
           }
+
+          // --- Change Logging ---
+          if (shouldLogChanges) {
+            try {
+              const changeLogEntries = [];
+              const oldItems = currentExpense.items || [];
+              const newItems = updateData.items !== undefined ? updateData.items : oldItems;
+              const oldFees = currentExpense.fees || [];
+              const newFees = updateData.fees !== undefined ? updateData.fees : oldFees;
+              const oldTotal = oldItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
+                + oldFees.reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+              const newTotal = newItems.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
+                + newFees.reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+              const roundOld = Math.round(oldTotal * 100) / 100;
+              const roundNew = Math.round(newTotal * 100) / 100;
+
+              // Detect total change
+              if (Math.abs(roundOld - roundNew) > 0.01) {
+                // Find affected settlements (non-noAction ones)
+                const affectedSettlements = existingSettlements
+                  .filter(s => (s.status || 'noAction') !== 'noAction')
+                  .map(s => {
+                    const from = s.debtor || s.from;
+                    const to = s.creditor || s.to;
+                    const amt = Math.round(s.amount * 100) / 100;
+                    return `${from}|||${to}|||${amt}`;
+                  });
+
+                // Get user name for the log
+                let userName = 'Someone';
+                if (userId) {
+                  try {
+                    const profile = await getUserProfile(userId);
+                    if (profile) {
+                      userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || 'Someone';
+                    }
+                  } catch (_) { /* use default */ }
+                }
+
+                changeLogEntries.push({
+                  type: 'priceChange',
+                  userId: userId || null,
+                  userName,
+                  timestamp: new Date().toISOString(),
+                  details: {
+                    field: 'total',
+                    previousValue: roundOld,
+                    newValue: roundNew,
+                    affectedSettlements,
+                  },
+                });
+              }
+
+              // Detect item additions/removals and modifications
+              if (updateData.items !== undefined) {
+                const oldIds = new Set(oldItems.map(i => i.id).filter(Boolean));
+                const newIds = new Set(newItems.map(i => i.id).filter(Boolean));
+                
+                // 1. Added Items
+                const addedItems = newItems.filter(i => i.id && !oldIds.has(i.id));
+                
+                // 2. Removed Items
+                const removedItems = oldItems.filter(i => i.id && !newIds.has(i.id));
+
+                // 3. Modified Items (Renamed, Amount Changed, Split Changed)
+                const modifiedItems = newItems.filter(newItem => {
+                  if (!newItem.id || !oldIds.has(newItem.id)) return false;
+                  const oldItem = oldItems.find(i => i.id === newItem.id);
+                  if (!oldItem) return false;
+
+                  // Check if name changed
+                  if (newItem.name !== oldItem.name) return true;
+                  
+                  // Check if amount changed
+                  if (parseFloat(newItem.amount) !== parseFloat(oldItem.amount)) return true;
+
+                  // Check if splits/payers/consumers changed
+                  const payersChanged = JSON.stringify(newItem.selectedPayers) !== JSON.stringify(oldItem.selectedPayers);
+                  const consumersChanged = JSON.stringify(newItem.selectedConsumers) !== JSON.stringify(oldItem.selectedConsumers);
+                  const splitsChanged = JSON.stringify(newItem.splits) !== JSON.stringify(oldItem.splits);
+                  
+                  return payersChanged || consumersChanged || splitsChanged;
+                });
+
+                let userName = null;
+                if ((addedItems.length > 0 || removedItems.length > 0 || modifiedItems.length > 0) && userId) {
+                  try {
+                    const profile = await getUserProfile(userId);
+                    if (profile) {
+                      userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || 'Someone';
+                    }
+                  } catch (_) { /* use default */ }
+                }
+                const actorName = userName || 'Someone';
+
+                // Log Added (only log items with a valid amount)
+                addedItems.forEach(item => {
+                  const amount = parseFloat(item.amount) || 0;
+                  // Only log if item has a price > 0
+                  if (amount > 0) {
+                    changeLogEntries.push({
+                      type: 'itemAdded',
+                      userId: userId || null,
+                      userName: actorName,
+                      timestamp: new Date().toISOString(),
+                      details: {
+                        itemName: item.name || 'Unnamed item',
+                        itemAmount: amount,
+                      },
+                    });
+                  }
+                });
+
+                // Log Removed
+                removedItems.forEach(item => {
+                  changeLogEntries.push({
+                    type: 'itemRemoved',
+                    userId: userId || null,
+                    userName: actorName,
+                    timestamp: new Date().toISOString(),
+                    details: {
+                      itemName: item.name || 'Unnamed item',
+                      itemAmount: parseFloat(item.amount) || 0,
+                    },
+                  });
+                });
+
+                // Log Modified
+                modifiedItems.forEach(newItem => {
+                  const oldItem = oldItems.find(i => i.id === newItem.id);
+                  const changes = [];
+                  
+                  if (newItem.name !== oldItem.name) {
+                    changes.push(`renamed from "${oldItem.name}" to "${newItem.name}"`);
+                  }
+                  if (parseFloat(newItem.amount) !== parseFloat(oldItem.amount)) {
+                    changes.push(`amount changed from $${parseFloat(oldItem.amount).toFixed(2)} to $${parseFloat(newItem.amount).toFixed(2)}`);
+                  }
+                  
+                  const payersChanged = JSON.stringify(newItem.selectedPayers) !== JSON.stringify(oldItem.selectedPayers);
+                  const consumersChanged = JSON.stringify(newItem.selectedConsumers) !== JSON.stringify(oldItem.selectedConsumers);
+                  const splitsChanged = JSON.stringify(newItem.splits) !== JSON.stringify(oldItem.splits);
+
+                  if (payersChanged || consumersChanged || splitsChanged) {
+                    changes.push('split details updated');
+                  }
+
+                  if (changes.length > 0) {
+                    changeLogEntries.push({
+                      type: 'itemModified',
+                      userId: userId || null,
+                      userName: actorName,
+                      timestamp: new Date().toISOString(),
+                      details: {
+                        itemId: newItem.id,
+                        itemName: newItem.name,
+                        changes: changes,
+                      },
+                    });
+                  }
+                });
+              }
+
+              // Detect participant changes
+              if (updateData.participants !== undefined) {
+                const oldParticipants = currentExpense.participants || [];
+                const newParticipants = updateData.participants;
+                const oldUserIds = new Set(oldParticipants.map(p => p.userId).filter(Boolean));
+                const newUserIds = new Set(newParticipants.map(p => p.userId).filter(Boolean));
+                const addedParticipants = newParticipants.filter(p => p.userId && !oldUserIds.has(p.userId));
+                const removedParticipants = oldParticipants.filter(p => p.userId && !newUserIds.has(p.userId));
+
+                let userName = null;
+                if ((addedParticipants.length > 0 || removedParticipants.length > 0) && userId) {
+                  try {
+                    const profile = await getUserProfile(userId);
+                    if (profile) {
+                      userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || 'Someone';
+                    }
+                  } catch (_) { /* use default */ }
+                }
+
+                addedParticipants.forEach(p => {
+                  changeLogEntries.push({
+                    type: 'participantAdded',
+                    userId: userId || null,
+                    userName: userName || 'Someone',
+                    timestamp: new Date().toISOString(),
+                    details: { participantName: p.name || 'Unknown' },
+                  });
+                });
+
+                removedParticipants.forEach(p => {
+                  changeLogEntries.push({
+                    type: 'participantRemoved',
+                    userId: userId || null,
+                    userName: userName || 'Someone',
+                    timestamp: new Date().toISOString(),
+                    details: { participantName: p.name || 'Unknown' },
+                  });
+                });
+              }
+
+              // Append change log entries using arrayUnion
+              if (changeLogEntries.length > 0) {
+                finalUpdateData.changeLog = arrayUnion(...changeLogEntries);
+              }
+            } catch (logError) {
+              console.error('[updateExpense] Failed to generate change log:', logError);
+              // Don't block the update if logging fails
+            }
+          }
         }
       } catch (recalcError) {
-        // If recalculation fails, log but don't block the update
+        // If recalculation/logging fails, log but don't block the update
         console.error('[updateExpense] Failed to recalculate settlements:', recalcError);
       }
     }

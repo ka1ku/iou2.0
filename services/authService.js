@@ -12,6 +12,7 @@ import {
   where,
   getDocs
 } from '@react-native-firebase/firestore';
+import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { getApp } from '@react-native-firebase/app';
 import { generateFallbackAvatar } from '../utils/venmoUtils';
 import { downloadAndUploadImage } from './imageHandler';
@@ -578,12 +579,53 @@ export const deleteUserAccount = async () => {
       throw new Error('No authenticated user');
     }
 
-    // TODO: Call Cloud Function to delete all user data
-    // For now, just sign out the user
+    const functions = getFunctions(getApp());
+    const deleteAccountFn = httpsCallable(functions, 'deleteAccount');
+    
+    await deleteAccountFn();
+    
+    // Sign out locally
     await signOutUser();
     
     return true;
   } catch (error) {
+    console.error('Error deleting account:', error);
+    throw error;
+  }
+};
+
+// Report a user
+export const reportUser = async (reportedUserId, reason, description = '') => {
+  try {
+    const functions = getFunctions(getApp());
+    const reportUserFn = httpsCallable(functions, 'reportUser');
+    
+    await reportUserFn({
+      reportedUserId,
+      reason,
+      description
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error reporting user:', error);
+    throw error;
+  }
+};
+
+// Block a user
+export const blockUser = async (blockedUserId) => {
+  try {
+    const functions = getFunctions(getApp());
+    const blockUserFn = httpsCallable(functions, 'blockUser');
+    
+    await blockUserFn({
+      blockedUserId
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error blocking user:', error);
     throw error;
   }
 };

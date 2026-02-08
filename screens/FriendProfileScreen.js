@@ -11,8 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
 import ProfilePicture from '../components/VenmoProfilePicture';
-import { getCurrentUser } from '../services/authService';
+import { getCurrentUser, reportUser, blockUser } from '../services/authService';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
+import { calculateSettlement } from '../utils/settlementCalculator';
 
 const FriendProfileScreen = ({ route, navigation }) => {
   const { friend: initialFriend, userId, friendId } = route.params || {};
@@ -88,72 +89,70 @@ const FriendProfileScreen = ({ route, navigation }) => {
     const debtBreakdown = {};
 
     userExpenses.forEach(expense => {
-      if (expense.participants && expense.participants.some(p => p.id === friendId)) {
-        const friendParticipant = expense.participants.find(p => p.id === friendId);
-        const currentUserParticipant = expense.participants.find(p => p.id === currentUserId);
-        
-        if (friendParticipant && currentUserParticipant) {
-          let friendOwes = 0;
-          let currentUserOwes = 0;
+      // Skip expenses that don't involve this friend
+      const friendParticipant = expense.participants?.find(p =>
+        p.userId === friendId || p.id === friendId || p.friendId === friendId
+      );
+      const currentUserParticipant = expense.participants?.find(p =>
+        p.userId === currentUserId || p.id === currentUserId
+      );
 
-          expense.items?.forEach(item => {
-            if (item.paidBy === friendParticipant.participantIndex) {
-              if (item.splitType === 'even') {
-                const splitAmount = item.amount / expense.participants.length;
-                currentUserOwes += splitAmount;
-                friendOwes -= splitAmount;
-              } else if (item.splitType === 'custom') {
-                const currentUserSplit = item.splits?.find(s => s.participantIndex === currentUserParticipant.participantIndex);
-                const friendSplit = item.splits?.find(s => s.participantIndex === friendParticipant.participantIndex);
-                
-                if (currentUserSplit && friendSplit) {
-                  currentUserOwes += currentUserSplit.amount;
-                  friendOwes -= friendSplit.amount;
-                }
-              }
-            } else if (item.paidBy === currentUserParticipant.participantIndex) {
-              if (item.splitType === 'even') {
-                const splitAmount = item.amount / expense.participants.length;
-                friendOwes += splitAmount;
-                currentUserOwes -= splitAmount;
-              } else if (item.splitType === 'custom') {
-                const currentUserSplit = item.splits?.find(s => s.participantIndex === currentUserParticipant.participantIndex);
-                const friendSplit = item.splits?.find(s => s.participantIndex === friendParticipant.participantIndex);
-                
-                if (currentUserSplit && friendSplit) {
-                  friendOwes += friendSplit.amount;
-                  currentUserOwes -= currentUserSplit.amount;
-                }
-              }
-            }
-          });
+      if (!friendParticipant || !currentUserParticipant) return;
 
-          expense.fees?.forEach(fee => {
-            if (fee.splitType === 'equal') {
-              const splitAmount = fee.amount / expense.participants.length;
-              if (fee.paidBy === friendParticipant.participantIndex) {
-                currentUserOwes += splitAmount;
-                friendOwes -= splitAmount;
-              } else if (fee.paidBy === currentUserParticipant.participantIndex) {
-                friendOwes += splitAmount;
-                currentUserOwes -= splitAmount;
-              }
-            }
-          });
-
-          if (friendOwes > 0) {
-            totalOwed += friendOwes;
-          } else {
-            totalOwes += Math.abs(friendOwes);
-          }
-
-          debtBreakdown[expense.id] = {
-            title: expense.title,
-            amount: friendOwes,
-            date: expense.createdAt,
-            type: friendOwes > 0 ? 'owes_you' : 'you_owe'
-          };
+      // Use existing settlements if available, otherwise calculate
+      let settlements = [];
+      if (expense.settlements && expense.settlements.length > 0) {
+        settlements = expense.settlements;
+      } else {
+        // Use shared calculator
+        try {
+          const result = calculateSettlement(expense);
+          settlements = result.settlements || [];
+        } catch (error) {
+          console.error('[FriendProfileScreen] Settlement calculation error:', error);
+          return;
         }
+      }
+
+      // Find settlement between current user and friend
+      const currentUserName = currentUserParticipant.name;
+      const friendName = friendParticipant.name;
+
+      let netAmount = 0;
+
+      settlements.forEach(settlement => {
+        const debtor = settlement.debtor || settlement.from;
+        const creditor = settlement.creditor || settlement.to;
+        const status = settlement.status || 'noAction';
+
+        // Skip already paid settlements
+        if (status === 'markedAsPaid' || status === 'confirmed') return;
+
+        // Current user owes friend
+        if (debtor === currentUserName && creditor === friendName) {
+          netAmount -= settlement.amount;
+        }
+        // Friend owes current user
+        else if (debtor === friendName && creditor === currentUserName) {
+          netAmount += settlement.amount;
+        }
+      });
+
+      // Aggregate totals
+      if (netAmount > 0) {
+        totalOwed += netAmount;
+      } else if (netAmount < 0) {
+        totalOwes += Math.abs(netAmount);
+      }
+
+      // Record breakdown for this expense
+      if (netAmount !== 0) {
+        debtBreakdown[expense.id] = {
+          title: expense.title,
+          amount: netAmount,
+          date: expense.createdAt,
+          type: netAmount > 0 ? 'owes_you' : 'you_owe'
+        };
       }
     });
 
@@ -222,6 +221,68 @@ const FriendProfileScreen = ({ route, navigation }) => {
     );
   }
 
+  const handleReportUser = () => {
+    Alert.prompt(
+      'Report User',
+      'Please tell us why you are reporting this user.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          onPress: async (reason) => {
+            if (!reason || reason.trim().length === 0) {
+              Alert.alert('Error', 'Please provide a reason for reporting.');
+              return;
+            }
+            try {
+              await reportUser(friendProfile.friendId || friendProfile.userId, 'user_report', reason);
+              Alert.alert('Report Sent', 'Thank you for your report. We will review it shortly.');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to send report. Please try again.');
+            }
+          }
+        }
+      ],
+      'plain-text'
+    );
+  };
+
+  const handleBlockUser = () => {
+    Alert.alert(
+      'Block User',
+      'Are you sure you want to block this user? You will no longer see their content or be able to interact with them.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await blockUser(friendProfile.friendId || friendProfile.userId);
+              Alert.alert('User Blocked', 'You have blocked this user.', [
+                { text: 'OK', onPress: () => navigation.goBack() }
+              ]);
+            } catch (error) {
+              Alert.alert('Error', 'Failed to block user. Please try again.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const showOptions = () => {
+    Alert.alert(
+      'Options',
+      'Choose an action',
+      [
+        { text: 'Report User', onPress: handleReportUser },
+        { text: 'Block User', onPress: handleBlockUser, style: 'destructive' },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -232,7 +293,9 @@ const FriendProfileScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Friend Profile</Text>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity style={styles.optionsButton} onPress={showOptions}>
+          <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -374,8 +437,8 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  headerSpacer: {
-    width: 40,
+  optionsButton: {
+    padding: Spacing.sm,
   },
   content: {
     flex: 1,

@@ -90,6 +90,9 @@ const TermsOfServiceScreen = ({ navigation }) => {
             <Text style={styles.bulletPoint}>• To infringe upon or violate our intellectual property rights or the intellectual property rights of others</Text>
             <Text style={styles.bulletPoint}>• To harass, abuse, insult, harm, defame, slander, disparage, intimidate, or discriminate</Text>
             <Text style={styles.bulletPoint}>• To submit false or misleading information</Text>
+            <Text style={styles.sectionText}>
+              We have a zero-tolerance policy for objectionable content and abusive users. Content that violates these terms will be removed, and users who engage in such behavior will be blocked and banned from the Service.
+            </Text>
           </View>
 
           <View style={styles.section}>

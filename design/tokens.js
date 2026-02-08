@@ -48,6 +48,17 @@ export const Colors = {
   tabInactive: '#BDBDBD', // Alias for navInactive
   green: '#4CAF50', // Chart/data visualization color (material green)
   red: '#F44336', // Chart/data visualization color (material red)
+
+  // Venmo
+  venmo: '#008CFF', // Official Venmo blue
+  venmoDark: '#006FCC', // Darker Venmo blue for pressed states
+
+  // Settlement status colors
+  statusPending: '#FF9800', // Amber for pending/awaiting
+  statusSettled: '#4CAF50', // Green for settled
+  statusPartial: '#FF9800', // Amber for partially settled
+  statusPaymentSent: '#2196F3', // Blue for payment sent
+  statusChanged: '#FF6F00', // Deep amber for price changed badge
 };
 
 export const Spacing = {

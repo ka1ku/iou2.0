@@ -7,7 +7,19 @@ import {
   ENTITLEMENTS
 } from './revenueCatService';
 import { checkPremiumStatus } from './contactInviteService';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  serverTimestamp,
+  increment 
+} from '@react-native-firebase/firestore';
+import { getApp } from '@react-native-firebase/app';
+import { getCurrentUser } from './authService';
 
+const SCAN_LIMIT_PER_WEEK = 3;
 
 export const initializeSubscriptions = async (userId = null) => {
   try {
@@ -25,13 +37,91 @@ export const setSubscriptionUser = async (userId) => {
   }
 };
 
+// Check if user has free scans remaining
+export const checkScanLimit = async () => {
+  try {
+    const user = getCurrentUser();
+    if (!user) return false;
+
+    const firestore = getFirestore(getApp());
+    const statsRef = doc(firestore, 'users', user.uid, 'private', 'scanStats');
+    const snapshot = await getDoc(statsRef);
+
+    if (!snapshot.exists()) {
+      return true; // No stats yet means they haven't scanned anything
+    }
+
+    const data = snapshot.data();
+    const lastReset = data.lastResetDate?.toDate() || new Date();
+    const now = new Date();
+    
+    // Check if a week has passed since last reset
+    const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
+    if (now.getTime() - lastReset.getTime() > oneWeekInMs) {
+      // It's been more than a week, reset the count
+      await setDoc(statsRef, {
+        count: 0,
+        lastResetDate: serverTimestamp()
+      }, { merge: true });
+      return true;
+    }
+
+    return (data.count || 0) < SCAN_LIMIT_PER_WEEK;
+  } catch (error) {
+    console.error('Error checking scan limit:', error);
+    return false; // Fail safe
+  }
+};
+
+// Increment the scan count
+export const incrementScanUsage = async () => {
+  try {
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const firestore = getFirestore(getApp());
+    const statsRef = doc(firestore, 'users', user.uid, 'private', 'scanStats');
+    const snapshot = await getDoc(statsRef);
+
+    if (!snapshot.exists()) {
+      // Initialize stats
+      await setDoc(statsRef, {
+        count: 1,
+        lastResetDate: serverTimestamp()
+      });
+    } else {
+      // Increment count
+      await updateDoc(statsRef, {
+        count: increment(1)
+      });
+    }
+  } catch (error) {
+    console.error('Error incrementing scan usage:', error);
+  }
+};
+
 export const canAccessReceiptScanning = async () => {
+  // 1. Check RevenueCat subscription
   const hasSub = await hasReceiptScanningAccess();
   if (hasSub) return true;
-  return await checkPremiumStatus();
+  
+  // 2. Check Invite Premium status
+  const isInvitePremium = await checkPremiumStatus();
+  if (isInvitePremium) return true;
+
+  // 3. Check Free Scan Limit
+  return await checkScanLimit();
 };
 
 export const requestReceiptScanningAccess = async () => {
+  const hasAccess = await canAccessReceiptScanning();
+  
+  if (hasAccess) {
+    return true;
+  }
+  
+  // If we're here, they have no sub, no premium, and no free scans left.
+  // Show the paywall.
   return await handleReceiptScanningAccess();
 };
 
@@ -41,9 +131,27 @@ export const getSubscriptionStatus = async () => {
     
     const isInvitePremium = await checkPremiumStatus();
     
+    // Get scan stats for display if needed
+    let remainingScans = 0;
+    try {
+      const user = getCurrentUser();
+      if (user) {
+        const firestore = getFirestore(getApp());
+        const statsRef = doc(firestore, 'users', user.uid, 'private', 'scanStats');
+        const snapshot = await getDoc(statsRef);
+        const count = snapshot.exists() ? (snapshot.data().count || 0) : 0;
+        remainingScans = Math.max(0, SCAN_LIMIT_PER_WEEK - count);
+      }
+    } catch (e) {
+      console.log('Error fetching stats for status', e);
+    }
+
+    const isActive = customerInfo.entitlements.active[ENTITLEMENTS.RECEIPT_SCANNING] !== undefined || isInvitePremium;
+    
     return {
-      isActive: customerInfo.entitlements.active[ENTITLEMENTS.RECEIPT_SCANNING] !== undefined || isInvitePremium,
+      isActive,
       isInvitePremium,
+      remainingScans,
       activeEntitlements: Object.keys(customerInfo.entitlements.active),
       allEntitlements: Object.keys(customerInfo.entitlements.all),
       originalAppUserId: customerInfo.originalAppUserId,
@@ -57,6 +165,7 @@ export const getSubscriptionStatus = async () => {
     return {
       isActive: isInvitePremium,
       isInvitePremium,
+      remainingScans: 0,
       activeEntitlements: [],
       allEntitlements: [],
       error: error.message

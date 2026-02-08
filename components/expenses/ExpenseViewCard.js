@@ -18,7 +18,7 @@ import { useExpense } from "../../contexts/ExpenseContext";
 import ProfilePicture from "../VenmoProfilePicture";
 import Card from "../Card";
 
-const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
+const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
   const { state } = useExpense();
   const { participants } = state;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -63,6 +63,13 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
   }, [item.selectedConsumers, item.splits, participants]);
 
   const handleMenuPress = () => {
+    if (isLocked) {
+      Alert.alert(
+        'Item Locked',
+        'This item is part of an active settlement. Undo the settlement to edit this item.'
+      );
+      return;
+    }
     Alert.alert(
       "Expense Actions",
       "What would you like to do?",
@@ -87,17 +94,25 @@ const ExpenseViewCard = ({ item, onEdit, onDelete }) => {
     >
       <View style={styles.header}>
         <View style={styles.titleSection}>
-          <Text style={styles.itemName} numberOfLines={2}>
-            {item.name || "Untitled Item"}
-          </Text>
-          <Text style={styles.totalAmount}>${totalAmount.toFixed(2)}</Text>
+          <View style={styles.itemNameRow}>
+            <Text style={[styles.itemName, isLocked && styles.itemNameLocked]} numberOfLines={2}>
+              {item.name || "Untitled Item"}
+            </Text>
+            {isLocked && (
+              <View style={styles.settledBadge}>
+                <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                <Text style={styles.settledBadgeText}>Settled</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.totalAmount, isLocked && styles.totalAmountLocked]}>${totalAmount.toFixed(2)}</Text>
           <Text style={styles.paidByText} numberOfLines={1}>{paidByInfo}</Text>
         </View>
         <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
           <Ionicons
-            name="ellipsis-horizontal"
+            name={isLocked ? "lock-closed" : "ellipsis-horizontal"}
             size={20}
-            color={Colors.textSecondary}
+            color={isLocked ? Colors.textSecondary : Colors.textSecondary}
           />
         </TouchableOpacity>
       </View>
@@ -189,17 +204,46 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: Spacing.md,
   },
+  itemNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
   itemName: {
     ...Typography.h3,
     color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
     lineHeight: 24,
+    flex: 1,
+  },
+  itemNameLocked: {
+    textDecorationLine: 'line-through',
+    color: Colors.textSecondary,
+    opacity: 0.7,
   },
   totalAmount: {
     ...Typography.h2,
     color: Colors.accent,
     marginBottom: Spacing.xs,
     lineHeight: 28,
+  },
+  totalAmountLocked: {
+    textDecorationLine: 'line-through',
+    opacity: 0.7,
+  },
+  settledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.success + '15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    gap: 3,
+  },
+  settledBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.success,
   },
   paidByText: {
     ...Typography.body,

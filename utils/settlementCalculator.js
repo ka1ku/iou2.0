@@ -1,3 +1,76 @@
+/**
+ * Build a map of participant name → { paidFor: Set<itemId>, consumed: Set<itemId> }
+ * This tracks which items each participant paid for and consumed.
+ */
+export const buildItemAssociationMap = (expense, participants, items) => {
+  const map = new Map(); // name → { paidFor: Set, consumed: Set }
+  participants.forEach(p => map.set(p.name, { paidFor: new Set(), consumed: new Set() }));
+
+  items.forEach(item => {
+    if (!item.id) return;
+    const payers = (item.selectedPayers && item.selectedPayers.length > 0)
+      ? item.selectedPayers
+      : (expense.selectedPayers || [0]);
+    payers.forEach(idx => {
+      const name = participants[idx]?.name;
+      if (name && map.has(name)) map.get(name).paidFor.add(item.id);
+    });
+
+    (item.selectedConsumers || []).forEach(idx => {
+      const name = participants[idx]?.name;
+      if (name && map.has(name)) map.get(name).consumed.add(item.id);
+    });
+  });
+  return map;
+};
+
+/**
+ * Given a settlement (from→to) and the association map + items array,
+ * return the associated items: items the creditor paid for that the debtor consumed.
+ * The amount field will be the debtor's split (how much they owe), not the full item price.
+ */
+const getAssociatedItems = (fromName, toName, assocMap, items, participants) => {
+  const creditorPaid = assocMap.get(toName)?.paidFor;
+  const debtorConsumed = assocMap.get(fromName)?.consumed;
+  if (!creditorPaid || !debtorConsumed) return [];
+
+  // Find debtor's index
+  const debtorIndex = participants.findIndex(p => p.name === fromName);
+  if (debtorIndex === -1) return [];
+
+  const result = [];
+  items.forEach(item => {
+    if (!item.id) return;
+    if (creditorPaid.has(item.id) && debtorConsumed.has(item.id)) {
+      // Calculate how much the debtor owes for this item (their split)
+      const consumers = item.selectedConsumers || [];
+      const consumerIndex = consumers.indexOf(debtorIndex);
+
+      let debtorOwes = 0;
+      if (consumerIndex !== -1) {
+        const splits = item.splits || [];
+        if (splits[consumerIndex] !== undefined && splits[consumerIndex] !== null) {
+          // Custom split amount
+          const splitAmount = typeof splits[consumerIndex] === 'object'
+            ? parseFloat(splits[consumerIndex].amount) || 0
+            : parseFloat(splits[consumerIndex]) || 0;
+          debtorOwes = Math.round(splitAmount * 100) / 100;
+        } else {
+          // Equal split among consumers
+          const itemAmount = parseFloat(item.amount) || 0;
+          debtorOwes = Math.round((itemAmount / consumers.length) * 100) / 100;
+        }
+      }
+
+      result.push({
+        id: item.id,
+        name: item.name || 'Item',
+        amount: debtorOwes  // Debtor's split, not full item price
+      });
+    }
+  });
+  return result;
+};
 
 export const calculateSettlement = (expense) => {
   const { participants, items, fees } = expense;
@@ -9,7 +82,12 @@ export const calculateSettlement = (expense) => {
   const total = itemsTotal + feesTotal;
 
   const balances = calculateParticipantBalances(expense, participants, items, fees, total);
-  const settlements = generateSettlementProposal(balances);
+  const assocMap = buildItemAssociationMap(expense, participants, items);
+  const rawSettlements = generateSettlementProposal(balances);
+  const settlements = rawSettlements.map(s => ({
+    ...s,
+    associatedItems: getAssociatedItems(s.from, s.to, assocMap, items, participants),
+  }));
   return {
     settlements,
     balances,
@@ -195,6 +273,8 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
   // This will create settlements for the remaining balance after accounting for transferred amounts
   const newSettlements = generateSettlementProposal(adjustedBalances);
 
+  const assocMap = buildItemAssociationMap(expense, participants, items);
+
   // Combine preserved transferred settlements with new settlements
   const allSettlements = [
     ...transferredSettlements.map(s => ({
@@ -202,12 +282,14 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
       to: s.creditor || s.to,
       amount: s.amount, // Keep original amount - money already transferred
       status: s.status, // Preserve original status
-      preserved: true
+      preserved: true,
+      associatedItems: s.associatedItems || getAssociatedItems(s.debtor || s.from, s.creditor || s.to, assocMap, items, participants),
     })),
     ...newSettlements.map(s => ({
       ...s,
       status: 'noAction',
-      preserved: false
+      preserved: false,
+      associatedItems: getAssociatedItems(s.from, s.to, assocMap, items, participants),
     }))
   ];
 
@@ -221,12 +303,101 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
   };
 };
 
+/**
+ * Migrate old settlements that don't have item-level settled flags.
+ * Old statuses: markedAsPaid/confirmed = all items settled
+ */
+export const migrateOldSettlement = (settlement) => {
+  const needsMigration = settlement.associatedItems?.some(item =>
+    item.settled === undefined
+  );
+
+  if (!needsMigration) return settlement;
+
+  // Old statuses: markedAsPaid/confirmed = all items settled
+  const isFullySettled = ['markedAsPaid', 'confirmed'].includes(settlement.status);
+
+  return {
+    ...settlement,
+    associatedItems: settlement.associatedItems.map(item => ({
+      ...item,
+      settled: isFullySettled,
+      settledAt: isFullySettled ? settlement.updatedAt : null
+    })),
+    settledAmount: isFullySettled ? settlement.amount : 0,
+    remainingAmount: isFullySettled ? 0 : settlement.amount,
+    status: isFullySettled ? 'complete' : 'noAction'
+  };
+};
+
+/**
+ * Calculate settlements while preserving item-level settlement states from existing settlements.
+ * This allows partial settlement tracking - users can settle individual items within a settlement.
+ */
+export const calculateSettlementWithItemStates = (expense, existingSettlements = []) => {
+  // 1. Calculate fresh settlements (gets updated associatedItems)
+  const freshResult = calculateSettlement(expense);
+
+  // 2. Build map of settled items by pair key (no amount, so item states survive when amounts change)
+  const PAYMENT_FLOW_STATUSES = ['markedAsPaid', 'paymentMade', 'paymentRequested', 'reminderSent', 'confirmed'];
+  const settledItemsMap = new Map();
+  existingSettlements.forEach(s => {
+    const pairKey = `${s.debtor || s.from}|||${s.creditor || s.to}`;
+    const settledIds = (s.associatedItems || [])
+      .filter(item => item.settled === true)
+      .map(item => item.id);
+    settledItemsMap.set(pairKey, new Set(settledIds));
+  });
+
+  // 3. Merge settled state into fresh settlements
+  const merged = freshResult.settlements.map(fresh => {
+    const pairKey = `${fresh.from}|||${fresh.to}`;
+    const settledIds = settledItemsMap.get(pairKey) || new Set();
+
+    const associatedItems = (fresh.associatedItems || []).map(item => ({
+      ...item,
+      settled: settledIds.has(item.id) ? true : (item.settled || false),
+      settledAt: settledIds.has(item.id) ? item.settledAt : null
+    }));
+
+    // Calculate amounts
+    const settledAmount = associatedItems
+      .filter(i => i.settled)
+      .reduce((sum, i) => sum + i.amount, 0);
+    const totalAmount = associatedItems.reduce((sum, i) => sum + i.amount, 0);
+
+    // Derive status from item flags
+    let status = 'noAction';
+    if (settledAmount > 0.01) {
+      status = Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial';
+    }
+
+    // Preserve payment-flow statuses from Firestore (they take priority over item-derived status)
+    const existingSettlement = existingSettlements.find(s =>
+      `${s.debtor || s.from}|||${s.creditor || s.to}` === pairKey
+    );
+    if (PAYMENT_FLOW_STATUSES.includes(existingSettlement?.status)) {
+      status = existingSettlement.status;
+    }
+
+    return {
+      ...fresh,
+      associatedItems,
+      settledAmount: Math.round(settledAmount * 100) / 100,
+      remainingAmount: Math.round((totalAmount - settledAmount) * 100) / 100,
+      status
+    };
+  });
+
+  return { ...freshResult, settlements: merged };
+};
+
 export const getSettlementSummary = (settlements) => {
   const totalAmount = settlements.reduce((sum, s) => sum + s.amount, 0);
   const uniquePayers = new Set(settlements.map(s => s.from)).size;
   const uniqueReceivers = new Set(settlements.map(s => s.to)).size;
   const uniquePeople = new Set(settlements.map(s => s.from).concat(settlements.map(s => s.to))).size;
-  
+
   return {
     totalTransactions: settlements.length,
     totalAmount,

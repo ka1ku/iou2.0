@@ -535,23 +535,63 @@ exports.onExpenseUpdated = functions.firestore
       const hasSignificantChange = significantChanges.some(field => {
         return JSON.stringify(before[field]) !== JSON.stringify(after[field]);
       });
-      
+
       if (!hasSignificantChange) return;
-      
+
       // Get updater info
       const updaterDoc = await admin.firestore().collection('users').doc(after.updatedBy || after.createdBy).get();
       const updaterData = updaterDoc.data();
       const updaterName = `${updaterData.firstName} ${updaterData.lastName}`.trim();
-      
+
       // Get all participant user IDs (excluding updater)
-      const participantIds = (after.participantIds || []).filter(id => 
+      const participantIds = (after.participantIds || []).filter(id =>
         id !== (after.updatedBy || after.createdBy)
       );
-      
+
+      // Check if total changed and there are paid settlements - send specific notification
+      const beforeTotal = (before.items || []).reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
+        + (before.fees || []).reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+      const afterTotal = (after.items || []).reduce((s, i) => s + (parseFloat(i.amount) || 0), 0)
+        + (after.fees || []).reduce((s, f) => s + (parseFloat(f.amount) || 0), 0);
+      const totalChanged = Math.abs(beforeTotal - afterTotal) > 0.01;
+
+      const hasPaidSettlements = (after.settlements || []).some(s => {
+        const status = s.status || 'noAction';
+        return status !== 'noAction';
+      });
+
+      if (totalChanged && hasPaidSettlements && participantIds.length > 0) {
+        // Find participants affected by paid settlements
+        const paidSettlements = (after.settlements || []).filter(s => (s.status || 'noAction') !== 'noAction');
+        const affectedUserIds = new Set();
+        paidSettlements.forEach(s => {
+          const debtorName = s.debtor || s.from;
+          const creditorName = s.creditor || s.to;
+          (after.participants || []).forEach(p => {
+            if ((p.name === debtorName || p.name === creditorName) && p.userId) {
+              affectedUserIds.add(p.userId);
+            }
+          });
+        });
+
+        const affectedIds = [...affectedUserIds].filter(id => id !== (after.updatedBy || after.createdBy));
+        if (affectedIds.length > 0) {
+          const priceTitle = 'Settlement May Have Changed';
+          const priceBody = `${updaterName} updated ${after.title || 'an expense'}. Your settlement amount may have changed.`;
+
+          await sendNotificationsToUsers(affectedIds, priceTitle, priceBody, {
+            type: 'settlements',
+            route: 'expense',
+            expenseId: expenseId,
+            updatedBy: after.updatedBy || after.createdBy
+          });
+        }
+      }
+
       if (participantIds.length > 0) {
         const title = 'Expense Updated';
         const body = `${updaterName} updated the expense: ${after.title || 'Untitled'}`;
-        
+
         await sendNotificationsToUsers(participantIds, title, body, {
           type: 'expenses',
           route: 'expense',
@@ -1042,5 +1082,93 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
   } catch (error) {
     console.error('Error in deleteSyntheticData:', error);
     throw new functions.https.HttpsError('internal', 'Failed to delete synthetic data: ' + error.message);
+  }
+});
+  }
+});
+
+// Delete user account (App Store Requirement)
+exports.deleteAccount = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const userId = context.auth.uid;
+  const db = admin.firestore();
+  
+  try {
+    // 1. Delete user document from Firestore
+    await db.collection('users').doc(userId).delete();
+    
+    // 2. Delete user from Firebase Authentication
+    await admin.auth().deleteUser(userId);
+    
+    // Note: The syncUserToAlgolia trigger will automatically remove the user from Algolia
+    // Note: We are keeping expenses/transactions for historical integrity for other users,
+    // but the user's personal data (name, etc.) is removed from the user doc.
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to delete account: ' + error.message);
+  }
+});
+
+// Report a user (UGC Requirement)
+exports.reportUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { reportedUserId, reason, description } = data;
+  const reporterId = context.auth.uid;
+  
+  if (!reportedUserId || !reason) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
+  }
+
+  try {
+    await admin.firestore().collection('reports').add({
+      reporterId,
+      reportedUserId,
+      reason,
+      description: description || '',
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      type: 'user_report'
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error reporting user:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to submit report');
+  }
+});
+
+// Block a user (UGC Requirement)
+exports.blockUser = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { blockedUserId } = data;
+  const blockerId = context.auth.uid;
+  
+  if (!blockedUserId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing blockedUserId');
+  }
+
+  try {
+    const db = admin.firestore();
+    
+    // Add to blocker's blocked list
+    await db.collection('users').doc(blockerId).collection('blockedUsers').doc(blockedUserId).set({
+      blockedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error blocking user:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to block user');
   }
 });

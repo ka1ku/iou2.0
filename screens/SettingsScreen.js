@@ -12,11 +12,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
-import { signOutUser } from '../services/authService';
+import { signOutUser, deleteUserAccount } from '../services/authService';
 import ChangeVenmoBottomSheet from '../components/ChangeVenmoBottomSheet';
 import i18n from '../utils/i18n';
 import { useSettingsStore } from '../stores/useSettingsStore';
-import { presentPaywall } from '../services/revenueCatService';
+import { presentPaywall, restorePurchases } from '../services/revenueCatService';
 
 const SectionHeader = ({ title }) => (
   <View style={styles.sectionHeader}>
@@ -74,6 +74,8 @@ const SettingsScreen = ({ navigation }) => {
     );
   };
 
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
   const handleDeleteAccount = () => {
     Alert.alert(
       i18n.t('settings.deleteAccount'),
@@ -83,8 +85,15 @@ const SettingsScreen = ({ navigation }) => {
         {
           text: i18n.t('settings.deleteAccount'),
           style: 'destructive',
-          onPress: () => {
-            Alert.alert('Coming Soon', 'Account deletion feature will be available soon.');
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await deleteUserAccount();
+              // Navigation to auth screen handled by auth state listener or navigation reset if needed
+            } catch (error) {
+              setIsDeleting(false);
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            }
           }
         }
       ]
@@ -107,6 +116,19 @@ const SettingsScreen = ({ navigation }) => {
       await presentPaywall();
     } catch (error) {
       Alert.alert('Error', 'Unable to open subscription management');
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    try {
+      const customerInfo = await restorePurchases();
+      if (customerInfo.activeSubscriptions.length > 0) {
+        Alert.alert('Success', 'Purchases restored successfully.');
+      } else {
+        Alert.alert('No Subscriptions', 'No active subscriptions found to restore.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to restore purchases. Please try again.');
     }
   };
 
@@ -140,9 +162,14 @@ const SettingsScreen = ({ navigation }) => {
           />
           <View style={styles.separator} />
           <SettingItem 
-            icon="diamond-outline" 
             title="Manage Subscription" 
             onPress={handleManageSubscription} 
+          />
+          <View style={styles.separator} />
+          <SettingItem 
+            icon="refresh-outline" 
+            title="Restore Purchases" 
+            onPress={handleRestorePurchases} 
           />
         </View>
 

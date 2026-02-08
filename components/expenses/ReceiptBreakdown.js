@@ -8,6 +8,7 @@ import {
   LayoutAnimation,
   UIManager,
   Platform,
+  Alert,
 } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { Image } from 'expo-image';
@@ -58,6 +59,7 @@ const ItemRow = memo(({
   item,
   index,
   isEditing,
+  isLocked,
   participants,
   onToggleEdit,
   onSave,
@@ -230,18 +232,35 @@ const ItemRow = memo(({
       {!isEditing && (
         <Animated.View style={viewModeAnimatedStyle}>
           <TouchableOpacity
-            style={styles.viewModeRow}
-            onPress={() => onToggleEdit(item.id)}
-            activeOpacity={0.6}
+            style={[styles.viewModeRow, isLocked && styles.viewModeRowLocked]}
+            onPress={() => {
+              if (isLocked) {
+                Alert.alert(
+                  'Item Locked',
+                  'This item is part of an active settlement. Undo the settlement to edit this item.'
+                );
+                return;
+              }
+              onToggleEdit(item.id);
+            }}
+            activeOpacity={isLocked ? 0.8 : 0.6}
           >
             <View style={styles.itemIconContainer}>
-               <Ionicons name="receipt-outline" size={20} color={Colors.textPrimary} />
+               <Ionicons name={isLocked ? "lock-closed" : "receipt-outline"} size={20} color={isLocked ? Colors.textSecondary : Colors.textPrimary} />
             </View>
-            
+
             <View style={styles.viewModeMain}>
-              <Text style={styles.viewModeName} numberOfLines={1}>
-                {item.name || `Item ${index + 1}`}
-              </Text>
+              <View style={styles.viewModeNameRow}>
+                <Text style={[styles.viewModeName, isLocked && styles.viewModeNameLocked]} numberOfLines={1}>
+                  {item.name || `Item ${index + 1}`}
+                </Text>
+                {isLocked && (
+                  <View style={styles.settledBadge}>
+                    <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
+                    <Text style={styles.settledBadgeText}>Settled</Text>
+                  </View>
+                )}
+              </View>
               <View style={styles.assignedAvatars}>
                 {selectedParticipants.length > 0 ? (
                   selectedParticipants.slice(0, 5).map((p, i) => (
@@ -269,14 +288,14 @@ const ItemRow = memo(({
                 )}
               </View>
             </View>
-            
+
             <View style={styles.amountContainer}>
-               <Text style={styles.viewModeAmount}>
+               <Text style={[styles.viewModeAmount, isLocked && styles.viewModeAmountLocked]}>
                 ${(parseFloat(item.amount) || 0).toFixed(2)}
                </Text>
             </View>
-            
-            <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} style={{ marginLeft: Spacing.sm }} />
+
+            <Ionicons name={isLocked ? "lock-closed" : "chevron-forward"} size={16} color={Colors.textSecondary} style={{ marginLeft: Spacing.sm }} />
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -286,7 +305,7 @@ const ItemRow = memo(({
 }, (prevProps, nextProps) => {
   const prevErrors = prevProps.validationErrors?.[prevProps.item.id] || {};
   const nextErrors = nextProps.validationErrors?.[nextProps.item.id] || {};
-  
+
   return (
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.name === nextProps.item.name &&
@@ -294,6 +313,7 @@ const ItemRow = memo(({
     prevProps.item.selectedConsumers === nextProps.item.selectedConsumers &&
     prevProps.index === nextProps.index &&
     prevProps.isEditing === nextProps.isEditing &&
+    prevProps.isLocked === nextProps.isLocked &&
     prevProps.participants === nextProps.participants &&
     prevProps.onToggleEdit === nextProps.onToggleEdit &&
     prevProps.onSave === nextProps.onSave &&
@@ -307,6 +327,7 @@ const ItemRow = memo(({
 const ReceiptBreakdown = ({
   items,
   participants,
+  lockedItemIds,
   onAddItem,
   onUpdateItem,
   onRemoveItem,
@@ -316,6 +337,7 @@ const ReceiptBreakdown = ({
   isFocused,
   validationErrors = {},
   onClearValidationError,
+  visibleHeaderHeight = 100, // Default fallback
 }) => {
   const [editingItemId, setEditingItemId] = useState(null); 
   const prevItemsLengthRef = useRef(items.length);
@@ -325,10 +347,36 @@ const ReceiptBreakdown = ({
 
   const scrollItemToTop = (itemId, delay = 0) => {
     setTimeout(() => {
-      const y = itemLayoutMapRef.current[itemId];
-      if (y != null && scrollRef?.current?.scrollTo) {
-        const headerOffset = -340; 
-        scrollRef.current.scrollTo({ y: Math.max(0, y - headerOffset), animated: true });
+      const itemY = itemLayoutMapRef.current[itemId];
+      if (itemY != null && scrollRef?.current?.scrollTo) {
+        // Calculate dynamic offset
+        // receiptContainerY is stored in scrollRef.current by parent
+        const containerY = scrollRef.current.receiptContainerY || 0;
+        
+        // Target Y is: Container Position + Item Position - Header/Tab Height
+        // padding top in ScrollView contentContainerStyle is handled by the scroll view itself usually,
+        // but we need to ensure the item ends up visible below the header.
+        
+        // If contentContainer has paddingTop, that pushes content down.
+        // scrollTo(0) is the very top of content.
+        // We want the item at 'visibleHeaderHeight' from the top of the SCREEN.
+        // But scrollTo deals with content coordinates.
+        // The ScrollView content starts at y=0.
+        // The visible area matches the content coordinates if no inset.
+        // But we have insets. 
+        
+        // Let's rely on relative calculation:
+        // We want the item top to be at the top of the "safe" viewing area.
+        // safe area top = visibleHeaderHeight (passed from parent).
+        
+        // Absolute Y of item in ScrollView content = containerY + itemY
+        // We want to scroll s.t. (containerY + itemY) - scrollY = visibleHeaderHeight + margin
+        // scrollY = (containerY + itemY) - (visibleHeaderHeight + margin)
+        
+        const margin = 20; // Increased margin for better visibility
+        const targetScrollY = Math.max(0, containerY + itemY - visibleHeaderHeight - margin);
+        
+        scrollRef.current.scrollTo({ y: targetScrollY, animated: true });
       }
     }, delay);
   };
@@ -429,6 +477,7 @@ const ReceiptBreakdown = ({
                 item={item}
                 index={index}
                 isEditing={editingItemId === item.id}
+                isLocked={lockedItemIds?.has(item.id) || false}
                 isSaving={isSavingItemId === item.id}
                 participants={participants}
                 onToggleEdit={toggleEditMode}
@@ -497,6 +546,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     minHeight: 56,
   },
+  viewModeRowLocked: {
+    opacity: 0.6,
+  },
   itemIconContainer: {
     width: 32,
     height: 32,
@@ -529,7 +581,36 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontFamily: Typography.familySemiBold,
   },
-  
+  viewModeNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: 2,
+  },
+  viewModeNameLocked: {
+    textDecorationLine: 'line-through',
+    color: Colors.textSecondary,
+    opacity: 0.7,
+  },
+  viewModeAmountLocked: {
+    textDecorationLine: 'line-through',
+    opacity: 0.7,
+  },
+  settledBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.success + '15',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    gap: 3,
+  },
+  settledBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.success,
+  },
+
   separator: {
     height: 1,
     backgroundColor: Colors.divider,
