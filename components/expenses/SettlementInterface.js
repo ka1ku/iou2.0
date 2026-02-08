@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,9 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 /* ─────────────────────────────────────────────────────────────────────────────
    Summary Header
    ───────────────────────────────────────────────────────────────────────── */
-const SettlementSummary = ({ settlements, currentUserName }) => {
+const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
+  const [activityExpanded, setActivityExpanded] = useState(false);
+
   const pending = settlements.filter(
     (s) => !['markedAsPaid', 'confirmed', 'complete'].includes(s.status || 'noAction'),
   ).length;
@@ -45,6 +47,44 @@ const SettlementSummary = ({ settlements, currentUserName }) => {
     if ((s.debtor || s.from) === currentUserName) youOwe += amount;
     if ((s.creditor || s.to) === currentUserName) youreOwed += amount;
   });
+
+  const sorted = changeLog?.length ? [...changeLog]
+    .filter(e => e.type !== 'priceChange')
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) : [];
+  const visible = activityExpanded ? sorted : sorted.slice(0, 3);
+
+  const relative = (ts) => {
+    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  const describe = (e) => {
+    const n = e.userName || 'Someone';
+    switch (e.type) {
+      case 'priceChange':
+        return `${n} updated the total from $${e.details?.previousValue?.toFixed(2)} to $${e.details?.newValue?.toFixed(2)}`;
+      case 'itemAdded':
+        if (e.details?.itemAmount != null) {
+          return `${n} added ${e.details.itemName} for $${parseFloat(e.details.itemAmount).toFixed(2)}`;
+        }
+        return `${n} added "${e.details?.itemName}"`;
+      case 'itemRemoved':
+        if (e.details?.itemAmount != null) {
+          return `${n} removed ${e.details.itemName} ($${parseFloat(e.details.itemAmount).toFixed(2)})`;
+        }
+        return `${n} removed "${e.details?.itemName}"`;
+      case 'participantAdded':
+        return `${n} added ${e.details?.participantName}`;
+      case 'participantRemoved':
+        return `${n} removed ${e.details?.participantName}`;
+      default:
+        return `${n} made a change`;
+    }
+  };
 
   return (
     <Animated.View entering={FadeInUp.duration(350).springify()} style={styles.summaryCard}>
@@ -91,6 +131,32 @@ const SettlementSummary = ({ settlements, currentUserName }) => {
           <Text style={[styles.pillText, { color: Colors.success }]}>{settled} settled</Text>
         </View>
       </View>
+
+      {/* Activity Log inside summary */}
+      {sorted.length > 0 && (
+        <>
+          <View style={styles.activityDivider} />
+          <TouchableOpacity style={styles.activityHeaderInline} onPress={() => setActivityExpanded(!activityExpanded)}>
+            <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
+            <Text style={styles.activityTitleInline}>Activity</Text>
+            <Ionicons name={activityExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
+          </TouchableOpacity>
+          {visible.map((e, i) => (
+            <View key={`${e.timestamp}-${i}`} style={styles.activityRowInline}>
+              <View style={styles.activityDot} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.activityBody} numberOfLines={2}>{describe(e)}</Text>
+                <Text style={styles.activityTime}>{relative(e.timestamp)}</Text>
+              </View>
+            </View>
+          ))}
+          {!activityExpanded && sorted.length > 3 && (
+            <TouchableOpacity style={styles.showMore} onPress={() => setActivityExpanded(true)}>
+              <Text style={styles.showMoreText}>Show {sorted.length - 3} more...</Text>
+            </TouchableOpacity>
+          )}
+        </>
+      )}
     </Animated.View>
   );
 };
@@ -119,25 +185,6 @@ const StatusPill = ({ status }) => {
   );
 };
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Progress Indicator
-   ───────────────────────────────────────────────────────────────────────── */
-const ProgressIndicator = ({ settlement }) => {
-  if (settlement.status !== 'partial') return null;
-
-  const progress = (settlement.settledAmount / settlement.amount) * 100;
-
-  return (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${progress}%` }]} />
-      </View>
-      <Text style={styles.progressText}>
-        ${settlement.settledAmount.toFixed(2)} of ${settlement.amount.toFixed(2)} settled
-      </Text>
-    </View>
-  );
-};
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Price Changed Badge
@@ -174,114 +221,93 @@ const PriceChangedBadge = ({ changeLog, settlement }) => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Activity Log
-   ───────────────────────────────────────────────────────────────────────── */
-const ActivityLog = ({ changeLog }) => {
-  const [expanded, setExpanded] = useState(false);
-  if (!changeLog?.length) return null;
-
-  const sorted = [...changeLog]
-    .filter(e => e.type !== 'priceChange') // Hide price change events
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  const visible = expanded ? sorted : sorted.slice(0, 3);
-
-  const relative = (ts) => {
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
-  };
-
-  const describe = (e) => {
-    const n = e.userName || 'Someone';
-    switch (e.type) {
-      case 'priceChange':
-        return `${n} updated the total from $${e.details?.previousValue?.toFixed(2)} to $${e.details?.newValue?.toFixed(2)}`;
-      case 'itemAdded':
-        if (e.details?.itemAmount != null) {
-          return `${n} added ${e.details.itemName} for $${parseFloat(e.details.itemAmount).toFixed(2)}`;
-        }
-        return `${n} added "${e.details?.itemName}"`;
-      case 'itemRemoved':
-        if (e.details?.itemAmount != null) {
-          return `${n} removed ${e.details.itemName} ($${parseFloat(e.details.itemAmount).toFixed(2)})`;
-        }
-        return `${n} removed "${e.details?.itemName}"`;
-      case 'participantAdded':
-        return `${n} added ${e.details?.participantName}`;
-      case 'participantRemoved':
-        return `${n} removed ${e.details?.participantName}`;
-      default:
-        return `${n} made a change`;
-    }
-  };
-
-  return (
-    <Animated.View entering={FadeInUp.delay(250).duration(300)} style={styles.activityCard}>
-      <TouchableOpacity style={styles.activityHeader} onPress={() => setExpanded(!expanded)}>
-        <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
-        <Text style={styles.activityTitle}>Activity</Text>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
-      </TouchableOpacity>
-      {visible.map((e, i) => (
-        <View key={`${e.timestamp}-${i}`} style={styles.activityRow}>
-          <View style={styles.activityDot} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.activityBody} numberOfLines={2}>{describe(e)}</Text>
-            <Text style={styles.activityTime}>{relative(e.timestamp)}</Text>
-          </View>
-        </View>
-      ))}
-      {!expanded && sorted.length > 3 && (
-        <TouchableOpacity style={styles.showMore} onPress={() => setExpanded(true)}>
-          <Text style={styles.showMoreText}>Show {sorted.length - 3} more...</Text>
-        </TouchableOpacity>
-      )}
-    </Animated.View>
-  );
-};
-
-/* ─────────────────────────────────────────────────────────────────────────────
    Associated Items List
    ───────────────────────────────────────────────────────────────────────── */
-const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly }) => {
+const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection }) => {
   if (!items || items.length === 0) return null;
+
+  const unsettledItems = items.filter(i => !i.settled);
+  const allUnsettledSelected = unsettledItems.length > 0 && unsettledItems.every(i => selectedItemIds?.has(i.id));
 
   return (
     <View style={styles.assocContainer}>
-      <Text style={styles.assocTitle}>
-        Items {!readOnly && '(tap to settle)'}
-      </Text>
-      {items.map((item, i) => (
-        <TouchableOpacity
-          key={item.id || i}
-          style={styles.assocRow}
-          onPress={() => !readOnly && onToggleItem && onToggleItem(settlement, item)}
-          disabled={readOnly || !onToggleItem}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={item.settled ? 'checkmark-circle' : 'ellipse-outline'}
-            size={18}
-            color={item.settled ? Colors.success : Colors.textSecondary}
-            style={{ marginRight: 8 }}
-          />
-          <Text style={[
-            styles.assocName,
-            item.settled && styles.assocNameSettled
-          ]} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={[
-            styles.assocAmount,
-            item.settled && styles.assocAmountSettled
-          ]}>
-            ${item.amount.toFixed(2)}
-          </Text>
-        </TouchableOpacity>
-      ))}
+      <View style={styles.assocHeader}>
+        <Text style={styles.assocTitle}>
+          Items {!readOnly && !selectedItemIds && '(tap to settle)'}
+        </Text>
+        {!readOnly && selectedItemIds && unsettledItems.length > 1 && (
+          <TouchableOpacity
+            onPress={() => {
+              if (allUnsettledSelected) {
+                unsettledItems.forEach(i => onToggleSelection(i.id));
+              } else {
+                unsettledItems.filter(i => !selectedItemIds.has(i.id)).forEach(i => onToggleSelection(i.id));
+              }
+            }}
+            hitSlop={8}
+          >
+            <Text style={styles.selectAllText}>
+              {allUnsettledSelected ? 'Deselect All' : 'Select All'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      {items.map((item, i) => {
+        const isSettled = item.settled;
+        const isSelected = !isSettled && selectedItemIds?.has(item.id);
+
+        let iconName, iconColor;
+        if (isSettled) {
+          iconName = 'checkmark-circle';
+          iconColor = Colors.success;
+        } else if (isSelected) {
+          iconName = 'checkbox';
+          iconColor = Colors.accent;
+        } else {
+          iconName = 'square-outline';
+          iconColor = Colors.textSecondary;
+        }
+
+        const handlePress = () => {
+          if (readOnly) return;
+          if (isSettled) {
+            onToggleItem?.(settlement, item);
+          } else if (onToggleSelection) {
+            onToggleSelection(item.id);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={item.id || i}
+            style={styles.assocRow}
+            onPress={handlePress}
+            disabled={readOnly}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name={iconName}
+              size={18}
+              color={iconColor}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={[
+              styles.assocName,
+              isSettled && styles.assocNameSettled,
+              !isSettled && !isSelected && selectedItemIds && styles.assocNameDeselected,
+            ]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={[
+              styles.assocAmount,
+              isSettled && styles.assocAmountSettled,
+              !isSettled && !isSelected && selectedItemIds && styles.assocAmountDeselected,
+            ]}>
+              ${item.amount.toFixed(2)}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 };
@@ -289,7 +315,7 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly }) => {
 /* ─────────────────────────────────────────────────────────────────────────────
    Settlement Card
    ───────────────────────────────────────────────────────────────────────── */
-const SettlementCard = ({ settlement, index, participants, currentUserId, currentUserName, onAction, onToggleItem, changeLog, readOnly }) => {
+const SettlementCard = ({ settlement, index, participants, currentUserId, currentUserName, onAction, onToggleItem, onBulkSettle, onBulkAction, changeLog, readOnly }) => {
   const fromName = settlement.debtor || settlement.from;
   const toName = settlement.creditor || settlement.to;
   const fromP = participants.find((p) => p.name === fromName);
@@ -302,6 +328,46 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
 
   const [busy, setBusy] = useState(false);
   const [venmoTag, setVenmoTag] = useState(null);
+
+  // Selection state: all unsettled items start selected
+  const unsettledItemIds = useMemo(() =>
+    (settlement.associatedItems || []).filter(i => !i.settled).map(i => i.id),
+    [settlement.associatedItems]
+  );
+  const [selectedItemIds, setSelectedItemIds] = useState(() => new Set(unsettledItemIds));
+
+  // Sync selection when unsettled items change (e.g. after settling/unsettling)
+  useEffect(() => {
+    setSelectedItemIds(prev => {
+      const unsettledSet = new Set(unsettledItemIds);
+      const next = new Set();
+      // Keep existing selections that are still unsettled
+      prev.forEach(id => {
+        if (unsettledSet.has(id)) next.add(id);
+      });
+      // Auto-select newly unsettled items (weren't in prev at all)
+      unsettledItemIds.forEach(id => {
+        if (!prev.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [unsettledItemIds.join(',')]);
+
+  const toggleSelection = useCallback((itemId) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }, []);
+
+  // Calculate selected amount for bulk actions
+  const selectedAmount = useMemo(() => {
+    return (settlement.associatedItems || [])
+      .filter(i => !i.settled && selectedItemIds.has(i.id))
+      .reduce((sum, i) => sum + i.amount, 0);
+  }, [settlement.associatedItems, selectedItemIds]);
 
   // Fetch venmo username of the "other" participant
   useEffect(() => {
@@ -320,7 +386,13 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
 
   const fire = async (type) => {
     setBusy(true);
-    try { await onAction(type, settlement); }
+    try {
+      if (onBulkAction) {
+        await onBulkAction(type, settlement, [...selectedItemIds]);
+      } else {
+        await onAction(type, settlement);
+      }
+    }
     finally { setBusy(false); }
   };
 
@@ -341,30 +413,55 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     );
 
   /* ── action button ─────────────────────────────────────────────────── */
+  const hasItems = (settlement.associatedItems || []).length > 0;
+  const noSelection = hasItems && selectedItemIds.size === 0;
+
   const actionBtn = () => {
     if (readOnly) return null;
-
-    const remaining = settlement.remainingAmount || settlement.amount;
 
     if (status === 'complete') {
       return btn('All Settled', 'checkmark-circle', 'disabled');
     }
 
+    const confirmMarkSettled = () => {
+      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      Alert.alert(
+        'Mark as Settled',
+        `Mark ${amt} as settled? This records the payment without using Venmo.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Settle', onPress: () => fire('markAsSettled') },
+        ],
+      );
+    };
+
     if (isDebtor) {
       if (status === 'paymentMade')
         return btn('Undo Payment', 'arrow-undo', 'secondary', () => fire('undoPaymentMade'));
-      if (status === 'partial')
-        return btn(`Pay Remaining $${remaining.toFixed(2)}`, 'logo-venmo', 'venmo', () => fire('makePayment'));
-      return btn('Pay Now', 'logo-venmo', 'venmo', () => fire('makePayment'));
+      if (noSelection)
+        return btn('Select items to settle', 'checkbox-outline', 'disabled');
+      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      return (
+        <View style={styles.actionBtnGroup}>
+          {btn(`Pay ${amt}`, 'logo-venmo', 'venmo', () => fire('makePayment'))}
+          {onBulkSettle && btn(`Mark ${amt} Settled`, 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
+        </View>
+      );
     }
     if (isCreditor) {
       if (status === 'paymentRequested')
         return btn('Request Sent', 'checkmark', 'disabled');
       if (status === 'paymentMade')
         return btn('Confirm Received', 'checkmark-circle', 'success', () => fire('confirmPaymentReceived'));
-      if (status === 'partial')
-        return btn(`Request $${remaining.toFixed(2)}`, 'paper-plane', 'primary', () => fire('requestPayment'));
-      return btn(`Request $${settlement.amount.toFixed(2)}`, 'paper-plane', 'primary', () => fire('requestPayment'));
+      if (noSelection)
+        return btn('Select items to settle', 'checkbox-outline', 'disabled');
+      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      return (
+        <View style={styles.actionBtnGroup}>
+          {btn(`Request ${amt}`, 'paper-plane', 'primary', () => fire('requestPayment'))}
+          {onBulkSettle && btn(`Mark ${amt} Settled`, 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
+        </View>
+      );
     }
     if (isSpectator) {
       if (status === 'reminderSent')
@@ -427,9 +524,6 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               <PriceChangedBadge changeLog={changeLog} settlement={settlement} />
             </View>
 
-            {/* Progress Indicator */}
-            <ProgressIndicator settlement={settlement} />
-
             {/* Participants */}
             <View style={styles.pRow}>
               <View style={styles.pSide}>
@@ -491,6 +585,8 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               settlement={settlement}
               onToggleItem={onToggleItem}
               readOnly={readOnly}
+              selectedItemIds={!readOnly ? selectedItemIds : undefined}
+              onToggleSelection={!readOnly ? toggleSelection : undefined}
             />
 
             {/* Actions */}
@@ -518,6 +614,8 @@ const SettlementInterface = ({
   currentUserId,
   onAction,
   onToggleItem,
+  onBulkSettle,
+  onBulkAction,
   changeLog = [],
   readOnly = false,
   recalculationInfo = null,
@@ -555,7 +653,7 @@ const SettlementInterface = ({
         </Animated.View>
       )}
 
-      {settlements.length > 0 && <SettlementSummary settlements={settlements} currentUserName={name} />}
+      {settlements.length > 0 && <SettlementSummary settlements={settlements} currentUserName={name} changeLog={changeLog} />}
 
       {settlements.map((s, i) => (
         <SettlementCard
@@ -567,12 +665,12 @@ const SettlementInterface = ({
           currentUserName={name}
           onAction={onAction}
           onToggleItem={onToggleItem}
+          onBulkSettle={onBulkSettle}
+          onBulkAction={onBulkAction}
           changeLog={changeLog}
           readOnly={readOnly}
         />
       ))}
-
-      <ActivityLog changeLog={changeLog} />
     </View>
   );
 };
@@ -636,38 +734,21 @@ const styles = StyleSheet.create({
   faded: { color: Colors.textSecondary, opacity: 0.6 },
   totalText: { fontSize: 13, color: Colors.textSecondary, marginTop: 4, fontWeight: '500' },
 
-  // Progress Indicator
-  progressContainer: {
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: Colors.border + '40',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: Colors.success,
-  },
-  progressText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontFamily: Typography.fontRegular,
-  },
-
   // Associated Items
   assocContainer: { backgroundColor: Colors.surfaceLight || Colors.background, borderRadius: Radius.sm, padding: Spacing.sm, marginBottom: Spacing.md },
-  assocTitle: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  assocHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  assocTitle: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
+  selectAllText: { fontSize: 12, fontWeight: '600', color: Colors.accent },
   assocRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3 },
   assocName: { flex: 1, fontSize: 13, color: Colors.textPrimary, fontWeight: '500' },
   assocNameSettled: { textDecorationLine: 'line-through', color: Colors.textSecondary },
   assocAmount: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginLeft: Spacing.sm },
   assocAmountSettled: { textDecorationLine: 'line-through', opacity: 0.6 },
+  assocNameDeselected: { opacity: 0.5 },
+  assocAmountDeselected: { opacity: 0.5 },
 
   // Buttons
+  actionBtnGroup: { gap: Spacing.xs },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 11, paddingHorizontal: Spacing.lg, borderRadius: Radius.md },
   btnPrimary: { backgroundColor: Colors.accent },
   btnVenmo: { backgroundColor: Colors.venmo },
@@ -691,11 +772,11 @@ const styles = StyleSheet.create({
   bannerTitle: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
   bannerSub: { fontSize: 12, color: Colors.textSecondary },
 
-  // Activity
-  activityCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, marginTop: Spacing.sm, ...Shadows.card },
-  activityHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.sm },
-  activityTitle: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, flex: 1 },
-  activityRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, gap: Spacing.sm },
+  // Activity (inline in summary card)
+  activityDivider: { height: 1, backgroundColor: Colors.divider, marginVertical: Spacing.md },
+  activityHeaderInline: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.sm },
+  activityTitleInline: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, flex: 1 },
+  activityRowInline: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, gap: Spacing.sm },
   activityDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.divider, marginTop: 6 },
   activityBody: { fontSize: 13, color: Colors.textPrimary, lineHeight: 18 },
   activityTime: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },

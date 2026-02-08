@@ -471,6 +471,135 @@ export default function useSettlementActions({
     [doItemToggle]
   );
 
+  // ─── bulk settle: settle multiple items at once ────────────────────
+  const persistBulkItemToggle = useCallback(
+    async (settlement, itemIds, settled) => {
+      if (!expense?.id) throw new Error('Expense ID missing');
+
+      const latest = await getExpenseById(expense.id);
+      if (!latest) throw new Error('Expense not found');
+
+      let existingSettlements = latest.settlements || [];
+
+      if (existingSettlements.length === 0 && calculatedSettlements.length > 0) {
+        existingSettlements = calculatedSettlements.map((s) => ({
+          debtor: s.debtor || s.from,
+          creditor: s.creditor || s.to,
+          amount: s.amount,
+          status: s.status || 'noAction',
+          updatedAt: new Date().toISOString(),
+          associatedItems: s.associatedItems || [],
+        }));
+      }
+
+      const pairKey = makePairKey(settlement);
+      const itemIdSet = new Set(itemIds);
+      let found = false;
+
+      const updated = existingSettlements.map(s => {
+        if (makePairKey(s) === pairKey) {
+          found = true;
+          const updatedItems = (s.associatedItems || []).map(item =>
+            itemIdSet.has(item.id)
+              ? { ...item, settled, settledAt: settled ? new Date().toISOString() : null }
+              : item
+          );
+
+          const settledAmount = updatedItems.filter(i => i.settled).reduce((sum, i) => sum + i.amount, 0);
+          const totalAmount = updatedItems.reduce((sum, i) => sum + i.amount, 0);
+
+          let status = 'noAction';
+          if (settledAmount > 0.01) {
+            status = Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial';
+          }
+
+          return {
+            ...s,
+            associatedItems: updatedItems,
+            status,
+            settledAmount: Math.round(settledAmount * 100) / 100,
+            remainingAmount: Math.round((totalAmount - settledAmount) * 100) / 100,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return s;
+      });
+
+      if (!found) {
+        const updatedItems = (settlement.associatedItems || []).map(item =>
+          itemIdSet.has(item.id)
+            ? { ...item, settled, settledAt: settled ? new Date().toISOString() : null }
+            : item
+        );
+        const settledAmount = updatedItems.filter(i => i.settled).reduce((sum, i) => sum + i.amount, 0);
+        const totalAmount = updatedItems.reduce((sum, i) => sum + i.amount, 0);
+        updated.push({
+          debtor: settlement.debtor || settlement.from,
+          creditor: settlement.creditor || settlement.to,
+          amount: settlement.amount,
+          status: settledAmount > 0.01 ? (Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial') : 'noAction',
+          updatedAt: new Date().toISOString(),
+          associatedItems: updatedItems,
+          settledAmount: Math.round(settledAmount * 100) / 100,
+          remainingAmount: Math.round((totalAmount - settledAmount) * 100) / 100,
+        });
+      }
+
+      const uid = getCurrentUser()?.uid;
+      await updateExpense(expense.id, { settlements: updated }, uid);
+    },
+    [expense?.id, calculatedSettlements]
+  );
+
+  const handleBulkSettle = useCallback(
+    async (settlement, itemIds) => {
+      if (!itemIds || itemIds.length === 0) return;
+
+      const pairKey = makePairKey(settlement);
+
+      // Optimistic update for all items at once
+      setItemOverrides(prev => {
+        const existing = prev[pairKey] || {};
+        const newOverrides = { ...existing };
+        itemIds.forEach(id => {
+          newOverrides[id] = { settled: true, settledAt: new Date().toISOString() };
+        });
+        return { ...prev, [pairKey]: newOverrides };
+      });
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      try {
+        await persistBulkItemToggle(settlement, itemIds, true);
+      } catch (err) {
+        console.error('[handleBulkSettle] failed:', err);
+        // Rollback
+        setItemOverrides(prev => {
+          const keyOv = { ...(prev[pairKey] || {}) };
+          itemIds.forEach(id => delete keyOv[id]);
+          return Object.keys(keyOv).length === 0
+            ? (({ [pairKey]: _, ...rest }) => rest)(prev)
+            : { ...prev, [pairKey]: keyOv };
+        });
+        Alert.alert('Error', 'Failed to settle items. Please try again.');
+      }
+    },
+    [persistBulkItemToggle]
+  );
+
+  const handleBulkAction = useCallback(
+    async (type, settlement, selectedItemIds) => {
+      if (type === 'markAsSettled') {
+        await handleBulkSettle(settlement, selectedItemIds);
+        return;
+      }
+
+      // For Venmo flows, run the existing action then bulk settle on confirmation
+      await handleAction(type, settlement);
+    },
+    [handleBulkSettle, handleAction]
+  );
+
   // ─── public action dispatcher ─────────────────────────────────────────
   const handleAction = useCallback(
     async (type, settlement) => {
@@ -614,6 +743,8 @@ export default function useSettlementActions({
     settlements,
     handleAction,
     handleItemToggle,
+    handleBulkSettle,
+    handleBulkAction,
     lockedItemIds,
     recalculationInfo,
     setRecalculationInfo

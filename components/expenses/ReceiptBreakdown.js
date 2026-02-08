@@ -21,6 +21,27 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// Helper function for relative time display
+const getRelativeTime = (timestamp) => {
+  if (!timestamp) return null;
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  return `${diffWeeks}w ago`;
+};
+
 const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
   <TouchableOpacity
     style={[styles.chip, isSelected && styles.chipSelected]}
@@ -261,7 +282,8 @@ const ItemRow = memo(({
                   </View>
                 )}
               </View>
-              <View style={styles.assignedAvatars}>
+              <View style={styles.viewModeSecondRow}>
+                <View style={styles.assignedAvatars}>
                 {selectedParticipants.length > 0 ? (
                   selectedParticipants.slice(0, 5).map((p, i) => (
                     <View key={p.id} style={[styles.miniAvatarContainer, { zIndex: 5 - i, marginLeft: i > 0 ? -8 : 0 }]}>
@@ -285,6 +307,12 @@ const ItemRow = memo(({
                       <Text style={styles.miniAvatarMoreText}>+{selectedParticipants.length - 5}</Text>
                     </View>
                   </View>
+                )}
+                </View>
+                {item.createdAt && (
+                  <Text style={styles.timestampText}>
+                    {getRelativeTime(item.createdAt)}
+                  </Text>
                 )}
               </View>
             </View>
@@ -585,7 +613,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: 2,
+    marginBottom: 4,
+  },
+  viewModeSecondRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  timestampText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontFamily: Typography.familyRegular,
   },
   viewModeNameLocked: {
     textDecorationLine: 'line-through',
@@ -622,7 +660,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 20,
-    marginTop: 2,
   },
   miniAvatarContainer: {
     width: 20,

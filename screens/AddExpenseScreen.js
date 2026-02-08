@@ -65,6 +65,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     settlements,
     handleAction: handleSettlementAction,
     handleItemToggle,
+    handleBulkSettle,
+    handleBulkAction,
     lockedItemIds,
     recalculationInfo,
     setRecalculationInfo,
@@ -535,6 +537,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                 currentUserId={currentUserId}
                 handleAction={handleSettlementAction}
                 handleItemToggle={handleItemToggle}
+                handleBulkSettle={handleBulkSettle}
+                handleBulkAction={handleBulkAction}
                 changeLog={expense?.changeLog}
                 recalculationInfo={recalculationInfo}
                 onDismissRecalculation={() => setRecalculationInfo(null)}

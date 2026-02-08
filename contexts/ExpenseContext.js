@@ -77,6 +77,7 @@ const expenseReducer = (state, action) => {
     case EXPENSE_ACTIONS.ADD_ITEM:
       const lastItem = state.items[state.items.length - 1];
       const payersToUse = lastItem?.selectedPayers || [0];
+      const timestamp = new Date().toISOString();
       const newItem = {
         id: Date.now().toString(),
         name: '',
@@ -84,6 +85,7 @@ const expenseReducer = (state, action) => {
         selectedConsumers: state.participants.map((_, i) => i),
         splits: [],
         selectedPayers: payersToUse,
+        createdAt: timestamp,
       };
       return { ...state, items: [...state.items, newItem] };
 

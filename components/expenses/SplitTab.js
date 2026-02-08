@@ -10,6 +10,8 @@ const SplitTab = ({
   currentUserId,
   handleAction,
   handleItemToggle,
+  handleBulkSettle,
+  handleBulkAction,
   changeLog,
   recalculationInfo,
   onDismissRecalculation,
@@ -41,6 +43,8 @@ const SplitTab = ({
         currentUserId={currentUserId}
         onAction={handleAction}
         onToggleItem={handleItemToggle}
+        onBulkSettle={handleBulkSettle}
+        onBulkAction={handleBulkAction}
         changeLog={changeLog}
         readOnly={false}
         recalculationInfo={recalculationInfo}

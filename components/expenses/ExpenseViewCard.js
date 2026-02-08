@@ -18,6 +18,27 @@ import { useExpense } from "../../contexts/ExpenseContext";
 import ProfilePicture from "../VenmoProfilePicture";
 import Card from "../Card";
 
+// Helper function for relative time display
+const getRelativeTime = (timestamp) => {
+  if (!timestamp) return null;
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const diffMs = now - then;
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  return `${diffWeeks}w ago`;
+};
+
 const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
   const { state } = useExpense();
   const { participants } = state;
@@ -106,7 +127,15 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
             )}
           </View>
           <Text style={[styles.totalAmount, isLocked && styles.totalAmountLocked]}>${totalAmount.toFixed(2)}</Text>
-          <Text style={styles.paidByText} numberOfLines={1}>{paidByInfo}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.paidByText} numberOfLines={1}>{paidByInfo}</Text>
+            {item.createdAt && (
+              <>
+                <Text style={styles.metaDot}>•</Text>
+                <Text style={styles.timestampText}>{getRelativeTime(item.createdAt)}</Text>
+              </>
+            )}
+          </View>
         </View>
         <TouchableOpacity onPress={handleMenuPress} style={styles.menuButton}>
           <Ionicons
@@ -245,10 +274,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.success,
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
   paidByText: {
     ...Typography.body,
     color: Colors.textSecondary,
     fontSize: 13,
+    lineHeight: 18,
+  },
+  metaDot: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    opacity: 0.5,
+  },
+  timestampText: {
+    ...Typography.body,
+    color: Colors.textSecondary,
+    fontSize: 12,
     lineHeight: 18,
   },
 
