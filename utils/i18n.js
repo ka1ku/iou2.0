@@ -1,4 +1,5 @@
 import i18n from 'i18n-js';
+import { getLocales } from 'expo-localization';
 import en from './locales/en.json';
 import es from './locales/es.json';
 import fr from './locales/fr.json';
@@ -25,5 +26,10 @@ i18n.translations = {
 
 i18n.fallbacks = true;
 i18n.defaultLocale = 'en';
+
+// Set initial locale from device settings
+const deviceLocales = getLocales();
+const deviceLanguage = deviceLocales[0]?.languageCode || 'en';
+i18n.locale = deviceLanguage;
 
 export default i18n;

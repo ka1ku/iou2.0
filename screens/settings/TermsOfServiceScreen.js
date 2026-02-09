@@ -10,7 +10,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 
+import { useTranslation } from '../../contexts/LanguageContext';
+
 const TermsOfServiceScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   React.useEffect(() => {
     navigation.setOptions({
       headerShown: false,
@@ -26,118 +29,118 @@ const TermsOfServiceScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Terms of Service</Text>
+        <Text style={styles.headerTitle}>{t('settings.terms')}</Text>
         <View style={styles.placeholder} />
       </View>
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.contentContainer}>
-          <Text style={styles.lastUpdated}>Last updated: December 2024</Text>
+          <Text style={styles.lastUpdated}>{t('settings.termsOfService.lastUpdated')}</Text>
           
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>1. Acceptance of Terms</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.1.title')}</Text>
             <Text style={styles.sectionText}>
-              By accessing and using the IOU mobile application ("App"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+              {t('settings.termsOfService.sections.1.content')}
             </Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>2. Use License</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.2.title')}</Text>
             <Text style={styles.sectionText}>
-              Permission is granted to temporarily download one copy of the IOU app for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:
+              {t('settings.termsOfService.sections.2.content')}
             </Text>
-            <Text style={styles.bulletPoint}>• modify or copy the materials</Text>
-            <Text style={styles.bulletPoint}>• use the materials for any commercial purpose or for any public display</Text>
-            <Text style={styles.bulletPoint}>• attempt to reverse engineer any software contained in the app</Text>
-            <Text style={styles.bulletPoint}>• remove any copyright or other proprietary notations from the materials</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.2.bullets.1')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.2.bullets.2')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.2.bullets.3')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.2.bullets.4')}</Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>3. User Accounts</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.3.title')}</Text>
             <Text style={styles.sectionText}>
-              To use certain features of the App, you must create an account. You are responsible for:
+              {t('settings.termsOfService.sections.3.content')}
             </Text>
-            <Text style={styles.bulletPoint}>• Providing accurate and complete information</Text>
-            <Text style={styles.bulletPoint}>• Maintaining the security of your account credentials</Text>
-            <Text style={styles.bulletPoint}>• All activities that occur under your account</Text>
-            <Text style={styles.bulletPoint}>• Notifying us immediately of any unauthorized use</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.3.bullets.1')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.3.bullets.2')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.3.bullets.3')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.3.bullets.4')}</Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>4. Payment Processing</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.4.title')}</Text>
             <Text style={styles.sectionText}>
-              The App facilitates expense tracking and settlement between users. We may integrate with third-party payment processors. By using these features, you agree to:
+              {t('settings.termsOfService.sections.4.content')}
             </Text>
-            <Text style={styles.bulletPoint}>• Comply with the terms of service of third-party payment providers</Text>
-            <Text style={styles.bulletPoint}>• Understand that we are not responsible for payment processing</Text>
-            <Text style={styles.bulletPoint}>• Bear any fees charged by payment processors</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.4.bullets.1')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.4.bullets.2')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.4.bullets.3')}</Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>5. Privacy Policy</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.5.title')}</Text>
             <Text style={styles.sectionText}>
-              Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the App, to understand our practices.
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>6. Prohibited Uses</Text>
-            <Text style={styles.sectionText}>
-              You may not use our App:
-            </Text>
-            <Text style={styles.bulletPoint}>• For any unlawful purpose or to solicit others to perform unlawful acts</Text>
-            <Text style={styles.bulletPoint}>• To violate any international, federal, provincial, or state regulations, rules, laws, or local ordinances</Text>
-            <Text style={styles.bulletPoint}>• To infringe upon or violate our intellectual property rights or the intellectual property rights of others</Text>
-            <Text style={styles.bulletPoint}>• To harass, abuse, insult, harm, defame, slander, disparage, intimidate, or discriminate</Text>
-            <Text style={styles.bulletPoint}>• To submit false or misleading information</Text>
-            <Text style={styles.sectionText}>
-              We have a zero-tolerance policy for objectionable content and abusive users. Content that violates these terms will be removed, and users who engage in such behavior will be blocked and banned from the Service.
+              {t('settings.termsOfService.sections.5.content')}
             </Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>7. Disclaimer</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.6.title')}</Text>
             <Text style={styles.sectionText}>
-              The information on this App is provided on an "as is" basis. To the fullest extent permitted by law, this Company:
+              {t('settings.termsOfService.sections.6.content')}
             </Text>
-            <Text style={styles.bulletPoint}>• Excludes all representations and warranties relating to this app and its contents</Text>
-            <Text style={styles.bulletPoint}>• Does not guarantee the accuracy, completeness, or timeliness of information</Text>
-            <Text style={styles.bulletPoint}>• Excludes all liability for damages arising out of or in connection with your use of this app</Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>8. Limitation of Liability</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.6.bullets.1')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.6.bullets.2')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.6.bullets.3')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.6.bullets.4')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.6.bullets.5')}</Text>
             <Text style={styles.sectionText}>
-              In no event shall IOU or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the App, even if IOU or an authorized representative has been notified orally or in writing of the possibility of such damage.
+              {t('settings.termsOfService.sections.6.content2')}
             </Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>9. Revisions</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.7.title')}</Text>
             <Text style={styles.sectionText}>
-              The materials appearing on the App could include technical, typographical, or photographic errors. IOU does not warrant that any of the materials on its App are accurate, complete, or current. IOU may make changes to the materials contained on its App at any time without notice.
+              {t('settings.termsOfService.sections.7.content')}
+            </Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.7.bullets.1')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.7.bullets.2')}</Text>
+            <Text style={styles.bulletPoint}>• {t('settings.termsOfService.sections.7.bullets.3')}</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.8.title')}</Text>
+            <Text style={styles.sectionText}>
+              {t('settings.termsOfService.sections.8.content')}
             </Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>10. Governing Law</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.9.title')}</Text>
             <Text style={styles.sectionText}>
-              These terms and conditions are governed by and construed in accordance with the laws of the United States and you irrevocably submit to the exclusive jurisdiction of the courts in that state or location.
+              {t('settings.termsOfService.sections.9.content')}
             </Text>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>11. Contact Information</Text>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.10.title')}</Text>
             <Text style={styles.sectionText}>
-              If you have any questions about these Terms of Service, please contact us at:
+              {t('settings.termsOfService.sections.10.content')}
             </Text>
-            <Text style={styles.contactInfo}>Email: legal@iou-app.com</Text>
-            <Text style={styles.contactInfo}>Support: support@iou-app.com</Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('settings.termsOfService.sections.11.title')}</Text>
+            <Text style={styles.sectionText}>
+              {t('settings.termsOfService.sections.11.content')}
+            </Text>
+            <Text style={styles.contactInfo}>{t('settings.termsOfService.sections.11.email')}</Text>
+            <Text style={styles.contactInfo}>{t('settings.termsOfService.sections.11.support')}</Text>
           </View>
 
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              By using IOU, you acknowledge that you have read and understood these Terms of Service and agree to be bound by them.
+              {t('settings.termsOfService.footer')}
             </Text>
           </View>
         </View>

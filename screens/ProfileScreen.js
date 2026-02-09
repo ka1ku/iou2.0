@@ -14,8 +14,10 @@ import BalanceSummary from '../components/profiles/BalanceSummary';
 import RecentExpenses from '../components/profiles/RecentExpenses';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const ProfileScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [displayedExpensesCount, setDisplayedExpensesCount] = useState(3);
   
   // Use shared expense data
@@ -39,7 +41,7 @@ const ProfileScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <LoadingSpinner size="large" />
-        <Text style={styles.loadingText}>Loading profile...</Text>
+        <Text style={styles.loadingText}>{t('profile.loading')}</Text>
       </SafeAreaView>
     );
   }
@@ -61,7 +63,7 @@ const ProfileScreen = ({ navigation }) => {
               {userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : 'User'}
             </Text>
             <Text style={styles.userEmail}>
-              {userProfile?.username ? `@${userProfile.username}` : 'No username'}
+              {userProfile?.username ? `@${userProfile.username}` : t('profile.noUsername')}
             </Text>
           </View>
         </View>

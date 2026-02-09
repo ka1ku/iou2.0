@@ -19,6 +19,7 @@ import {
   Typography,
 } from "../../design/tokens";
 import { useExpense } from "../../contexts/ExpenseContext";
+import { useTranslation } from "../../contexts/LanguageContext";
 import { updateExpense, updateExpenseParticipants } from "../../services/expenseService";
 import { getCurrentUser } from "../../services/authService";
 import Card from "../Card";
@@ -52,6 +53,7 @@ if (
 }
 
 const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEditing = false, isLocked = false }) => {
+  const { t } = useTranslation();
   const { state, actions } = useExpense();
   const { participants } = state;
 
@@ -204,14 +206,14 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     
     if (hasErrors) {
       const missingFields = [];
-      if (errors.name) missingFields.push("item name");
-      if (errors.amount) missingFields.push("price");
-      if (errors.payers) missingFields.push("at least one payer");
-      if (errors.consumers) missingFields.push("at least one person in the split");
+      if (errors.name) missingFields.push(t('components.expenses.expenseItemCard.fields.name'));
+      if (errors.amount) missingFields.push(t('components.expenses.expenseItemCard.fields.price'));
+      if (errors.payers) missingFields.push(t('components.expenses.expenseItemCard.fields.payer'));
+      if (errors.consumers) missingFields.push(t('components.expenses.expenseItemCard.fields.consumer'));
       
       Alert.alert(
-        "Incomplete Item",
-        `Please check the following: ${missingFields.join(", ")}`
+        t('components.expenses.expenseItemCard.alerts.incomplete'),
+        t('components.expenses.expenseItemCard.alerts.incompleteDesc', { fields: missingFields.join(", ") })
       );
       return false;
     }
@@ -225,8 +227,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     if (Math.abs(totalAmount - allocatedTotal) > SPLIT_TOLERANCE) {
       setValidationErrors(prev => ({ ...prev, splitMismatch: true }));
       Alert.alert(
-        "Uneven Split",
-        "The split amounts don't match the item total. Please adjust the splits or the total amount."
+        t('components.expenses.expenseItemCard.alerts.uneven'),
+        t('components.expenses.expenseItemCard.alerts.unevenDesc')
       );
       return false;
     }
@@ -261,7 +263,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     try {
       const currentUser = getCurrentUser();
       if (!currentUser) {
-        Alert.alert("Error", "User not authenticated");
+        Alert.alert(t('common.error'), t('auth.errors.unauthenticated'));
         setSaving(false);
         return;
       }
@@ -287,7 +289,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
 
       onCancelEdit && onCancelEdit({ revertChanges: false });
     } catch (error) {
-      Alert.alert("Error", "Failed to save expense: " + error.message);
+      Alert.alert(t('common.error'), t('components.expenses.expenseItemCard.alerts.saveError', { error: error.message }));
     } finally {
       setSaving(false);
     }
@@ -306,12 +308,11 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
   }, [remainingAmount, validationErrors.splitMismatch]);
 
   let errorMessage = null;
+
   if (Math.abs(remainingAmount) > SPLIT_TOLERANCE) {
     if (remainingAmount < 0)
-      errorMessage = `Total exceeds bill by $${Math.abs(
-        remainingAmount
-      ).toFixed(2)}`;
-    else errorMessage = `Unallocated: $${remainingAmount.toFixed(2)}`;
+      errorMessage = t('components.expenses.expenseItemCard.totalExceeds', { amount: Math.abs(remainingAmount).toFixed(2) });
+    else errorMessage = t('components.expenses.expenseItemCard.unallocated', { amount: remainingAmount.toFixed(2) });
   }
 
   return (
@@ -329,7 +330,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
                 styles.itemNameInput,
                 validationErrors.name && styles.inputError
               ]}
-              placeholder="Enter item name"
+              placeholder={t('components.expenses.expenseItemCard.itemNamePlaceholder')}
               placeholderTextColor={Colors.textSecondary}
               value={item.name}
               onChangeText={(text) => {
@@ -364,7 +365,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
 
         <View style={styles.whoPaidSection}>
           <Text style={[styles.whoPaidLabel, validationErrors.payers && styles.errorLabel]}>
-            Payers{validationErrors.payers && " *"}
+            {t('components.expenses.expenseItemCard.payers')}{validationErrors.payers && " *"}
           </Text>
           <View style={[
             styles.payerChips,
@@ -398,7 +399,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
                         styles.payerChipTextActive,
                     ]}
                   >
-                    {participant.name || `Person ${pIndex + 1}`}
+                    {participant.name || t('components.expenses.expenseItemCard.person', { index: pIndex + 1 })}
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -414,7 +415,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
             (validationErrors.consumers || validationErrors.splitMismatch) && styles.errorLabel
           ]}
         >
-          Split{(validationErrors.consumers || validationErrors.splitMismatch) && " *"}
+          {t('components.expenses.expenseItemCard.split')}{(validationErrors.consumers || validationErrors.splitMismatch) && " *"}
         </Text>
         <View style={[
           styles.splitCard,
@@ -434,8 +435,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
             ) : (
               <Text style={styles.unallocatedText}>
                 {totalAmount > 0
-                  ? "All funds allocated"
-                  : "Enter a price to split"}
+                  ? t('components.expenses.expenseItemCard.allAllocated')
+                  : t('components.expenses.expenseItemCard.enterPrice')}
               </Text>
             )}
           </View>
@@ -464,7 +465,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
                     ]}
                     numberOfLines={1}
                   >
-                    {participant.name || `Person ${pIndex + 1}`}
+                    {participant.name || t('components.expenses.expenseItemCard.person', { index: pIndex + 1 })}
                   </Text>
                 </View>
                 <View style={styles.inputContainer}>
@@ -509,7 +510,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
               disabled={saving}
               activeOpacity={0.7}
             >
-              <Text style={styles.footerButtonCancelText}>Cancel</Text>
+              <Text style={styles.footerButtonCancelText}>{t('components.expenses.expenseItemCard.cancel')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -528,7 +529,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
                   color={Colors.white}
                   style={{ marginRight: 6 }}
                 />
-                <Text style={styles.footerButtonSaveText}>Save Changes</Text>
+                <Text style={styles.footerButtonSaveText}>{t('components.expenses.expenseItemCard.save')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -540,7 +541,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
         <View style={styles.lockedOverlay}>
           <View style={styles.lockedContent}>
             <Ionicons name="lock-closed" size={20} color={Colors.warning} />
-            <Text style={styles.lockedText}>Settled in payment</Text>
+            <Text style={styles.lockedText}>{t('components.expenses.expenseItemCard.settled')}</Text>
           </View>
         </View>
       )}

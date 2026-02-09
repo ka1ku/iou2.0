@@ -52,9 +52,17 @@ export const NotificationProvider = ({ children }) => {
     const cleanup = expoNotificationService.setupListeners(
       // Notification received handler
       (notification) => {
-        // Increment unread count
+        // Filter out notifications from your own actions
+        const actorUserId = notification.request.content.data?.actorUserId;
+
+        // Don't increment unread count if you're the one who performed the action
+        if (currentUser && actorUserId && currentUser.uid === actorUserId) {
+          return; // Skip processing this notification
+        }
+
+        // Increment unread count for notifications from others
         setUnreadCount(prev => prev + 1);
-        
+
         // Show alert for foreground notifications (optional - Expo handles this automatically)
         // You can customize this behavior
       },
@@ -62,7 +70,7 @@ export const NotificationProvider = ({ children }) => {
       (response) => {
         const { notification } = response;
         const data = notification.request.content.data;
-        
+
         // Navigation will be handled by the navigation handler set in App.js
         if (data) {
           expoNotificationService.handleNotificationResponse(data);

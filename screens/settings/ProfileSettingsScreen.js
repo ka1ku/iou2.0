@@ -21,7 +21,10 @@ import { updateUserProfile } from '../../services/authService';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ChangeVenmoBottomSheet from '../../components/ChangeVenmoBottomSheet';
 
+import { useTranslation } from '../../contexts/LanguageContext';
+
 const ProfileSettingsScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { userProfile } = useExpenseData();
   const venmoBottomSheetRef = useRef(null);
   
@@ -76,7 +79,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
         setHasChanges(true);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to select image');
+      Alert.alert(t('settings.profileSettings.error'), t('settings.profileSettings.selectImageError'));
     }
   };
 
@@ -88,11 +91,11 @@ const ProfileSettingsScreen = ({ navigation }) => {
       await updateUserProfile(localProfile);
 
       setHasChanges(false);
-      Alert.alert('Success', 'Profile updated successfully!', [
+      Alert.alert(t('settings.profileSettings.success'), t('settings.profileSettings.updateSuccess'), [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      Alert.alert(t('settings.profileSettings.error'), error.message || t('settings.profileSettings.updateError'));
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +106,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <LoadingSpinner size="large" />
-          <Text style={styles.loadingText}>Loading profile...</Text>
+          <Text style={styles.loadingText}>{t('settings.profileSettings.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -118,7 +121,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <Text style={styles.headerTitle}>{t('settings.profileSettings.title')}</Text>
         <View style={styles.placeholder} />
       </View>
       
@@ -156,18 +159,18 @@ const ProfileSettingsScreen = ({ navigation }) => {
                 <Ionicons name="camera" size={16} color={Colors.white} />
               </View>
             </TouchableOpacity>
-            <Text style={styles.photoHint}>Change Profile Photo</Text>
+            <Text style={styles.photoHint}>{t('settings.profileSettings.changePhoto')}</Text>
           </View>
 
           {/* Personal Information */}
           <View style={styles.formContainer}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>First Name</Text>
+              <Text style={styles.inputLabel}>{t('settings.profileSettings.firstName')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={localProfile.firstName}
                 onChangeText={(value) => handleInputChange('firstName', value)}
-                placeholder="First Name"
+                placeholder={t('settings.profileSettings.firstName')}
                 placeholderTextColor={Colors.textSecondary}
               />
             </View>
@@ -175,12 +178,12 @@ const ProfileSettingsScreen = ({ navigation }) => {
             <View style={styles.separator} />
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Last Name</Text>
+              <Text style={styles.inputLabel}>{t('settings.profileSettings.lastName')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={localProfile.lastName}
                 onChangeText={(value) => handleInputChange('lastName', value)}
-                placeholder="Last Name"
+                placeholder={t('settings.profileSettings.lastName')}
                 placeholderTextColor={Colors.textSecondary}
               />
             </View>
@@ -188,7 +191,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
             <View style={styles.separator} />
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Username</Text>
+              <Text style={styles.inputLabel}>{t('settings.profileSettings.username')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={localProfile.username}
@@ -202,7 +205,7 @@ const ProfileSettingsScreen = ({ navigation }) => {
 
           {/* Venmo Account Section */}
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Payment Methods</Text>
+            <Text style={styles.sectionTitle}>{t('settings.profileSettings.paymentMethods')}</Text>
             <TouchableOpacity 
               style={styles.venmoRow}
               onPress={() => venmoBottomSheetRef.current?.open()}
@@ -217,9 +220,9 @@ const ProfileSettingsScreen = ({ navigation }) => {
                   />
                 </View>
                 <View style={styles.venmoTextContainer}>
-                  <Text style={styles.venmoLabel}>Venmo Account</Text>
+                  <Text style={styles.venmoLabel}>{t('settings.profileSettings.venmo')}</Text>
                   <Text style={styles.venmoValue}>
-                    {userProfile?.venmoUsername ? `@${userProfile.venmoUsername}` : 'Not Connected'}
+                    {userProfile?.venmoUsername ? `@${userProfile.venmoUsername}` : t('settings.profileSettings.notConnected')}
                   </Text>
                 </View>
               </View>
@@ -228,14 +231,14 @@ const ProfileSettingsScreen = ({ navigation }) => {
           </View>
 
           <Text style={styles.infoText}>
-            This information will be visible to your friends on IOU.
+            {t('settings.profileSettings.visibilityInfo')}
           </Text>
 
           {/* Save Button */}
           {hasChanges && (
             <View style={styles.saveButtonContainer}>
               <Button
-                title="Save Changes"
+                title={t('settings.profileSettings.save')}
                 onPress={saveProfile}
                 disabled={isLoading}
                 loading={isLoading}

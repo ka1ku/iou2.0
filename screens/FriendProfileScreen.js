@@ -14,8 +14,10 @@ import ProfilePicture from '../components/VenmoProfilePicture';
 import { getCurrentUser, reportUser, blockUser } from '../services/authService';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 import { calculateSettlement } from '../utils/settlementCalculator';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const FriendProfileScreen = ({ route, navigation }) => {
+  const { t } = useTranslation();
   const { friend: initialFriend, userId, friendId } = route.params || {};
   const [friendProfile, setFriendProfile] = useState(initialFriend || null);
   const [friendBalances, setFriendBalances] = useState({
@@ -39,7 +41,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
         const targetFriendId = initialFriend?.friendId || initialFriend?.userId || userId || friendId;
         
         if (!targetFriendId) {
-          Alert.alert('Error', 'No friend information found');
+          Alert.alert(t('common.error'), 'No friend information found');
           navigation.goBack();
           return;
         }
@@ -74,7 +76,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
         const calculatedBalances = calculateFriendBalances(expenses, currentUser.uid, targetFriendId);
         setFriendBalances(calculatedBalances);
       } catch (error) {
-        Alert.alert('Error', 'Failed to load friend data');
+        Alert.alert(t('common.error'), 'Failed to load friend data');
       } finally {
         setLoading(false);
       }
@@ -201,7 +203,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
             color={expenseData.type === 'owes_you' ? Colors.success : Colors.danger} 
           />
           <Text style={styles.expenseAmountText}>
-            {expenseData.type === 'owes_you' ? 'Owes you' : 'You owe'} ${Math.abs(expenseData.amount).toFixed(2)}
+            {expenseData.type === 'owes_you' ? t('friendProfile.owesYou') : t('friendProfile.youOwe')} ${Math.abs(expenseData.amount).toFixed(2)}
           </Text>
         </View>
       </View>
@@ -215,7 +217,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading friend profile...</Text>
+          <Text style={styles.loadingText}>{t('friendProfile.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -236,9 +238,9 @@ const FriendProfileScreen = ({ route, navigation }) => {
             }
             try {
               await reportUser(friendProfile.friendId || friendProfile.userId, 'user_report', reason);
-              Alert.alert('Report Sent', 'Thank you for your report. We will review it shortly.');
+              Alert.alert(t('friendProfile.reportSuccess'), t('friendProfile.reportSuccessDesc'));
             } catch (error) {
-              Alert.alert('Error', 'Failed to send report. Please try again.');
+              Alert.alert(t('common.error'), 'Failed to send report. Please try again.');
             }
           }
         }
@@ -259,11 +261,11 @@ const FriendProfileScreen = ({ route, navigation }) => {
           onPress: async () => {
             try {
               await blockUser(friendProfile.friendId || friendProfile.userId);
-              Alert.alert('User Blocked', 'You have blocked this user.', [
-                { text: 'OK', onPress: () => navigation.goBack() }
+              Alert.alert(t('friendProfile.blockSuccess'), t('friendProfile.blockSuccessDesc'), [
+                { text: "OK", onPress: () => navigation.goBack() }
               ]);
             } catch (error) {
-              Alert.alert('Error', 'Failed to block user. Please try again.');
+              Alert.alert(t('common.error'), 'Failed to block user. Please try again.');
             }
           }
         }
@@ -273,12 +275,12 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
   const showOptions = () => {
     Alert.alert(
-      'Options',
+      t('friendProfile.options'),
       'Choose an action',
       [
-        { text: 'Report User', onPress: handleReportUser },
-        { text: 'Block User', onPress: handleBlockUser, style: 'destructive' },
-        { text: 'Cancel', style: 'cancel' }
+        { text: t('friendProfile.report'), onPress: handleReportUser },
+        { text: t('friendProfile.block'), onPress: handleBlockUser, style: 'destructive' },
+        { text: t('common.cancel'), style: 'cancel' }
       ]
     );
   };
@@ -292,7 +294,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Friend Profile</Text>
+        <Text style={styles.headerTitle}>{t('friendProfile.title')}</Text>
         <TouchableOpacity style={styles.optionsButton} onPress={showOptions}>
           <Ionicons name="ellipsis-horizontal" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
@@ -321,10 +323,10 @@ const FriendProfileScreen = ({ route, navigation }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Balance Summary</Text>
+          <Text style={styles.sectionTitle}>{t('friendProfile.balanceSummary')}</Text>
           
           <View style={styles.netBalanceCard}>
-            <Text style={styles.netBalanceLabel}>Net Balance</Text>
+            <Text style={styles.netBalanceLabel}>{t('friendProfile.netBalance')}</Text>
             <Text style={[
               styles.netBalanceAmount,
               { color: friendBalances.netBalance >= 0 ? Colors.success : Colors.danger }
@@ -333,21 +335,21 @@ const FriendProfileScreen = ({ route, navigation }) => {
             </Text>
             <Text style={styles.netBalanceSubtext}>
               {friendBalances.netBalance >= 0 
-                ? 'They owe you money overall' 
-                : 'You owe them money overall'
+                ? t('friendProfile.theyOweYouOverall') 
+                : t('friendProfile.youOweThemOverall')
               }
             </Text>
           </View>
 
           <View style={styles.balanceCardsContainer}>
             {renderBalanceCard(
-              'They Owe You',
+              t('friendProfile.theyOweYou'),
               friendBalances.totalOwed,
               Colors.success,
               'arrow-down-circle'
             )}
             {renderBalanceCard(
-              'You Owe Them',
+              t('friendProfile.youOweThem'),
               friendBalances.totalOwes,
               Colors.danger,
               'arrow-up-circle'
@@ -356,7 +358,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Methods</Text>
+          <Text style={styles.sectionTitle}>{t('friendProfile.paymentMethods')}</Text>
           
           <View style={styles.paymentMethods}>
             {friendProfile.username && (
@@ -375,7 +377,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
             {!friendProfile.username && (
               <View style={styles.noPaymentMethod}>
                 <Ionicons name="information-circle-outline" size={24} color={Colors.textSecondary} />
-                <Text style={styles.noPaymentMethodText}>No payment method available</Text>
+                <Text style={styles.noPaymentMethodText}>{t('friendProfile.noPaymentMethod')}</Text>
               </View>
             )}
           </View>
@@ -384,12 +386,12 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Shared Expenses</Text>
+          <Text style={styles.sectionTitle}>{t('friendProfile.sharedExpenses')}</Text>
           
           {Object.keys(friendBalances.debtBreakdown).length === 0 ? (
             <View style={styles.noExpensesContainer}>
               <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
-              <Text style={styles.noExpensesText}>No shared expenses yet</Text>
+              <Text style={styles.noExpensesText}>{t('friendProfile.noSharedExpenses')}</Text>
               <TouchableOpacity 
                 style={styles.addExpenseButton}
                 onPress={() => navigation.navigate('AddExpense', { 
@@ -397,7 +399,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
                   fromFriendProfile: true 
                 })}
               >
-                <Text style={styles.addExpenseButtonText}>Add First Expense</Text>
+                <Text style={styles.addExpenseButtonText}>{t('friendProfile.addFirstExpense')}</Text>
               </TouchableOpacity>
             </View>
           ) : (

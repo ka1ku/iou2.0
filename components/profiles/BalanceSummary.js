@@ -10,8 +10,10 @@ import Animated from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import DonutChart from '../charts/DonutChart';
 import LoadingSpinner from '../LoadingSpinner';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const BalanceSummary = ({ balances, loading }) => {
+  const { t } = useTranslation();
   // Donut chart shared state (stable across re-focus without rerenders)
   const segment1Value = useSharedValue(0);
   const segment2Value = useSharedValue(0);
@@ -73,7 +75,7 @@ const BalanceSummary = ({ balances, loading }) => {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionTitle}>Balance Summary</Text>
+        <Text style={styles.sectionTitle}>{t('profile.balanceSummary')}</Text>
         <SkeletonLoader />
       </View>
     );
@@ -81,7 +83,7 @@ const BalanceSummary = ({ balances, loading }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Balance Summary</Text>
+      <Text style={styles.sectionTitle}>{t('profile.balanceSummary')}</Text>
       <View style={styles.chartCard}>
         <View style={styles.chartContainer}>
           <DonutChart
@@ -102,12 +104,12 @@ const BalanceSummary = ({ balances, loading }) => {
 
       <View style={styles.balanceCardsContainer}>
         {renderBalanceCard(
-          'Total Owed to You',
+          t('profile.totalOwedToYou'),
           balances.totalOwed,
           Colors.green
         )}
         {renderBalanceCard(
-          'Total You Owe',
+          t('profile.totalYouOwe'),
           balances.totalOwes,
           Colors.red
         )}

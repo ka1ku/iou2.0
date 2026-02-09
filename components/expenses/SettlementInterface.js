@@ -21,14 +21,26 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import { getUserProfile } from '../../services/friendService';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const AVATAR_SIZE = 40;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const EmptySettlementState = ({ title, body }) => (
+  <View style={styles.emptyWrap}>
+    <View style={styles.emptyIconContainer}>
+      <Ionicons name="checkmark-circle" size={48} color={Colors.success} />
+    </View>
+    <Text style={styles.emptyTitle}>{title}</Text>
+    <Text style={styles.emptyBody}>{body}</Text>
+  </View>
+);
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Summary Header
    ───────────────────────────────────────────────────────────────────────── */
 const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
+  const { t } = useTranslation();
   const [activityExpanded, setActivityExpanded] = useState(false);
 
   const pending = settlements.filter(
@@ -54,51 +66,67 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
   const visible = activityExpanded ? sorted : sorted.slice(0, 3);
 
   const relative = (ts) => {
-    const m = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return `${m}m ago`;
+    const diffMs = Date.now() - new Date(ts).getTime();
+    const m = Math.floor(diffMs / 60000);
+    if (m < 1) return t('components.expenses.receiptBreakdown.time.justNow');
+    if (m < 60) return t('components.expenses.receiptBreakdown.time.minutesAgo', { count: m });
     const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
+    if (h < 24) return t('components.expenses.receiptBreakdown.time.hoursAgo', { count: h });
+    const d = Math.floor(h / 24);
+    if (d < 7) return t('components.expenses.receiptBreakdown.time.daysAgo', { count: d });
+    const w = Math.floor(d / 7);
+    return t('components.expenses.receiptBreakdown.time.weeksAgo', { count: w });
   };
 
   const describe = (e) => {
-    const n = e.userName || 'Someone';
+    const user = e.userName || 'Someone';
     switch (e.type) {
       case 'priceChange':
-        return `${n} updated the total from $${e.details?.previousValue?.toFixed(2)} to $${e.details?.newValue?.toFixed(2)}`;
+        return t('components.expenses.settlementInterface.activity.types.priceChange', { 
+            user, 
+            prev: e.details?.previousValue?.toFixed(2), 
+            new: e.details?.newValue?.toFixed(2) 
+        });
       case 'itemAdded':
         if (e.details?.itemAmount != null) {
-          return `${n} added ${e.details.itemName} for $${parseFloat(e.details.itemAmount).toFixed(2)}`;
+          return t('components.expenses.settlementInterface.activity.types.itemAddedAmount', {
+              user,
+              item: e.details.itemName,
+              amount: parseFloat(e.details.itemAmount).toFixed(2)
+          });
         }
-        return `${n} added "${e.details?.itemName}"`;
+        return t('components.expenses.settlementInterface.activity.types.itemAdded', { user, item: e.details?.itemName });
       case 'itemRemoved':
         if (e.details?.itemAmount != null) {
-          return `${n} removed ${e.details.itemName} ($${parseFloat(e.details.itemAmount).toFixed(2)})`;
+            return t('components.expenses.settlementInterface.activity.types.itemRemovedAmount', {
+                user,
+                item: e.details.itemName,
+                amount: parseFloat(e.details.itemAmount).toFixed(2)
+            });
         }
-        return `${n} removed "${e.details?.itemName}"`;
+        return t('components.expenses.settlementInterface.activity.types.itemRemoved', { user, item: e.details?.itemName });
       case 'participantAdded':
-        return `${n} added ${e.details?.participantName}`;
+        return t('components.expenses.settlementInterface.activity.types.participantAdded', { user, participant: e.details?.participantName });
       case 'participantRemoved':
-        return `${n} removed ${e.details?.participantName}`;
+        return t('components.expenses.settlementInterface.activity.types.participantRemoved', { user, participant: e.details?.participantName });
       default:
-        return `${n} made a change`;
+        return t('components.expenses.settlementInterface.activity.types.default', { user });
     }
   };
 
   return (
-    <Animated.View entering={FadeInUp.duration(350).springify()} style={styles.summaryCard}>
+    <Animated.View style={pending === 0 ? undefined : styles.summaryCard}>
       {pending === 0 && settlements.length > 0 ? (
-        <View style={styles.summaryRow}>
-          <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
-          <Text style={styles.summaryAllSettled}>All settled up!</Text>
-        </View>
+        <EmptySettlementState 
+          title={t('components.expenses.settlementInterface.summary.allSettled')}
+          body={t('components.expenses.settlementInterface.empty.body')}
+        />
       ) : (
         <>
           {youOwe > 0 && (
             <View style={styles.summaryRow}>
               <View style={[styles.dot, { backgroundColor: Colors.error }]} />
-              <Text style={styles.summaryLabel}>You owe</Text>
+              <Text style={styles.summaryLabel}>{t('components.expenses.settlementInterface.summary.youOwe')}</Text>
               <Text style={[styles.summaryAmount, { color: Colors.error }]}>
                 ${youOwe.toFixed(2)}
               </Text>
@@ -107,7 +135,7 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
           {youreOwed > 0 && (
             <View style={styles.summaryRow}>
               <View style={[styles.dot, { backgroundColor: Colors.success }]} />
-              <Text style={styles.summaryLabel}>You're owed</Text>
+              <Text style={styles.summaryLabel}>{t('components.expenses.settlementInterface.summary.youreOwed')}</Text>
               <Text style={[styles.summaryAmount, { color: Colors.success }]}>
                 ${youreOwed.toFixed(2)}
               </Text>
@@ -117,29 +145,38 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
             <View style={styles.summaryRow}>
               <Ionicons name="swap-horizontal" size={18} color={Colors.textSecondary} />
               <Text style={styles.summaryLabel}>
-                {pending} pending · {settled} settled
+                {t('components.expenses.settlementInterface.summary.pendingSettled', { pending, settled })}
               </Text>
             </View>
           )}
         </>
       )}
-      <View style={styles.pillRow}>
-        <View style={[styles.pill, { backgroundColor: Colors.statusPending + '20' }]}>
-          <Text style={[styles.pillText, { color: Colors.statusPending }]}>{pending} pending</Text>
+      
+      {pending > 0 && (
+        <View style={styles.pillRow}>
+          <View style={[styles.pill, { backgroundColor: Colors.statusPending + '20' }]}>
+            <Text style={[styles.pillText, { color: Colors.statusPending }]}>{t('components.expenses.settlementInterface.summary.pending', { count: pending })}</Text>
+          </View>
+          <View style={[styles.pill, { backgroundColor: Colors.success + '20' }]}>
+            <Text style={[styles.pillText, { color: Colors.success }]}>{t('components.expenses.settlementInterface.summary.settled', { count: settled })}</Text>
+          </View>
         </View>
-        <View style={[styles.pill, { backgroundColor: Colors.success + '20' }]}>
-          <Text style={[styles.pillText, { color: Colors.success }]}>{settled} settled</Text>
-        </View>
-      </View>
+      )}
 
       {/* Activity Log inside summary */}
       {sorted.length > 0 && (
         <>
           <View style={styles.activityDivider} />
-          <TouchableOpacity style={styles.activityHeaderInline} onPress={() => setActivityExpanded(!activityExpanded)}>
+          <TouchableOpacity
+            style={styles.activityHeaderInline}
+            onPress={() => sorted.length > 3 && setActivityExpanded(!activityExpanded)}
+            disabled={sorted.length <= 3}
+          >
             <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
-            <Text style={styles.activityTitleInline}>Activity</Text>
-            <Ionicons name={activityExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
+            <Text style={styles.activityTitleInline}>{t('components.expenses.settlementInterface.activity.title')}</Text>
+            {sorted.length > 3 && (
+              <Ionicons name={activityExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
+            )}
           </TouchableOpacity>
           {visible.map((e, i) => (
             <View key={`${e.timestamp}-${i}`} style={styles.activityRowInline}>
@@ -152,7 +189,7 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
           ))}
           {!activityExpanded && sorted.length > 3 && (
             <TouchableOpacity style={styles.showMore} onPress={() => setActivityExpanded(true)}>
-              <Text style={styles.showMoreText}>Show {sorted.length - 3} more...</Text>
+              <Text style={styles.showMoreText}>{t('components.expenses.settlementInterface.activity.showMore', { count: sorted.length - 3 })}</Text>
             </TouchableOpacity>
           )}
         </>
@@ -169,14 +206,36 @@ const STATUS_MAP = {
   partial: { label: 'Partially Settled', color: Colors.statusPartial },
   markedAsPaid: { label: 'Settled', color: Colors.statusSettled },
   confirmed: { label: 'Settled', color: Colors.statusSettled },
-  paymentMade: { label: 'Payment Sent', color: Colors.statusPaymentSent },
-  paymentRequested: { label: 'Request Sent', color: Colors.statusPaymentSent },
   reminderSent: { label: 'Reminded', color: Colors.statusPending },
   noAction: { label: 'Awaiting Payment', color: Colors.statusPending },
 };
 
 const StatusPill = ({ status }) => {
-  const { label, color } = STATUS_MAP[status] || STATUS_MAP.noAction;
+  const { t } = useTranslation();
+  
+  const getStatusLabel = (s) => {
+    switch (s) {
+      case 'complete': return t('components.expenses.settlementInterface.status.fullySettled');
+      case 'partial': return t('components.expenses.settlementInterface.status.partiallySettled');
+      case 'markedAsPaid':
+      case 'confirmed': return t('components.expenses.settlementInterface.status.settled');
+      case 'reminderSent': return t('components.expenses.settlementInterface.status.reminded');
+      default: return t('components.expenses.settlementInterface.status.awaitingPayment');
+    }
+  };
+
+  const STATUS_COLORS = {
+    complete: Colors.statusSettled,
+    partial: Colors.statusPartial,
+    markedAsPaid: Colors.statusSettled,
+    confirmed: Colors.statusSettled,
+    reminderSent: Colors.statusPending,
+    noAction: Colors.statusPending,
+  };
+
+  const color = STATUS_COLORS[status] || STATUS_COLORS.noAction;
+  const label = getStatusLabel(status);
+
   return (
     <View style={[styles.statusPill, { backgroundColor: color + '15' }]}>
       <View style={[styles.statusDot, { backgroundColor: color }]} />
@@ -186,44 +245,12 @@ const StatusPill = ({ status }) => {
 };
 
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Price Changed Badge
-   ───────────────────────────────────────────────────────────────────────── */
-const PriceChangedBadge = ({ changeLog, settlement }) => {
-  if (!changeLog?.length) return null;
-  const from = settlement.debtor || settlement.from;
-  const to = settlement.creditor || settlement.to;
-
-  const change = [...changeLog].reverse().find((e) => {
-    if (e.type !== 'priceChange') return false;
-    return (e.details?.affectedSettlements || []).some((k) => {
-      const [f, t] = k.split('|||');
-      return f === from && t === to;
-    });
-  });
-  if (!change) return null;
-
-  return (
-    <TouchableOpacity
-      style={styles.changedBadge}
-      activeOpacity={0.7}
-      onPress={() =>
-        Alert.alert(
-          'Price Changed',
-          `Total: $${change.details.previousValue?.toFixed(2)} → $${change.details.newValue?.toFixed(2)}\nBy ${change.userName || 'someone'}`,
-        )
-      }
-    >
-      <Ionicons name="alert-circle" size={14} color={Colors.statusChanged} />
-      <Text style={styles.changedText}>Price Changed</Text>
-    </TouchableOpacity>
-  );
-};
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Associated Items List
    ───────────────────────────────────────────────────────────────────────── */
 const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection }) => {
+  const { t } = useTranslation();
   if (!items || items.length === 0) return null;
 
   const unsettledItems = items.filter(i => !i.settled);
@@ -233,7 +260,7 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
     <View style={styles.assocContainer}>
       <View style={styles.assocHeader}>
         <Text style={styles.assocTitle}>
-          Items {!readOnly && !selectedItemIds && '(tap to settle)'}
+          {t('components.expenses.settlementInterface.items.title')} {!readOnly && !selectedItemIds && t('components.expenses.settlementInterface.items.tapToSettle')}
         </Text>
         {!readOnly && selectedItemIds && unsettledItems.length > 1 && (
           <TouchableOpacity
@@ -247,7 +274,7 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
             hitSlop={8}
           >
             <Text style={styles.selectAllText}>
-              {allUnsettledSelected ? 'Deselect All' : 'Select All'}
+              {allUnsettledSelected ? t('components.expenses.settlementInterface.items.deselectAll') : t('components.expenses.settlementInterface.items.selectAll')}
             </Text>
           </TouchableOpacity>
         )}
@@ -315,7 +342,8 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
 /* ─────────────────────────────────────────────────────────────────────────────
    Settlement Card
    ───────────────────────────────────────────────────────────────────────── */
-const SettlementCard = ({ settlement, index, participants, currentUserId, currentUserName, onAction, onToggleItem, onBulkSettle, onBulkAction, changeLog, readOnly }) => {
+const SettlementCard = ({ settlement, index, participants, currentUserId, currentUserName, onAction, onToggleItem, onBulkSettle, onBulkAction, readOnly }) => {
+  const { t } = useTranslation();
   const fromName = settlement.debtor || settlement.from;
   const toName = settlement.creditor || settlement.to;
   const fromP = participants.find((p) => p.name === fromName);
@@ -399,7 +427,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
   // Accent color for left strip
   let accent = Colors.statusPending;
   if (isSettled) accent = Colors.statusSettled;
-  else if (status === 'paymentMade' || status === 'paymentRequested') accent = Colors.statusPaymentSent;
+  else if (status === 'partial') accent = Colors.statusPartial;
 
   const avatar = (p, isCurrent) =>
     p?.profilePhoto ? (
@@ -420,53 +448,47 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     if (readOnly) return null;
 
     if (status === 'complete') {
-      return btn('All Settled', 'checkmark-circle', 'disabled');
+      return btn(t('components.expenses.settlementInterface.actions.allSettled'), 'checkmark-circle', 'disabled');
     }
 
     const confirmMarkSettled = () => {
       const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
       Alert.alert(
-        'Mark as Settled',
-        `Mark ${amt} as settled? This records the payment without using Venmo.`,
+        t('components.expenses.settlementInterface.alerts.markSettled.title'),
+        t('components.expenses.settlementInterface.alerts.markSettled.message', { amount: amt }),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Settle', onPress: () => fire('markAsSettled') },
+          { text: t('components.expenses.settlementInterface.alerts.markSettled.cancel'), style: 'cancel' },
+          { text: t('components.expenses.settlementInterface.alerts.markSettled.confirm'), onPress: () => fire('markAsSettled') },
         ],
       );
     };
 
     if (isDebtor) {
-      if (status === 'paymentMade')
-        return btn('Undo Payment', 'arrow-undo', 'secondary', () => fire('undoPaymentMade'));
       if (noSelection)
-        return btn('Select items to settle', 'checkbox-outline', 'disabled');
+        return btn(t('components.expenses.settlementInterface.actions.selectToSettle'), 'checkbox-outline', 'disabled');
       const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
       return (
         <View style={styles.actionBtnGroup}>
-          {btn(`Pay ${amt}`, 'logo-venmo', 'venmo', () => fire('makePayment'))}
-          {onBulkSettle && btn(`Mark ${amt} Settled`, 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
+          {btn(t('components.expenses.settlementInterface.actions.pay', { amount: amt }), 'logo-venmo', 'venmo', () => fire('makePayment'))}
+          {onBulkSettle && btn(t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }), 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
         </View>
       );
     }
     if (isCreditor) {
-      if (status === 'paymentRequested')
-        return btn('Request Sent', 'checkmark', 'disabled');
-      if (status === 'paymentMade')
-        return btn('Confirm Received', 'checkmark-circle', 'success', () => fire('confirmPaymentReceived'));
       if (noSelection)
-        return btn('Select items to settle', 'checkbox-outline', 'disabled');
+        return btn(t('components.expenses.settlementInterface.actions.selectToSettle'), 'checkbox-outline', 'disabled');
       const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
       return (
         <View style={styles.actionBtnGroup}>
-          {btn(`Request ${amt}`, 'paper-plane', 'primary', () => fire('requestPayment'))}
-          {onBulkSettle && btn(`Mark ${amt} Settled`, 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
+          {btn(t('components.expenses.settlementInterface.actions.request', { amount: amt }), 'logo-venmo', 'venmo', () => fire('requestPayment'))}
+          {onBulkSettle && btn(t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }), 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
         </View>
       );
     }
     if (isSpectator) {
       if (status === 'reminderSent')
-        return btn('Reminder Sent', 'checkmark', 'disabled');
-      return btn('Send Reminder', 'notifications-outline', 'secondary', () => fire('sendReminder'));
+        return btn(t('components.expenses.settlementInterface.actions.reminderSent'), 'checkmark', 'disabled');
+      return btn(t('components.expenses.settlementInterface.actions.sendReminder'), 'notifications-outline', 'secondary', () => fire('sendReminder'));
     }
     return null;
   };
@@ -521,7 +543,6 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
             {/* Badges */}
             <View style={styles.badgeRow}>
               <StatusPill status={status} />
-              <PriceChangedBadge changeLog={changeLog} settlement={settlement} />
             </View>
 
             {/* Participants */}
@@ -549,17 +570,17 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
             <View style={styles.oweLabel}>
               {isDebtor && (
                 <Text style={styles.oweLabelText}>
-                  You owe {toName?.split(' ')[0]}
+                  {t('components.expenses.settlementInterface.relationships.youOwe', { name: toName?.split(' ')[0] })}
                 </Text>
               )}
               {isCreditor && (
                 <Text style={styles.oweLabelText}>
-                  {fromName?.split(' ')[0]} owes you
+                  {t('components.expenses.settlementInterface.relationships.owesYou', { name: fromName?.split(' ')[0] })}
                 </Text>
               )}
               {isSpectator && (
                 <Text style={styles.oweLabelText}>
-                  {fromName?.split(' ')[0]} owes {toName?.split(' ')[0]}
+                    {t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
                 </Text>
               )}
             </View>
@@ -573,7 +594,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
                 </Text>
                 {status === 'partial' && (
                   <Text style={styles.totalText}>
-                    (${settlement.amount.toFixed(2)} total)
+                    {t('components.expenses.settlementInterface.total', { amount: settlement.amount.toFixed(2) })}
                   </Text>
                 )}
               </View>
@@ -595,7 +616,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
             {/* Subtle links */}
             {!readOnly && (status === 'markedAsPaid' || status === 'confirmed') && (
               <TouchableOpacity style={styles.link} onPress={() => fire('undoMarkAsPaid')}>
-                <Text style={styles.linkText}>Undo settlement</Text>
+                <Text style={styles.linkText}>{t('components.expenses.settlementInterface.actions.undoSettlement')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -621,15 +642,26 @@ const SettlementInterface = ({
   recalculationInfo = null,
   onDismissRecalculation,
 }) => {
+  const { t } = useTranslation();
   const current = participants.find((p) => p.userId === currentUserId) || {};
   const name = current.name || '';
 
-  if (!settlements.length && !readOnly) {
+  // Filter settlements to only show those involving the current user
+  const userSettlements = useMemo(() => {
+    return settlements.filter(s => {
+      const debtor = s.debtor || s.from;
+      const creditor = s.creditor || s.to;
+      return debtor === name || creditor === name;
+    });
+  }, [settlements, name]);
+
+  if (!userSettlements.length && !readOnly) {
     return (
-      <Animated.View entering={FadeInUp.duration(400).springify()} style={styles.emptyWrap}>
-        <Ionicons name="checkmark-circle" size={56} color={Colors.success} />
-        <Text style={styles.emptyTitle}>All Settled Up!</Text>
-        <Text style={styles.emptyBody}>Everyone is square. No payments needed.</Text>
+      <Animated.View>
+          <EmptySettlementState 
+             title={t('components.expenses.settlementInterface.empty.title')}
+             body={t('components.expenses.settlementInterface.empty.body')}
+          />
       </Animated.View>
     );
   }
@@ -640,9 +672,9 @@ const SettlementInterface = ({
         <Animated.View entering={FadeInDown.duration(250)} exiting={FadeOut.duration(200)} style={styles.banner}>
           <Ionicons name="information-circle" size={20} color={Colors.statusPaymentSent} />
           <View style={styles.bannerBody}>
-            <Text style={styles.bannerTitle}>Settlements updated due to changes.</Text>
+            <Text style={styles.bannerTitle}>{t('components.expenses.settlementInterface.banner.title')}</Text>
             <Text style={styles.bannerSub}>
-              {recalculationInfo.newSettlements} new, {recalculationInfo.paidSettlements} paid preserved.
+              {t('components.expenses.settlementInterface.banner.sub', { new: recalculationInfo.newSettlements, paid: recalculationInfo.paidSettlements })}
             </Text>
           </View>
           {onDismissRecalculation && (
@@ -653,9 +685,9 @@ const SettlementInterface = ({
         </Animated.View>
       )}
 
-      {settlements.length > 0 && <SettlementSummary settlements={settlements} currentUserName={name} changeLog={changeLog} />}
+      {userSettlements.length > 0 && <SettlementSummary settlements={userSettlements} currentUserName={name} changeLog={changeLog} />}
 
-      {settlements.map((s, i) => (
+      {userSettlements.map((s, i) => (
         <SettlementCard
           key={`${s.debtor || s.from}|||${s.creditor || s.to}|||${i}`}
           settlement={s}
@@ -667,7 +699,6 @@ const SettlementInterface = ({
           onToggleItem={onToggleItem}
           onBulkSettle={onBulkSettle}
           onBulkAction={onBulkAction}
-          changeLog={changeLog}
           readOnly={readOnly}
         />
       ))}
@@ -683,6 +714,7 @@ const styles = StyleSheet.create({
 
   // Summary
   summaryCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, marginBottom: Spacing.lg, ...Shadows.card },
+  summaryCardEmpty: { marginBottom: Spacing.lg },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.xs },
   dot: { width: 8, height: 8, borderRadius: 4 },
   summaryLabel: { ...Typography.body, color: Colors.textSecondary, fontWeight: '500' },
@@ -703,8 +735,6 @@ const styles = StyleSheet.create({
   statusPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, borderRadius: Radius.pill, gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, fontWeight: '600' },
-  changedBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.statusChanged + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill, gap: 4 },
-  changedText: { fontSize: 11, fontWeight: '600', color: Colors.statusChanged },
 
   // Participants
   pRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
@@ -762,9 +792,39 @@ const styles = StyleSheet.create({
   linkText: { fontSize: 12, fontWeight: '500', color: Colors.textSecondary, textDecorationLine: 'underline' },
 
   // Empty
-  emptyWrap: { alignItems: 'center', padding: Spacing.xl, backgroundColor: Colors.surface, borderRadius: Radius.lg, ...Shadows.card },
-  emptyTitle: { marginTop: Spacing.md, fontSize: 20, fontWeight: '600', color: Colors.success },
-  emptyBody: { marginTop: Spacing.xs, fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  emptyWrap: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    marginVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 260,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  emptyBody: {
+    fontSize: 15,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
 
   // Banner
   banner: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, padding: Spacing.sm, borderRadius: Radius.md, marginBottom: Spacing.md, borderLeftWidth: 3, borderLeftColor: Colors.statusPaymentSent, ...Shadows.card },

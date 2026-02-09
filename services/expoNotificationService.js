@@ -5,13 +5,32 @@ import { Platform } from 'react-native';
 import { getFirestore, doc, updateDoc, getDoc } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
 
+// Import getCurrentUser to filter self-notifications
+import { getCurrentUser } from './authService';
+
 // Configure how notifications are handled
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async (notification) => {
+    // Filter out notifications from your own actions
+    const currentUser = getCurrentUser();
+    const actorUserId = notification.request.content.data?.actorUserId;
+
+    // Don't show notification if you're the one who performed the action
+    if (currentUser && actorUserId && currentUser.uid === actorUserId) {
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      };
+    }
+
+    // Show notifications from others
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 class ExpoNotificationService {

@@ -5,6 +5,8 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,11 +16,13 @@ import { Colors, Spacing, Radius, Shadows, Typography } from '../design/tokens';
 import { getCurrentUser } from '../services/authService';
 import { calculateUserBalanceForExpense, calculateExpenseTotal } from '../utils/balanceCalculator';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
+import { useTranslation } from '../contexts/LanguageContext';
 import AnimatedSearchHeader from '../components/AnimatedSearchHeader';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { searchExpensesWithDetails } from '../services/expenseSearchService';
 
 const HomeScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { expenses, loading, loadingMore, hasMore, loadMoreExpenses, balances } = useExpenseData();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -39,18 +43,27 @@ const HomeScreen = ({ navigation }) => {
       const currentUserParticipant = expense.participants?.find(p => p.userId === currentUser.uid);
       const currentUserName = currentUserParticipant?.name;
       
+      const SETTLED_STATUSES = ['paymentRequested', 'paymentMade', 'markedAsPaid', 'complete', 'confirmed', 'partial'];
+      
       expense.settlements.forEach(settlement => {
-        // Check if settlement is in paymentRequested or paymentMade status
-        if (settlement.status === 'paymentRequested' || settlement.status === 'paymentMade') {
+        // Check if settlement is in any "handled" status (pending or settled)
+        if (SETTLED_STATUSES.includes(settlement.status)) {
           const isDebtor = settlement.debtor === currentUserName || settlement.from === currentUserName;
           const isCreditor = settlement.creditor === currentUserName || settlement.to === currentUserName;
           
+          let amountToSubtract = 0;
+          if (settlement.status === 'partial') {
+            amountToSubtract = parseFloat(settlement.settledAmount) || 0;
+          } else {
+            amountToSubtract = parseFloat(settlement.amount) || 0;
+          }
+          
           if (isDebtor) {
-            // User owes this amount, but it's pending confirmation
-            pendingAmount += settlement.amount;
+            // User owes this amount, but it's pending confirmation or already settled
+            pendingAmount += amountToSubtract;
           } else if (isCreditor) {
-            // User is owed this amount, but it's pending confirmation
-            pendingAmount -= settlement.amount;
+            // User is owed this amount, but it's pending confirmation or already settled
+            pendingAmount -= amountToSubtract;
           }
         }
       });
@@ -73,7 +86,7 @@ const HomeScreen = ({ navigation }) => {
     const currentUserName = currentUserParticipant?.name;
 
     const allSettled = expense.settlements.every(settlement => 
-      settlement.status === 'markedAsPaid'
+      ['markedAsPaid', 'complete', 'confirmed'].includes(settlement.status)
     );
 
     if (allSettled) {
@@ -205,6 +218,8 @@ const HomeScreen = ({ navigation }) => {
     }
 
     const handleItemPress = () => {
+      // Dismiss keyboard when tapping expense item
+      Keyboard.dismiss();
       if (isReceipt) {
         navigation.navigate('AddReceipt', { expense: item });
       } else {
@@ -227,7 +242,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.rightHeaderSection}>
             <View style={[styles.typeBadge, isReceipt ? styles.receiptBadge : styles.expenseBadge]}>
               <Text style={[styles.typeText, isReceipt ? styles.receiptTypeText : styles.expenseTypeText]}>
-                {isReceipt ? 'Receipt' : 'Expense'}
+                {isReceipt ? t('home.receipt') : t('home.expense')}
               </Text>
             </View>
             <View style={styles.expenseBalance}>
@@ -239,7 +254,7 @@ const HomeScreen = ({ navigation }) => {
                   return (
                     <View style={styles.evenContainer}>
                       <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-                      <Text style={styles.evenText}>Settled up</Text>
+                      <Text style={styles.evenText}>{t('home.settledUp')}</Text>
                     </View>
                   );
                 }
@@ -249,14 +264,14 @@ const HomeScreen = ({ navigation }) => {
                   return (
                     <View style={styles.oweContainer}>
                       <Ionicons name="arrow-up-circle" size={16} color={Colors.danger} />
-                      <Text style={styles.oweText}>You owe ${expenseBalance.youOwe.toFixed(2)}</Text>
+                      <Text style={styles.oweText}>{t('home.youOwe')} ${expenseBalance.youOwe.toFixed(2)}</Text>
                     </View>
                   );
                 } else if (expenseBalance.youOwe < 0) {
                   return (
                     <View style={styles.owedContainer}>
                       <Ionicons name="arrow-down-circle" size={16} color={Colors.success} />
-                      <Text style={styles.owedText}>You're owed ${Math.abs(expenseBalance.youOwe).toFixed(2)}</Text>
+                      <Text style={styles.owedText}>{t('home.youAreOwed')} ${Math.abs(expenseBalance.youOwe).toFixed(2)}</Text>
                     </View>
                   );
                 }
@@ -266,14 +281,14 @@ const HomeScreen = ({ navigation }) => {
                   return (
                     <View style={styles.confirmPaymentContainer}>
                       <Ionicons name="alert-circle" size={16} color={Colors.accent} />
-                      <Text style={styles.confirmPaymentText}>Confirm payment</Text>
+                      <Text style={styles.confirmPaymentText}>{t('home.confirmPayment')}</Text>
                     </View>
                   );
                 } else if (settlementStatus === 'awaitingConfirmation') {
                   return (
                     <View style={styles.awaitingConfirmationContainer}>
                       <Ionicons name="time-outline" size={16} color={Colors.warning} />
-                      <Text style={styles.awaitingConfirmationText}>Awaiting confirmation</Text>
+                      <Text style={styles.awaitingConfirmationText}>{t('home.awaitingConfirmation')}</Text>
                     </View>
                   );
                 }
@@ -282,7 +297,7 @@ const HomeScreen = ({ navigation }) => {
                 return (
                   <View style={styles.needsSettlementContainer}>
                     <Ionicons name="time-outline" size={16} color={Colors.warning} />
-                    <Text style={styles.needsSettlementText}>Needs settlement</Text>
+                    <Text style={styles.needsSettlementText}>{t('home.needsSettlement')}</Text>
                   </View>
                 );
               })()}
@@ -299,7 +314,7 @@ const HomeScreen = ({ navigation }) => {
           return (
             <View style={styles.participantsContainer}>
               <View style={styles.participantsHeader}>
-                <Text style={styles.participantsLabel}>Other Members</Text>
+                <Text style={styles.participantsLabel}>{t('home.otherMembers')}</Text>
                 <View style={styles.participantCountBadge}>
                   <Ionicons name="people" size={12} color={Colors.textSecondary} />
                   <Text style={styles.participantCountText}>{otherMembers.length}</Text>
@@ -377,12 +392,12 @@ const HomeScreen = ({ navigation }) => {
         color="#ccc" 
       />
       <Text style={styles.emptyStateText}>
-        {searchQuery.trim() ? 'No expenses found' : 'No expenses yet'}
+        {searchQuery.trim() ? t('home.noSearchResultsTitle') : t('home.noExpensesTitle')}
       </Text>
       <Text style={styles.emptyStateSubtext}>
         {searchQuery.trim() 
-          ? 'Try a different search term'
-          : 'Tap the Create button to add your first expense'
+          ? t('home.noSearchResultsDesc')
+          : t('home.noExpensesDesc')
         }
       </Text>
     </View>
@@ -457,12 +472,11 @@ const HomeScreen = ({ navigation }) => {
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          keyboardDismissMode="interactive"
           onScrollBeginDrag={() => {
-            // Close search when user starts scrolling
-            if (searchHeaderRef.current) {
-              searchHeaderRef.current.close();
-            }
+            // Dismiss keyboard when user starts scrolling
+            // This will trigger onBlur on the search input
+            Keyboard.dismiss();
           }}
           style={styles.list}
         />

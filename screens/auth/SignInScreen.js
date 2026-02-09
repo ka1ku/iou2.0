@@ -14,9 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { sendOTP, handleMultiFactorError } from '../../services/authService';
+
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const SignInScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef(null);
@@ -40,13 +43,13 @@ const SignInScreen = ({ navigation }) => {
 
   const handleSendOTP = async () => {
     if (!phoneNumber.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
+      Alert.alert(t('common.error'), t('auth.signIn.errors.missingPhone'));
       return;
     }
 
     const digits = phoneNumber.replace(/\D/g, '');
     if (digits.length !== 10) {
-      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      Alert.alert(t('common.error'), t('auth.signIn.errors.invalidPhone'));
       return;
     }
 
@@ -76,7 +79,8 @@ const SignInScreen = ({ navigation }) => {
       } catch (mfaError) {
       }
       
-      Alert.alert('Error', error.message || 'Failed to send verification code. Please try again.');
+      
+      Alert.alert(t('common.error'), error.message || t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -104,30 +108,32 @@ const SignInScreen = ({ navigation }) => {
             >
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.title}>Sign In</Text>
+
+            <Text style={styles.title}>{t('auth.signIn.title')}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
           <View style={styles.formContainer}>
             <View style={styles.stepHeader}>
-              <Text style={styles.stepTitle}>Phone Number</Text>
+
+              <Text style={styles.stepTitle}>{t('auth.signIn.stepTitle')}</Text>
               <Text style={styles.stepSubtitle}>
-                We'll send you a verification code to confirm your number
+                {t('auth.signIn.stepSubtitle')}
               </Text>
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Phone Number</Text>
+              <Text style={styles.inputLabel}>{t('auth.signIn.inputLabel')}</Text>
               <View style={styles.phoneInputContainer}>
                 <View style={styles.countryCode}>
-                  <Text style={styles.countryCodeText}>🇺🇸 +1</Text>
+                  <Text style={styles.countryCodeText}>{t('auth.common.usCountryCode')}</Text>
                 </View>
                 <TextInput
-                  ref={inputRef}
+
                   style={styles.phoneInput}
                   value={phoneNumber}
                   onChangeText={handlePhoneNumberChange}
-                  placeholder="(555) 123-4567"
+                  placeholder={t('auth.signIn.placeholder')}
                   placeholderTextColor={Colors.textSecondary}
                   keyboardType="phone-pad"
                   maxLength={14}
@@ -143,12 +149,13 @@ const SignInScreen = ({ navigation }) => {
             >
               {loading ? (
                 <>
+
                   <LoadingSpinner size="small" color={Colors.white} />
-                  <Text style={styles.sendButtonText}>Sending...</Text>
+                  <Text style={styles.sendButtonText}>{t('auth.signIn.sending')}</Text>
                 </>
               ) : (
                 <>
-                  <Text style={styles.sendButtonText}>Send Verification Code</Text>
+                  <Text style={styles.sendButtonText}>{t('auth.signIn.button')}</Text>
                   <Ionicons 
                     name="arrow-forward" 
                     size={20} 
@@ -163,8 +170,9 @@ const SignInScreen = ({ navigation }) => {
               style={styles.signUpLink}
               onPress={() => navigation.navigate('SignUp')}
             >
+
               <Text style={styles.signUpLinkText}>
-                Don't have an account? <Text style={styles.signUpLinkAccent}>Create Account</Text>
+                {t('auth.signIn.noAccount')} <Text style={styles.signUpLinkAccent}>{t('auth.signIn.createAccount')}</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -172,14 +180,16 @@ const SignInScreen = ({ navigation }) => {
           <View style={styles.infoContainer}>
             <View style={styles.infoItem}>
               <Ionicons name="shield-checkmark-outline" size={24} color={Colors.accent} />
+
               <Text style={styles.infoText}>
-                We'll send you a verification code via SMS
+                {t('auth.signIn.infoSms')}
               </Text>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="lock-closed-outline" size={24} color={Colors.accent} />
+
               <Text style={styles.infoText}>
-                Your phone number is kept secure and private
+                {t('auth.signIn.infoSecure')}
               </Text>
             </View>
           </View>

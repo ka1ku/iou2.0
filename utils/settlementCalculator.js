@@ -114,15 +114,15 @@ export const calculateParticipantBalances = (expense, participants, items, fees,
     const payersToUse = itemPayers.length > 0 ? itemPayers : (expense.selectedPayers || [0]);
     
     
-    if (payersToUse.length > 0) {
-      const amountPerPayer = Math.round((itemAmount / payersToUse.length) * 100) / 100;
-      payersToUse.forEach(payerIndex => {
-        if (payerIndex < balances.length) {
-          balances[payerIndex].paid += amountPerPayer;
-          balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
-        }
-      });
-    }
+      if (payersToUse.length > 0) {
+        const amountPerPayer = Math.round((itemAmount / payersToUse.length) * 100) / 100;
+        payersToUse.forEach(payerIndex => {
+          if (payerIndex < balances.length && balances[payerIndex]) {
+            balances[payerIndex].paid += amountPerPayer;
+            balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
+          }
+        });
+      }
   });
   
   
@@ -137,13 +137,17 @@ export const calculateParticipantBalances = (expense, participants, items, fees,
           ? parseFloat(itemSplits[splitIndex].amount) || 0
           : parseFloat(itemSplits[splitIndex]) || 0;
         const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
-        balances[consumerIndex].owed += roundedSplitAmount;
-        balances[consumerIndex].balance += roundedSplitAmount; // Positive because they owe
+        if (balances[consumerIndex]) {
+          balances[consumerIndex].owed += roundedSplitAmount;
+          balances[consumerIndex].balance += roundedSplitAmount; // Positive because they owe
+        }
       } else {
         const itemAmount = parseFloat(item.amount) || 0;
         const amountPerConsumer = Math.round((itemAmount / itemConsumers.length) * 100) / 100;
-        balances[consumerIndex].owed += amountPerConsumer;
-        balances[consumerIndex].balance += amountPerConsumer;
+        if (balances[consumerIndex]) {
+          balances[consumerIndex].owed += amountPerConsumer;
+          balances[consumerIndex].balance += amountPerConsumer;
+        }
       }
     });
   });
@@ -156,7 +160,7 @@ export const calculateParticipantBalances = (expense, participants, items, fees,
     if (feePayers.length > 0) {
       const amountPerPayer = Math.round((totalFeeAmount / feePayers.length) * 100) / 100;
       feePayers.forEach(payerIndex => {
-        if (payerIndex < balances.length) {
+        if (payerIndex < balances.length && balances[payerIndex]) {
           balances[payerIndex].paid += amountPerPayer;
           balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
         }
@@ -168,7 +172,7 @@ export const calculateParticipantBalances = (expense, participants, items, fees,
       const participantIndex = split.participantIndex;
       const splitAmount = parseFloat(split.amount) || 0;
       const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
-      if (participantIndex !== undefined && participantIndex < balances.length) {
+      if (participantIndex !== undefined && participantIndex < balances.length && balances[participantIndex]) {
         balances[participantIndex].owed += roundedSplitAmount;
         balances[participantIndex].balance += roundedSplitAmount; // Positive because they owe
       }

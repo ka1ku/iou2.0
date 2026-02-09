@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors, Spacing, Radius, Typography, Shadows } from "../design/tokens";
 import { getCurrentUser } from "../services/authService";
+import { useTranslation } from '../contexts/LanguageContext';
 import ChangeExpenseNameBottomSheet from "../components/ChangeExpenseNameBottomSheet";
 import {
   updateExpense,
@@ -58,6 +59,7 @@ const SettingItem = ({
 );
 
 const ExpenseSettingsScreen = ({ route, navigation }) => {
+  const { t } = useTranslation();
   const { expense } = route.params;
   const currentUser = getCurrentUser();
   const [joinEnabled, setJoinEnabled] = useState(expense?.join?.enabled ?? true);
@@ -99,7 +101,7 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
       );
       setJoinEnabled(value);
     } catch (error) {
-      Alert.alert("Error", "Failed to update join setting");
+      Alert.alert(t('common.error'), t('expenseSettings.errors.leaveError'));
     } finally {
       setLoading(false);
     }
@@ -125,10 +127,10 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
           url: inviteLink,
         });
       } else if (joinEnabled) {
-        Alert.alert("Error", "Unable to generate invite link. Please try again.");
+        Alert.alert(t('common.error'), "Unable to generate invite link. Please try again.");
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to share invite link");
+      Alert.alert(t('common.error'), "Failed to share invite link");
     }
   };
 
@@ -152,7 +154,7 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         Alert.alert("Error", "Unable to generate invite link. Please try again.");
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to copy invite link");
+      Alert.alert(t('common.error'), "Failed to copy invite link");
     }
   };
 
@@ -163,7 +165,7 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
   const handleSaveExpenseName = async (newName) => {
     try {
       if (!newName.trim()) {
-        Alert.alert("Error", "Expense name cannot be empty");
+        Alert.alert(t('common.error'), t('expenseSettings.errors.emptyName'));
         return;
       }
       if (newName.trim() === expense?.title) {
@@ -181,9 +183,9 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
       expense.title = newName.trim();
       setExpenseTitle(newName.trim());
       changeExpenseNameBottomSheetRef.current?.close();
-      Alert.alert("Success", "Expense name updated successfully");
+      Alert.alert(t('common.success'), t('expenseSettings.success.nameUpdated'));
     } catch (error) {
-      Alert.alert("Error", "Failed to update expense name");
+      Alert.alert(t('common.error'), t('expenseSettings.errors.updateNameError'));
     } finally {
       setLoading(false);
     }
@@ -214,19 +216,19 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
       if (isInAnyItem) {
         Alert.alert(
-          "Cannot Leave",
-          "You can only leave this expense if you are not part of any items. Remove yourself from all items first."
+          t('expenseSettings.errors.cannotLeave'),
+          t('expenseSettings.errors.cannotLeaveDesc')
         );
         return;
       }
     } catch (e) {}
 
     Alert.alert(
-      "Leave Expense",
-      "Are you sure you want to leave this expense? You will be removed from all splits and won't be able to access it anymore.",
+      t('expenseSettings.confirmLeave.title'),
+      t('expenseSettings.confirmLeave.message'),
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Leave", style: "destructive", onPress: confirmLeaveExpense },
+        { text: t('common.cancel'), style: "cancel" },
+        { text: t('expenseSettings.leaveExpense'), style: "destructive", onPress: confirmLeaveExpense },
       ]
     );
   };
@@ -238,7 +240,7 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         (p) => p.userId === currentUser?.uid
       );
       if (currentUserIndex === -1) {
-        Alert.alert("Error", "User not found in expense participants");
+        Alert.alert(t('common.error'), "User not found in expense participants");
         return;
       }
 
@@ -285,12 +287,12 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
       await updateExpense(expense.id, cleanUpdateData, currentUser?.uid);
 
       Alert.alert(
-        "Success",
-        "You have left the expense successfully",
+        t('common.success'),
+        t('expenseSettings.success.leftExpense'),
         [{ text: "OK", onPress: () => navigation.navigate("MainTabs") }]
       );
     } catch (error) {
-      Alert.alert("Error", "Failed to leave expense");
+      Alert.alert(t('common.error'), t('expenseSettings.errors.leaveError'));
     } finally {
       setLoading(false);
     }
@@ -309,31 +311,31 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Expense Settings</Text>
+        <Text style={styles.headerTitle}>{t('expenseSettings.title')}</Text>
         <View style={styles.placeholder} />
       </View>
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        <SectionHeader title="Expense Name" />
+        <SectionHeader title={t('expenseSettings.expenseName')} />
         <View style={styles.sectionContainer}>
           <SettingItem 
             icon="pencil-outline" 
-            title="Change Name" 
-            subtitle={expenseTitle || "Untitled Expense"}
+            title={t('expenseSettings.changeName')}
+            subtitle={expenseTitle || t('expenseSettings.untitledExpense')}
             onPress={handleChangeExpenseName} 
             rightElement={null}
           />
         </View>
 
-        <SectionHeader title="Share Expense" />
+        <SectionHeader title={t('expenseSettings.shareExpense')} />
         <View style={styles.sectionContainer}>
           <View style={styles.settingItemWithSwitch}>
             <View style={styles.iconContainer}>
               <Ionicons name="people-outline" size={20} color={Colors.textPrimary === '#FFFFFF' ? Colors.textPrimary : '#555'} />
             </View>
             <View style={styles.settingContent}>
-               <Text style={styles.settingText}>Allow others to join</Text>
+               <Text style={styles.settingText}>{t('expenseSettings.allowJoin')}</Text>
             </View>
             <Switch
                 value={joinEnabled}
@@ -350,13 +352,13 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
               <View style={styles.separator} />
               <SettingItem 
                 icon="share-outline" 
-                title="Share Link" 
+                title={t('expenseSettings.shareLink')} 
                 onPress={handleShareInviteLink} 
               />
               <View style={styles.separator} />
               <SettingItem 
                 icon="copy-outline" 
-                title="Copy Link" 
+                title={t('expenseSettings.copyLink')} 
                 onPress={handleCopyInviteLink} 
               />
             </>
@@ -365,12 +367,12 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
 
         {canLeaveExpense && (
           <>
-            <SectionHeader title="Danger Zone" />
+            <SectionHeader title={t('expenseSettings.dangerZone')} />
             <View style={styles.sectionContainer}>
                 <SettingItem 
                     icon="log-out-outline" 
-                    title="Leave Expense" 
-                    subtitle="Remove yourself from this expense"
+                    title={t('expenseSettings.leaveExpense')} 
+                    subtitle={t('expenseSettings.leaveExpenseSubtitle')}
                     onPress={handleLeaveExpense}
                     danger
                     showChevron={false}

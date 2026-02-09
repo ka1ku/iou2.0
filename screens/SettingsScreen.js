@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../design/tokens';
 import { signOutUser, deleteUserAccount } from '../services/authService';
 import ChangeVenmoBottomSheet from '../components/ChangeVenmoBottomSheet';
-import i18n from '../utils/i18n';
+import { useTranslation } from '../contexts/LanguageContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { presentPaywall, restorePurchases } from '../services/revenueCatService';
 
@@ -51,16 +51,17 @@ const SettingItem = ({
 
 const SettingsScreen = ({ navigation }) => {
   const changeVenmoBottomSheetRef = useRef(null);
-  const { language, currency, region } = useSettingsStore();
+  const { language, currency } = useSettingsStore();
+  const { t } = useTranslation();
 
   const handleSignOut = () => {
     Alert.alert(
-      i18n.t('settings.signOut'),
+      t('settings.signOut'),
       'Are you sure you want to sign out?',
       [
-        { text: i18n.t('common.cancel'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: i18n.t('settings.signOut'),
+          text: t('settings.signOut'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -78,12 +79,12 @@ const SettingsScreen = ({ navigation }) => {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      i18n.t('settings.deleteAccount'),
+      t('settings.deleteAccount'),
       'Are you sure you want to permanently delete your account? This action cannot be undone.',
       [
-        { text: i18n.t('common.cancel'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: i18n.t('settings.deleteAccount'),
+          text: t('settings.deleteAccount'),
           style: 'destructive',
           onPress: async () => {
             setIsDeleting(true);
@@ -115,7 +116,7 @@ const SettingsScreen = ({ navigation }) => {
     try {
       await presentPaywall();
     } catch (error) {
-      Alert.alert('Error', 'Unable to open subscription management');
+      Alert.alert(t('common.error'), 'Unable to open subscription management');
     }
   };
 
@@ -123,12 +124,12 @@ const SettingsScreen = ({ navigation }) => {
     try {
       const customerInfo = await restorePurchases();
       if (customerInfo.activeSubscriptions.length > 0) {
-        Alert.alert('Success', 'Purchases restored successfully.');
+        Alert.alert(t('common.success'), t('settings.restoreSuccess'));
       } else {
-        Alert.alert('No Subscriptions', 'No active subscriptions found to restore.');
+        Alert.alert(t('common.error'), t('settings.noSubscriptions'));
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to restore purchases. Please try again.');
+      Alert.alert(t('common.error'), t('settings.restoreError'));
     }
   };
 
@@ -141,77 +142,80 @@ const SettingsScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{i18n.t('settings.title')}</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={styles.placeholder} />
       </View>
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        <SectionHeader title={i18n.t('settings.account')} />
+
+        <SectionHeader title={t('settings.account')} />
         <View style={styles.sectionContainer}>
-          <SettingItem 
-            icon="person-outline" 
-            title={i18n.t('settings.profile')} 
-            onPress={() => navigation.navigate('ProfileSettings')} 
+          <SettingItem
+            icon="person-outline"
+            title={t('settings.profile')}
+            onPress={() => navigation.navigate('ProfileSettings')}
           />
           <View style={styles.separator} />
-          <SettingItem 
-            icon="card-outline" 
-            title={i18n.t('settings.venmo')} 
-            onPress={() => changeVenmoBottomSheetRef.current?.open()} 
+          <SettingItem
+            icon="card-outline"
+            title={t('settings.venmo')}
+            onPress={() => changeVenmoBottomSheetRef.current?.open()}
           />
           <View style={styles.separator} />
-          <SettingItem 
-            title="Manage Subscription" 
-            onPress={handleManageSubscription} 
+          <SettingItem
+            icon="rocket-outline"
+            title={t('settings.manageSubscription')}
+            onPress={handleManageSubscription}
           />
           <View style={styles.separator} />
-          <SettingItem 
-            icon="refresh-outline" 
-            title="Restore Purchases" 
-            onPress={handleRestorePurchases} 
+          <SettingItem
+            icon="refresh-outline"
+            title={t('settings.restorePurchases')}
+            onPress={handleRestorePurchases}
           />
         </View>
 
-        <SectionHeader title={i18n.t('settings.preferences')} />
+
+
+        <SectionHeader title={t('settings.preferences')} />
         <View style={styles.sectionContainer}>
-          <SettingItem 
-            icon="globe-outline" 
-            title={i18n.t('settings.language')} 
-            rightElement={<Text style={styles.rightValueText}>{language.toUpperCase()} • {region} • {currency}</Text>}
-            onPress={() => navigation.navigate('LanguageRegion')} 
+          <SettingItem
+            icon="globe-outline"
+            title={t('settings.language')}
+            rightElement={<Text style={styles.rightValueText}>{language.toUpperCase()} • {currency}</Text>}
+            onPress={() => navigation.navigate('LanguageRegion')}
           />
         </View>
 
-        <SectionHeader title={i18n.t('settings.support')} />
+        <SectionHeader title={t('settings.support')} />
         <View style={styles.sectionContainer}>
-          <SettingItem 
-            icon="document-text-outline" 
-            title={i18n.t('settings.terms')} 
-            onPress={handleTermsOfService} 
+          <SettingItem
+            icon="document-text-outline"
+            title={t('settings.terms')}
+            onPress={handleTermsOfService}
           />
           <View style={styles.separator} />
-          <SettingItem 
-            icon="star-outline" 
-            title={i18n.t('settings.rate')} 
-            onPress={handleRateApp} 
+          <SettingItem
+            icon="star-outline"
+            title={t('settings.rate')}
+            onPress={handleRateApp}
           />
         </View>
 
         <View style={styles.sectionSpacing} />
-        
+
         <View style={styles.sectionContainer}>
-          <SettingItem 
-            icon="log-out-outline" 
-            title={i18n.t('settings.signOut')} 
+          <SettingItem
+            icon="log-out-outline"
+            title={t('settings.signOut')}
             onPress={handleSignOut}
             danger
             showChevron={false}
           />
           <View style={styles.separator} />
-          <SettingItem 
-            icon="close-circle-outline" 
-            title={i18n.t('settings.deleteAccount')} 
+          <SettingItem
+            icon="close-circle-outline"
+            title={t('settings.deleteAccount')}
             onPress={handleDeleteAccount}
             danger
             showChevron={false}

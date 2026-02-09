@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Keyboard,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,8 +23,10 @@ import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import ParticipantsGrid from '../components/expenses/ParticipantsGrid';
 import { useExpense } from '../contexts/ExpenseContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const SetupExpenseScreen = ({ route, navigation }) => {
+  const { t } = useTranslation();
   const { expenseType = 'expense', scannedReceipt, fromReceiptScan } = route.params || {};
   const insets = useSafeAreaInsets();
   const currentUserId = getCurrentUser()?.uid;
@@ -107,22 +110,22 @@ const SetupExpenseScreen = ({ route, navigation }) => {
     const finalTitle = title.trim();
     
     if (!finalTitle) {
-      Alert.alert('Error', 'Please enter a title for this ' + expenseType);
+      Alert.alert(t('common.error'), t('setupExpense.errors.titleRequired', { type: expenseType }));
       return;
     }
 
     if (participants.some(p => !p.name.trim())) {
-      Alert.alert('Error', 'Please enter names for all participants');
+      Alert.alert(t('common.error'), t('setupExpense.errors.participantsRequired'));
       return;
     }
 
     actions.setLoading(true);
     try {
       const currentUser = getCurrentUser();
-      if (!currentUser) throw new Error('No user signed in');
+      if (!currentUser) throw new Error(t('setupExpense.errors.noUser'));
 
       const userProfile = await getUserProfile(currentUser.uid);
-      if (!userProfile) throw new Error('Failed to get user profile');
+      if (!userProfile) throw new Error(t('setupExpense.errors.profileError'));
 
       const mappedParticipants = participants.map((p) => {
         // Check if this is the current user by userId (works for both "Me" and actual name)
@@ -176,7 +179,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
       }
 
     } catch (error) {
-      Alert.alert('Error', 'Failed to create ' + expenseType + ': ' + error.message);
+      Alert.alert(t('common.error'), t('setupExpense.errors.createError', { type: expenseType, message: error.message }));
     } finally {
       actions.setLoading(false);
     }
@@ -189,10 +192,11 @@ const SetupExpenseScreen = ({ route, navigation }) => {
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
-          style={styles.content} 
+        <ScrollView
+          style={styles.content}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ 
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
             paddingTop: insets.top + Spacing.md,
             paddingBottom: Spacing.xl,
             paddingHorizontal: 0
@@ -211,13 +215,13 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                   <View style={styles.buttonContent}>
                     <LoadingSpinner size="small" color={Colors.accent} />
                     <Text style={[styles.continueButtonText, (loading || !title.trim()) && styles.continueButtonTextDisabled]}>
-                      Creating...
+                      {t('setupExpense.creating')}
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.buttonContent}>
                     <Text style={[styles.continueButtonText, (!title.trim()) && styles.continueButtonTextDisabled]}>
-                      Continue
+                      {t('setupExpense.continue')}
                     </Text>
                     <Ionicons 
                       name="arrow-forward" 
@@ -232,7 +236,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
 
             <View style={styles.titleSection}>
               <Text style={styles.mainTitle}>
-                What would you like to call this {expenseType}?
+                {t('setupExpense.title', { type: expenseType })}
               </Text>
               <TextInput
                 style={[
@@ -241,7 +245,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                 ]}
                 value={title}
                 onChangeText={actions.setTitle}
-                placeholder={`Enter ${expenseType} name...`}
+                placeholder={t('setupExpense.titlePlaceholder', { type: expenseType })}
                 placeholderTextColor={Colors.textSecondary}
                 autoFocus={!scannedReceipt}
                 returnKeyType="next"
@@ -253,19 +257,22 @@ const SetupExpenseScreen = ({ route, navigation }) => {
             </View>
 
             <View style={styles.participantsSection}>
-              <Text style={styles.sectionTitle}>Who's splitting this?</Text>
+              <Text style={styles.sectionTitle}>{t('setupExpense.whoSplitting')}</Text>
               
               <View style={styles.participantsContainer}>
                 <View style={styles.participantsList}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.addPersonButton}
-                    onPress={() => participantsGridRef.current?.openModal()}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      participantsGridRef.current?.openModal();
+                    }}
                     activeOpacity={0.7}
                   >
                     <View style={styles.addPersonIcon}>
                       <Ionicons name="add" size={28} color={Colors.accent} />
                     </View>
-                    <Text style={styles.addPersonText} numberOfLines={1}>Add people</Text>
+                    <Text style={styles.addPersonText} numberOfLines={1}>{t('setupExpense.addPeople')}</Text>
                   </TouchableOpacity>
 
                   {participants
@@ -295,7 +302,7 @@ const SetupExpenseScreen = ({ route, navigation }) => {
                         )}
                       </View>
                       <Text style={styles.participantName} numberOfLines={1}>
-                        {participant.name === 'Me' ? 'You' : participant.name}
+                        {participant.name === 'Me' ? t('common.you') || 'You' : participant.name}
                       </Text>
                       {participant.username && (
                         <Text style={styles.participantUsername} numberOfLines={1}>@{participant.username}</Text>

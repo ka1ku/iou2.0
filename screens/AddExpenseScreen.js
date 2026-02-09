@@ -30,10 +30,12 @@ import GroupMembersModal from "../components/expenses/GroupMembersModal";
 import SplitTab from "../components/expenses/SplitTab";
 import useSettlementActions from "../hooks/useSettlementActions";
 import useExpenseSnapshot from "../hooks/useExpenseSnapshot";
+import { useTranslation } from '../contexts/LanguageContext';
 
 const SPLIT_TOLERANCE = 0.01;
 
 const AddExpenseScreenContent = ({ route, navigation }) => {
+  const { t } = useTranslation();
   const { expense: initialExpense, isNewExpense = false } = route.params || {};
 
   // Real-time expense snapshot listener for live updates between Split and Track tabs
@@ -197,11 +199,11 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
 
   const validateExpense = () => {
     if (state.participants.some((p) => !p.name.trim())) {
-      Alert.alert("Error", "Please enter names for all participants");
+      Alert.alert(t('common.error'), t('addExpense.validationError'));
       return false;
     }
     if (state.items.length === 0) {
-      Alert.alert("Error", "Please add at least one item");
+      Alert.alert(t('common.error'), t('addExpense.validationError'));
       return false;
     }
     if (
@@ -210,19 +212,19 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       )
     ) {
       Alert.alert(
-        "Error",
-        "Please fill in all item names and ensure amounts are valid"
+        t('common.error'),
+        t('addExpense.validationError')
       );
       return false;
     }
     if (state.fees.some((fee) => !fee.name.trim())) {
-      Alert.alert("Error", "Please fill in all fee names");
+      Alert.alert(t('common.error'), t('addExpense.validation.feeNames'));
       return false;
     }
     if (!state.selectedPayers?.length) {
       Alert.alert(
-        "Error",
-        "Please select at least one person who paid for this expense"
+        t('common.error'),
+        t('addExpense.validationError')
       );
       return false;
     }
@@ -242,8 +244,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     });
     if (hasSplitMismatch) {
       Alert.alert(
-        "Uneven Split",
-        "One or more items have split amounts that don't match their totals. Please check your items."
+        t('addExpense.validation.unevenSplitTitle'),
+        t('addExpense.validation.unevenSplitMessage')
       );
       return false;
     }
@@ -267,18 +269,16 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         const { participants, ...otherFields } = expenseData;
         await updateExpense(expense.id, otherFields, currentUser.uid);
         Alert.alert(
-          "Success",
-          isNewExpense
-            ? "Expense created successfully"
-            : "Expense updated successfully"
+          t('common.success'),
+          t('addExpense.saveSuccess')
         );
       } else {
         await createExpense(expenseData, currentUser.uid);
-        Alert.alert("Success", "Expense created successfully");
+        Alert.alert(t('common.success'), t('addExpense.saveSuccess'));
       }
       navigation.goBack();
     } catch (error) {
-      Alert.alert("Error", "Failed to save expense: " + error.message);
+      Alert.alert(t('common.error'), t('addExpense.saveError') + ": " + error.message);
     } finally {
       actions.setLoading(false);
     }
@@ -329,7 +329,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         if (isEditing && expense?.id) {
           const currentUser = getCurrentUser();
           if (!currentUser) {
-            Alert.alert("Error", "User not authenticated");
+            Alert.alert(t('common.error'), t('addExpense.validation.unauthenticated'));
             return;
           }
           
@@ -351,7 +351,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
           itemSnapshotsRef.current.delete(itemToDelete.id);
         }
       } catch (error) {
-        Alert.alert("Error", "Failed to delete item: " + error.message);
+        Alert.alert(t('common.error'), t('addExpense.validation.deleteError', { error: error.message }));
       }
     };
 
@@ -359,12 +359,12 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
       performDelete();
     } else {
       Alert.alert(
-        "Delete Item",
-        "Are you sure you want to delete this item? This action cannot be undone.",
+        t('addExpense.deleteItemParams.title'),
+        t('addExpense.deleteItemParams.message'),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t('common.cancel'), style: "cancel" },
           {
-            text: "Delete",
+            text: t('addExpense.deleteItemParams.confirm'),
             style: "destructive",
             onPress: performDelete
           }
@@ -411,7 +411,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <ExpenseHeader
-        title={state.title || (isEditing ? "Edit Expense" : "Add Expense")}
+        title={state.title || (isEditing ? t('addExpense.editExpenseTitle') : t('addExpense.addExpenseTitle'))}
         onBackPress={() => navigation.goBack()}
         onSettingsPress={() =>
           navigation.navigate("ExpenseSettings", {
@@ -451,9 +451,9 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                   <View style={styles.emptyStateIconContainer}>
                     <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
                   </View>
-                  <Text style={styles.emptyStateTitle}>No items yet</Text>
+                  <Text style={styles.emptyStateTitle}>{t('addExpense.noItemsTitle')}</Text>
                   <Text style={styles.emptyStateDescription}>
-                    Start by adding your first item to this expense
+                    {t('addExpense.noItemsDesc')}
                   </Text>
                   
                   <TouchableOpacity
@@ -464,7 +464,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                     <View style={styles.emptyStateButtonIcon}>
                       <Ionicons name="add" size={20} color={Colors.white} />
                     </View>
-                    <Text style={styles.emptyStateButtonText}>Add Your First Item</Text>
+                    <Text style={styles.emptyStateButtonText}>{t('addExpense.addFirstItem')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -522,7 +522,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                     <View style={styles.addAnotherItemIcon}>
                       <Ionicons name="add" size={20} color={Colors.white} />
                     </View>
-                    <Text style={styles.addAnotherItemText}>Add Another Item</Text>
+                    <Text style={styles.addAnotherItemText}>{t('addExpense.addAnotherItem')}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -543,6 +543,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                 recalculationInfo={recalculationInfo}
                 onDismissRecalculation={() => setRecalculationInfo(null)}
                 onAddPeople={() => setShowMembersModal(true)}
+                containerStyle={{ paddingHorizontal: 0 }}
               />
             </View>
           )}

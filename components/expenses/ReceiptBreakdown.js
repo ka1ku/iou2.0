@@ -16,30 +16,31 @@ import { Ionicons } from '@expo/vector-icons';
 import PriceInput from './PriceInput'; 
 import LoadingSpinner from '../LoadingSpinner';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 // Helper function for relative time display
-const getRelativeTime = (timestamp) => {
+const getRelativeTime = (timestamp, t) => {
   if (!timestamp) return null;
   const now = Date.now();
   const then = new Date(timestamp).getTime();
   const diffMs = now - then;
   const diffMins = Math.floor(diffMs / 60000);
 
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1) return t('components.expenses.receiptBreakdown.time.justNow');
+  if (diffMins < 60) return t('components.expenses.receiptBreakdown.time.minutesAgo', { count: diffMins });
 
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) return t('components.expenses.receiptBreakdown.time.hoursAgo', { count: diffHours });
 
   const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 7) return t('components.expenses.receiptBreakdown.time.daysAgo', { count: diffDays });
 
   const diffWeeks = Math.floor(diffDays / 7);
-  return `${diffWeeks}w ago`;
+  return t('components.expenses.receiptBreakdown.time.weeksAgo', { count: diffWeeks });
 };
 
 const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
@@ -91,6 +92,7 @@ const ItemRow = memo(({
   validationErrors,
   onClearValidationError
 }) => {
+  const { t } = useTranslation();
   const itemErrors = validationErrors?.[item.id] || {};
   const [localValidationErrors, setLocalValidationErrors] = useState({});
   
@@ -153,7 +155,7 @@ const ItemRow = memo(({
         <Animated.View style={editCardAnimatedStyle}>
           <View style={styles.editCard}>
             <View style={styles.editHeader}>
-              <Text style={styles.editTitle}>Edit Item</Text>
+              <Text style={styles.editTitle}>{t('components.expenses.receiptBreakdown.editItem')}</Text>
               <TouchableOpacity onPress={() => onRemove(index)} style={styles.deleteIconBtn}>
                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
               </TouchableOpacity>
@@ -161,12 +163,12 @@ const ItemRow = memo(({
 
             <View style={styles.editFormRow}>
               <View style={styles.editFieldFlex}>
-                <Text style={styles.editLabel}>Item Name</Text>
+                <Text style={styles.editLabel}>{t('components.expenses.receiptBreakdown.itemName')}</Text>
                 <TextInput
                   style={styles.editInput}
-                  value={item.name || `Item ${index + 1}`}
+                  value={item.name || t('components.expenses.receiptBreakdown.itemDefault', { index: index + 1 })}
                   onChangeText={(value) => onUpdate('item', index, 'name', value)}
-                  placeholder="Enter item name"
+                  placeholder={t('components.expenses.receiptBreakdown.itemNamePlaceholder')}
                   keyboardType="default"
                   autoCorrect={false}
                 />
@@ -174,7 +176,7 @@ const ItemRow = memo(({
 
               <View style={styles.editFieldFixed}>
                 <Text style={[styles.editLabel, (itemErrors.amount || localValidationErrors.amount) && styles.errorLabel]}>
-                  Price
+                  {t('components.expenses.receiptBreakdown.price')}
                 </Text>
                 <PriceInput
                   value={item.amount || 0}
@@ -196,7 +198,7 @@ const ItemRow = memo(({
 
             <View style={styles.participantsSection}>
               <Text style={[styles.editLabel, itemErrors.consumers && styles.errorLabel]}>
-                Split with
+                {t('components.expenses.receiptBreakdown.splitWith')}
               </Text>
               <View style={[
                 styles.participantChipContainer,
@@ -216,7 +218,7 @@ const ItemRow = memo(({
               </View>
               {itemErrors.consumers && (
                 <Text style={styles.errorHelperText}>
-                  Select at least one person
+                  {t('components.expenses.receiptBreakdown.selectPerson')}
                 </Text>
               )}
             </View>
@@ -227,7 +229,7 @@ const ItemRow = memo(({
                 style={[styles.editActionButton, styles.cancelActionButton]}
                 activeOpacity={0.8}
               >
-                <Text style={styles.cancelActionText}>Cancel</Text>
+                <Text style={styles.cancelActionText}>{t('components.expenses.receiptBreakdown.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSaveClick}
@@ -257,8 +259,8 @@ const ItemRow = memo(({
             onPress={() => {
               if (isLocked) {
                 Alert.alert(
-                  'Item Locked',
-                  'This item is part of an active settlement. Undo the settlement to edit this item.'
+                  t('components.expenses.receiptBreakdown.lockedTitle'),
+                  t('components.expenses.receiptBreakdown.lockedMsg')
                 );
                 return;
               }
@@ -273,12 +275,12 @@ const ItemRow = memo(({
             <View style={styles.viewModeMain}>
               <View style={styles.viewModeNameRow}>
                 <Text style={[styles.viewModeName, isLocked && styles.viewModeNameLocked]} numberOfLines={1}>
-                  {item.name || `Item ${index + 1}`}
+                  {item.name || t('components.expenses.receiptBreakdown.itemDefault', { index: index + 1 })}
                 </Text>
                 {isLocked && (
                   <View style={styles.settledBadge}>
                     <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
-                    <Text style={styles.settledBadgeText}>Settled</Text>
+                    <Text style={styles.settledBadgeText}>{t('components.expenses.receiptBreakdown.settled')}</Text>
                   </View>
                 )}
               </View>
@@ -298,7 +300,7 @@ const ItemRow = memo(({
                   ))
                 ) : (
                    <Text style={[styles.unassignedText, itemErrors.consumers && { color: Colors.danger }]}>
-                     {itemErrors.consumers ? 'Assign someone' : 'No one assigned'}
+                     {itemErrors.consumers ? t('components.expenses.receiptBreakdown.assignSomeone') : t('components.expenses.receiptBreakdown.noOneAssigned')}
                    </Text>
                 )}
                 {selectedParticipants.length > 5 && (
@@ -311,7 +313,7 @@ const ItemRow = memo(({
                 </View>
                 {item.createdAt && (
                   <Text style={styles.timestampText}>
-                    {getRelativeTime(item.createdAt)}
+                    {getRelativeTime(item.createdAt, t)}
                   </Text>
                 )}
               </View>
@@ -367,6 +369,7 @@ const ReceiptBreakdown = ({
   onClearValidationError,
   visibleHeaderHeight = 100, // Default fallback
 }) => {
+  const { t } = useTranslation();
   const [editingItemId, setEditingItemId] = useState(null); 
   const prevItemsLengthRef = useRef(items.length);
   const itemLayoutMapRef = useRef({});
@@ -492,7 +495,7 @@ const ReceiptBreakdown = ({
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
-        <Text style={styles.sectionHeaderText}>Receipt Items</Text>
+        <Text style={styles.sectionHeaderText}>{t('components.expenses.receiptBreakdown.header')}</Text>
       </View>
 
       <View style={styles.cardContainer}>
@@ -530,7 +533,7 @@ const ReceiptBreakdown = ({
             <View style={styles.addItemIconContainer}>
                 <Ionicons name="add" size={20} color={Colors.accent} />
             </View>
-            <Text style={styles.addItemText}>Add Item</Text>
+            <Text style={styles.addItemText}>{t('components.expenses.receiptBreakdown.addItem')}</Text>
           </TouchableOpacity>
       </View>
     </View>

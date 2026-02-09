@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert, ActivityIndicator, Linking } from 'react-native';
 import { NavigationContainer, getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -27,6 +28,7 @@ import '@react-native-firebase/ai';
 import { onAuthStateChange, getUserPreferences } from './services/authService';
 import deepLinkService from './services/deepLinkService';
 import expoNotificationService from './services/expoNotificationService';
+import { parseReferralCode } from './services/referralService';
 import HomeScreen from './screens/HomeScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SetupExpenseScreen from './screens/SetupExpenseScreen';
@@ -36,6 +38,7 @@ import ExpenseSettingsScreen from './screens/ExpenseSettingsScreen';
 import ProfileSettingsScreen from './screens/settings/ProfileSettingsScreen';
 import TermsOfServiceScreen from './screens/settings/TermsOfServiceScreen';
 import LanguageRegionSettingsScreen from './screens/settings/LanguageRegionSettingsScreen';
+
 import SettingsScreen from './screens/SettingsScreen';
 import FriendProfileScreen from './screens/FriendProfileScreen';
 
@@ -43,7 +46,7 @@ import WelcomeScreen from './screens/auth/WelcomeScreen';
 import SignInScreen from './screens/auth/SignInScreen';
 import SignUpScreen from './screens/auth/SignUpScreen';
 import VerifyOTPScreen from './screens/auth/VerifyOTPScreen';
-import ContactInviteScreen from './screens/auth/ContactInviteScreen';
+
 
 import ExpenseJoinHandler from './components/expenses/ExpenseJoinHandler';
 import CreateBottomSheet from './components/CreateBottomSheet';
@@ -52,6 +55,7 @@ import { ExpenseProvider } from './contexts/ExpenseContext';
 import { ExpenseDataProvider, useExpenseData } from './contexts/ExpenseDataContext';
 import { NotificationProvider, useNotifications } from './contexts/NotificationContext';
 import { ReceiptScanningProvider, useReceiptScanning } from './contexts/ReceiptScanningContext';
+import { LanguageProvider, useTranslation } from './contexts/LanguageContext';
 import { useSettingsStore } from './stores/useSettingsStore';
 import i18n from './utils/i18n';
 
@@ -168,6 +172,7 @@ const NotificationNavigationSetup = () => {
 const CreateTabScreen = () => null;
 
 const MainTabs = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const bottomSheetRef = useRef(null);
   const { isReceiptScanning, showScanningOverlay } = useReceiptScanning();
@@ -213,6 +218,9 @@ const MainTabs = () => {
         <Tab.Screen 
           name="Home" 
           component={HomeStack}
+          options={{
+            tabBarLabel: t('navigation.home'),
+          }}
           listeners={{
             tabPress: () => handleTabPress('Home'),
           }}
@@ -241,6 +249,9 @@ const MainTabs = () => {
         <Tab.Screen 
           name="Profile" 
           component={ProfileStack}
+          options={{
+            tabBarLabel: t('navigation.profile'),
+          }}
           listeners={{
             tabPress: () => handleTabPress('Profile'),
           }}
@@ -284,17 +295,13 @@ const AuthStack = () => (
     <Stack.Screen name="SignIn" component={SignInScreen} />
     <Stack.Screen name="SignUp" component={SignUpScreen} />
     <Stack.Screen name="VerifyOTP" component={VerifyOTPScreen} />
-    <Stack.Screen name="ContactInvite" component={ContactInviteScreen} />
+
   </Stack.Navigator>
 );
 
 SplashScreen.preventAutoHideAsync();
 
-const OnboardingStack = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="ContactInvite" component={ContactInviteScreen} />
-  </Stack.Navigator>
-);
+
 
 const RootStack = () => {
   return (
@@ -306,6 +313,7 @@ const RootStack = () => {
       <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
       <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
       <Stack.Screen name="LanguageRegion" component={LanguageRegionSettingsScreen} />
+
       <Stack.Screen name="FriendProfile" component={FriendProfileScreen} />
       
       {/* Expense Flow Screens */}
@@ -330,10 +338,7 @@ const AppContent = ({ user, loading }) => {
        return <LoadingScreen />;
     }
     
-    // Check if onboarding is completed
-    if (userProfile.onboardingCompleted === false) {
-      return <OnboardingStack />;
-    }
+
     
     return <RootStack />;
   }
@@ -352,12 +357,6 @@ export default function App() {
     Poppins_700Bold,
   });
 
-  const { language } = useSettingsStore();
-
-  useEffect(() => {
-    i18n.locale = language;
-  }, [language]);
-
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
       await SplashScreen.hideAsync();
@@ -371,17 +370,43 @@ export default function App() {
           apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
           appUserID: null,
         });
-        
+
         Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-        
+
         await Purchases.getOfferings();
-        
+
       } catch (error) {
       }
-      
+
       try {
         deepLinkService.initialize();
       } catch (error) {
+      }
+
+      // Handle referral deep links
+      try {
+        // Check for initial URL (app opened via link)
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl) {
+          const referralCode = parseReferralCode(initialUrl);
+          if (referralCode) {
+            await AsyncStorage.setItem('pendingReferralCode', referralCode);
+          }
+        }
+
+        // Listen for incoming links (app already open)
+        const linkingListener = Linking.addEventListener('url', async ({ url }) => {
+          const referralCode = parseReferralCode(url);
+          if (referralCode) {
+            await AsyncStorage.setItem('pendingReferralCode', referralCode);
+          }
+        });
+
+        return () => {
+          linkingListener.remove();
+        };
+      } catch (error) {
+        console.error('Error handling referral deep link:', error);
       }
     };
 
@@ -447,18 +472,20 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <KeyboardProvider>
           <BottomSheetModalProvider>
-            <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
-              <StatusBar style="dark" />
-              <ExpenseDataProvider>
-                <NotificationProvider>
-                  <ReceiptScanningProvider>
-                    <AppContent user={user} loading={loading} />
-                    <ExpenseJoinHandler />
-                    {user && <NotificationNavigationSetup />}
-                  </ReceiptScanningProvider>
-                </NotificationProvider>
-              </ExpenseDataProvider>
-            </NavigationContainer>
+            <LanguageProvider>
+              <NavigationContainer ref={navigationRef} onReady={onLayoutRootView}>
+                <StatusBar style="dark" />
+                <ExpenseDataProvider>
+                  <NotificationProvider>
+                    <ReceiptScanningProvider>
+                      <AppContent user={user} loading={loading} />
+                      <ExpenseJoinHandler />
+                      {user && <NotificationNavigationSetup />}
+                    </ReceiptScanningProvider>
+                  </NotificationProvider>
+                </ExpenseDataProvider>
+              </NavigationContainer>
+            </LanguageProvider>
           </BottomSheetModalProvider>
         </KeyboardProvider>
       </GestureHandlerRootView>

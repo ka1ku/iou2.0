@@ -16,19 +16,22 @@ const SplitTab = ({
   recalculationInfo,
   onDismissRecalculation,
   onAddPeople,
+  containerStyle,
 }) => {
   if (participants.length < 2) {
     return (
-      <View style={styles.emptyContainer}>
+      <View style={[styles.emptyContainer, containerStyle]}>
         <View style={styles.iconCircle}>
-          <Ionicons name="people" size={32} color={Colors.accent} />
+          <Ionicons name="people" size={48} color={Colors.textSecondary} />
         </View>
         <Text style={styles.emptyTitle}>Split the cost</Text>
         <Text style={styles.emptyText}>
           Add friends to split this expense with them.
         </Text>
         <TouchableOpacity style={styles.addButton} onPress={onAddPeople}>
-          <Ionicons name="add" size={20} color={Colors.accent} />
+          <View style={styles.addButtonIconContainer}>
+            <Ionicons name="add" size={20} color={Colors.white} />
+          </View>
           <Text style={styles.addButtonText}>Add people</Text>
         </TouchableOpacity>
       </View>
@@ -36,7 +39,7 @@ const SplitTab = ({
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       <SettlementInterface
         settlements={settlements}
         participants={participants}
@@ -62,52 +65,62 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     padding: Spacing.xl,
-    marginHorizontal: Spacing.lg,
-    marginTop: Spacing.md,
+    marginVertical: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.card,
-    borderWidth: 1,
-    borderColor: Colors.divider,
+    minHeight: 260,
   },
   iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: Colors.accent + '15',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.background,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
+    textAlign: "center",
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.textSecondary,
     textAlign: 'center',
-    marginBottom: Spacing.lg,
-    lineHeight: 20,
-    maxWidth: 240,
+    lineHeight: 22,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.xl,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: Radius.pill,
-    borderWidth: 1,
+    justifyContent: 'center',
+    backgroundColor: Colors.accent + '10',
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
     borderColor: Colors.accent,
-    gap: 6,
+    borderStyle: 'dashed',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    alignSelf: "stretch",
+    marginHorizontal: Spacing.md,
+  },
+  addButtonIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
   },
   addButtonText: {
     color: Colors.accent,
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 16,
   },
 });
 

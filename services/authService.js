@@ -1,9 +1,9 @@
 import auth, { getAuth, onAuthStateChanged, signOut, signInWithPhoneNumber } from '@react-native-firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
+import {
+  getFirestore,
+  collection,
+  addDoc,
   serverTimestamp,
   doc,
   setDoc,
@@ -16,6 +16,8 @@ import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { getApp } from '@react-native-firebase/app';
 import { generateFallbackAvatar } from '../utils/venmoUtils';
 import { downloadAndUploadImage } from './imageHandler';
+import { getContactPhotoForProfile } from '../utils/contactPhotoUtils';
+import { generateReferralCode } from './referralService';
 
 // Store verification session globally for access in verify function
 let globalPhoneAuthState = null;
@@ -327,31 +329,88 @@ export const createUserProfile = async (userData, phoneNumber) => {
       profilePhoto: null
     };
 
-    // Determine profile photo: Venmo profile pic if available, otherwise generated avatar
-    if (userData.venmoProfilePic) {
+    // Determine profile photo priority: Apple Contact Photo > Venmo > Generated Avatar
+    let profilePhotoSet = false;
+
+    // 1. Try to get Apple contact photo first
+    try {
+      const contactPhotoUri = await getContactPhotoForProfile(cleanUserData.phoneNumber);
+      if (contactPhotoUri) {
+        // Upload the contact photo to Firebase Storage
+        try {
+          cleanUserData.profilePhoto = await downloadAndUploadImage(contactPhotoUri, user.uid);
+          profilePhotoSet = true;
+          console.log('Using Apple contact photo as profile picture');
+        } catch (uploadError) {
+          console.log('Failed to upload contact photo, falling back to Venmo or avatar');
+        }
+      }
+    } catch (contactError) {
+      console.log('Could not get contact photo, falling back to Venmo or avatar');
+    }
+
+    // 2. If no contact photo, try Venmo profile pic
+    if (!profilePhotoSet && userData.venmoProfilePic) {
       try {
         // Check if this is a real Venmo profile picture (not a fallback avatar)
         const isRealVenmoProfile = !userData.venmoProfilePic.includes('ui-avatars.com');
-        
+
         if (isRealVenmoProfile) {
           // This is a real Venmo profile picture - download and upload to Firebase Storage
           try {
             cleanUserData.profilePhoto = await downloadAndUploadImage(userData.venmoProfilePic.trim(), user.uid);
+            profilePhotoSet = true;
+            console.log('Using Venmo profile photo');
           } catch (uploadError) {
             // If upload fails, fallback to the original Venmo URL
             cleanUserData.profilePhoto = userData.venmoProfilePic.trim();
+            profilePhotoSet = true;
           }
-        } else {
-          // This is a fallback avatar - generate a new one based on user's name
-          cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
         }
       } catch (urlError) {
-        // Fallback to generated avatar if Venmo URL parsing fails
-        cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
+        console.log('Failed to process Venmo photo');
       }
-    } else {
-      // No Venmo profile picture, use generated avatar
+    }
+
+    // 3. If neither contact photo nor Venmo photo, use generated avatar
+    if (!profilePhotoSet) {
       cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
+      console.log('Using generated avatar');
+    }
+
+    // Generate referral code for new user
+    const referralCode = generateReferralCode(cleanUserData.username, user.uid);
+
+    // Check if user was referred by someone
+    let referredBy = null;
+    try {
+      const pendingReferralCode = await AsyncStorage.getItem('pendingReferralCode');
+      if (pendingReferralCode) {
+        // Find the referrer by their referral code
+        const firestoreInstance = getFirestore(getApp());
+        const usersRef = collection(firestoreInstance, 'users');
+        const referrerQuery = query(
+          usersRef,
+          where('inviteStats.referralCode', '==', pendingReferralCode)
+        );
+        const referrerSnapshot = await getDocs(referrerQuery);
+
+        if (!referrerSnapshot.empty) {
+          const referrerDoc = referrerSnapshot.docs[0];
+          const referrerData = referrerDoc.data();
+          referredBy = {
+            userId: referrerDoc.id,
+            username: referrerData.username,
+            referralCode: pendingReferralCode,
+            joinedAt: serverTimestamp()
+          };
+        }
+
+        // Clear the pending referral code
+        await AsyncStorage.removeItem('pendingReferralCode');
+      }
+    } catch (error) {
+      console.error('Error processing referral:', error);
     }
 
     // Create user document with auth UID as document ID
@@ -370,10 +429,20 @@ export const createUserProfile = async (userData, phoneNumber) => {
         friendsJoined: 0,
         premiumUnlocked: false,
         premiumUntil: null,
-        inviteHistory: []
+        inviteHistory: [],
+        referralCode,
+        rewardsEarned: {
+          tier1: { unlocked: false, unlockedAt: null },
+          tier2: { unlocked: false, unlockedAt: null }
+        }
       },
       onboardingCompleted: false
     };
+
+    // Add referredBy if user was referred
+    if (referredBy) {
+      userDoc.referredBy = referredBy;
+    }
 
     // Log what's being saved
 
@@ -642,13 +711,18 @@ export const updateUserPreferences = async (preferences) => {
     const firestoreInstance = getFirestore(getApp());
     const userDocRef = doc(firestoreInstance, 'users', user.uid);
     
+    const prefsToUpdate = {
+      language: preferences.language,
+      currency: preferences.currency,
+      updatedAt: serverTimestamp()
+    };
+
+    if (preferences.region !== undefined) {
+      prefsToUpdate.region = preferences.region;
+    }
+
     await setDoc(userDocRef, {
-      preferences: {
-        language: preferences.language,
-        region: preferences.region,
-        currency: preferences.currency,
-        updatedAt: serverTimestamp()
-      }
+      preferences: prefsToUpdate
     }, { merge: true });
     
     return true;

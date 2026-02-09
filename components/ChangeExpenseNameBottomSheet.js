@@ -10,8 +10,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetBackdrop, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
 import LoadingSpinner from './LoadingSpinner';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const ChangeExpenseNameBottomSheet = forwardRef(({ expense, onSave, loading }, ref) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['85%'], []);
@@ -83,20 +85,20 @@ const ChangeExpenseNameBottomSheet = forwardRef(({ expense, onSave, loading }, r
           <View style={styles.iconContainer}>
             <Ionicons name="create-outline" size={32} color={Colors.accent} />
           </View>
-          <Text style={styles.title}>Change Expense Name</Text>
+          <Text style={styles.title}>{t('components.changeExpenseName.title')}</Text>
           <Text style={styles.subtitle}>
-            Enter a new name for this expense
+            {t('components.changeExpenseName.subtitle')}
           </Text>
         </View>
 
         <View style={styles.formContainer}>
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Expense Name</Text>
+            <Text style={styles.inputLabel}>{t('components.changeExpenseName.label')}</Text>
             <BottomSheetTextInput
               style={styles.textInput}
               value={expenseName}
               onChangeText={setExpenseName}
-              placeholder="Enter expense name"
+              placeholder={t('components.changeExpenseName.placeholder')}
               placeholderTextColor={Colors.textSecondary}
               autoFocus={true}
               maxLength={50}
@@ -119,7 +121,7 @@ const ChangeExpenseNameBottomSheet = forwardRef(({ expense, onSave, loading }, r
             <LoadingSpinner size="small" color={Colors.white} />
           ) : (
             <>
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>{t('components.changeExpenseName.save')}</Text>
               <Ionicons name="checkmark" size={20} color="white" style={styles.buttonIcon} />
             </>
           )}

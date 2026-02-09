@@ -18,10 +18,12 @@ import { sendOTP, storeTemporarySignupData, clearTemporarySignupData, getTempora
 import { fetchVenmoProfile, generateFallbackAvatar } from '../../utils/venmoUtils';
 import ProfilePicture from '../../components/VenmoProfilePicture';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 
 
 const SignUpScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
@@ -120,15 +122,16 @@ const SignUpScreen = ({ navigation }) => {
         // Check if they have a real profile picture
         const hasRealProfilePic = !profileData.imageUrl.includes('ui-avatars.com');
         
+
       } else if (profileData.userExists === false) {
         // User definitely doesn't exist
         setVenmoVerified(false);
-        setVerificationError('Venmo user does not exist. Please check the username and try again.');
+        setVerificationError(t('auth.signUp.errors.verificationError'));
         
       } else {
         // userExists is null - network or other error, can't determine
         setVenmoVerified(false);
-        setVerificationError('Unable to verify Venmo account. Please check your connection and try again.');
+        setVerificationError(t('auth.signUp.errors.checkError'));
         
       }
       
@@ -137,7 +140,7 @@ const SignUpScreen = ({ navigation }) => {
       // This should rarely happen now since fetchVenmoProfile handles most errors
       setVenmoVerified(false);
       setVenmoProfilePic(generateFallbackAvatar(firstName, lastName, usernameToVerify.trim()));
-      setVerificationError('Unable to verify Venmo account. Please check your connection and try again.');
+      setVerificationError(t('auth.signUp.errors.checkError'));
       
     } finally {
       setIsVerifying(false);
@@ -240,35 +243,35 @@ const SignUpScreen = ({ navigation }) => {
 
   const validateStep1 = () => {
     if (!firstName.trim()) {
-      Alert.alert('Required Field', 'Please enter your first name');
+      Alert.alert(t('auth.signUp.errors.required'), t('auth.signUp.errors.firstNameReq'));
       return false;
     }
     if (!lastName.trim()) {
-      Alert.alert('Required Field', 'Please enter your last name');
+      Alert.alert(t('auth.signUp.errors.required'), t('auth.signUp.errors.lastNameReq'));
       return false;
     }
     
     // Validate first name format (letters, spaces, hyphens, apostrophes only)
     const nameRegex = /^[a-zA-Z\s\-']+$/;
     if (!nameRegex.test(firstName.trim())) {
-      Alert.alert('Invalid First Name', 'First name can only contain letters, spaces, hyphens, and apostrophes');
+      Alert.alert(t('common.error'), t('auth.signUp.errors.invalidFirst'));
       return false;
     }
     
     // Validate last name format (letters, spaces, hyphens, apostrophes only)
     if (!nameRegex.test(lastName.trim())) {
-      Alert.alert('Invalid Last Name', 'Last name can only contain letters, spaces, hyphens, and apostrophes');
+      Alert.alert(t('common.error'), t('auth.signUp.errors.invalidLast'));
       return false;
     }
     
     // Check minimum length (at least 2 characters)
     if (firstName.trim().length < 2) {
-      Alert.alert('Invalid First Name', 'First name must be at least 2 characters long');
+      Alert.alert(t('common.error'), t('auth.signUp.errors.minFirst'));
       return false;
     }
     
     if (lastName.trim().length < 2) {
-      Alert.alert('Invalid Last Name', 'Last name must be at least 2 characters long');
+      Alert.alert(t('common.error'), t('auth.signUp.errors.minLast'));
       return false;
     }
     
@@ -277,14 +280,14 @@ const SignUpScreen = ({ navigation }) => {
 
   const validateStep2 = async () => {
     if (!username.trim()) {
-      Alert.alert('Required Field', 'Please enter a username');
+      Alert.alert(t('auth.signUp.errors.required'), t('auth.signUp.errors.usernameReq'));
       return false;
     }
     
     // Check username format (alphanumeric, 3-20 characters)
     const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
     if (!usernameRegex.test(username.trim())) {
-      Alert.alert('Invalid Username', 'Username must be 3-20 characters long and contain only letters, numbers, and underscores');
+      Alert.alert(t('common.error'), t('auth.signUp.errors.invalidUsername'));
       return false;
     }
     
@@ -292,11 +295,11 @@ const SignUpScreen = ({ navigation }) => {
     try {
       const usernameExists = await checkUsernameExists(username.trim());
       if (usernameExists) {
-        Alert.alert('Username Taken', 'This username is already taken. Please choose a different one.');
+        Alert.alert(t('auth.signUp.errors.usernameTaken'), t('auth.signUp.errors.usernameTakenDesc'));
         return false;
       }
     } catch (error) {
-      Alert.alert('Error', 'Unable to check username availability. Please try again.');
+      Alert.alert(t('common.error'), t('auth.signUp.errors.checkError'));
       return false;
     }
     
@@ -310,13 +313,13 @@ const SignUpScreen = ({ navigation }) => {
 
   const validateStep4 = () => {
     if (!phoneNumber.trim()) {
-      Alert.alert('Required Field', 'Please enter your phone number');
+      Alert.alert(t('auth.signUp.errors.required'), t('auth.signIn.errors.missingPhone'));
       return false;
     }
 
     const digits = phoneNumber.replace(/\D/g, '');
     if (digits.length !== 10) {
-      Alert.alert('Invalid Phone', 'Please enter a valid 10-digit phone number');
+      Alert.alert(t('common.error'), t('auth.signIn.errors.invalidPhone'));
       return false;
     }
     return true;
@@ -351,7 +354,7 @@ const SignUpScreen = ({ navigation }) => {
           isProceedingToVerification.current = true;
           animateStepTransition(() => setCurrentStep(4));
         } else {
-          Alert.alert('Error', 'Failed to save your information. Please try again.');
+          Alert.alert(t('common.error'), t('auth.signUp.errors.saveError'));
         }
       }
     } else if (currentStep === 4) {
@@ -376,7 +379,7 @@ const SignUpScreen = ({ navigation }) => {
       const result = await sendOTP(`+1${digits}`);
       
       if (!result || !result.verificationId) {
-        throw new Error('Invalid verification response received');
+        throw new Error(t('auth.signUp.errors.verificationError'));
       }
       
       navigation.navigate('VerifyOTP', { 
@@ -391,16 +394,17 @@ const SignUpScreen = ({ navigation }) => {
       
       // Handle phone number already exists error specifically
       if (error.message.includes('already exists')) {
+
         Alert.alert(
-          'Account Already Exists',
-          'This phone number is already registered. You can either sign in with this number or use a different phone number to create a new account.',
+          t('auth.signUp.errors.accountExists'),
+          t('auth.signUp.errors.accountExistsDesc'),
           [
-            { text: 'Sign In Instead', onPress: () => navigation.navigate('SignIn') },
-            { text: 'Use Different Number', style: 'cancel' }
+            { text: t('auth.signUp.errors.signInInstead'), onPress: () => navigation.navigate('SignIn') },
+            { text: t('auth.signUp.errors.useDiffNumber'), style: 'cancel' }
           ]
         );
       } else {
-        Alert.alert('Error', error.message || 'Failed to send verification code. Please try again.');
+        Alert.alert(t('common.error'), error.message || t('common.error'));
       }
     } finally {
       setLoading(false);
@@ -437,27 +441,27 @@ const SignUpScreen = ({ navigation }) => {
           ]} 
         />
       </View>
-      <Text style={styles.progressText}>Step {currentStep} of 4</Text>
+      <Text style={styles.progressText}>{t('auth.signUp.stepIndicator', { current: currentStep, total: 4 })}</Text>
     </View>
   );
 
   const renderStep1 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>What's your name?</Text>
+        <Text style={styles.stepTitle}>{t('auth.signUp.step1.title')}</Text>
         <Text style={styles.stepSubtitle}>
-          We'll use this to identify you to your friends
+          {t('auth.signUp.step1.subtitle')}
         </Text>
       </View>
 
       <View style={styles.formContainer}>
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>First Name</Text>
+          <Text style={styles.inputLabel}>{t('auth.signUp.step1.firstName')}</Text>
           <TextInput
             style={styles.textInput}
             value={firstName}
             onChangeText={handleFirstNameChange}
-            placeholder="Enter your first name"
+            placeholder={t('auth.signUp.step1.firstNamePlaceholder')}
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="words"
             autoCorrect={false}
@@ -467,12 +471,12 @@ const SignUpScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Last Name</Text>
+          <Text style={styles.inputLabel}>{t('auth.signUp.step1.lastName')}</Text>
           <TextInput
             style={styles.textInput}
             value={lastName}
             onChangeText={handleLastNameChange}
-            placeholder="Enter your last name"
+            placeholder={t('auth.signUp.step1.lastNamePlaceholder')}
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="words"
             autoCorrect={false}
@@ -486,20 +490,20 @@ const SignUpScreen = ({ navigation }) => {
   const renderStep2 = () => (
     <View style={styles.stepContainer}>
       <View style={styles.stepHeader}>
-        <Text style={styles.stepTitle}>Choose a username</Text>
+        <Text style={styles.stepTitle}>{t('auth.signUp.step2.title')}</Text>
         <Text style={styles.stepSubtitle}>
-          This will be your unique identifier in the app
+          {t('auth.signUp.step2.subtitle')}
         </Text>
       </View>
 
       <View style={styles.formContainer}>
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Username</Text>
+          <Text style={styles.inputLabel}>{t('auth.signUp.step2.username')}</Text>
           <TextInput
             style={styles.textInput}
             value={username}
             onChangeText={setUsername}
-            placeholder="Enter a username"
+            placeholder={t('auth.signUp.step2.placeholder')}
             placeholderTextColor={Colors.textSecondary}
             autoCapitalize="none"
             autoCorrect={false}
@@ -507,7 +511,7 @@ const SignUpScreen = ({ navigation }) => {
             autoFocus
           />
           <Text style={styles.inputHint}>
-            3-20 characters, letters, numbers, and underscores only
+            {t('auth.signUp.step2.hint')}
           </Text>
         </View>
       </View>
@@ -524,10 +528,11 @@ const SignUpScreen = ({ navigation }) => {
             contentFit="contain"
             transition={200}
           />
+
         </View>
-        <Text style={styles.stepTitle}>Link Your Venmo</Text>
+        <Text style={styles.stepTitle}>{t('auth.signUp.step3.title')}</Text>
         <Text style={styles.stepSubtitle}>
-          Connect your Venmo to make splitting expenses easier (optional)
+          {t('auth.signUp.step3.subtitle')}
         </Text>
       </View>
 
@@ -548,9 +553,10 @@ const SignUpScreen = ({ navigation }) => {
                     ? Colors.success 
                     : Colors.textSecondary 
                 }]}>
+
                   {(venmoProfilePic && !venmoProfilePic.includes('ui-avatars.com'))
-                    ? '✓ Verified Venmo Account'
-                    : '✓ Venmo Account (No Profile Picture)'
+                    ? `✓ ${t('auth.signUp.step3.verified')}`
+                    : `✓ ${t('auth.signUp.step3.noProfilePic')}`
                   }
                 </Text>
               </View>
@@ -560,20 +566,20 @@ const SignUpScreen = ({ navigation }) => {
               style={styles.changeButton}
               onPress={resetVenmoProfile}
             >
-              <Text style={styles.changeButtonText}>Change Account</Text>
+              <Text style={styles.changeButtonText}>{t('auth.signUp.step3.change')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
             <View style={styles.venmoInputContainer}>
-              <Text style={styles.venmoInputLabel}>Venmo Username</Text>
+              <Text style={styles.venmoInputLabel}>{t('auth.signUp.step3.label')}</Text>
               <View style={styles.venmoInputWrapper}>
                 <Text style={styles.atSymbol}>@</Text>
                 <TextInput
                   style={styles.venmoInput}
                   value={venmoUsername}
                   onChangeText={handleUsernameChange}
-                  placeholder="your-venmo-username"
+                  placeholder={t('auth.signUp.step3.placeholder')}
                   placeholderTextColor={Colors.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -608,26 +614,27 @@ const SignUpScreen = ({ navigation }) => {
 
   const renderStep4 = () => {
     return (
+
       <View style={styles.stepContainer}>
         <View style={styles.stepHeader}>
-          <Text style={styles.stepTitle}>Phone Number</Text>
+          <Text style={styles.stepTitle}>{t('auth.signIn.stepTitle')}</Text>
           <Text style={styles.stepSubtitle}>
-            We'll send you a verification code to confirm your number
+            {t('auth.signIn.stepSubtitle')}
           </Text>
         </View>
 
         <View style={styles.formContainer}>
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Phone Number</Text>
+            <Text style={styles.inputLabel}>{t('auth.signIn.inputLabel')}</Text>
             <View style={styles.phoneInputContainer}>
               <View style={styles.countryCode}>
-                <Text style={styles.countryCodeText}>🇺🇸 +1</Text>
+                <Text style={styles.countryCodeText}>{t('auth.common.usCountryCode')}</Text>
               </View>
               <TextInput
                 style={styles.phoneInput}
                 value={phoneNumber}
                 onChangeText={handlePhoneNumberChange}
-                placeholder="(555) 123-4567"
+                placeholder={t('auth.signIn.placeholder')}
                 placeholderTextColor={Colors.textSecondary}
                 keyboardType="phone-pad"
                 maxLength={14}
@@ -638,6 +645,7 @@ const SignUpScreen = ({ navigation }) => {
         </View>
       </View>
     );
+
   };
 
   return (
@@ -661,7 +669,7 @@ const SignUpScreen = ({ navigation }) => {
             >
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
-            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.title}>{t('auth.signUp.title')}</Text>
           </View>
 
           {/* Progress Bar */}
@@ -681,12 +689,13 @@ const SignUpScreen = ({ navigation }) => {
               disabled={loading}
               activeOpacity={0.8}
             >
+
               <Text style={styles.nextButtonText}>
-                {loading ? 'Sending...' : 
-                 currentStep === 1 ? 'Continue' : 
-                 currentStep === 2 ? 'Continue' : 
-                 currentStep === 3 ? (venmoVerified ? 'Continue' : 'Skip') : 
-                 'Send Verification Code'}
+                {loading ? t('auth.signIn.sending') : 
+                 currentStep === 1 ? t('auth.signUp.continue') : 
+                 currentStep === 2 ? t('auth.signUp.continue') : 
+                 currentStep === 3 ? (venmoVerified ? t('auth.signUp.continue') : t('auth.signUp.step3.skip')) : 
+                 t('auth.signIn.button')}
               </Text>
               <Ionicons 
                 name="arrow-forward" 
@@ -701,7 +710,7 @@ const SignUpScreen = ({ navigation }) => {
               onPress={() => navigation.navigate('SignIn')}
             >
               <Text style={styles.signInLinkText}>
-                Already have an account? <Text style={styles.signInLinkAccent}>Sign In</Text>
+                {t('auth.signUp.alreadyHaveAccount')} <Text style={styles.signInLinkAccent}>{t('auth.welcome.signIn')}</Text>
               </Text>
             </TouchableOpacity>
           </View>

@@ -57,6 +57,7 @@ export default function useSettlementActions({
   const [statusOverrides, setStatusOverrides] = useState({});   // key → status string
   const [itemOverrides, setItemOverrides] = useState({});        // key → { [itemId]: { settled, settledAt } }
   const [venmoReturnKey, setVenmoReturnKey] = useState(null);
+  const [venmoReturnItemIds, setVenmoReturnItemIds] = useState(null); // itemIds to settle on Venmo return
   const [recalculationInfo, setRecalculationInfo] = useState(null);
 
   // ─── settlement calculation ───────────────────────────────────────────
@@ -99,7 +100,7 @@ export default function useSettlementActions({
   // Seed payment-flow status overrides on expense load (once per expense)
   useEffect(() => {
     if (!expense?.settlements?.length) return;
-    const PAYMENT_FLOW_STATUSES = ['markedAsPaid', 'paymentMade', 'paymentRequested', 'reminderSent', 'confirmed'];
+    const PAYMENT_FLOW_STATUSES = ['markedAsPaid', 'reminderSent', 'confirmed'];
     const initial = {};
     expense.settlements.forEach((s) => {
       const key = makeKey(s);
@@ -319,16 +320,26 @@ export default function useSettlementActions({
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
       const key = venmoReturnKey;
+      const itemIds = venmoReturnItemIds;
       setVenmoReturnKey(null);
+      setVenmoReturnItemIds(null);
 
       setTimeout(() => {
         Alert.alert('Payment Status', 'Did you complete the payment in Venmo?', [
           { text: "No, I'll pay later", style: 'cancel' },
           {
             text: 'Yes, mark as paid',
-            onPress: () => {
+            onPress: async () => {
               const match = settlements.find((s) => makeKey(s) === key);
-              if (match) optimistic(match, 'markedAsPaid', match.status);
+              if (match) {
+                // If we have specific items to settle, bulk settle them
+                if (itemIds && itemIds.length > 0) {
+                  await handleBulkSettle(match, itemIds);
+                } else {
+                  // Otherwise just mark the status (legacy behavior)
+                  await optimistic(match, 'markedAsPaid', match.status);
+                }
+              }
             },
           },
         ]);
@@ -336,7 +347,7 @@ export default function useSettlementActions({
     });
 
     return () => sub.remove();
-  }, [venmoReturnKey, settlements, optimistic]);
+  }, [venmoReturnKey, venmoReturnItemIds, settlements, optimistic, handleBulkSettle]);
 
   // ─── item-level toggle handler ────────────────────────────────────────
   const persistItemToggle = useCallback(
@@ -594,7 +605,23 @@ export default function useSettlementActions({
         return;
       }
 
-      // For Venmo flows, run the existing action then bulk settle on confirmation
+      // For Venmo flows, store selected items to settle on return confirmation
+      if (type === 'makePayment' || type === 'requestPayment') {
+        setVenmoReturnItemIds(selectedItemIds && selectedItemIds.length > 0 ? selectedItemIds : null);
+
+        // Calculate the amount from selected items
+        const selectedAmount = selectedItemIds && selectedItemIds.length > 0
+          ? (settlement.associatedItems || [])
+              .filter(i => !i.settled && selectedItemIds.includes(i.id))
+              .reduce((sum, i) => sum + i.amount, 0)
+          : null;
+
+        // Run the action with the selected amount
+        await handleAction(type, settlement, selectedAmount);
+        return;
+      }
+
+      // Run the existing action (which will set venmoReturnKey)
       await handleAction(type, settlement);
     },
     [handleBulkSettle, handleAction]
@@ -602,7 +629,7 @@ export default function useSettlementActions({
 
   // ─── public action dispatcher ─────────────────────────────────────────
   const handleAction = useCallback(
-    async (type, settlement) => {
+    async (type, settlement, customAmount = null) => {
       const prev = settlement.status || 'noAction';
 
       switch (type) {
@@ -623,20 +650,14 @@ export default function useSettlementActions({
           const profile = await getUserProfile(recipient.userId);
           if (!profile?.venmoUsername) return Alert.alert('Error', 'Recipient has no Venmo username');
 
-          setStatus(settlement, 'paymentMade');
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-          try {
-            await persistStatus(settlement, 'paymentMade');
-          } catch {
-            setStatus(settlement, prev);
-            return Alert.alert('Error', 'Failed to save status.');
-          }
-
-          // Use remaining amount for partial settlements, otherwise use full amount
-          const paymentAmount = settlement.status === 'partial'
-            ? (settlement.remainingAmount || settlement.amount)
-            : settlement.amount;
+          // Use custom amount if provided (from selected items), otherwise use remaining or full amount
+          const paymentAmount = customAmount !== null
+            ? customAmount
+            : settlement.status === 'partial'
+              ? (settlement.remainingAmount || settlement.amount)
+              : settlement.amount;
 
           const opened = await openVenmoOrFallback({
             txn: 'pay',
@@ -648,11 +669,6 @@ export default function useSettlementActions({
           break;
         }
 
-        // ── undo payment ───────────────────────────────────────────
-        case 'undoPaymentMade':
-          await optimistic(settlement, 'noAction', prev);
-          break;
-
         // ── request payment (charge) ───────────────────────────────
         case 'requestPayment': {
           const payer = participants.find((p) => p.name === (settlement.debtor || settlement.from));
@@ -663,10 +679,12 @@ export default function useSettlementActions({
           const me = getCurrentUser();
           if (!me) return Alert.alert('Error', 'You must be logged in');
 
-          // Use remaining amount for partial settlements, otherwise use full amount
-          const requestAmount = settlement.status === 'partial'
-            ? (settlement.remainingAmount || settlement.amount)
-            : settlement.amount;
+          // Use custom amount if provided (from selected items), otherwise use remaining or full amount
+          const requestAmount = customAmount !== null
+            ? customAmount
+            : settlement.status === 'partial'
+              ? (settlement.remainingAmount || settlement.amount)
+              : settlement.amount;
 
           // Fire-and-forget payment request doc
           createPaymentRequest({
@@ -677,14 +695,7 @@ export default function useSettlementActions({
             expenseTitle,
           }).catch(() => {});
 
-          setStatus(settlement, 'paymentRequested');
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-          try {
-            await persistStatus(settlement, 'paymentRequested');
-          } catch {
-            setStatus(settlement, prev);
-          }
 
           const chargeOpened = await openVenmoOrFallback({
             txn: 'charge',
@@ -695,16 +706,6 @@ export default function useSettlementActions({
           if (chargeOpened) setVenmoReturnKey(makeKey(settlement));
           break;
         }
-
-        // ── undo request ───────────────────────────────────────────
-        case 'undoPaymentRequested':
-          await optimistic(settlement, 'noAction', prev);
-          break;
-
-        // ── confirm received ───────────────────────────────────────
-        case 'confirmPaymentReceived':
-          await optimistic(settlement, 'markedAsPaid', prev);
-          break;
 
         // ── send reminder ──────────────────────────────────────────
         case 'sendReminder': {

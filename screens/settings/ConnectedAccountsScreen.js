@@ -13,7 +13,10 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/token
 import { useExpenseData } from '../../contexts/ExpenseDataContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
+import { useTranslation } from '../../contexts/LanguageContext';
+
 const ConnectedAccountsScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const { userProfile } = useExpenseData();
   
   const [connectedAccounts, setConnectedAccounts] = useState([]);
@@ -36,36 +39,36 @@ const ConnectedAccountsScreen = ({ navigation }) => {
           username: userProfile.venmoUsername,
           connected: true,
           icon: 'card-outline',
-          description: 'For payments and settlements'
+          description: t('settings.connectedAccounts.venmo.description')
         });
       } else {
         accounts.push({
           id: 'venmo',
-          name: 'Venmo',
+          name: t('settings.connectedAccounts.venmo.name'),
           username: null,
           connected: false,
           icon: 'card-outline',
-          description: 'For payments and settlements'
+          description: t('settings.connectedAccounts.venmo.description')
         });
       }
 
       // Placeholder for future integrations
       accounts.push({
         id: 'paypal',
-        name: 'PayPal',
+        name: t('settings.connectedAccounts.paypal.name'),
         username: null,
         connected: false,
         icon: 'wallet-outline',
-        description: 'Coming soon'
+        description: t('settings.connectedAccounts.paypal.description')
       });
 
       accounts.push({
         id: 'zelle',
-        name: 'Zelle',
+        name: t('settings.connectedAccounts.zelle.name'),
         username: null,
         connected: false,
         icon: 'flash-outline',
-        description: 'Coming soon'
+        description: t('settings.connectedAccounts.zelle.description')
       });
 
       setConnectedAccounts(accounts);
@@ -75,36 +78,36 @@ const ConnectedAccountsScreen = ({ navigation }) => {
   const handleConnectAccount = (accountId) => {
     if (accountId === 'venmo') {
       Alert.alert(
-        'Connect Venmo',
-        'To connect your Venmo account, please sign up or sign in again with your Venmo information.',
+        t('settings.connectedAccounts.venmo.connectTitle'),
+        t('settings.connectedAccounts.venmo.connectMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: t('common.cancel'), style: 'cancel' },
           {
-            text: 'Go to Sign Up',
+            text: t('settings.connectedAccounts.venmo.goToSignUp'),
             onPress: () => {
               // TODO: Navigate to sign up with Venmo
-              Alert.alert('Coming Soon', 'Venmo reconnection will be available soon.');
+              Alert.alert(t('settings.connectedAccounts.soon'), t('settings.connectedAccounts.venmo.reconnectionSoon'));
             }
           }
         ]
       );
     } else {
-      Alert.alert('Coming Soon', `${accountId} integration will be available soon.`);
+      Alert.alert(t('settings.connectedAccounts.soon'), t('settings.connectedAccounts.integrationSoon', { name: accountId }));
     }
   };
 
   const handleDisconnectAccount = (accountId) => {
     Alert.alert(
-      'Disconnect Account',
-      'Are you sure you want to disconnect this account? You may lose access to some features.',
+      t('settings.connectedAccounts.disconnectAlert.title'),
+      t('settings.connectedAccounts.disconnectAlert.message'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Disconnect',
+          text: t('settings.connectedAccounts.disconnectAlert.confirm'),
           style: 'destructive',
           onPress: () => {
             // TODO: Implement disconnect functionality
-            Alert.alert('Coming Soon', 'Account disconnection will be available soon.');
+            Alert.alert(t('settings.connectedAccounts.soon'), t('settings.connectedAccounts.disconnectAlert.soon'));
           }
         }
       ]
@@ -116,7 +119,7 @@ const ConnectedAccountsScreen = ({ navigation }) => {
   };
 
   const getAccountStatusText = (connected) => {
-    return connected ? 'Connected' : 'Not Connected';
+    return connected ? t('settings.connectedAccounts.connected') : t('settings.connectedAccounts.notConnected');
   };
 
   if (!userProfile) {
@@ -124,7 +127,7 @@ const ConnectedAccountsScreen = ({ navigation }) => {
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <LoadingSpinner size="large" />
-          <Text style={styles.loadingText}>Loading accounts...</Text>
+          <Text style={styles.loadingText}>{t('settings.connectedAccounts.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -139,13 +142,13 @@ const ConnectedAccountsScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Connected Accounts</Text>
+        <Text style={styles.headerTitle}>{t('settings.connectedAccounts.title')}</Text>
         <View style={styles.placeholder} />
       </View>
       
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Payment Accounts</Text>
+          <Text style={styles.sectionTitle}>{t('settings.connectedAccounts.sectionTitle')}</Text>
           <View style={styles.settingsList}>
             {connectedAccounts.map((account, index) => (
               <View key={account.id} style={styles.accountItem}>
@@ -199,7 +202,7 @@ const ConnectedAccountsScreen = ({ navigation }) => {
                       styles.actionButtonText,
                       account.connected ? styles.disconnectButtonText : styles.connectButtonText
                     ]}>
-                      {account.connected ? 'Disconnect' : 'Connect'}
+                      {account.connected ? t('settings.connectedAccounts.disconnect') : t('settings.connectedAccounts.connect')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -208,25 +211,24 @@ const ConnectedAccountsScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Information Section */}
         <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>About Connected Accounts</Text>
+          <Text style={styles.sectionTitle}>{t('settings.connectedAccounts.aboutTitle')}</Text>
           <View style={styles.settingsList}>
             <View style={styles.infoItem}>
               <Ionicons name="information-circle-outline" size={24} color={Colors.accent} />
               <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>Secure & Private</Text>
+                <Text style={styles.infoTitle}>{t('settings.connectedAccounts.info.secureTitle')}</Text>
                 <Text style={styles.infoDescription}>
-                  Your payment information is securely stored and never shared with other users.
+                  {t('settings.connectedAccounts.info.secureDesc')}
                 </Text>
               </View>
             </View>
             <View style={styles.infoItem}>
               <Ionicons name="shield-checkmark-outline" size={24} color={Colors.accent} />
               <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>Easy Settlements</Text>
+                <Text style={styles.infoTitle}>{t('settings.connectedAccounts.info.easyTitle')}</Text>
                 <Text style={styles.infoDescription}>
-                  Connected accounts make it easy to send and receive payments for shared expenses.
+                  {t('settings.connectedAccounts.info.easyDesc')}
                 </Text>
               </View>
             </View>

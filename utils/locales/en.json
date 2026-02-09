@@ -12,10 +12,813 @@
         "terms": "Terms of Service",
         "rate": "Rate the App",
         "signOut": "Sign Out",
-        "deleteAccount": "Delete Account"
+        "deleteAccount": "Delete Account",
+        "manageSubscription": "Manage Subscription",
+        "restorePurchases": "Restore Purchases",
+        "restoreSuccess": "Purchases restored successfully",
+        "noSubscriptions": "No active subscriptions found to restore",
+        "restoreError": "Failed to restore purchases. Please try again",
+        "growth": "Growth",
+        "buildYourSquad": {
+            "title": "Build Your Squad",
+            "subtitle": "Earn rewards for inviting friends"
+        },
+        "connectedAccounts": {
+            "title": "Connected Accounts",
+            "sectionTitle": "Payment Accounts",
+            "aboutTitle": "About Connected Accounts",
+            "connected": "Connected",
+            "notConnected": "Not Connected",
+            "connect": "Connect",
+            "disconnect": "Disconnect",
+            "loading": "Loading accounts...",
+            "venmo": {
+                "name": "Venmo",
+                "description": "For payments and settlements",
+                "connectTitle": "Connect Venmo",
+                "connectMessage": "To connect your Venmo account, please sign up or sign in again with your Venmo information.",
+                "goToSignUp": "Go to Sign Up",
+                "reconnectionSoon": "Venmo reconnection will be available soon."
+            },
+            "paypal": {
+                "name": "PayPal",
+                "description": "Coming soon"
+            },
+            "zelle": {
+                "name": "Zelle",
+                "description": "Coming soon"
+            },
+            "disconnectAlert": {
+                "title": "Disconnect Account",
+                "message": "Are you sure you want to disconnect this account? You may lose access to some features.",
+                "confirm": "Disconnect",
+                "cancel": "Cancel",
+                "success": "Account disconnected successfully",
+                "soon": "Account disconnection will be available soon."
+            },
+            "info": {
+                "secureTitle": "Secure & Private",
+                "secureDesc": "Your payment information is securely stored and never shared with other users.",
+                "easyTitle": "Easy Settlements",
+                "easyDesc": "Connected accounts make it easy to send and receive payments for shared expenses."
+            },
+            "soon": "Coming Soon",
+            "integrationSoon": "{{name}} integration will be available soon."
+        },
+        "profileSettings": {
+            "title": "Edit Profile",
+            "loading": "Loading profile...",
+            "changePhoto": "Change Profile Photo",
+            "firstName": "First Name",
+            "lastName": "Last Name",
+            "username": "Username",
+            "paymentMethods": "Payment Methods",
+            "venmo": "Venmo Account",
+            "notConnected": "Not Connected",
+            "visibilityInfo": "This information will be visible to your friends on IOU.",
+            "save": "Save Changes",
+            "success": "Success",
+            "error": "Error",
+            "selectImageError": "Failed to select image",
+            "updateSuccess": "Profile updated successfully!",
+            "updateError": "Failed to update profile"
+        },
+        "currencies": {
+            "usd": "US Dollar (USD)",
+            "eur": "Euro (EUR)",
+            "gbp": "British Pound (GBP)",
+            "mxn": "Mexican Peso (MXN)",
+            "cad": "Canadian Dollar (CAD)",
+            "cny": "Chinese Yuan (CNY)",
+            "jpy": "Japanese Yen (JPY)",
+            "krw": "Korean Won (KRW)",
+            "vnd": "Vietnamese Dong (VND)"
+        },
+        "termsOfService": {
+            "lastUpdated": "Last updated: December 2024",
+            "sections": {
+                "1": {
+                    "title": "1. Acceptance of Terms",
+                    "content": "By accessing and using the IOU mobile application (\"App\"), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service."
+                },
+                "2": {
+                    "title": "2. Use License",
+                    "content": "Permission is granted to temporarily download one copy of the IOU app for personal, non-commercial transitory viewing only. This is the grant of a license, not a transfer of title, and under this license you may not:",
+                    "bullets": {
+                        "1": "modify or copy the materials",
+                        "2": "use the materials for any commercial purpose or for any public display",
+                        "3": "attempt to reverse engineer any software contained in the app",
+                        "4": "remove any copyright or other proprietary notations from the materials"
+                    }
+                },
+                "3": {
+                    "title": "3. User Accounts",
+                    "content": "To use certain features of the App, you must create an account. You are responsible for:",
+                    "bullets": {
+                        "1": "Providing accurate and complete information",
+                        "2": "Maintaining the security of your account credentials",
+                        "3": "All activities that occur under your account",
+                        "4": "Notifying us immediately of any unauthorized use"
+                    }
+                },
+                "4": {
+                    "title": "4. Payment Processing",
+                    "content": "The App facilitates expense tracking and settlement between users. We may integrate with third-party payment processors. By using these features, you agree to:",
+                    "bullets": {
+                        "1": "Comply with the terms of service of third-party payment providers",
+                        "2": "Understand that we are not responsible for payment processing",
+                        "3": "Bear any fees charged by payment processors"
+                    }
+                },
+                "5": {
+                    "title": "5. Privacy Policy",
+                    "content": "Your privacy is important to us. Please review our Privacy Policy, which also governs your use of the App, to understand our practices."
+                },
+                "6": {
+                    "title": "6. Prohibited Uses",
+                    "content": "You may not use our App:",
+                    "bullets": {
+                        "1": "For any unlawful purpose or to solicit others to perform unlawful acts",
+                        "2": "To violate any international, federal, provincial, or state regulations, rules, laws, or local ordinances",
+                        "3": "To infringe upon or violate our intellectual property rights or the intellectual property rights of others",
+                        "4": "To harass, abuse, insult, harm, defame, slander, disparage, intimidate, or discriminate",
+                        "5": "To submit false or misleading information"
+                    },
+                    "content2": "We have a zero-tolerance policy for objectionable content and abusive users. Content that violates these terms will be removed, and users who engage in such behavior will be blocked and banned from the Service."
+                },
+                "7": {
+                    "title": "7. Disclaimer",
+                    "content": "The information on this App is provided on an \"as is\" basis. To the fullest extent permitted by law, this Company:",
+                    "bullets": {
+                        "1": "Excludes all representations and warranties relating to this app and its contents",
+                        "2": "Does not guarantee the accuracy, completeness, or timeliness of information",
+                        "3": "Excludes all liability for damages arising out of or in connection with your use of this app"
+                    }
+                },
+                "8": {
+                    "title": "8. Limitation of Liability",
+                    "content": "In no event shall IOU or its suppliers be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the App, even if IOU or an authorized representative has been notified orally or in writing of the possibility of such damage."
+                },
+                "9": {
+                    "title": "9. Revisions",
+                    "content": "The materials appearing on the App could include technical, typographical, or photographic errors. IOU does not warrant that any of the materials on its App are accurate, complete, or current. IOU may make changes to the materials contained on its App at any time without notice."
+                },
+                "10": {
+                    "title": "10. Governing Law",
+                    "content": "These terms and conditions are governed by and construed in accordance with the laws of the United States and you irrevocably submit to the exclusive jurisdiction of the courts in that state or location."
+                },
+                "11": {
+                    "title": "11. Contact Information",
+                    "content": "If you have any questions about these Terms of Service, please contact us at:",
+                    "email": "Email: legal@iou-app.com",
+                    "support": "Support: support@iou-app.com"
+                }
+            },
+            "footer": "By using IOU, you acknowledge that you have read and understood these Terms of Service and agree to be bound by them."
+        }
     },
     "common": {
         "cancel": "Cancel",
-        "save": "Save"
+        "save": "Save",
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success"
+    },
+    "home": {
+        "title": "Home",
+        "headerTitle": "Expenses",
+        "searchPlaceholder": "Search expenses or members...",
+        "noExpensesTitle": "No expenses yet",
+        "noExpensesDesc": "Tap the Create button to add your first expense",
+        "noSearchResultsTitle": "No expenses found",
+        "noSearchResultsDesc": "Try a different search term",
+        "settledUp": "Settled up",
+        "youOwe": "You owe",
+        "youAreOwed": "You're owed",
+        "confirmPayment": "Confirm payment",
+        "awaitingConfirmation": "Awaiting confirmation",
+        "needsSettlement": "Needs settlement",
+        "receipt": "Receipt",
+        "expense": "Expense",
+        "otherMembers": "Other Members"
+    },
+    "profile": {
+        "title": "Profile",
+        "balanceSummary": "Balance Summary",
+        "recentExpenses": "Recent Expenses",
+        "editProfile": "Edit Profile",
+        "loading": "Loading profile...",
+        "noUsername": "No username",
+        "totalOwedToYou": "Total Owed to You",
+        "totalYouOwe": "Total You Owe",
+        "participants": "participants",
+        "createFirstExpense": "Create Your First Expense",
+        "startTracking": "Start tracking your shared expenses",
+        "loadMore": "Load More",
+        "remaining": "remaining"
+    },
+    "navigation": {
+        "home": "Home",
+        "profile": "Profile"
+    },
+    "addExpense": {
+        "addExpenseTitle": "Add Expense",
+        "editExpenseTitle": "Edit Expense",
+        "item": "Item",
+        "items": "Items",
+        "date": "Date",
+        "amount": "Amount",
+        "paidBy": "Paid by",
+        "split": "Split",
+        "saveSuccess": "Expense saved successfully",
+        "saveError": "Failed to save expense",
+        "validationError": "Please fill in all required fields",
+        "deleteItemParams": {
+            "title": "Delete Item",
+            "message": "Are you sure you want to delete this item? This action cannot be undone.",
+            "confirm": "Delete"
+        },
+        "validation": {
+            "feeNames": "Please fill in all fee names",
+            "unevenSplitTitle": "Uneven Split",
+            "unevenSplitMessage": "One or more items have split amounts that don't match their totals. Please check your items.",
+            "unauthenticated": "User not authenticated",
+            "deleteError": "Failed to delete item: {{error}}"
+        },
+        "addFirstItem": "Add Your First Item",
+        "addAnotherItem": "Add Another Item",
+        "noItemsTitle": "No items yet",
+        "noItemsDesc": "Start by adding your first item to this expense"
+    },
+    "addReceipt": {
+        "addReceiptTitle": "Add Receipt",
+        "editReceiptTitle": "Edit Receipt",
+        "paidBy": "PAID BY",
+        "extraCharges": "EXTRA CHARGES",
+        "totals": "TOTALS",
+        "addFee": "Add {{type}}",
+        "feeTypes": {
+            "tip": "Tip",
+            "tax": "Tax",
+            "service": "Service",
+            "custom": "Custom"
+        },
+        "placeholders": {
+            "feeName": "Fee Name (e.g. Corkage)"
+        },
+        "subtotal": "Subtotal",
+        "feesAndTip": "Fees & Tip",
+        "total": "Total",
+        "incompleteItems": "Incomplete Items",
+        "incompleteItemsDesc": "Please ensure all items have a price greater than zero and at least one person assigned to split the cost.",
+        "feeNameMissing": "Please fill in all fee names"
+    },
+    "expenseSettings": {
+        "title": "Expense Settings",
+        "expenseName": "Expense Name",
+        "changeName": "Change Name",
+        "untitledExpense": "Untitled Expense",
+        "shareExpense": "Share Expense",
+        "allowJoin": "Allow others to join",
+        "shareLink": "Share Link",
+        "copyLink": "Copy Link",
+        "dangerZone": "Danger Zone",
+        "leaveExpense": "Leave Expense",
+        "leaveExpenseSubtitle": "Remove yourself from this expense",
+        "errors": {
+            "emptyName": "Expense name cannot be empty",
+            "updateNameError": "Failed to update expense name",
+            "leaveError": "Failed to leave expense",
+            "cannotLeave": "Cannot Leave",
+            "cannotLeaveDesc": "You can only leave this expense if you are not part of any items. Remove yourself from all items first."
+        },
+        "success": {
+            "nameUpdated": "Expense name updated successfully",
+            "leftExpense": "You have left the expense successfully",
+            "copied": "Copied!",
+            "linkCopied": "Invite link copied to clipboard"
+        },
+        "confirmLeave": {
+            "title": "Leave Expense",
+            "message": "Are you sure you want to leave this expense? You will be removed from all splits and won't be able to access it anymore."
+        },
+        "shareMessage": "Join my expense \"{{title}}\" on IOU.\n\nTap to join:\n{{link}}"
+    },
+    "friendProfile": {
+        "title": "Friend Profile",
+        "options": "Options",
+        "report": "Report User",
+        "block": "Block User",
+        "loading": "Loading friend profile...",
+        "balanceSummary": "Balance Summary",
+        "netBalance": "Net Balance",
+        "theyOweYouOverall": "They owe you money overall",
+        "youOweThemOverall": "You owe them money overall",
+        "theyOweYou": "They Owe You",
+        "youOweThem": "You Owe Them",
+        "paymentMethods": "Payment Methods",
+        "noPaymentMethod": "No payment method available",
+        "sharedExpenses": "Shared Expenses",
+        "noSharedExpenses": "No shared expenses yet",
+        "addFirstExpense": "Add First Expense",
+        "owesYou": "Owes you",
+        "youOwe": "You owe",
+        "reportPrompt": {
+            "title": "Report User",
+            "message": "Please tell us why you are reporting this user.",
+            "submit": "Report"
+        },
+        "blockPrompt": {
+            "title": "Block User",
+            "message": "Are you sure you want to block this user? You will no longer see their content or be able to interact with them.",
+            "confirm": "Block"
+        },
+        "reportSuccess": "Report Sent",
+        "reportSuccessDesc": "Thank you for your report. We will review it shortly.",
+        "blockSuccess": "User Blocked",
+        "blockSuccessDesc": "You have blocked this user."
+    },
+    "setupExpense": {
+        "title": "What would you like to call this {{type}}?",
+        "titlePlaceholder": "Enter {{type}} name...",
+        "whoSplitting": "Who's splitting this?",
+        "addPeople": "Add people",
+        "creating": "Creating...",
+        "continue": "Continue",
+        "errors": {
+            "titleRequired": "Please enter a title for this {{type}}",
+            "participantsRequired": "Please enter names for all participants",
+            "noUser": "No user signed in",
+            "profileError": "Failed to get user profile",
+            "createError": "Failed to create {{type}}: {{message}}"
+        }
+    },
+    "auth": {
+        "common": {
+            "usCountryCode": "🇺🇸 +1"
+        },
+        "welcome": {
+            "title": "Welcome to IOU!",
+            "split": "Split with Groups",
+            "autoCalculate": "Auto Calculate",
+            "realTime": "Real-time Sync",
+            "createAccount": "Create Account",
+            "signIn": "Sign In"
+        },
+        "signIn": {
+            "title": "Sign In",
+            "stepTitle": "Phone Number",
+            "stepSubtitle": "We'll send you a verification code to confirm your number",
+            "inputLabel": "Phone Number",
+            "placeholder": "(555) 123-4567",
+            "button": "Send Verification Code",
+            "sending": "Sending...",
+            "noAccount": "Don't have an account?",
+            "createAccount": "Create Account",
+            "infoSms": "We'll send you a verification code via SMS",
+            "infoSecure": "Your phone number is kept secure and private",
+            "errors": {
+                "missingPhone": "Please enter your phone number",
+                "invalidPhone": "Please enter a valid 10-digit phone number"
+            }
+        },
+        "signUp": {
+            "stepIndicator": "Step {{current}} of {{total}}",
+            "title": "Create Account",
+            "step1": {
+                "title": "What's your name?",
+                "subtitle": "We'll use this to identify you to your friends",
+                "firstName": "First Name",
+                "lastName": "Last Name",
+                "firstNamePlaceholder": "Enter your first name",
+                "lastNamePlaceholder": "Enter your last name"
+            },
+            "step2": {
+                "title": "Choose a username",
+                "subtitle": "This will be your unique identifier in the app",
+                "username": "Username",
+                "placeholder": "Enter a username",
+                "hint": "3-20 characters, letters, numbers, and underscores only"
+            },
+            "step3": {
+                "title": "Link Your Venmo",
+                "subtitle": "Connect your Venmo to make splitting expenses easier (optional)",
+                "label": "Venmo Username",
+                "placeholder": "your-venmo-username",
+                "verified": "Verified Venmo Account",
+                "noProfilePic": "Venmo Account (No Profile Picture)",
+                "change": "Change Account",
+                "skip": "Skip"
+            },
+            "continue": "Continue",
+            "alreadyHaveAccount": "Already have an account?",
+            "errors": {
+                "required": "Required Field",
+                "firstNameReq": "Please enter your first name",
+                "lastNameReq": "Please enter your last name",
+                "invalidFirst": "First name can only contain letters, spaces, hyphens, and apostrophes",
+                "invalidLast": "Last name can only contain letters, spaces, hyphens, and apostrophes",
+                "minFirst": "First name must be at least 2 characters long",
+                "minLast": "Last name must be at least 2 characters long",
+                "usernameReq": "Please enter a username",
+                "invalidUsername": "Username must be 3-20 characters long and contain only letters, numbers, and underscores",
+                "usernameTaken": "Username Taken",
+                "usernameTakenDesc": "This username is already taken. Please choose a different one.",
+                "checkError": "Unable to check username availability",
+                "saveError": "Failed to save your information. Please try again.",
+                "accountExists": "Account Already Exists",
+                "accountExistsDesc": "This phone number is already registered. You can either sign in with this number or use a different phone number to create a new account.",
+                "signInInstead": "Sign In Instead",
+                "useDiffNumber": "Use Different Number",
+                "verificationError": "Invalid verification response received"
+            }
+        },
+        "verifyOTP": {
+            "title": "Verify Phone Number",
+            "title2FA": "Two-Factor Authentication",
+            "subtitle": "Enter the 6-digit code sent to\n{{phone}}",
+            "subtitle2FA": "Enter the 6-digit code sent to your enrolled device",
+            "button": "Verify Code",
+            "verifying": "Verifying...",
+            "resend": "Resend Code",
+            "sending": "Sending...",
+            "resendTimer": "Resend code in {{timer}} seconds",
+            "info": "Didn't receive the code? Check your signal and try again.",
+            "success": {
+                "resend": "Verification code sent successfully"
+            },
+            "errors": {
+                "invalidCodeLength": "Please enter the complete 6-digit code",
+                "noSession": "No verification session found. Please request a new code.",
+                "signupMissing": "Signup Data Missing",
+                "signupMissingDesc": "Unable to create your profile. Please try signing up again.",
+                "profileFailed": "Profile Creation Failed",
+                "profileFailedDesc": "Your phone was verified but we could not create your profile: {{message}}",
+                "verificationFailed": "Verification Failed",
+                "noResend2FA": "Cannot resend 2FA verification codes. Please try entering the code again or sign in again.",
+                "resendFailed": "Failed to resend verification code. Please try again."
+            },
+            "loading": {
+                "uploading": "Uploading your profile picture...",
+                "creating": "Creating your profile...",
+                "finalizing": "Finalizing your account...",
+                "securing": "Securing your data..."
+            }
+        },
+        "contactInvite": {
+            "title": "Build Your Squad",
+            "subtitle": "IOU is better with friends. Connect your contacts to find people you know and unlock features.",
+            "findFriends": "Find Friends",
+            "skip": "Skip for now",
+            "skipLink": "Skip",
+            "done": "Done",
+            "tiers": {
+                "solo": {
+                    "name": "Solo Mode",
+                    "description": "Basic features",
+                    "features": {
+                        "manual": "Manual expense entry",
+                        "ratios": "Simple split ratios"
+                    }
+                },
+                "squadStarted": {
+                    "name": "Squad Started",
+                    "description": "Smart features unlocked",
+                    "features": {
+                        "suggestions": "Smart contact suggestions",
+                        "friends": "See friends on app",
+                        "templates": "Expense templates"
+                    }
+                },
+                "fullSquad": {
+                    "name": "Full Squad",
+                    "description": "Premium Status",
+                    "features": {
+                        "premium": "1 Month Premium Free",
+                        "categories": "Custom categories",
+                        "support": "Priority support"
+                    }
+                }
+            },
+            "alerts": {
+                "contactsRequired": {
+                    "title": "Contacts Required",
+                    "message": "To find your friends, we need access to your contacts. Please enable it in settings.",
+                    "ok": "OK"
+                },
+                "premiumUnlocked": {
+                    "title": "Premium Unlocked! 🌟",
+                    "message": "You've unlocked 1 month of Premium automatically!"
+                },
+                "featuresUnlocked": {
+                    "title": "New Features Unlocked! 🚀",
+                    "message": "You've unlocked Smart Suggestions and Templates!"
+                },
+                "error": "Something went wrong. Please try again."
+            }
+        },
+        "twoFactor": {
+            "screenTitle": "Two-Factor Authentication",
+            "title": "Two-Factor Authentication",
+            "description": {
+                "title": "Enhanced Security",
+                "text": "Two-factor authentication adds an extra layer of security to your account by requiring a verification code from your phone."
+            },
+            "methods": {
+                "title": "Enrolled Methods",
+                "empty": "No 2FA methods enrolled",
+                "emptyDesc": "Add a phone number to get started with two-factor authentication",
+                "enrolledAt": "Enrolled {{date}}",
+                "remove": {
+                    "title": "Remove 2FA Method",
+                    "message": "Are you sure you want to remove \"{{name}}\" from your account?",
+                    "confirm": "Remove",
+                    "cancel": "Cancel"
+                }
+            },
+            "add": {
+                "button": "Add Phone Number",
+                "title": "Add Phone Number for 2FA",
+                "description": "Enter a phone number to receive verification codes for two-factor authentication.",
+                "label": "Phone Number",
+                "placeholder": "(555) 123-4567",
+                "send": "Send Code",
+                "sending": "Sending...",
+                "cancel": "Cancel"
+            },
+            "verify": {
+                "title": "Verify Phone Number",
+                "description": "Enter the 6-digit code sent to your phone.",
+                "label": "Verification Code",
+                "placeholder": "123456",
+                "submit": "Verify & Enable",
+                "verifying": "Verifying...",
+                "cancel": "Cancel"
+            },
+            "success": {
+                "codeSent": "Verification code sent to your phone",
+                "enrolled": "2FA enrollment completed successfully",
+                "removed": "2FA method removed successfully"
+            },
+            "errors": {
+                "loadFailed": "Failed to load 2FA settings",
+                "missingPhone": "Please enter a phone number",
+                "invalidPhone": "Please enter a valid 10-digit phone number",
+                "startFailed": "Failed to start 2FA enrollment",
+                "invalidCode": "Please enter the complete 6-digit code",
+                "completeFailed": "Failed to complete 2FA enrollment",
+                "removeFailed": "Failed to remove 2FA method"
+            }
+        }
+    },
+    "components": {
+        "createBottomSheet": {
+            "title": "Create New",
+            "addExpense": "Add Expense",
+            "addExpenseDesc": "Manually add an expense",
+            "scanReceipt": "Scan Receipt",
+            "scanReceiptDesc": "Scan a receipt to extract items",
+            "joinExpense": "Join Expense",
+            "joinExpenseDesc": "Use a link or code to join",
+            "scanTitle": "Scan Receipt",
+            "takePhoto": "Take Photo",
+            "takePhotoDesc": "Capture a new receipt photo",
+            "chooseGallery": "Choose from Gallery",
+            "chooseGalleryDesc": "Select an existing photo",
+            "joinTitle": "Join Expense",
+            "enterLink": "Enter Invite Link or Code",
+            "linkPlaceholder": "Paste link or code here...",
+            "joinButton": "Join",
+            "missingLinkError": "Please enter an invite link or code",
+            "scanError": "Receipt Scanning Error"
+        },
+        "changeVenmo": {
+            "title": "Change Venmo",
+            "subtitle": "Connect your Venmo to make splitting expenses easier",
+            "verified": "Verified Venmo Account",
+            "noProfilePic": "Venmo Account (No Profile Picture)",
+            "changeAccount": "Change Account",
+            "usernameLabel": "Venmo Username",
+            "usernamePlaceholder": "your-venmo-username",
+            "removeHint": "Leave blank to remove your Venmo account",
+            "save": "Save Changes",
+            "verificationRequired": "Verification Required",
+            "verificationRequiredDesc": "Please wait for Venmo verification to complete or enter a valid Venmo username.",
+            "verificationInProgress": "Verification in Progress",
+            "verificationInProgressDesc": "Please wait for Venmo verification to complete.",
+            "updateSuccess": "Your Venmo account has been updated successfully.",
+            "removeSuccess": "Your Venmo account has been removed successfully.",
+            "updateError": "Failed to update Venmo account. Please try again.",
+            "userNotFound": "Venmo user does not exist. Please check the username and try again.",
+            "verifyError": "Unable to verify Venmo account. Please check your connection and try again."
+        },
+        "changeExpenseName": {
+            "title": "Change Expense Name",
+            "subtitle": "Enter a new name for this expense",
+            "label": "Expense Name",
+            "placeholder": "Enter expense name",
+            "save": "Save Changes"
+        },
+        "expenses": {
+            "header": {
+                "edit": "Edit",
+                "add": "Add",
+                "track": "Track",
+                "split": "Split"
+            },
+            "footer": {
+                "settleUp": "Settle Up",
+                "processing": "Processing..."
+            },
+            "paidBy": {
+                "label": "Paid by",
+                "you": "You",
+                "noParticipants": "No participants"
+            },
+            "participantsGrid": {
+                "addFriends": "Add friends",
+                "manage": "Manage"
+            },
+            "expenseItemCard": {
+                "itemNamePlaceholder": "Enter item name",
+                "allAllocated": "All funds allocated",
+                "enterPrice": "Enter a price to split",
+                "unallocated": "Unallocated: ${{amount}}",
+                "totalExceeds": "Total exceeds bill by ${{amount}}",
+                "payers": "Payers",
+                "split": "Split",
+                "cancel": "Cancel",
+                "save": "Save Changes",
+                "settled": "Settled in payment",
+                "person": "Person {{index}}",
+                "alerts": {
+                    "incomplete": "Incomplete Item",
+                    "incompleteDesc": "Please check the following: {{fields}}",
+                    "uneven": "Uneven Split",
+                    "unevenDesc": "The split amounts don't match the item total. Please adjust the splits or the total amount.",
+                    "saveError": "Failed to save expense: {{error}}"
+                },
+                "fields": {
+                    "name": "item name",
+                    "price": "price",
+                    "payer": "at least one payer",
+                    "consumer": "at least one person in the split"
+                }
+            },
+            "expenseViewCard": {
+                "paidByUnassigned": "Paid by Unassigned",
+                "paidByOne": "Paid by {{name}}",
+                "paidByTwo": "Paid by {{name1}} and {{name2}}",
+                "paidByMany": "Paid by {{name}} and {{count}} others",
+                "untitledItem": "Untitled Item",
+                "settled": "Settled",
+                "splitWith": "Split with",
+                "actions": {
+                    "title": "Expense Actions",
+                    "message": "What would you like to do?",
+                    "edit": "Edit",
+                    "delete": "Delete",
+                    "cancel": "Cancel"
+                },
+                "locked": {
+                    "title": "Item Locked",
+                    "message": "This item is part of an active settlement. Undo the settlement to edit this item."
+                }
+            },
+            "receiptBreakdown": {
+                "header": "Receipt Items",
+                "addItem": "Add Item",
+                "editItem": "Edit Item",
+                "itemName": "Item Name",
+                "itemNamePlaceholder": "Enter item name",
+                "price": "Price",
+                "splitWith": "Split with",
+                "selectPerson": "Select at least one person",
+                "cancel": "Cancel",
+                "save": "Save Changes",
+                "lockedTitle": "Item Locked",
+                "lockedMsg": "This item is part of an active settlement. Undo the settlement to edit this item.",
+                "itemDefault": "Item {{index}}",
+                "settled": "Settled",
+                "assignSomeone": "Assign someone",
+                "noOneAssigned": "No one assigned",
+                "time": {
+                    "justNow": "just now",
+                    "minutesAgo": "{{count}}m ago",
+                    "hoursAgo": "{{count}}h ago",
+                    "daysAgo": "{{count}}d ago",
+                    "weeksAgo": "{{count}}w ago"
+                }
+            },
+            "settlementInterface": {
+                "summary": {
+                    "allSettled": "All settled up!",
+                    "youOwe": "You owe",
+                    "youreOwed": "You're owed",
+                    "pendingSettled": "{{pending}} pending · {{settled}} settled",
+                    "pending": "{{count}} pending",
+                    "settled": "{{count}} settled"
+                },
+                "activity": {
+                    "title": "Activity",
+                    "showMore": "Show {{count}} more...",
+                    "types": {
+                        "priceChange": "{{user}} updated the total from ${{prev}} to ${{new}}",
+                        "itemAdded": "{{user}} added {{item}}",
+                        "itemAddedAmount": "{{user}} added {{item}} for ${{amount}}",
+                        "itemRemoved": "{{user}} removed \"{{item}}\"",
+                        "itemRemovedAmount": "{{user}} removed {{item}} (${{amount}})",
+                        "participantAdded": "{{user}} added {{participant}}",
+                        "participantRemoved": "{{user}} removed {{participant}}",
+                        "default": "{{user}} made a change"
+                    }
+                },
+                "status": {
+                    "fullySettled": "Fully Settled",
+                    "partiallySettled": "Partially Settled",
+                    "settled": "Settled",
+                    "reminded": "Reminded",
+                    "awaitingPayment": "Awaiting Payment"
+                },
+                "items": {
+                    "title": "Items",
+                    "tapToSettle": "(tap to settle)",
+                    "selectAll": "Select All",
+                    "deselectAll": "Deselect All"
+                },
+                "actions": {
+                    "allSettled": "All Settled",
+                    "selectToSettle": "Select items to settle",
+                    "pay": "Pay {{amount}}",
+                    "markSettled": "Mark {{amount}} Settled",
+                    "request": "Request {{amount}}",
+                    "reminderSent": "Reminder Sent",
+                    "sendReminder": "Send Reminder",
+                    "undoSettlement": "Undo settlement"
+                },
+                "relationships": {
+                    "youOwe": "You owe {{name}}",
+                    "owesYou": "{{name}} owes you",
+                    "owes": "{{name}} owes {{name2}}"
+                },
+                "total": "(${{amount}} total)",
+                "empty": {
+                    "title": "All Settled Up!",
+                    "body": "Everyone is square. No payments needed."
+                },
+                "banner": {
+                    "title": "Settlements updated due to changes.",
+                    "sub": "{{new}} new, {{paid}} paid preserved."
+                },
+                "alerts": {
+                    "markSettled": {
+                        "title": "Mark as Settled",
+                        "message": "Mark {{amount}} as settled? This records the payment without using Venmo.",
+                        "cancel": "Cancel",
+                        "confirm": "Settle"
+                    }
+                }
+            }
+        },
+        "referral": {
+            "progress": {
+                "title": "Your Progress",
+                "referrals": "{{count}} referrals confirmed",
+                "nextTier": "{{count}} more for next reward"
+            },
+            "tier1": {
+                "title": "Tier 1: Squad Starter",
+                "requirement": "3 successful referrals",
+                "reward": "1 month IOU Pro",
+                "benefits": [
+                    "Receipt scanning",
+                    "Unlimited expenses",
+                    "Custom categories"
+                ]
+            },
+            "tier2": {
+                "title": "Tier 2: Squad Leader",
+                "requirement": "5 successful referrals",
+                "reward": "3 months IOU Pro",
+                "benefits": [
+                    "Everything in Tier 1",
+                    "Priority support",
+                    "Early access to features"
+                ]
+            },
+            "share": {
+                "title": "Share Your Link",
+                "description": "Invite friends to earn rewards",
+                "copyLink": "Copy Link",
+                "shareLink": "Share Link",
+                "copied": "Link copied!"
+            },
+            "history": {
+                "title": "Referral History",
+                "confirmed": "Confirmed",
+                "pending": "Pending",
+                "empty": "No referrals yet. Start inviting friends!"
+            }
+        }
     }
 }

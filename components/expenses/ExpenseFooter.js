@@ -4,13 +4,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import LoadingSpinner from '../LoadingSpinner';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const ExpenseFooter = ({ 
   loading = false,
   onSettlePress,
   settleButtonText = 'Settle Up'
 }) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const resolvedSettleButtonText = settleButtonText === 'Settle Up' ? t('components.expenses.footer.settleUp') : settleButtonText;
 
   return (
     <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
@@ -23,7 +26,7 @@ const ExpenseFooter = ({
         {loading ? (
           <>
             <LoadingSpinner size="small" color={Colors.surface} />
-            <Text style={styles.settleButtonText}>Processing...</Text>
+            <Text style={styles.settleButtonText}>{t('components.expenses.footer.processing')}</Text>
           </>
         ) : (
           <>
@@ -33,7 +36,7 @@ const ExpenseFooter = ({
               color={Colors.surface}
               style={styles.settleIcon}
             />
-            <Text style={styles.settleButtonText}>{settleButtonText}</Text>
+            <Text style={styles.settleButtonText}>{resolvedSettleButtonText}</Text>
           </>
         )}
       </TouchableOpacity>

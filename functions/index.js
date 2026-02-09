@@ -1,4 +1,4 @@
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const algoliasearch = require('algoliasearch');
 
@@ -505,12 +505,13 @@ exports.onExpenseCreated = functions.firestore
       if (participantIds.length > 0) {
         const title = 'New Expense Added';
         const body = `${creatorName} added a new expense: ${expense.title || 'Untitled'}`;
-        
+
         await sendNotificationsToUsers(participantIds, title, body, {
           type: 'expenses',
           route: 'expense',
           expenseId: expenseId,
-          createdBy: expense.createdBy
+          createdBy: expense.createdBy,
+          actorUserId: expense.createdBy // Added for client-side filtering
         });
       }
     } catch (error) {
@@ -583,7 +584,8 @@ exports.onExpenseUpdated = functions.firestore
             type: 'settlements',
             route: 'expense',
             expenseId: expenseId,
-            updatedBy: after.updatedBy || after.createdBy
+            updatedBy: after.updatedBy || after.createdBy,
+            actorUserId: after.updatedBy || after.createdBy // Added for client-side filtering
           });
         }
       }
@@ -596,7 +598,8 @@ exports.onExpenseUpdated = functions.firestore
           type: 'expenses',
           route: 'expense',
           expenseId: expenseId,
-          updatedBy: after.updatedBy || after.createdBy
+          updatedBy: after.updatedBy || after.createdBy,
+          actorUserId: after.updatedBy || after.createdBy // Added for client-side filtering
         });
       }
     } catch (error) {
@@ -622,11 +625,12 @@ exports.onExpenseSettled = functions.firestore
         if (participantIds.length > 0) {
           const title = 'Expense Settled';
           const body = `The expense "${after.title || 'Untitled'}" has been settled!`;
-          
+
           await sendNotificationsToUsers(participantIds, title, body, {
             type: 'settlements',
             route: 'expense',
-            expenseId: expenseId
+            expenseId: expenseId,
+            actorUserId: settledBy // Added for client-side filtering
           });
         }
       }
@@ -651,12 +655,13 @@ exports.onPaymentRequestSent = functions.firestore
       // Send notification to recipient
       const title = 'Payment Request';
       const body = `${senderName} requested $${request.amount} from you`;
-      
+
       await sendNotificationsToUsers([request.toUserId], title, body, {
         type: 'payments',
         route: 'settle',
         requestId: requestId,
-        amount: request.amount.toString()
+        amount: request.amount.toString(),
+        actorUserId: request.fromUserId // Added for client-side filtering
       });
     } catch (error) {
       console.error('Error in onPaymentRequestSent:', error);
@@ -691,12 +696,13 @@ exports.onExpenseJoin = functions.firestore
         if (existingParticipants.length > 0) {
           const title = 'Someone Joined Your Expense';
           const body = `${joinerName} joined the expense: ${after.title || 'Untitled'}`;
-          
+
           await sendNotificationsToUsers(existingParticipants, title, body, {
             type: 'expenses',
             route: 'expense',
             expenseId: expenseId,
-            joinedBy: joinerId
+            joinedBy: joinerId,
+            actorUserId: joinerId // Added for client-side filtering
           });
         }
       }
@@ -1084,8 +1090,6 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', 'Failed to delete synthetic data: ' + error.message);
   }
 });
-  }
-});
 
 // Delete user account (App Store Requirement)
 exports.deleteAccount = functions.https.onCall(async (data, context) => {
@@ -1153,22 +1157,143 @@ exports.blockUser = functions.https.onCall(async (data, context) => {
 
   const { blockedUserId } = data;
   const blockerId = context.auth.uid;
-  
+
   if (!blockedUserId) {
     throw new functions.https.HttpsError('invalid-argument', 'Missing blockedUserId');
   }
 
   try {
     const db = admin.firestore();
-    
+
     // Add to blocker's blocked list
     await db.collection('users').doc(blockerId).collection('blockedUsers').doc(blockedUserId).set({
       blockedAt: admin.firestore.FieldValue.serverTimestamp()
     });
-    
+
     return { success: true };
   } catch (error) {
     console.error('Error blocking user:', error);
     throw new functions.https.HttpsError('internal', 'Failed to block user');
   }
 });
+
+// Referral conversion tracking - triggered when new user signs up
+exports.onNewUserSignup = functions.firestore
+  .document('users/{userId}')
+  .onCreate(async (snap, context) => {
+    const newUser = snap.data();
+    const newUserId = context.params.userId;
+
+    try {
+      // Check if user was referred
+      if (!newUser.referredBy || !newUser.referredBy.userId) {
+        console.log('User was not referred, skipping referral tracking');
+        return null;
+      }
+
+      const referrerId = newUser.referredBy.userId;
+      const db = admin.firestore();
+      const referrerRef = db.collection('users').doc(referrerId);
+
+      // Get referrer document
+      const referrerDoc = await referrerRef.get();
+      if (!referrerDoc.exists) {
+        console.error('Referrer not found:', referrerId);
+        return null;
+      }
+
+      const referrerData = referrerDoc.data();
+      const inviteStats = referrerData.inviteStats || {};
+      const friendsJoined = (inviteStats.friendsJoined || 0) + 1;
+
+      // Update referrer's friendsJoined count
+      await referrerRef.update({
+        'inviteStats.friendsJoined': admin.firestore.FieldValue.increment(1)
+      });
+
+      // Update inviteHistory to mark as joined
+      const inviteHistory = inviteStats.inviteHistory || [];
+      const updatedHistory = inviteHistory.map(invite => {
+        if (invite.phoneNumber === newUser.phoneNumber) {
+          return {
+            ...invite,
+            joined: true,
+            joinedAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+        }
+        return invite;
+      });
+
+      await referrerRef.update({
+        'inviteStats.inviteHistory': updatedHistory
+      });
+
+      // Check and grant tier rewards
+      await checkAndGrantRewards(referrerRef, referrerData, friendsJoined);
+
+      console.log(`Referral conversion tracked: ${newUserId} referred by ${referrerId}`);
+      return null;
+    } catch (error) {
+      console.error('Error tracking referral conversion:', error);
+      return null;
+    }
+  });
+
+// Helper function to check and grant tier rewards
+async function checkAndGrantRewards(referrerRef, referrerData, friendsJoined) {
+  const updates = {};
+  const inviteStats = referrerData.inviteStats || {};
+  const rewardsEarned = inviteStats.rewardsEarned || { tier1: {}, tier2: {} };
+
+  // Get current premium until date
+  let currentPremiumUntil = inviteStats.premiumUntil;
+  if (currentPremiumUntil && currentPremiumUntil.toDate) {
+    currentPremiumUntil = currentPremiumUntil.toDate();
+  }
+
+  // If no premium or expired, start from now
+  if (!currentPremiumUntil || currentPremiumUntil < new Date()) {
+    currentPremiumUntil = new Date();
+  }
+
+  // Tier 1: 3 referrals = 1 month Pro
+  if (friendsJoined >= 3 && !rewardsEarned.tier1.unlocked) {
+    updates['inviteStats.rewardsEarned.tier1'] = {
+      unlocked: true,
+      unlockedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Add 30 days to premium
+    const newPremiumUntil = new Date(currentPremiumUntil);
+    newPremiumUntil.setDate(newPremiumUntil.getDate() + 30);
+
+    updates['inviteStats.premiumUntil'] = admin.firestore.Timestamp.fromDate(newPremiumUntil);
+    updates['inviteStats.premiumUnlocked'] = true;
+
+    currentPremiumUntil = newPremiumUntil;
+
+    console.log(`Tier 1 reward granted to ${referrerRef.id}: 1 month premium`);
+  }
+
+  // Tier 2: 5 referrals = additional 2 months (total 3 months)
+  if (friendsJoined >= 5 && !rewardsEarned.tier2.unlocked) {
+    updates['inviteStats.rewardsEarned.tier2'] = {
+      unlocked: true,
+      unlockedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    // Add additional 60 days to premium
+    const newPremiumUntil = new Date(currentPremiumUntil);
+    newPremiumUntil.setDate(newPremiumUntil.getDate() + 60);
+
+    updates['inviteStats.premiumUntil'] = admin.firestore.Timestamp.fromDate(newPremiumUntil);
+    updates['inviteStats.premiumUnlocked'] = true;
+
+    console.log(`Tier 2 reward granted to ${referrerRef.id}: additional 2 months premium`);
+  }
+
+  // Apply updates if any rewards were granted
+  if (Object.keys(updates).length > 0) {
+    await referrerRef.update(updates);
+  }
+}

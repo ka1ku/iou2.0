@@ -145,6 +145,25 @@ export const Typography = {
     fontSize: 10,
     fontFamily: 'Poppins_400Regular',
   },
+  
+  // Font Sizes
+  sizes: {
+    xs: 10,
+    sm: 12,
+    md: 14,
+    lg: 18,
+    xl: 24,
+    xxl: 32,
+    xxxl: 40,
+  },
+  
+  // Font Weights
+  weights: {
+    regular: '400',
+    medium: '500',
+    semibold: '600',
+    bold: '700',
+  },
 };
 
 

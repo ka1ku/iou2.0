@@ -20,7 +20,10 @@ import {
   unenroll2FA,
 } from '../../services/authService';
 
+import { useTranslation } from '../../contexts/LanguageContext';
+
 const TwoFactorAuthScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   const [enrolledFactors, setEnrolledFactors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
@@ -41,7 +44,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
       const factors = await getEnrolledFactors();
       setEnrolledFactors(factors);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load 2FA settings');
+      Alert.alert(t('common.error'), t('auth.twoFactor.errors.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -65,13 +68,13 @@ const TwoFactorAuthScreen = ({ navigation }) => {
 
   const startEnrollment = async () => {
     if (!phoneNumber.trim()) {
-      Alert.alert('Error', 'Please enter a phone number');
+      Alert.alert(t('common.error'), t('auth.twoFactor.errors.missingPhone'));
       return;
     }
 
     const digits = phoneNumber.replace(/\D/g, '');
     if (digits.length !== 10) {
-      Alert.alert('Error', 'Please enter a valid 10-digit phone number');
+      Alert.alert(t('common.error'), t('auth.twoFactor.errors.invalidPhone'));
       return;
     }
 
@@ -81,9 +84,9 @@ const TwoFactorAuthScreen = ({ navigation }) => {
       setVerificationId(result.verificationId);
       setSessionInfo(result.sessionInfo);
       setVerificationStep(true);
-      Alert.alert('Success', 'Verification code sent to your phone');
+      Alert.alert(t('common.success'), t('auth.twoFactor.success.codeSent'));
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to start 2FA enrollment');
+      Alert.alert(t('common.error'), error.message || t('auth.twoFactor.errors.startFailed'));
     } finally {
       setEnrolling(false);
     }
@@ -91,14 +94,14 @@ const TwoFactorAuthScreen = ({ navigation }) => {
 
   const completeEnrollment = async () => {
     if (otp.length !== 6) {
-      Alert.alert('Error', 'Please enter the complete 6-digit code');
+      Alert.alert(t('common.error'), t('auth.twoFactor.errors.invalidCode'));
       return;
     }
 
     setEnrolling(true);
     try {
       await complete2FAEnrollment(verificationId, otp, sessionInfo, 'Phone');
-      Alert.alert('Success', '2FA enrollment completed successfully');
+      Alert.alert(t('common.success'), t('auth.twoFactor.success.enrolled'));
       
       // Reset form and reload factors
       setShowEnrollForm(false);
@@ -109,7 +112,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
       setSessionInfo(null);
       await loadEnrolledFactors();
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to complete 2FA enrollment');
+      Alert.alert(t('common.error'), error.message || t('auth.twoFactor.errors.completeFailed'));
     } finally {
       setEnrolling(false);
     }
@@ -117,20 +120,20 @@ const TwoFactorAuthScreen = ({ navigation }) => {
 
   const handleUnenroll = async (factorUid, displayName) => {
     Alert.alert(
-      'Remove 2FA Method',
-      `Are you sure you want to remove "${displayName}" from your account?`,
+      t('auth.twoFactor.methods.remove.title'),
+      t('auth.twoFactor.methods.remove.message', { name: displayName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('auth.twoFactor.methods.remove.cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('auth.twoFactor.methods.remove.confirm'),
           style: 'destructive',
           onPress: async () => {
             try {
               await unenroll2FA(factorUid);
-              Alert.alert('Success', '2FA method removed successfully');
+              Alert.alert(t('common.success'), t('auth.twoFactor.success.removed'));
               await loadEnrolledFactors();
             } catch (error) {
-              Alert.alert('Error', error.message || 'Failed to remove 2FA method');
+              Alert.alert(t('common.error'), error.message || t('auth.twoFactor.methods.removeFailed'));
             }
           },
         },
@@ -151,22 +154,22 @@ const TwoFactorAuthScreen = ({ navigation }) => {
     if (!verificationStep) {
       return (
         <View style={styles.enrollForm}>
-          <Text style={styles.formTitle}>Add Phone Number for 2FA</Text>
+          <Text style={styles.formTitle}>{t('auth.twoFactor.add.title')}</Text>
           <Text style={styles.formDescription}>
-            Enter a phone number to receive verification codes for two-factor authentication.
+            {t('auth.twoFactor.add.description')}
           </Text>
           
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Phone Number</Text>
+            <Text style={styles.inputLabel}>{t('auth.twoFactor.add.label')}</Text>
             <View style={styles.phoneInputContainer}>
               <View style={styles.countryCode}>
-                <Text style={styles.countryCodeText}>🇺🇸 +1</Text>
+                <Text style={styles.countryCodeText}>{t('auth.common.usCountryCode')}</Text>
               </View>
               <TextInput
                 style={styles.phoneInput}
                 value={phoneNumber}
                 onChangeText={handlePhoneNumberChange}
-                placeholder="(555) 123-4567"
+                placeholder={t('auth.twoFactor.add.placeholder')}
                 placeholderTextColor={Colors.textSecondary}
                 keyboardType="phone-pad"
                 maxLength={14}
@@ -179,7 +182,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
               style={[styles.button, styles.cancelButton]}
               onPress={cancelEnrollment}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>{t('auth.twoFactor.add.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.button, styles.primaryButton, enrolling && styles.buttonDisabled]}
@@ -187,7 +190,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
               disabled={enrolling}
             >
               <Text style={styles.primaryButtonText}>
-                {enrolling ? 'Sending...' : 'Send Code'}
+                {enrolling ? t('auth.twoFactor.add.sending') : t('auth.twoFactor.add.send')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -197,18 +200,18 @@ const TwoFactorAuthScreen = ({ navigation }) => {
 
     return (
       <View style={styles.enrollForm}>
-        <Text style={styles.formTitle}>Verify Phone Number</Text>
+        <Text style={styles.formTitle}>{t('auth.twoFactor.verify.title')}</Text>
         <Text style={styles.formDescription}>
-          Enter the 6-digit code sent to your phone.
+          {t('auth.twoFactor.verify.description')}
         </Text>
         
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Verification Code</Text>
+          <Text style={styles.inputLabel}>{t('auth.twoFactor.verify.label')}</Text>
           <TextInput
             style={styles.otpInput}
             value={otp}
             onChangeText={setOtp}
-            placeholder="123456"
+            placeholder={t('auth.twoFactor.verify.placeholder')}
             placeholderTextColor={Colors.textSecondary}
             keyboardType="number-pad"
             maxLength={6}
@@ -221,7 +224,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
             style={[styles.button, styles.cancelButton]}
             onPress={cancelEnrollment}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('auth.twoFactor.verify.cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.primaryButton, enrolling && styles.buttonDisabled]}
@@ -229,7 +232,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
             disabled={enrolling}
           >
             <Text style={styles.primaryButtonText}>
-              {enrolling ? 'Verifying...' : 'Verify & Enable'}
+              {enrolling ? t('auth.twoFactor.verify.verifying') : t('auth.twoFactor.verify.submit')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -247,7 +250,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
           >
             <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Two-Factor Authentication</Text>
+          <Text style={styles.title}>{t('auth.twoFactor.title')}</Text>
         </View>
         <View style={styles.loadingContainer}>
           <LoadingSpinner size="large" />
@@ -267,27 +270,27 @@ const TwoFactorAuthScreen = ({ navigation }) => {
           >
             <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.title}>Two-Factor Authentication</Text>
+          <Text style={styles.title}>{t('auth.twoFactor.screenTitle')}</Text>
         </View>
 
         <View style={styles.descriptionContainer}>
           <View style={styles.infoCard}>
             <Ionicons name="shield-checkmark" size={32} color={Colors.accent} />
-            <Text style={styles.infoTitle}>Enhanced Security</Text>
+            <Text style={styles.infoTitle}>{t('auth.twoFactor.description.title')}</Text>
             <Text style={styles.infoDescription}>
-              Two-factor authentication adds an extra layer of security to your account by requiring a verification code from your phone in addition to your password.
+              {t('auth.twoFactor.description.text')}
             </Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Enrolled Methods</Text>
+          <Text style={styles.sectionTitle}>{t('auth.twoFactor.methods.title')}</Text>
           {enrolledFactors.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="phone-portrait-outline" size={48} color={Colors.textSecondary} />
-              <Text style={styles.emptyStateText}>No 2FA methods enrolled</Text>
+              <Text style={styles.emptyStateText}>{t('auth.twoFactor.methods.empty')}</Text>
               <Text style={styles.emptyStateSubtext}>
-                Add a phone number to get started with two-factor authentication
+                {t('auth.twoFactor.methods.emptyDesc')}
               </Text>
             </View>
           ) : (
@@ -299,7 +302,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
                     <View style={styles.factorDetails}>
                       <Text style={styles.factorName}>{factor.displayName || 'Phone'}</Text>
                       <Text style={styles.factorDate}>
-                        Enrolled {new Date(factor.enrollmentTime).toLocaleDateString()}
+                        {t('auth.twoFactor.methods.enrolledAt', { date: new Date(factor.enrollmentTime).toLocaleDateString() })}
                       </Text>
                     </View>
                   </View>
@@ -321,7 +324,7 @@ const TwoFactorAuthScreen = ({ navigation }) => {
             onPress={() => setShowEnrollForm(true)}
           >
             <Ionicons name="add-circle" size={24} color={Colors.accent} />
-            <Text style={styles.addButtonText}>Add Phone Number</Text>
+            <Text style={styles.addButtonText}>{t('auth.twoFactor.add.button')}</Text>
           </TouchableOpacity>
         )}
 

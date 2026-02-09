@@ -16,8 +16,10 @@ import ProfilePicture from './VenmoProfilePicture';
 import { updateVenmoProfile } from '../services/authService';
 import { useExpenseData } from '../contexts/ExpenseDataContext';
 import LoadingSpinner from './LoadingSpinner';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['85%',], []);
@@ -105,10 +107,10 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
         setLastVerifiedUsername(profileData.username);
       } else if (profileData.userExists === false) {
         setVenmoVerified(false);
-        setVerificationError('Venmo user does not exist. Please check the username and try again.');
+        setVerificationError(t('components.changeVenmo.userNotFound'));
       } else {
         setVenmoVerified(false);
-        setVerificationError('Unable to verify Venmo account. Please check your connection and try again.');
+        setVerificationError(t('components.changeVenmo.verifyError'));
       }
     } catch (error) {
       setVenmoVerified(false);
@@ -117,7 +119,7 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
         userProfile?.lastName || '',
         usernameToVerify.trim()
       ));
-      setVerificationError('Unable to verify Venmo account. Please check your connection and try again.');
+      setVerificationError(t('components.changeVenmo.verifyError'));
     } finally {
       setIsVerifying(false);
     }
@@ -174,16 +176,16 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
   const handleSave = async () => {
     if (venmoUsername.trim() && !venmoVerified && !isVerifying) {
       Alert.alert(
-        'Verification Required',
-        'Please wait for Venmo verification to complete or enter a valid Venmo username.',
+        t('components.changeVenmo.verificationRequired'),
+        t('components.changeVenmo.verificationRequiredDesc'),
       );
       return;
     }
 
     if (isVerifying) {
       Alert.alert(
-        'Verification in Progress',
-        'Please wait for Venmo verification to complete.',
+        t('components.changeVenmo.verificationInProgress'),
+        t('components.changeVenmo.verificationInProgressDesc'),
       );
       return;
     }
@@ -198,10 +200,10 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
       await updateVenmoProfile(venmoData);
       
       Alert.alert(
-        'Success',
+        t('common.success'),
         venmoData.venmoUsername 
-          ? 'Your Venmo account has been updated successfully.'
-          : 'Your Venmo account has been removed successfully.',
+          ? t('components.changeVenmo.updateSuccess')
+          : t('components.changeVenmo.removeSuccess'),
         [
           {
             text: 'OK',
@@ -214,8 +216,8 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
     } catch (error) {
       console.error('Error updating Venmo profile:', error);
       Alert.alert(
-        'Error',
-        error.message || 'Failed to update Venmo account. Please try again.'
+        t('common.error'),
+        error.message || t('components.changeVenmo.updateError')
       );
     } finally {
       setIsSaving(false);
@@ -267,9 +269,9 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
               transition={200}
             />
           </View>
-          <Text style={styles.title}>Change Venmo</Text>
+          <Text style={styles.title}>{t('components.changeVenmo.title')}</Text>
           <Text style={styles.subtitle}>
-            Connect your Venmo to make splitting expenses easier
+            {t('components.changeVenmo.subtitle')}
           </Text>
         </View>
 
@@ -297,8 +299,8 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
                     ]}
                   >
                     {venmoProfilePic && !venmoProfilePic.includes('ui-avatars.com')
-                      ? '✓ Verified Venmo Account'
-                      : '✓ Venmo Account (No Profile Picture)'}
+                      ? '✓ ' + t('components.changeVenmo.verified')
+                      : '✓ ' + t('components.changeVenmo.noProfilePic')}
                   </Text>
                 </View>
               </View>
@@ -307,20 +309,20 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
                 style={styles.changeButton}
                 onPress={resetVenmoProfile}
               >
-                <Text style={styles.changeButtonText}>Change Account</Text>
+                <Text style={styles.changeButtonText}>{t('components.changeVenmo.changeAccount')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <>
               <View style={styles.venmoInputContainer}>
-                <Text style={styles.venmoInputLabel}>Venmo Username</Text>
+                <Text style={styles.venmoInputLabel}>{t('components.changeVenmo.usernameLabel')}</Text>
                 <View style={styles.venmoInputWrapper}>
                   <Text style={styles.atSymbol}>@</Text>
                   <BottomSheetTextInput
                     style={styles.venmoInput}
                     value={venmoUsername}
                     onChangeText={handleUsernameChange}
-                    placeholder="your-venmo-username"
+                    placeholder={t('components.changeVenmo.usernamePlaceholder')}
                     placeholderTextColor={Colors.textSecondary}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -348,7 +350,7 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
 
               {!venmoUsername.trim() && (
                 <Text style={styles.helperText}>
-                  Leave blank to remove your Venmo account
+                  {t('components.changeVenmo.removeHint')}
                 </Text>
               )}
             </>
@@ -365,7 +367,7 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
             <LoadingSpinner size="small" color={Colors.white} />
           ) : (
             <>
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>{t('components.changeVenmo.save')}</Text>
               <Ionicons name="checkmark" size={20} color="white" style={styles.buttonIcon} />
             </>
           )}
@@ -440,10 +442,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.divider,
   },
   profilePic: {
-    marginRight: Spacing.md,
+    // Removed margin since it wasn't being applied to the container
   },
   profileInfo: {
     flex: 1,
+    marginLeft: Spacing.md,
   },
   profileName: {
     ...Typography.title,
@@ -538,7 +541,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: Spacing.md,
-    ...Shadows.button,
   },
   saveButtonDisabled: {
     opacity: 0.6,

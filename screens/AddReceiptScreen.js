@@ -29,9 +29,12 @@ import PaidBySection from '../components/expenses/PaidBySection';
 import ReceiptBreakdown from '../components/expenses/ReceiptBreakdown';
 import SplitTab from '../components/expenses/SplitTab';
 
+import { useTranslation } from '../contexts/LanguageContext';
+
 const SPLIT_TOLERANCE = 0.01;
 
 const AddReceiptScreenContent = ({ route, navigation }) => {
+  const { t } = useTranslation();
   const { expense: initialExpense, scannedReceipt, fromReceiptScan, isNewExpense = false } = route.params || {};
 
   // Real-time expense snapshot listener for live updates between Split and Track tabs
@@ -107,23 +110,39 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     actions.updateItem(index, { [field]: value });
   }, [actions]);
 
-  const handleRemoveItem = useCallback(async (index) => {
-    try {
-      if (isEditing && expense?.id) {
-        const currentUser = getCurrentUser();
-        if (!currentUser) {
-          Alert.alert("Error", "User not authenticated");
-          return;
-        }
+  const handleRemoveItem = useCallback((index) => {
+    Alert.alert(
+      t('addExpense.deleteItemParams.title'),
+      t('addExpense.deleteItemParams.message'),
+      [
+        {
+          text: t('common.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('addExpense.deleteItemParams.confirm'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (isEditing && expense?.id) {
+                const currentUser = getCurrentUser();
+                if (!currentUser) {
+                  Alert.alert(t('common.error'), t('addExpense.validation.unauthenticated'));
+                  return;
+                }
 
-        await deleteItemFromExpense(expense.id, index, currentUser.uid);
-      }
+                await deleteItemFromExpense(expense.id, index, currentUser.uid);
+              }
 
-      actions.removeItem(index);
-    } catch (error) {
-      Alert.alert("Error", "Failed to remove item: " + error.message);
-    }
-  }, [isEditing, expense?.id, actions]);
+              actions.removeItem(index);
+            } catch (error) {
+              Alert.alert(t('common.error'), t('addExpense.validation.deleteError', { error: error.message }));
+            }
+          },
+        },
+      ]
+    );
+  }, [isEditing, expense?.id, actions, t]);
 
   const handleAddFee = useCallback((feeData) => {
     actions.addFee(feeData);
@@ -143,7 +162,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
     let feeName = selectedFeeType;
     if (selectedFeeType === 'Custom') {
-      feeName = customFeeName.trim() || 'Fee';
+      feeName = customFeeName.trim() || t('addReceipt.feeTypes.custom');
     }
 
     let newFee;
@@ -152,7 +171,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       const feeAmount = (itemsSubtotal * (value / 100)).toFixed(2);
       newFee = {
         id: feeId,
-        name: selectedFeeType === 'Tip' ? `${value}% Tip` : `${feeName} (${value}%)`,
+        name: selectedFeeType === 'Tip' ? `${value}% ${t('addReceipt.feeTypes.tip')}` : `${feeName} (${value}%)`,
         amount: parseFloat(feeAmount),
         type: 'percentage',
         percentage: value / 100,
@@ -209,10 +228,10 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
-    if (!currentUser) throw new Error("No user signed in");
+    if (!currentUser) throw new Error(t('setupExpense.errors.noUser'));
 
     const userProfile = await getUserProfile(currentUser.uid);
-    if (!userProfile) throw new Error("Failed to get user profile");
+    if (!userProfile) throw new Error(t('setupExpense.errors.profileError'));
 
     const finalTitle =
       state.title.trim() || state.items[0]?.name.trim() || "Receipt";
@@ -262,11 +281,11 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   const validateExpense = () => {
     if (state.participants.some((p) => !p.name.trim())) {
-      Alert.alert("Error", "Please enter names for all participants");
+      Alert.alert(t('common.error'), t('addExpense.validationError'));
       return false;
     }
     if (state.items.length === 0) {
-      Alert.alert("Error", "Please add at least one item");
+      Alert.alert(t('common.error'), t('addExpense.validationError'));
       return false;
     }
     if (
@@ -275,19 +294,19 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       )
     ) {
       Alert.alert(
-        "Error",
-        "Please fill in all item names and ensure amounts are valid"
+        t('common.error'),
+        t('addExpense.validationError')
       );
       return false;
     }
     if (state.fees.some((fee) => !fee.name.trim())) {
-      Alert.alert("Error", "Please fill in all fee names");
+      Alert.alert(t('common.error'), t('addReceipt.feeNameMissing'));
       return false;
     }
     if (!state.selectedPayers?.length) {
       Alert.alert(
-        "Error",
-        "Please select at least one person who paid for this receipt"
+        t('common.error'),
+        t('addExpense.validationError')
       );
       return false;
     }
@@ -320,8 +339,8 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     if (hasErrors) {
       setItemValidationErrors(errors);
       Alert.alert(
-        "Incomplete Items",
-        "Please ensure all items have a price greater than zero and at least one person assigned to split the cost."
+        t('addReceipt.incompleteItems'),
+        t('addReceipt.incompleteItemsDesc')
       );
       return false;
     }
@@ -475,7 +494,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
           formattedFees = scannedReceipt.fees.map((fee, index) => ({
               id: Date.now().toString() + 'fee' + index,
-              name: fee.name || 'Fee',
+              name: fee.name || t('addReceipt.feeTypes.custom'),
             amount: parseFloat(fee.amount) || 0,
             type: fee.type || 'fixed',
             percentage: fee.percentage || null,
@@ -511,7 +530,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
         <ExpenseHeader
-          title={state.title || (isEditing ? 'Edit Receipt' : 'Add Receipt')}
+          title={state.title || (isEditing ? t('addReceipt.editReceiptTitle') : t('addReceipt.addReceiptTitle'))}
           onBackPress={() => navigation.goBack()}
           onSettingsPress={() => navigation.navigate('ExpenseSettings', { expense: { 
             id: expense?.id,
@@ -547,7 +566,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         {/* Paid By Section */}
         <View style={styles.sectionContainer}>
           <View style={styles.headerRow}>
-            <Text style={styles.sectionHeaderText}>PAID BY</Text>
+            <Text style={styles.sectionHeaderText}>{t('addReceipt.paidBy')}</Text>
           </View>
           <View style={styles.cardContainer}>
             <View style={styles.paidByWrapper}>
@@ -587,7 +606,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                     await updateExpenseParticipants(expense.id, participants, currentUser.uid);
                     await updateExpense(expense.id, otherFields, currentUser.uid);
                 } catch (error) {
-                    Alert.alert("Error", "Failed to save item changes: " + error.message);
+                    Alert.alert(t('common.error'), t('components.expenses.expenseItemCard.alerts.saveError', { error: error.message }));
                 } finally {
                     setSavingItemId(null);
                 }
@@ -617,7 +636,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
           {/* Tips & Fees Section */}
           <View style={styles.sectionContainer}>
             <View style={styles.headerRow}>
-              <Text style={styles.sectionHeaderText}>EXTRA CHARGES</Text>
+              <Text style={styles.sectionHeaderText}>{t('addReceipt.extraCharges')}</Text>
             </View>
             
             <View style={styles.cardContainer}>
@@ -641,7 +660,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                         styles.feeTypeLabel,
                         isSelected && styles.feeTypeLabelSelected
                         ]}>
-                        {type}
+                        {t(`addReceipt.feeTypes.${type.toLowerCase()}`)}
                         </Text>
                     </TouchableOpacity>
                     );
@@ -657,7 +676,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                         <View style={styles.customNameContainer}>
                         <TextInput
                             style={styles.inlineInput}
-                            placeholder="Fee Name (e.g. Corkage)"
+                            placeholder={t('addReceipt.placeholders.feeName')}
                             placeholderTextColor={Colors.textSecondary}
                             value={customFeeName}
                             onChangeText={setCustomFeeName}
@@ -724,7 +743,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                     activeOpacity={0.7}
                 >
                     <Text style={[styles.addItemText, (!customFeeInput || parseFloat(customFeeInput) <= 0) && { color: Colors.textSecondary }]}>
-                        Add {selectedFeeType}
+                        {t('addReceipt.addFee', { type: selectedFeeType })}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -769,21 +788,21 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
           {/* Totals Section */}
           <View style={styles.sectionContainer}>
              <View style={styles.headerRow}>
-              <Text style={styles.sectionHeaderText}>TOTALS</Text>
+              <Text style={styles.sectionHeaderText}>{t('addReceipt.totals')}</Text>
             </View>
             <View style={styles.cardContainer}>
                 <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Subtotal</Text>
+                    <Text style={styles.totalLabel}>{t('addReceipt.subtotal')}</Text>
                     <Text style={styles.totalValue}>${itemsSubtotal.toFixed(2)}</Text>
                 </View>
                 <View style={styles.separator} />
                 <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Fees & Tip</Text>
+                    <Text style={styles.totalLabel}>{t('addReceipt.feesAndTip')}</Text>
                     <Text style={styles.totalValue}>${feesSubtotal.toFixed(2)}</Text>
                 </View>
                 <View style={styles.separator} />
                 <View style={styles.totalRow}>
-                    <Text style={styles.grandTotalLabel}>Total</Text>
+                    <Text style={styles.grandTotalLabel}>{t('addReceipt.total')}</Text>
                     <Text style={styles.grandTotalValue}>${calculatedTotal.toFixed(2)}</Text>
                 </View>
             </View>

@@ -22,53 +22,42 @@ export const searchExpenses = async (query, hitsPerPage = 3) => {
       return [];
     }
 
-    // Check if search method exists
-    if (typeof searchClient.search !== 'function') {
-      throw new Error('Algolia search client does not have search method');
-    }
-
     // Search expenses using Algolia v5 API with filters to only return user's expenses
-    // Algolia array filter syntax: filter by array containing value
-    // Using search method which takes an array of search requests
-    const searchParams = {
+    // IMPORTANT: participantIds must be in attributesForFaceting for filtering to work
+    // Run: node scripts/configureAlgoliaIndex.js to set this up
+
+    const searchRequest = {
       indexName: 'expenses',
-        params: {
-          query: query.trim(),
-          // Filter by participantIds array containing the user ID
-          // Algolia automatically handles array-contains for filterable attributes
-          filters: `participantIds:${currentUser.uid}`,
-          hitsPerPage: hitsPerPage,
-          attributesToRetrieve: [
-            'objectID',
-            'title',
-            'expenseType',
-            'participantIds',
-            'participantNames',
-            'participantUsernames',
-            'itemNames',
-            'createdBy',
-            'createdAt',
-            'updatedAt',
-            'settled',
-            'total',
-          ],
-        },
+      query: query.trim(),
+      // Filter by participantIds array containing the user ID
+      // For array attributes, Algolia matches if ANY element in the array matches
+      filters: `participantIds:"${currentUser.uid}"`,
+      hitsPerPage: hitsPerPage,
+      attributesToRetrieve: [
+        'objectID',
+        'title',
+        'expenseType',
+        'participantIds',
+        'participantNames',
+        'participantUsernames',
+        'itemNames',
+        'createdBy',
+        'createdAt',
+        'updatedAt',
+        'settled',
+        'total',
+      ],
     };
 
-    const searchResponse = await searchClient.search([searchParams]);
+    const searchResponse = await searchClient.search({ requests: [searchRequest] });
 
     // Extract hits from the response
     // Algolia v5 response structure: { results: [{ hits: [...], processingTimeMS: number, ... }] }
     let hits = [];
-    if (searchResponse) {
-      if (searchResponse.results && Array.isArray(searchResponse.results) && searchResponse.results.length > 0) {
-        const firstResult = searchResponse.results[0];
-        if (firstResult && firstResult.hits && Array.isArray(firstResult.hits)) {
-          hits = firstResult.hits;
-        }
-      } else if (searchResponse.hits && Array.isArray(searchResponse.hits)) {
-        // Alternative response structure (direct hits)
-        hits = searchResponse.hits;
+    if (searchResponse && searchResponse.results && Array.isArray(searchResponse.results) && searchResponse.results.length > 0) {
+      const firstResult = searchResponse.results[0];
+      if (firstResult && firstResult.hits && Array.isArray(firstResult.hits)) {
+        hits = firstResult.hits;
       }
     }
     

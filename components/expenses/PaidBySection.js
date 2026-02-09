@@ -10,8 +10,10 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { useExpense } from '../../contexts/ExpenseContext';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const PaidBySection = () => {
+  const { t } = useTranslation();
   const { state, actions } = useExpense();
   const { participants, selectedPayers, items } = state;
 
@@ -32,7 +34,7 @@ const PaidBySection = () => {
 
   return (
     <View style={styles.paidByContainer}>
-      <Text style={styles.label}>Paid by</Text>
+      {/* Label removed to avoid duplication with screen header */}
       
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.paidByGrid}>
@@ -74,7 +76,7 @@ const PaidBySection = () => {
                     )}
                     {isSelected && (
                         <View style={styles.paidByCheckmark}>
-                        <Ionicons name="checkmark" size={10} color={Colors.surface} />
+                        <Ionicons name="checkmark" size={12} color={Colors.surface} />
                         </View>
                     )}
                     </View>
@@ -82,13 +84,13 @@ const PaidBySection = () => {
                     styles.paidByName,
                     isSelected && styles.paidByNameSelected
                     ]} numberOfLines={1}>
-                    {participant.name === 'Me' ? 'You' : participant.name.split(' ')[0]}
+                    {participant.name === 'Me' ? t('components.expenses.paidBy.you') : participant.name.split(' ')[0]}
                     </Text>
                 </View>
                 </TouchableOpacity>
             );
             }) : (
-            <Text style={styles.noParticipantsText}>No participants</Text>
+            <Text style={styles.noParticipantsText}>{t('components.expenses.paidBy.noParticipants')}</Text>
             )}
         </View>
       </ScrollView>
@@ -100,14 +102,9 @@ const styles = StyleSheet.create({
   paidByContainer: {
     // Clean container
   },
-  label: {
-      ...Typography.caption,
-      color: Colors.textSecondary,
-      marginBottom: Spacing.sm,
-      fontWeight: '600',
-  },
   scrollContent: {
-      paddingVertical: 2, // avoid shadow clipping
+      paddingVertical: 4, // ample space for shadows/selection
+      paddingHorizontal: 2, 
   },
   paidByGrid: {
     flexDirection: 'row',
@@ -115,41 +112,41 @@ const styles = StyleSheet.create({
   },
   paidByItem: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg, // Larger radius
     borderWidth: 1,
     borderColor: Colors.divider,
     padding: Spacing.sm,
-    width: 70, // Compact width
-    height: 90,
+    width: 80, // Increased width for better touch target
+    height: 100, // Increased height
     alignItems: 'center',
     justifyContent: 'center',
   },
   paidByItemSelected: {
     backgroundColor: Colors.brandLight,
-    borderColor: Colors.accent,
+    borderColor: Colors.brand, // Using brand color for active state
     borderWidth: 1.5,
   },
   paidByItemContent: {
     alignItems: 'center',
-    gap: 6,
+    gap: 8, // More spacing between avatar and name
   },
   paidByAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 48, // Larger avatar
+    height: 48,
+    borderRadius: 24,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
   paidByAvatarImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   paidByAvatarPlaceholder: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: Colors.surfaceLight,
     alignItems: 'center',
     justifyContent: 'center',
@@ -157,31 +154,31 @@ const styles = StyleSheet.create({
     borderColor: Colors.divider,
   },
   paidByAvatarText: {
-    fontSize: 12,
+    fontSize: 16, // Larger text
     fontWeight: '700',
     color: Colors.textPrimary,
   },
   paidByCheckmark: {
     position: 'absolute',
-    bottom: -4,
-    right: -4,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.accent,
+    bottom: -2,
+    right: -2,
+    width: 20, // Larger checkmark badge
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.brand, // Using brand color
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: Colors.surface,
   },
   paidByName: {
     ...Typography.caption,
-    fontSize: 10,
+    fontSize: 11, // Slightly larger
     color: Colors.textSecondary,
     textAlign: 'center',
   },
   paidByNameSelected: {
-    color: Colors.accent,
+    color: Colors.brand,
     fontWeight: '700',
   },
   noParticipantsText: {
@@ -190,12 +187,12 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   currentUserAvatar: {
-    borderColor: Colors.accent,
+    borderColor: Colors.brand,
     borderWidth: 2,
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.brandLight,
   },
   currentUserInitials: {
-    color: Colors.white,
+    color: Colors.brand, // Brand color for text
   },
 });
 

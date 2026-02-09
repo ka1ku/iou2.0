@@ -12,10 +12,161 @@
         "terms": "Conditions d'utilisation",
         "rate": "Évaluer l'application",
         "signOut": "Se déconnecter",
-        "deleteAccount": "Supprimer le compte"
+        "deleteAccount": "Supprimer le compte",
+        "growth": "Croissance",
+        "buildYourSquad": {
+            "title": "Construis Ton Équipe",
+            "subtitle": "Gagne des récompenses en invitant des amis"
+        },
+        "currencies": {
+            "usd": "Dollar américain (USD)",
+            "eur": "Euro (EUR)",
+            "gbp": "Livre sterling (GBP)",
+            "mxn": "Peso mexicain (MXN)",
+            "cad": "Dollar canadien (CAD)",
+            "cny": "Yuan chinois (CNY)",
+            "jpy": "Yen japonais (JPY)",
+            "krw": "Won sud-coréen (KRW)",
+            "vnd": "Dong vietnamien (VND)"
+        },
+        "termsOfService": {
+            "lastUpdated": "Dernière mise à jour : Décembre 2024",
+            "sections": {
+                "1": {
+                    "title": "1. Acceptation des conditions",
+                    "content": "En accédant et en utilisant l'application mobile IOU (« App »), vous acceptez d'être lié par les termes et dispositions du présent accord. Si vous n'acceptez pas de respecter ce qui précède, veuillez ne pas utiliser ce service."
+                },
+                "2": {
+                    "title": "2. Licence d'utilisation",
+                    "content": "L'autorisation est accordée de télécharger temporairement une copie de l'application IOU pour une visualisation transitoire personnelle et non commerciale uniquement. Il s'agit de l'octroi d'une licence, et non d'un transfert de titre, et en vertu de cette licence, vous ne pouvez pas :",
+                    "bullets": {
+                        "1": "modifier ou copier le matériel",
+                        "2": "utiliser le matériel à des fins commerciales ou pour toute exposition publique",
+                        "3": "tenter de procéder à une ingénierie inverse de tout logiciel contenu dans l'application",
+                        "4": "supprimer tout droit d'auteur ou autre mention de propriété du matériel"
+                    }
+                },
+                "3": {
+                    "title": "3. Comptes utilisateurs",
+                    "content": "Pour utiliser certaines fonctionnalités de l'App, vous devez créer un compte. Vous êtes responsable de :",
+                    "bullets": {
+                        "1": "Fournir des informations exactes et complètes",
+                        "2": "Maintenir la sécurité de vos identifiants de compte",
+                        "3": "Toutes les activités qui se produisent sous votre compte",
+                        "4": "Nous informer immédiatement de toute utilisation non autorisée"
+                    }
+                },
+                "4": {
+                    "title": "4. Traitement des paiements",
+                    "content": "L'App facilite le suivi des dépenses et le règlement entre les utilisateurs. Nous pouvons nous intégrer à des processeurs de paiement tiers. En utilisant ces fonctionnalités, vous acceptez de :",
+                    "bullets": {
+                        "1": "Respecter les conditions d'utilisation des fournisseurs de paiement tiers",
+                        "2": "Comprendre que nous ne sommes pas responsables du traitement des paiements",
+                        "3": "Supporter tous les frais facturés par les processeurs de paiement"
+                    }
+                },
+                "5": {
+                    "title": "5. Politique de confidentialité",
+                    "content": "Votre vie privée est importante pour nous. Veuillez consulter notre Politique de confidentialité, qui régit également votre utilisation de l'App, pour comprendre nos pratiques."
+                },
+                "6": {
+                    "title": "6. Utilisations interdites",
+                    "content": "Vous ne pouvez pas utiliser notre App :",
+                    "bullets": {
+                        "1": "À des fins illégales ou pour solliciter d'autres personnes à accomplir des actes illégaux",
+                        "2": "Pour enfreindre toute réglementation, règle, loi ou ordonnance locale internationale, fédérale, provinciale ou étatique",
+                        "3": "Pour enfreindre ou violer nos droits de propriété intellectuelle ou les droits de propriété intellectuelle d'autrui",
+                        "4": "Pour harceler, abuser, insulter, nuire, diffamer, calomnier, dénigrer, intimider ou discriminer",
+                        "5": "Pour soumettre des informations fausses ou trompeuses"
+                    },
+                    "content2": "Nous avons une politique de tolérance zéro pour le contenu répréhensible et les utilisateurs abusifs. Le contenu qui viole ces conditions sera supprimé, et les utilisateurs qui se livrent à un tel comportement seront bloqués et bannis du Service."
+                },
+                "7": {
+                    "title": "7. Avis de non-responsabilité",
+                    "content": "Les informations sur cette App sont fournies « telles quelles ». Dans toute la mesure permise par la loi, cette Société :",
+                    "bullets": {
+                        "1": "Exclut toutes les représentations et garanties relatives à cette app et à son contenu",
+                        "2": "Ne garantit pas l'exactitude, l'exhaustivité ou l'actualité des informations",
+                        "3": "Exclut toute responsabilité pour les dommages résultant de ou en relation avec votre utilisation de cette app"
+                    }
+                },
+                "8": {
+                    "title": "8. Limitation de responsabilité",
+                    "content": "En aucun cas, IOU ou ses fournisseurs ne seront responsables de tout dommage (y compris, sans s'y limiter, les dommages pour perte de données ou de profit, ou en raison d'une interruption d'activité) résultant de l'utilisation ou de l'impossibilité d'utiliser l'App, même si IOU ou un représentant autorisé a été informé oralement ou par écrit de la possibilité de tels dommages."
+                },
+                "9": {
+                    "title": "9. Révisions",
+                    "content": "Le matériel apparaissant sur l'App pourrait inclure des erreurs techniques, typographiques ou photographiques. IOU ne garantit pas que l'un des matériaux sur son App est exact, complet ou actuel. IOU peut apporter des modifications au matériel contenu sur son App à tout moment sans préavis."
+                },
+                "10": {
+                    "title": "10. Loi applicable",
+                    "content": "Ces termes et conditions sont régis et interprétés conformément aux lois des États-Unis et vous vous soumettez irrévocablement à la compétence exclusive des tribunaux de cet état ou lieu."
+                },
+                "11": {
+                    "title": "11. Coordonnées",
+                    "content": "Si vous avez des questions sur ces Conditions d'utilisation, veuillez nous contacter à :",
+                    "email": "Email : legal@iou-app.com",
+                    "support": "Support : support@iou-app.com"
+                }
+            },
+            "footer": "En utilisant IOU, vous reconnaissez avoir lu et compris ces Conditions d'utilisation et acceptez d'être lié par elles."
+        }
+    },
+    "auth": {
+        "common": {
+            "usCountryCode": "🇺🇸 +1"
+        },
+        "signUp": {
+            "stepIndicator": "Étape {{current}} sur {{total}}",
+            "title": "Créer un compte"
+        },
+        "twoFactor": {
+            "screenTitle": "Authentification à deux facteurs",
+            "title": "Authentification à deux facteurs"
+        }
     },
     "common": {
         "cancel": "Annuler",
         "save": "Enregistrer"
+    },
+    "referral": {
+        "progress": {
+            "title": "Votre Progression",
+            "referrals": "{{count}} parrainages confirmés",
+            "nextTier": "{{count}} de plus pour la prochaine récompense"
+        },
+        "tier1": {
+            "title": "Niveau 1: Lanceur d'Équipe",
+            "requirement": "3 parrainages réussis",
+            "reward": "1 mois de IOU Pro",
+            "benefits": [
+                "Scanner de reçus",
+                "Dépenses illimitées",
+                "Catégories personnalisées"
+            ]
+        },
+        "tier2": {
+            "title": "Niveau 2: Chef d'Équipe",
+            "requirement": "5 parrainages réussis",
+            "reward": "3 mois de IOU Pro",
+            "benefits": [
+                "Tout du Niveau 1",
+                "Support prioritaire",
+                "Accès anticipé aux fonctionnalités"
+            ]
+        },
+        "share": {
+            "title": "Partage Ton Lien",
+            "description": "Invite des amis pour gagner des récompenses",
+            "copyLink": "Copier le Lien",
+            "shareLink": "Partager le Lien",
+            "copied": "Lien copié!"
+        },
+        "history": {
+            "title": "Historique des Parrainages",
+            "confirmed": "Confirmé",
+            "pending": "En attente",
+            "empty": "Pas encore de parrainages. Commence à inviter des amis!"
+        }
     }
 }

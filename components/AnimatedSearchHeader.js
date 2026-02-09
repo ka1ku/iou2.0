@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography } from '../design/tokens';
+import { useTranslation } from '../contexts/LanguageContext';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -26,6 +27,7 @@ const HEADER_PADDING = Spacing.lg * 2;
 const EXPANDED_WIDTH = SCREEN_WIDTH - HEADER_PADDING;
 
 const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearchClose }, ref) => {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(false);
   const insets = useSafeAreaInsets();
   const inputRef = useRef(null);
@@ -137,7 +139,7 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
         <View style={styles.headerContent}>
           {/* Left Section - Title */}
           <Animated.View style={[styles.leftSection, leftSectionStyle]}>
-            <Text style={styles.headerTitle}>Expenses</Text>
+            <Text style={styles.headerTitle}>{t('home.headerTitle')}</Text>
           </Animated.View>
 
           {/* Search Container - Expands to cover entire header */}
@@ -170,7 +172,7 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
               <TextInput
                 ref={inputRef}
                 style={styles.searchInput}
-                placeholder="Search expenses or members..."
+                placeholder={t('home.searchPlaceholder')}
                 placeholderTextColor={Colors.textSecondary}
                 value={searchQuery}
                 onChangeText={onSearchChange}
@@ -178,10 +180,10 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
                 autoCorrect={false}
                 returnKeyType="search"
                 onBlur={() => {
-                  // Close search when input loses focus (user taps outside)
+                  // Close search when input loses focus ONLY if there's no text
                   // Small delay to allow clear button presses to register
                   setTimeout(() => {
-                    if (isExpanded && shouldCloseOnBlurRef.current) {
+                    if (isExpanded && shouldCloseOnBlurRef.current && !searchQuery.trim()) {
                       handleCloseSearch();
                     }
                     // Reset the flag
@@ -192,13 +194,11 @@ const AnimatedSearchHeader = forwardRef(({ searchQuery, onSearchChange, onSearch
               {searchQuery.length > 0 && (
                 <TouchableOpacity
                   onPress={() => {
-                    // Prevent closing on blur when clearing text
+                    // Prevent closing on blur when pressing X button
                     shouldCloseOnBlurRef.current = false;
+                    // Clear text and close search
                     onSearchChange('');
-                    // Keep focus on input after clearing
-                    setTimeout(() => {
-                      inputRef.current?.focus();
-                    }, 50);
+                    handleCloseSearch();
                   }}
                   style={styles.clearTextButton}
                   activeOpacity={0.7}

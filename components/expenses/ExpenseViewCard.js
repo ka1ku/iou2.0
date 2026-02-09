@@ -15,6 +15,7 @@ import {
   Typography,
 } from "../../design/tokens";
 import { useExpense } from "../../contexts/ExpenseContext";
+import { useTranslation } from "../../contexts/LanguageContext";
 import ProfilePicture from "../VenmoProfilePicture";
 import Card from "../Card";
 
@@ -40,6 +41,7 @@ const getRelativeTime = (timestamp) => {
 };
 
 const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
+  const { t } = useTranslation();
   const { state } = useExpense();
   const { participants } = state;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -48,19 +50,19 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
 
   const paidByInfo = useMemo(() => {
     const payers = item.selectedPayers || [];
-    if (payers.length === 0) return "Paid by Unassigned";
+    if (payers.length === 0) return t('components.expenses.expenseViewCard.paidByUnassigned');
 
     const payerDetails = payers.map((index) => participants[index]).filter(Boolean);
-    if (payerDetails.length === 0) return "Paid by Unassigned";
+    if (payerDetails.length === 0) return t('components.expenses.expenseViewCard.paidByUnassigned');
 
     if (payerDetails.length === 1) {
-      return `Paid by ${payerDetails[0].name}`;
+      return t('components.expenses.expenseViewCard.paidByOne', { name: payerDetails[0].name });
     }
     if (payerDetails.length === 2) {
-      return `Paid by ${payerDetails[0].name} and ${payerDetails[1].name}`;
+      return t('components.expenses.expenseViewCard.paidByTwo', { name1: payerDetails[0].name, name2: payerDetails[1].name });
     }
-    return `Paid by ${payerDetails[0].name} and ${payerDetails.length - 1} others`;
-  }, [item.selectedPayers, participants]);
+    return t('components.expenses.expenseViewCard.paidByMany', { name: payerDetails[0].name, count: payerDetails.length - 1 });
+  }, [item.selectedPayers, participants, t]);
 
   const splitInfo = useMemo(() => {
     const consumers = item.selectedConsumers || [];
@@ -86,22 +88,22 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
   const handleMenuPress = () => {
     if (isLocked) {
       Alert.alert(
-        'Item Locked',
-        'This item is part of an active settlement. Undo the settlement to edit this item.'
+        t('components.expenses.expenseViewCard.locked.title'),
+        t('components.expenses.expenseViewCard.locked.message')
       );
       return;
     }
     Alert.alert(
-      "Expense Actions",
-      "What would you like to do?",
+      t('components.expenses.expenseViewCard.actions.title'),
+      t('components.expenses.expenseViewCard.actions.message'),
       [
-        { text: "Edit", onPress: () => onEdit && onEdit() },
+        { text: t('components.expenses.expenseViewCard.actions.edit'), onPress: () => onEdit && onEdit() },
         {
-          text: "Delete",
+          text: t('components.expenses.expenseViewCard.actions.delete'),
           style: "destructive",
           onPress: () => onDelete && onDelete(),
         },
-        { text: "Cancel", style: "cancel" },
+        { text: t('components.expenses.expenseViewCard.actions.cancel'), style: "cancel" },
       ]
     );
   };
@@ -117,12 +119,12 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
         <View style={styles.titleSection}>
           <View style={styles.itemNameRow}>
             <Text style={[styles.itemName, isLocked && styles.itemNameLocked]} numberOfLines={2}>
-              {item.name || "Untitled Item"}
+              {item.name || t('components.expenses.expenseViewCard.untitledItem')}
             </Text>
             {isLocked && (
               <View style={styles.settledBadge}>
                 <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
-                <Text style={styles.settledBadgeText}>Settled</Text>
+                <Text style={styles.settledBadgeText}>{t('components.expenses.expenseViewCard.settled')}</Text>
               </View>
             )}
           </View>
@@ -155,7 +157,7 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
           activeOpacity={0.7}
         >
           <View style={styles.headerLeft}>
-            <Text style={styles.sectionTitle}>Split with</Text>
+            <Text style={styles.sectionTitle}>{t('components.expenses.expenseViewCard.splitWith')}</Text>
             {!isExpanded && (
               <View style={styles.previewContainer}>
                 {splitInfo.slice(0, 3).map((split, index) => (

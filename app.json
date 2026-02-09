@@ -45,7 +45,7 @@
           "venmo",
           "venmo"
         ],
-        "NSContactsUsageDescription": "This app needs access to your contacts to help you find and connect with people you know, whether they're already using the app or just in your phone contacts.",
+        "NSContactsUsageDescription": "This app needs access to your contacts to help you find and connect with people you know, and to use your contact photo as your default profile picture.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -86,7 +86,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts."
+          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts and use your contact photo as your profile picture."
         }
       ]
     ],

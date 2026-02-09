@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import Button from '../../components/Button';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const LINE_SPACING = 28; // Spacing between lines for notebook paper
@@ -37,6 +38,7 @@ const LinedPaperBackground = () => {
 };
 
 const WelcomeScreen = ({ navigation }) => {
+  const { t } = useTranslation();
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={PAPER_BACKGROUND} />
@@ -54,7 +56,7 @@ const WelcomeScreen = ({ navigation }) => {
             transition={200}
           />
         </View>
-        <Text style={styles.title}>Welcome to IOU!</Text>
+        <Text style={styles.title}>{t('auth.welcome.title')}</Text>
 
       </View>
 
@@ -63,19 +65,19 @@ const WelcomeScreen = ({ navigation }) => {
           <View style={styles.iconContainer}>
             <Ionicons name="people-outline" size={28} color={Colors.accent} />
           </View>
-          <Text style={styles.featureText}>Split with Groups</Text>
+          <Text style={styles.featureText}>{t('auth.welcome.split')}</Text>
         </View>
         <View style={styles.feature}>
           <View style={styles.iconContainer}>
             <Ionicons name="calculator-outline" size={28} color={Colors.accent} />
           </View>
-          <Text style={styles.featureText}>Auto Calculate</Text>
+          <Text style={styles.featureText}>{t('auth.welcome.autoCalculate')}</Text>
         </View>
         <View style={styles.feature}>
           <View style={styles.iconContainer}>
             <Ionicons name="sync-outline" size={28} color={Colors.accent} />
           </View>
-          <Text style={styles.featureText}>Real-time Sync</Text>
+          <Text style={styles.featureText}>{t('auth.welcome.realTime')}</Text>
         </View>
       </View>
 
@@ -83,7 +85,7 @@ const WelcomeScreen = ({ navigation }) => {
 
       <View style={[styles.buttonContainer, { zIndex: 1 }]}>
         <Button
-          title="Create Account"
+          title={t('auth.welcome.createAccount')}
           onPress={() => navigation.navigate('SignUp')}
           variant="primary"
           size="large"
@@ -92,7 +94,7 @@ const WelcomeScreen = ({ navigation }) => {
         />
         
         <Button
-          title="Sign In"
+          title={t('auth.welcome.signIn')}
           onPress={() => navigation.navigate('SignIn')}
           variant="outline"
           size="large"

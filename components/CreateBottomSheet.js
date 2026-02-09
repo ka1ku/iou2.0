@@ -19,8 +19,10 @@ import { requestReceiptScanningAccess, incrementScanUsage } from '../services/su
 import { useReceiptScanning } from '../contexts/ReceiptScanningContext';
 import deepLinkService from '../services/deepLinkService';
 import { parseExpenseJoinLink } from '../services/expenseService';
+import { useTranslation } from '../contexts/LanguageContext';
 
 const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['50%'], []);
@@ -169,7 +171,7 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
   const handleProcessJoin = useCallback(() => {
     const input = joinInput.trim();
     if (!input) {
-      Alert.alert('Error', 'Please enter an invite link or code');
+      Alert.alert(t('common.error'), t('components.createBottomSheet.missingLinkError'));
       return;
     }
 
@@ -272,7 +274,7 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
               >
                 <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
               </TouchableOpacity>
-              <Text style={styles.title}>Scan Receipt</Text>
+              <Text style={styles.title}>{t('components.createBottomSheet.scanTitle')}</Text>
               <View style={styles.backButtonPlaceholder} />
             </View>
             
@@ -286,8 +288,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
                   <Ionicons name="camera" size={28} color={Colors.blue} />
                 </View>
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Take Photo</Text>
-                  <Text style={styles.optionSubtitle}>Capture a new receipt photo</Text>
+                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.takePhoto')}</Text>
+                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.takePhotoDesc')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -301,8 +303,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
                   <Ionicons name="images-outline" size={28} color={Colors.blue} />
                 </View>
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Choose from Gallery</Text>
-                  <Text style={styles.optionSubtitle}>Select an existing photo</Text>
+                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.chooseGallery')}</Text>
+                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.chooseGalleryDesc')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -318,15 +320,15 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
               >
                 <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
               </TouchableOpacity>
-              <Text style={styles.title}>Join Expense</Text>
+              <Text style={styles.title}>{t('components.createBottomSheet.joinTitle')}</Text>
               <View style={styles.backButtonPlaceholder} />
             </View>
             
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Enter Invite Link or Code</Text>
+              <Text style={styles.inputLabel}>{t('components.createBottomSheet.enterLink')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Paste link or code here..."
+                placeholder={t('components.createBottomSheet.linkPlaceholder')}
                 value={joinInput}
                 onChangeText={setJoinInput}
                 autoCapitalize="none"
@@ -339,14 +341,14 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
                 onPress={handleProcessJoin}
                 disabled={!joinInput.trim()}
               >
-                <Text style={styles.actionButtonText}>Join</Text>
+                <Text style={styles.actionButtonText}>{t('components.createBottomSheet.joinButton')}</Text>
               </TouchableOpacity>
             </View>
           </>
         ) : (
           <>
             <View style={styles.headerRow}>
-              <Text style={styles.title}>Create New</Text>
+              <Text style={styles.title}>{t('components.createBottomSheet.title')}</Text>
             </View>
             
             <View style={styles.optionsContainer}>
@@ -359,8 +361,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
                   <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
                 </View>
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Add Expense</Text>
-                  <Text style={styles.optionSubtitle}>Manually add an expense</Text>
+                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.addExpense')}</Text>
+                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.addExpenseDesc')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -374,8 +376,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
                   <Ionicons name="camera-outline" size={28} color={Colors.blue} />
                 </View>
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Scan Receipt</Text>
-                  <Text style={styles.optionSubtitle}>Scan a receipt to extract items</Text>
+                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.scanReceipt')}</Text>
+                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.scanReceiptDesc')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
@@ -389,8 +391,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
                   <Ionicons name="enter-outline" size={28} color={Colors.accent} />
                 </View>
                 <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>Join Expense</Text>
-                  <Text style={styles.optionSubtitle}>Use a link or code to join</Text>
+                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.joinExpense')}</Text>
+                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.joinExpenseDesc')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>

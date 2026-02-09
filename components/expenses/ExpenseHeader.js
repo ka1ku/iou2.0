@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Typography, Radius } from '../../design/tokens';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const ExpenseHeader = ({
   title,
@@ -15,6 +16,7 @@ const ExpenseHeader = ({
   activeTab,
   onTabChange,
 }) => {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   return (
@@ -34,7 +36,7 @@ const ExpenseHeader = ({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {title || (isEditing ? 'Edit' : 'Add')}
+          {title || (isEditing ? t('components.expenses.header.edit') : t('components.expenses.header.add'))}
         </Text>
 
         {onPeoplePress && (
@@ -78,7 +80,7 @@ const ExpenseHeader = ({
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, activeTab === 'track' && styles.tabTextActive]}>
-                Track
+                {t('components.expenses.header.track')}
               </Text>
             </TouchableOpacity>
             
@@ -88,7 +90,7 @@ const ExpenseHeader = ({
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, activeTab === 'split' && styles.tabTextActive]}>
-                Split
+                {t('components.expenses.header.split')}
               </Text>
             </TouchableOpacity>
           </View>

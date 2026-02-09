@@ -10,6 +10,7 @@ import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import { calculateUserBalanceForExpense, getFormattedBalanceString, getBalanceColor, calculateExpenseTotal } from '../../utils/balanceCalculator';
 import LoadingSpinner from '../LoadingSpinner';
 import { getCurrentUser } from '../../services/authService';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 const RecentExpenses = ({ 
   expenses, 
@@ -19,6 +20,7 @@ const RecentExpenses = ({
   onExpensePress,
   userProfile 
 }) => {
+  const { t } = useTranslation();
   const recentExpenses = useMemo(() => {
     return expenses.slice(0, displayedExpensesCount);
   }, [expenses, displayedExpensesCount]);
@@ -167,7 +169,7 @@ const RecentExpenses = ({
                 <View style={styles.participantsRow}>
                   <Ionicons name="people-outline" size={12} color={Colors.textSecondary} />
                   <Text style={styles.participantCount}>
-                    {expense.participants?.length || 0} participants
+                    {expense.participants?.length || 0} {t('profile.participants')}
                   </Text>
                 </View>
               </View>
@@ -186,7 +188,7 @@ const RecentExpenses = ({
                 return (
                   <View style={styles.statusBadge}>
                     <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-                    <Text style={[styles.statusText, { color: Colors.success }]}>Settled up</Text>
+                    <Text style={[styles.statusText, { color: Colors.success }]}>{t('home.settledUp')}</Text>
                   </View>
                 );
               }
@@ -197,7 +199,7 @@ const RecentExpenses = ({
                   <View style={styles.statusBadge}>
                     <Ionicons name="arrow-up-circle" size={14} color={Colors.danger} />
                     <Text style={[styles.statusText, { color: Colors.danger }]}>
-                      You owe ${userBalance.netBalance.toFixed(2)}
+                      {t('home.youOwe')} ${userBalance.netBalance.toFixed(2)}
                     </Text>
                   </View>
                 );
@@ -206,7 +208,7 @@ const RecentExpenses = ({
                   <View style={styles.statusBadge}>
                     <Ionicons name="arrow-down-circle" size={14} color={Colors.success} />
                     <Text style={[styles.statusText, { color: Colors.success }]}>
-                      You're owed ${Math.abs(userBalance.netBalance).toFixed(2)}
+                      {t('home.youAreOwed')} ${Math.abs(userBalance.netBalance).toFixed(2)}
                     </Text>
                   </View>
                 );
@@ -217,14 +219,14 @@ const RecentExpenses = ({
                 return (
                   <View style={styles.statusBadge}>
                     <Ionicons name="alert-circle" size={14} color={Colors.accent} />
-                    <Text style={[styles.statusText, { color: Colors.accent }]}>Confirm payment</Text>
+                    <Text style={[styles.statusText, { color: Colors.accent }]}>{t('home.confirmPayment')}</Text>
                   </View>
                 );
               } else if (settlementStatus === 'awaitingConfirmation') {
                 return (
                   <View style={styles.statusBadge}>
                     <Ionicons name="time-outline" size={14} color={Colors.warning} />
-                    <Text style={[styles.statusText, { color: Colors.warning }]}>Awaiting confirmation</Text>
+                    <Text style={[styles.statusText, { color: Colors.warning }]}>{t('home.awaitingConfirmation')}</Text>
                   </View>
                 );
               }
@@ -233,7 +235,7 @@ const RecentExpenses = ({
               return (
                 <View style={styles.statusBadge}>
                   <Ionicons name="time-outline" size={14} color={Colors.warning} />
-                  <Text style={[styles.statusText, { color: Colors.warning }]}>Needs settlement</Text>
+                  <Text style={[styles.statusText, { color: Colors.warning }]}>{t('home.needsSettlement')}</Text>
                 </View>
               );
             })()}
@@ -248,7 +250,7 @@ const RecentExpenses = ({
       <View style={styles.container}>
         <View style={styles.sectionHeader}>
           <View style={styles.sectionHeaderLeft}>
-            <Text style={styles.sectionTitle}>Recent Expenses</Text>
+            <Text style={styles.sectionTitle}>{t('profile.recentExpenses')}</Text>
           </View>
         </View>
         <SkeletonLoader />
@@ -260,7 +262,7 @@ const RecentExpenses = ({
     <View style={styles.container}>
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderLeft}>
-          <Text style={styles.sectionTitle}>Recent Expenses</Text>
+          <Text style={styles.sectionTitle}>{t('profile.recentExpenses')}</Text>
           {!loading && expenses.length > 0 && (
             <View style={styles.expenseTypeCounts}>
               <View style={styles.typeCount}>
@@ -289,14 +291,14 @@ const RecentExpenses = ({
           <View style={styles.emptyStateIconContainer}>
             <Ionicons name="receipt-outline" size={48} color={Colors.accent} />
           </View>
-          <Text style={styles.emptyStateTitle}>No expenses yet</Text>
-          <Text style={styles.emptyStateSubtitle}>Start tracking your shared expenses</Text>
+          <Text style={styles.emptyStateTitle}>{t('home.noExpensesTitle')}</Text>
+          <Text style={styles.emptyStateSubtitle}>{t('profile.startTracking')}</Text>
           <TouchableOpacity
             style={styles.createExpenseButton}
             onPress={() => onExpensePress('SetupExpense')}
           >
             <Ionicons name="add-circle-outline" size={20} color="white" style={styles.createExpenseButtonIcon} />
-            <Text style={styles.createExpenseButtonText}>Create Your First Expense</Text>
+            <Text style={styles.createExpenseButtonText}>{t('profile.createFirstExpense')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -307,7 +309,7 @@ const RecentExpenses = ({
           {displayedExpensesCount < expenses.length && (
             <TouchableOpacity onPress={onLoadMore} style={styles.loadMoreButton}>
               <Text style={styles.loadMoreText}>
-                Load More ({expenses.length - displayedExpensesCount} remaining)
+                {t('profile.loadMore')} ({expenses.length - displayedExpensesCount} {t('profile.remaining')})
               </Text>
               <Ionicons name="chevron-down" size={18} color={Colors.accent} />
             </TouchableOpacity>

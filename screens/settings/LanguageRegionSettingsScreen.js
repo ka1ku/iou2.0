@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { useTranslation } from '../../contexts/LanguageContext';
 import i18n from '../../utils/i18n';
 
 const FLAG_MAP = {
@@ -40,40 +41,29 @@ const LANGUAGES = [
 ];
 
 const CURRENCIES = [
-  { label: 'US Dollar (USD)', value: 'USD', symbol: '$' },
-  { label: 'Euro (EUR)', value: 'EUR', symbol: '€' },
-  { label: 'British Pound (GBP)', value: 'GBP', symbol: '£' },
-  { label: 'Mexican Peso (MXN)', value: 'MXN', symbol: '$' },
-  { label: 'Canadian Dollar (CAD)', value: 'CAD', symbol: '$' },
-  { label: 'Chinese Yuan (CNY)', value: 'CNY', symbol: '¥' },
-  { label: 'Japanese Yen (JPY)', value: 'JPY', symbol: '¥' },
-  { label: 'Korean Won (KRW)', value: 'KRW', symbol: '₩' },
-  { label: 'Vietnamese Dong (VND)', value: 'VND', symbol: '₫' },
+  { labelKey: 'settings.currencies.usd', value: 'USD', symbol: '$' },
+  { labelKey: 'settings.currencies.eur', value: 'EUR', symbol: '€' },
+  { labelKey: 'settings.currencies.gbp', value: 'GBP', symbol: '£' },
+  { labelKey: 'settings.currencies.mxn', value: 'MXN', symbol: '$' },
+  { labelKey: 'settings.currencies.cad', value: 'CAD', symbol: '$' },
+  { labelKey: 'settings.currencies.cny', value: 'CNY', symbol: '¥' },
+  { labelKey: 'settings.currencies.jpy', value: 'JPY', symbol: '¥' },
+  { labelKey: 'settings.currencies.krw', value: 'KRW', symbol: '₩' },
+  { labelKey: 'settings.currencies.vnd', value: 'VND', symbol: '₫' },
 ];
 
-const REGIONS = [
-  { label: 'United States', value: 'US' },
-  { label: 'United Kingdom', value: 'GB' },
-  { label: 'Spain', value: 'ES' },
-  { label: 'France', value: 'FR' },
-  { label: 'Mexico', value: 'MX' },
-  { label: 'Canada', value: 'CA' },
-  { label: 'China', value: 'CN' },
-  { label: 'Japan', value: 'JP' },
-  { label: 'South Korea', value: 'KR' },
-  { label: 'Vietnam', value: 'VN' },
-];
+
 
 import { updateUserPreferences } from '../../services/authService';
 
 const LanguageRegionSettingsScreen = ({ navigation }) => {
-  const { language, setLanguage, currency, setCurrency, region, setRegion } = useSettingsStore();
+  const { language, setLanguage, currency, setCurrency } = useSettingsStore();
+  const { t } = useTranslation();
 
   const syncPreferences = (updates) => {
     // Current state merged with updates
     const currentPrefs = {
       language,
-      region,
       currency,
       ...updates
     };
@@ -87,10 +77,7 @@ const LanguageRegionSettingsScreen = ({ navigation }) => {
     syncPreferences({ language: lang });
   };
 
-  const handleSetRegion = (reg) => {
-    setRegion(reg);
-    syncPreferences({ region: reg });
-  };
+
 
   const handleSetCurrency = (curr) => {
     setCurrency(curr);
@@ -115,7 +102,9 @@ const LanguageRegionSettingsScreen = ({ navigation }) => {
                 {FLAG_MAP[item.value] && (
                   <Image source={FLAG_MAP[item.value]} style={styles.flag} />
                 )}
-                <Text style={styles.itemText}>{item.label}</Text>
+                <Text style={styles.itemText}>
+                  {item.label || t(item.labelKey)}
+                </Text>
               </View>
               {value === item.value && (
                 <Ionicons name="checkmark" size={20} color={Colors.accent} />
@@ -137,29 +126,23 @@ const LanguageRegionSettingsScreen = ({ navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{i18n.t('settings.preferences')}</Text>
+        <Text style={styles.headerTitle}>{t('settings.preferences')}</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <SelectionSection
-          title={i18n.t('settings.language')}
+          title={t('settings.language')}
           data={LANGUAGES}
           value={language}
           onSelect={handleSetLanguage}
           icon="language-outline"
         />
 
-        <SelectionSection
-          title={i18n.t('settings.region')}
-          data={REGIONS}
-          value={region}
-          onSelect={handleSetRegion}
-          icon="globe-outline"
-        />
+
 
         <SelectionSection
-          title={i18n.t('settings.currency')}
+          title={t('settings.currency')}
           data={CURRENCIES}
           value={currency}
           onSelect={handleSetCurrency}

@@ -15,6 +15,7 @@ import {
 } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
 import { getCurrentUser } from './authService';
+import { getReferralLink } from './referralService';
 
 // Standardize phone number for matching
 export const normalizePhoneNumber = (phone) => {
@@ -96,7 +97,11 @@ export const fetchAndClassifyContacts = async () => {
           onAppPhoneNumbers.add(userData.phoneNumber);
           onAppUsers.push({
             ...contact,
-            userData: userData, // Store linked user data
+            userData: {
+              ...userData,
+              userId: doc.id, // Store the user's document ID for deduplication
+              id: doc.id
+            },
             id: contact.id,
             name: contact.name || userData.firstName,
             phoneNumber: userData.phoneNumber
@@ -152,13 +157,17 @@ export const sendInviteSMS = async (phoneNumber, name) => {
   }
 
   const user = getCurrentUser();
-  // We need to fetch user profile to get their name
+  // We need to fetch user profile to get their name and referral code
   const firestore = getFirestore(getApp());
   const userDoc = await getDoc(doc(firestore, 'users', user.uid));
   const userData = userDoc.data();
   const userName = userData?.firstName || 'A friend';
+  const referralCode = userData?.inviteStats?.referralCode;
 
-  const message = `Let's stop the awkward Venmo reminders 😅 - ${userName} invited you to IOU. Download here: https://iou.app.link/invite`;
+  // Generate personalized referral link
+  const referralLink = referralCode ? getReferralLink(referralCode) : 'https://iou.app.link/invite';
+
+  const message = `Let's stop the awkward Venmo reminders 😅 - ${userName} invited you to IOU. Download here: ${referralLink}`;
 
   const { result } = await SMS.sendSMSAsync(
     [phoneNumber],

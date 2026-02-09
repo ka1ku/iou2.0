@@ -15,7 +15,10 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/token
 import { verifyOTP, sendOTP, resolve2FAChallenge, createUserProfile, getTemporarySignupData, clearTemporarySignupData } from '../../services/authService';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
+  import { useTranslation } from '../../contexts/LanguageContext';
+
 const VerifyOTPScreen = ({ navigation, route }) => {
+  const { t } = useTranslation();
   const { phoneNumber, verificationId, isInitialAuth = true, is2FA = false, resolver = null, isSignUp = false } = route.params;
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -85,12 +88,12 @@ const VerifyOTPScreen = ({ navigation, route }) => {
     const code = otpCode || otp.join('');
     
     if (code.length !== 6) {
-      Alert.alert('Error', 'Please enter the complete 6-digit code');
+      Alert.alert(t('common.error'), t('auth.verifyOTP.errors.invalidCodeLength'));
       return;
     }
 
     if (!currentVerificationId && is2FA) {
-      Alert.alert('Error', 'No verification session found. Please request a new code.');
+      Alert.alert(t('common.error'), t('auth.verifyOTP.errors.noSession'));
       return;
     }
 
@@ -106,29 +109,28 @@ const VerifyOTPScreen = ({ navigation, route }) => {
         if (isSignUp) {
           if (!userData) {
             Alert.alert(
-              'Signup Data Missing',
-              'Unable to create your profile. Please try signing up again.',
+              t('auth.verifyOTP.errors.signupMissing'),
+              t('auth.verifyOTP.errors.signupMissingDesc'),
               [{ text: 'OK' }]
             );
             return;
           }
           
           try {
-            // Check if user has a real Venmo profile picture to upload
             const hasRealVenmoProfile = userData.venmoProfilePic && !userData.venmoProfilePic.includes('ui-avatars.com');
             
             if (hasRealVenmoProfile) {
-              setLoadingMessage('Uploading your profile picture...');
+              setLoadingMessage(t('auth.verifyOTP.loading.uploading'));
             } else {
-              setLoadingMessage('Creating your profile...');
+              setLoadingMessage(t('auth.verifyOTP.loading.creating'));
             }
             
             const createdUser = await createUserProfile(userData, phoneNumber);
             
-            setLoadingMessage('Finalizing your account...');
+            setLoadingMessage(t('auth.verifyOTP.loading.finalizing'));
             await clearTemporarySignupData();
             
-            setLoadingMessage('Securing your data...');
+            setLoadingMessage(t('auth.verifyOTP.loading.securing'));
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             setLoading(false);
@@ -139,8 +141,8 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             setLoadingMessage('');
             
             Alert.alert(
-              'Profile Creation Failed',
-              `Your phone was verified but we could not create your profile: ${profileError.message}`,
+              t('auth.verifyOTP.errors.profileFailed'),
+              t('auth.verifyOTP.errors.profileFailedDesc', { message: profileError.message }),
               [{ text: 'OK' }]
             );
           }
@@ -148,7 +150,7 @@ const VerifyOTPScreen = ({ navigation, route }) => {
       }
       
     } catch (error) {
-      Alert.alert('Verification Failed', error.message);
+      Alert.alert(t('auth.verifyOTP.errors.verificationFailed'), error.message);
       // Clear the OTP inputs on error
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
@@ -159,7 +161,7 @@ const VerifyOTPScreen = ({ navigation, route }) => {
 
   const handleResendOTP = async () => {
     if (is2FA) {
-      Alert.alert('Info', 'Cannot resend 2FA verification codes. Please try entering the code again or sign in again.');
+      Alert.alert(t('common.info'), t('auth.verifyOTP.errors.noResend2FA'));
       return;
     }
 
@@ -171,9 +173,9 @@ const VerifyOTPScreen = ({ navigation, route }) => {
       setCanResend(false);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-      Alert.alert('Success', 'Verification code sent successfully');
+      Alert.alert(t('common.success'), t('auth.verifyOTP.success.resend'));
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to resend verification code. Please try again.');
+      Alert.alert(t('common.error'), error.message || t('auth.verifyOTP.errors.resendFailed'));
     } finally {
       setResendLoading(false);
     }
@@ -204,12 +206,12 @@ const VerifyOTPScreen = ({ navigation, route }) => {
               <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
             </TouchableOpacity>
             <Text style={styles.title}>
-              {is2FA ? 'Two-Factor Authentication' : 'Verify Phone Number'}
+              {is2FA ? t('auth.verifyOTP.title2FA') : t('auth.verifyOTP.title')}
             </Text>
             <Text style={styles.subtitle}>
               {is2FA 
-                ? 'Enter the 6-digit code sent to your enrolled device'
-                : `Enter the 6-digit code sent to\n${formatPhoneNumber(phoneNumber)}`
+                ? t('auth.verifyOTP.subtitle2FA')
+                : t('auth.verifyOTP.subtitle', { phone: formatPhoneNumber(phoneNumber) })
               }
             </Text>
           </View>
@@ -244,10 +246,10 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             {loading ? (
               <>
                 <LoadingSpinner size="small" color={Colors.white} />
-                <Text style={styles.verifyButtonText}>Verifying...</Text>
+                <Text style={styles.verifyButtonText}>{t('auth.verifyOTP.verifying')}</Text>
               </>
             ) : (
-              <Text style={styles.verifyButtonText}>Verify Code</Text>
+              <Text style={styles.verifyButtonText}>{t('auth.verifyOTP.button')}</Text>
             )}
           </TouchableOpacity>
 
@@ -271,15 +273,15 @@ const VerifyOTPScreen = ({ navigation, route }) => {
                   {resendLoading ? (
                     <>
                       <LoadingSpinner size="small" color={Colors.accent} />
-                      <Text style={styles.resendText}>Sending...</Text>
+                      <Text style={styles.resendText}>{t('auth.verifyOTP.sending')}</Text>
                     </>
                   ) : (
-                    <Text style={styles.resendText}>Resend Code</Text>
+                    <Text style={styles.resendText}>{t('auth.verifyOTP.resend')}</Text>
                   )}
                 </TouchableOpacity>
               ) : (
                 <Text style={styles.timerText}>
-                  Resend code in {timer} seconds
+                  {t('auth.verifyOTP.resendTimer', { timer })}
                 </Text>
               )}
             </View>
@@ -288,7 +290,7 @@ const VerifyOTPScreen = ({ navigation, route }) => {
           <View style={styles.infoContainer}>
             <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} />
             <Text style={styles.infoText}>
-              Didn't receive the code? Check your signal and try again.
+              {t('auth.verifyOTP.info')}
             </Text>
           </View>
         </View>

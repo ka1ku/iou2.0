@@ -11,12 +11,14 @@ import { Colors, Spacing, Radius, Typography } from '../../design/tokens';
 import { getCurrentUser } from '../../services/authService';
 import { useExpense } from '../../contexts/ExpenseContext';
 import GroupMembersModal from './GroupMembersModal';
+import { useTranslation } from '../../contexts/LanguageContext';
 
 
 const ParticipantsGrid = forwardRef(({ 
   expenseId = null,
   currentUserId = null
 }, ref) => {
+  const { t } = useTranslation();
   const { state } = useExpense();
   const { participants } = state;
   const [showModal, setShowModal] = useState(false);
@@ -67,12 +69,12 @@ const ParticipantsGrid = forwardRef(({
           )}
 
           {displayParticipants.length === 0 && (
-             <Text style={styles.emptyText}>Add friends</Text>
+             <Text style={styles.emptyText}>{t('components.expenses.participantsGrid.addFriends')}</Text>
           )}
         </View>
 
         <View style={styles.actionContainer}>
-          <Text style={styles.actionText}>Manage</Text>
+          <Text style={styles.actionText}>{t('components.expenses.participantsGrid.manage')}</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
         </View>
       </TouchableOpacity>
