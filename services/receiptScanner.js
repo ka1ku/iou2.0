@@ -37,7 +37,7 @@ export const scanReceiptWithAI = async (base64Image) => {
   try {
     const app = getApp();
     const ai = getAI(app);
-    const model = getGenerativeModel(ai, { model: 'gemini-2.5-flash-lite' });
+    const model = getGenerativeModel(ai, { model: 'gemini-2.5-flash-lite-preview-09-2025' });
 
     const prompt = `Extract receipt data as JSON:
 {

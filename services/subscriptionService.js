@@ -44,29 +44,38 @@ export const checkScanLimit = async () => {
     if (!user) return false;
 
     const firestore = getFirestore(getApp());
-    const statsRef = doc(firestore, 'users', user.uid, 'private', 'scanStats');
-    const snapshot = await getDoc(statsRef);
+    const userRef = doc(firestore, 'users', user.uid);
+    const snapshot = await getDoc(userRef);
 
     if (!snapshot.exists()) {
-      return true; // No stats yet means they haven't scanned anything
+      return true; 
     }
 
-    const data = snapshot.data();
-    const lastReset = data.lastResetDate?.toDate() || new Date();
+    const userData = snapshot.data();
+    const scanStats = userData.scanStats || {};
+    
+    // If no stats yet, they haven't scanned anything
+    if (!scanStats.lastResetDate) {
+      return true;
+    }
+
+    const lastReset = scanStats.lastResetDate?.toDate() || new Date();
     const now = new Date();
     
     // Check if a week has passed since last reset
     const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
     if (now.getTime() - lastReset.getTime() > oneWeekInMs) {
       // It's been more than a week, reset the count
-      await setDoc(statsRef, {
-        count: 0,
-        lastResetDate: serverTimestamp()
-      }, { merge: true });
+      await updateDoc(userRef, {
+        scanStats: {
+          count: 0,
+          lastResetDate: serverTimestamp()
+        }
+      });
       return true;
     }
 
-    return (data.count || 0) < SCAN_LIMIT_PER_WEEK;
+    return (scanStats.count || 0) < SCAN_LIMIT_PER_WEEK;
   } catch (error) {
     console.error('Error checking scan limit:', error);
     return false; // Fail safe
@@ -80,19 +89,26 @@ export const incrementScanUsage = async () => {
     if (!user) return;
 
     const firestore = getFirestore(getApp());
-    const statsRef = doc(firestore, 'users', user.uid, 'private', 'scanStats');
-    const snapshot = await getDoc(statsRef);
+    const userRef = doc(firestore, 'users', user.uid);
+    const snapshot = await getDoc(userRef);
 
-    if (!snapshot.exists()) {
+    if (!snapshot.exists()) return;
+
+    const userData = snapshot.data();
+    
+    // Check if scanStats exists to determine if we need to initialize or update
+    if (!userData.scanStats) {
       // Initialize stats
-      await setDoc(statsRef, {
-        count: 1,
-        lastResetDate: serverTimestamp()
+      await updateDoc(userRef, {
+        scanStats: {
+          count: 1,
+          lastResetDate: serverTimestamp()
+        }
       });
     } else {
       // Increment count
-      await updateDoc(statsRef, {
-        count: increment(1)
+      await updateDoc(userRef, {
+        'scanStats.count': increment(1)
       });
     }
   } catch (error) {
@@ -137,9 +153,10 @@ export const getSubscriptionStatus = async () => {
       const user = getCurrentUser();
       if (user) {
         const firestore = getFirestore(getApp());
-        const statsRef = doc(firestore, 'users', user.uid, 'private', 'scanStats');
-        const snapshot = await getDoc(statsRef);
-        const count = snapshot.exists() ? (snapshot.data().count || 0) : 0;
+        const userRef = doc(firestore, 'users', user.uid);
+        const snapshot = await getDoc(userRef);
+        const userData = snapshot.exists() ? snapshot.data() : {};
+        const count = userData.scanStats ? (userData.scanStats.count || 0) : 0;
         remainingScans = Math.max(0, SCAN_LIMIT_PER_WEEK - count);
       }
     } catch (e) {
