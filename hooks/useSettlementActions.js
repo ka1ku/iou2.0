@@ -58,6 +58,7 @@ export default function useSettlementActions({
   const [itemOverrides, setItemOverrides] = useState({});        // key → { [itemId]: { settled, settledAt } }
   const [venmoReturnKey, setVenmoReturnKey] = useState(null);
   const [venmoReturnItemIds, setVenmoReturnItemIds] = useState(null); // itemIds to settle on Venmo return
+  const [venmoActionType, setVenmoActionType] = useState(null); // 'pay' or 'charge'
   const [recalculationInfo, setRecalculationInfo] = useState(null);
 
   // ─── settlement calculation ───────────────────────────────────────────
@@ -195,7 +196,7 @@ export default function useSettlementActions({
 
       let found = false;
       const pairKey = makePairKey(settlement);
-      
+
       const updated = rows.map((s) => {
         // Use pairKey (debtor/creditor) to match, ignoring amount changes
         if (makePairKey(s) === pairKey) {
@@ -326,14 +327,24 @@ export default function useSettlementActions({
       if (next !== 'active') return;
       const key = venmoReturnKey;
       const itemIds = venmoReturnItemIds;
+      const actionType = venmoActionType; // Capture current action type
+
       setVenmoReturnKey(null);
       setVenmoReturnItemIds(null);
+      setVenmoActionType(null);
 
       setTimeout(() => {
-        Alert.alert('Payment Status', 'Did you complete the payment in Venmo?', [
+        const isCharge = actionType === 'charge';
+        const title = isCharge ? 'Request Status' : 'Payment Status';
+        const message = isCharge
+          ? 'Did you send the request in Venmo?'
+          : 'Did you complete the payment in Venmo?';
+        const successText = isCharge ? 'Yes, request sent' : 'Yes, mark as paid';
+
+        Alert.alert(title, message, [
           { text: "No, I'll pay later", style: 'cancel' },
           {
-            text: 'Yes, mark as paid',
+            text: successText,
             onPress: async () => {
               const match = settlements.find((s) => makeKey(s) === key);
               if (match) {
@@ -342,6 +353,10 @@ export default function useSettlementActions({
                   await handleBulkSettle(match, itemIds);
                 } else {
                   // Otherwise just mark the status (legacy behavior)
+                  // For requests, we still 'mark as paid' (or confirmed) effectively acting as "pending request sent"
+                  // But the status logic uses 'markedAsPaid' or 'reminderSent' usually.
+                  // If it's a request, maybe valid status is 'reminderSent'? 
+                  // But current logic is 'markedAsPaid'. User just wants the alert to make sense.
                   await optimistic(match, 'markedAsPaid', match.status);
                 }
               }
@@ -352,7 +367,7 @@ export default function useSettlementActions({
     });
 
     return () => sub.remove();
-  }, [venmoReturnKey, venmoReturnItemIds, settlements, optimistic, handleBulkSettle]);
+  }, [venmoReturnKey, venmoReturnItemIds, venmoActionType, settlements, optimistic, handleBulkSettle]);
 
   // ─── item-level toggle handler ────────────────────────────────────────
   const persistItemToggle = useCallback(
@@ -617,8 +632,8 @@ export default function useSettlementActions({
         // Calculate the amount from selected items
         const selectedAmount = selectedItemIds && selectedItemIds.length > 0
           ? (settlement.associatedItems || [])
-              .filter(i => !i.settled && selectedItemIds.includes(i.id))
-              .reduce((sum, i) => sum + i.amount, 0)
+            .filter(i => !i.settled && selectedItemIds.includes(i.id))
+            .reduce((sum, i) => sum + i.amount, 0)
           : null;
 
         // Run the action with the selected amount
@@ -670,7 +685,10 @@ export default function useSettlementActions({
             amount: paymentAmount.toFixed(2),
             note: `IOU Payment - ${expenseTitle}`,
           });
-          if (opened) setVenmoReturnKey(makeKey(settlement));
+          if (opened) {
+            setVenmoReturnKey(makeKey(settlement));
+            setVenmoActionType('pay');
+          }
           break;
         }
 
@@ -698,7 +716,7 @@ export default function useSettlementActions({
             amount: requestAmount,
             expenseId: expense?.id,
             expenseTitle,
-          }).catch(() => {});
+          }).catch(() => { });
 
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -708,7 +726,10 @@ export default function useSettlementActions({
             amount: requestAmount.toFixed(2),
             note: `IOU Payment Request - ${expenseTitle}`,
           });
-          if (chargeOpened) setVenmoReturnKey(makeKey(settlement));
+          if (chargeOpened) {
+            setVenmoReturnKey(makeKey(settlement));
+            setVenmoActionType('charge');
+          }
           break;
         }
 

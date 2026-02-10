@@ -82,27 +82,27 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
     const user = e.userName || 'Someone';
     switch (e.type) {
       case 'priceChange':
-        return t('components.expenses.settlementInterface.activity.types.priceChange', { 
-            user, 
-            prev: e.details?.previousValue?.toFixed(2), 
-            new: e.details?.newValue?.toFixed(2) 
+        return t('components.expenses.settlementInterface.activity.types.priceChange', {
+          user,
+          prev: e.details?.previousValue?.toFixed(2),
+          new: e.details?.newValue?.toFixed(2)
         });
       case 'itemAdded':
         if (e.details?.itemAmount != null) {
           return t('components.expenses.settlementInterface.activity.types.itemAddedAmount', {
-              user,
-              item: e.details.itemName,
-              amount: parseFloat(e.details.itemAmount).toFixed(2)
+            user,
+            item: e.details.itemName,
+            amount: parseFloat(e.details.itemAmount).toFixed(2)
           });
         }
         return t('components.expenses.settlementInterface.activity.types.itemAdded', { user, item: e.details?.itemName });
       case 'itemRemoved':
         if (e.details?.itemAmount != null) {
-            return t('components.expenses.settlementInterface.activity.types.itemRemovedAmount', {
-                user,
-                item: e.details.itemName,
-                amount: parseFloat(e.details.itemAmount).toFixed(2)
-            });
+          return t('components.expenses.settlementInterface.activity.types.itemRemovedAmount', {
+            user,
+            item: e.details.itemName,
+            amount: parseFloat(e.details.itemAmount).toFixed(2)
+          });
         }
         return t('components.expenses.settlementInterface.activity.types.itemRemoved', { user, item: e.details?.itemName });
       case 'participantAdded':
@@ -110,24 +110,32 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
       case 'participantRemoved':
         return t('components.expenses.settlementInterface.activity.types.participantRemoved', { user, participant: e.details?.participantName });
       case 'itemModified':
-        return t('components.expenses.settlementInterface.activity.types.itemModified', { 
-            user, 
+        if (e.details?.changes && e.details.changes.length > 0) {
+          const changesList = e.details.changes.join(', ');
+          return t('components.expenses.settlementInterface.activity.types.itemModifiedComputed', {
+            user,
             item: e.details?.itemName,
-            amount: parseFloat(e.details?.itemAmount || 0).toFixed(2)
+            changes: changesList
+          });
+        }
+        return t('components.expenses.settlementInterface.activity.types.itemModified', {
+          user,
+          item: e.details?.itemName,
+          amount: parseFloat(e.details?.itemAmount || 0).toFixed(2)
         });
       case 'settlementAction':
         if (e.subtype === 'settled') {
-             return t('components.expenses.settlementInterface.activity.types.settled', {
-                user,
-                peer: e.details?.peerName || 'someone',
-                amount: parseFloat(e.details?.amount || 0).toFixed(2)
-             });
+          return t('components.expenses.settlementInterface.activity.types.settled', {
+            user,
+            peer: e.details?.peerName || 'someone',
+            amount: parseFloat(e.details?.amount || 0).toFixed(2)
+          });
         } else if (e.subtype === 'unsettled') {
-             return t('components.expenses.settlementInterface.activity.types.unsettled', {
-                user,
-                peer: e.details?.peerName || 'someone',
-                amount: parseFloat(e.details?.amount || 0).toFixed(2)
-             });
+          return t('components.expenses.settlementInterface.activity.types.unsettled', {
+            user,
+            peer: e.details?.peerName || 'someone',
+            amount: parseFloat(e.details?.amount || 0).toFixed(2)
+          });
         }
         return t('components.expenses.settlementInterface.activity.types.default', { user });
       default:
@@ -136,34 +144,34 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
   };
 
   return (
-      <Animated.View style={styles.summaryCard}>
-          {youOwe > 0 && (
-            <View style={styles.summaryRow}>
-              <View style={[styles.dot, { backgroundColor: Colors.error }]} />
-              <Text style={styles.summaryLabel}>{t('components.expenses.settlementInterface.summary.youOwe')}</Text>
-              <Text style={[styles.summaryAmount, { color: Colors.error }]}>
-                ${youOwe.toFixed(2)}
-              </Text>
-            </View>
-          )}
-          {youreOwed > 0 && (
-            <View style={styles.summaryRow}>
-              <View style={[styles.dot, { backgroundColor: Colors.success }]} />
-              <Text style={styles.summaryLabel}>{t('components.expenses.settlementInterface.summary.youreOwed')}</Text>
-              <Text style={[styles.summaryAmount, { color: Colors.success }]}>
-                ${youreOwed.toFixed(2)}
-              </Text>
-            </View>
-          )}
-          {youOwe === 0 && youreOwed === 0 && (
-            <View style={styles.summaryRow}>
-              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-              <Text style={[styles.summaryLabel, { color: Colors.success, fontWeight: '600' }]}>
-                 {t('components.expenses.settlementInterface.summary.allSettled')}
-              </Text>
-            </View>
-          )}
-      
+    <Animated.View style={styles.summaryCard}>
+      {youOwe > 0 && (
+        <View style={styles.summaryRow}>
+          <View style={[styles.dot, { backgroundColor: Colors.error }]} />
+          <Text style={styles.summaryLabel}>{t('components.expenses.settlementInterface.summary.youOwe')}</Text>
+          <Text style={[styles.summaryAmount, { color: Colors.error }]}>
+            ${youOwe.toFixed(2)}
+          </Text>
+        </View>
+      )}
+      {youreOwed > 0 && (
+        <View style={styles.summaryRow}>
+          <View style={[styles.dot, { backgroundColor: Colors.success }]} />
+          <Text style={styles.summaryLabel}>{t('components.expenses.settlementInterface.summary.youreOwed')}</Text>
+          <Text style={[styles.summaryAmount, { color: Colors.success }]}>
+            ${youreOwed.toFixed(2)}
+          </Text>
+        </View>
+      )}
+      {youOwe === 0 && youreOwed === 0 && (
+        <View style={styles.summaryRow}>
+          <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
+          <Text style={[styles.summaryLabel, { color: Colors.success, fontWeight: '600' }]}>
+            {t('components.expenses.settlementInterface.summary.allSettled')}
+          </Text>
+        </View>
+      )}
+
       {pending > 0 && (
         <View style={styles.pillRow}>
           <View style={[styles.pill, { backgroundColor: Colors.statusPending + '20' }]}>
@@ -224,7 +232,7 @@ const STATUS_MAP = {
 
 const StatusPill = ({ status }) => {
   const { t } = useTranslation();
-  
+
   const getStatusLabel = (s) => {
     switch (s) {
       case 'complete': return t('components.expenses.settlementInterface.status.fullySettled');
@@ -416,7 +424,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     let cancelled = false;
     getUserProfile(other.userId).then((p) => {
       if (!cancelled && p?.venmoUsername) setVenmoTag(p.venmoUsername);
-    }).catch(() => {});
+    }).catch(() => { });
     return () => { cancelled = true; };
   }, [isDebtor, isCreditor, fromP?.userId, toP?.userId]);
 
@@ -509,14 +517,14 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     const disabled = variant === 'disabled';
     const variantStyle =
       variant === 'venmo' ? styles.btnVenmo :
-      variant === 'primary' ? styles.btnPrimary :
-      variant === 'success' ? styles.btnSuccess :
-      variant === 'disabled' ? styles.btnDisabled :
-      styles.btnSecondary;
+        variant === 'primary' ? styles.btnPrimary :
+          variant === 'success' ? styles.btnSuccess :
+            variant === 'disabled' ? styles.btnDisabled :
+              styles.btnSecondary;
     const textColor =
       variant === 'secondary' ? Colors.textPrimary :
-      variant === 'disabled' ? Colors.textSecondary :
-      Colors.white;
+        variant === 'disabled' ? Colors.textSecondary :
+          Colors.white;
 
     return (
       <TouchableOpacity
@@ -592,7 +600,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               )}
               {isSpectator && (
                 <Text style={styles.oweLabelText}>
-                    {t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
+                  {t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
                 </Text>
               )}
             </View>
@@ -670,10 +678,10 @@ const SettlementInterface = ({
   if (!userSettlements.length && !readOnly) {
     return (
       <Animated.View>
-          <EmptySettlementState 
-             title={t('components.expenses.settlementInterface.empty.title')}
-             body={t('components.expenses.settlementInterface.empty.body')}
-          />
+        <EmptySettlementState
+          title={t('components.expenses.settlementInterface.empty.title')}
+          body={t('components.expenses.settlementInterface.empty.body')}
+        />
       </Animated.View>
     );
   }

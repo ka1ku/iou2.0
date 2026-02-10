@@ -1,14 +1,14 @@
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  doc, 
-  updateDoc, 
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  doc,
+  updateDoc,
   deleteDoc,
-  query, 
-  where, 
-  orderBy, 
-  serverTimestamp, 
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
   getDoc,
   getDocs
 } from '@react-native-firebase/firestore';
@@ -32,7 +32,7 @@ const generateJoinCode = () => {
 
 export const createExpense = async (expenseData, userId) => {
   try {
-    
+
     // Create participantIds array for efficient array-contains queries
     const participantIds = [];
     if (expenseData.participants) {
@@ -42,7 +42,7 @@ export const createExpense = async (expenseData, userId) => {
         }
       });
     }
-    
+
     const expense = {
       ...expenseData,
       createdBy: userId,
@@ -57,11 +57,11 @@ export const createExpense = async (expenseData, userId) => {
         createdAt: serverTimestamp(),
       }
     };
-    
+
     const firestoreInstance = getFirestore(getApp());
     const docRef = await addDoc(collection(firestoreInstance, 'expenses'), expense);
-    
-    
+
+
     return {
       ...expense,
       id: docRef.id
@@ -73,9 +73,9 @@ export const createExpense = async (expenseData, userId) => {
 
 export const updateExpense = async (expenseId, updateData, userId) => {
   try {
-    
+
     let finalUpdateData = { ...updateData };
-    
+
     // Create participantIds array for efficient array-contains queries
     if (updateData.participants) {
       const participantIds = [];
@@ -86,26 +86,26 @@ export const updateExpense = async (expenseId, updateData, userId) => {
       });
       finalUpdateData.participantIds = participantIds;
     }
-    
+
     // Add updatedBy field
     finalUpdateData.updatedBy = userId;
-    
+
     // Check if we need to recalculate settlements
     // Only recalculate if items, participants, or fees are being updated
     // AND settlements are not being explicitly updated (to avoid infinite loops)
     const shouldRecalculateSettlements =
       !updateData.settlements && // Don't recalculate if settlements are being explicitly set
       (updateData.items !== undefined ||
-       updateData.participants !== undefined ||
-       updateData.fees !== undefined);
+        updateData.participants !== undefined ||
+        updateData.fees !== undefined);
 
     // Track whether we need to log changes (price/item/participant changes)
     const shouldLogChanges =
       (updateData.items !== undefined ||
-       updateData.participants !== undefined ||
-       updateData.fees !== undefined ||
-       updateData.total !== undefined ||
-       updateData.settlements !== undefined);
+        updateData.participants !== undefined ||
+        updateData.fees !== undefined ||
+        updateData.total !== undefined ||
+        updateData.settlements !== undefined);
 
     if (shouldRecalculateSettlements || shouldLogChanges) {
       try {
@@ -113,11 +113,11 @@ export const updateExpense = async (expenseId, updateData, userId) => {
         const firestoreInstance = getFirestore(getApp());
         const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
         const expenseSnap = await getDoc(expenseRef);
-        
+
         if (expenseSnap.exists()) {
           const currentExpense = { id: expenseSnap.id, ...expenseSnap.data() };
           const existingSettlements = currentExpense.settlements || [];
-          
+
           // Only recalculate if settlements already exist
           if (existingSettlements.length > 0) {
             // Merge the update data with current expense data to get the complete expense
@@ -129,13 +129,13 @@ export const updateExpense = async (expenseId, updateData, userId) => {
               participants: updateData.participants !== undefined ? updateData.participants : currentExpense.participants,
               fees: updateData.fees !== undefined ? updateData.fees : currentExpense.fees,
             };
-            
+
             // Recalculate settlements preserving paid ones
             const settlementResult = calculateSettlementWithPartialSettlements(
               updatedExpense,
               existingSettlements
             );
-            
+
             // Format settlements for Firestore (use debtor/creditor format)
             // The calculateSettlementWithPartialSettlements function preserves settlements where
             // money has been transferred (status !== 'noAction') and marks them with preserved: true
@@ -151,16 +151,16 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                   const settlementFrom = s.from || s.debtor;
                   const settlementTo = s.to || s.creditor;
                   const settlementAmount = s.amount;
-                  
+
                   // Round amounts for comparison
                   const roundedExisting = Math.round(existingAmount * 100) / 100;
                   const roundedSettlement = Math.round(settlementAmount * 100) / 100;
-                  
-                  return existingFrom === settlementFrom && 
-                         existingTo === settlementTo && 
-                         roundedExisting === roundedSettlement;
+
+                  return existingFrom === settlementFrom &&
+                    existingTo === settlementTo &&
+                    roundedExisting === roundedSettlement;
                 });
-                
+
                 // Use original settlement data exactly as it was (money already transferred)
                 // This preserves the original amount, status (markedAsPaid, paymentMade, paymentRequested), and metadata
                 if (originalSettlement) {
@@ -197,7 +197,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                 };
               }
             });
-            
+
             // Add recalculated settlements to update data
             finalUpdateData.settlements = recalculatedSettlements;
           }
@@ -261,10 +261,10 @@ export const updateExpense = async (expenseId, updateData, userId) => {
               if (updateData.items !== undefined) {
                 const oldIds = new Set(oldItems.map(i => i.id).filter(Boolean));
                 const newIds = new Set(newItems.map(i => i.id).filter(Boolean));
-                
+
                 // 1. Added Items
                 const addedItems = newItems.filter(i => i.id && !oldIds.has(i.id));
-                
+
                 // 2. Removed Items
                 const removedItems = oldItems.filter(i => i.id && !newIds.has(i.id));
 
@@ -276,7 +276,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
 
                   // Check if name changed
                   if (newItem.name !== oldItem.name) return true;
-                  
+
                   // Check if amount changed
                   if (parseFloat(newItem.amount) !== parseFloat(oldItem.amount)) return true;
 
@@ -284,7 +284,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                   const payersChanged = JSON.stringify(newItem.selectedPayers) !== JSON.stringify(oldItem.selectedPayers);
                   const consumersChanged = JSON.stringify(newItem.selectedConsumers) !== JSON.stringify(oldItem.selectedConsumers);
                   const splitsChanged = JSON.stringify(newItem.splits) !== JSON.stringify(oldItem.splits);
-                  
+
                   return payersChanged || consumersChanged || splitsChanged;
                 });
 
@@ -326,23 +326,48 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                 modifiedItems.forEach(newItem => {
                   const oldItem = oldItems.find(i => i.id === newItem.id);
                   const changes = [];
-                  
-                  if (newItem.name !== oldItem.name) {
-                    changes.push(`renamed from "${oldItem.name}" to "${newItem.name}"`);
-                  }
-                  if (parseFloat(newItem.amount) !== parseFloat(oldItem.amount)) {
-                    changes.push(`amount changed from $${parseFloat(oldItem.amount).toFixed(2)} to $${parseFloat(newItem.amount).toFixed(2)}`);
-                  }
-                  
-                  const payersChanged = JSON.stringify(newItem.selectedPayers) !== JSON.stringify(oldItem.selectedPayers);
-                  const consumersChanged = JSON.stringify(newItem.selectedConsumers) !== JSON.stringify(oldItem.selectedConsumers);
-                  const splitsChanged = JSON.stringify(newItem.splits) !== JSON.stringify(oldItem.splits);
 
-                  if (payersChanged || consumersChanged || splitsChanged) {
-                    changes.push('split details updated');
+                  if (newItem.name !== oldItem.name) {
+                    changes.push('renamed');
+                  }
+
+                  // Amount change
+                  if (parseFloat(newItem.amount) !== parseFloat(oldItem.amount)) {
+                    changes.push('changed amount');
+                  }
+
+                  // Participant changes
+                  const oldPayers = new Set(oldItem.selectedPayers || []);
+                  const newPayers = new Set(newItem.selectedPayers || []);
+                  const oldConsumers = new Set(oldItem.selectedConsumers || []);
+                  const newConsumers = new Set(newItem.selectedConsumers || []);
+
+                  // Check for added/removed people
+                  const addedPayers = [...newPayers].filter(p => !oldPayers.has(p));
+                  const removedPayers = [...oldPayers].filter(p => !newPayers.has(p));
+                  const addedConsumers = [...newConsumers].filter(c => !oldConsumers.has(c));
+                  const removedConsumers = [...oldConsumers].filter(c => !newConsumers.has(c));
+
+                  if (addedConsumers.length > 0 || addedPayers.length > 0) {
+                    changes.push('added person');
+                  }
+
+                  if (removedConsumers.length > 0 || removedPayers.length > 0) {
+                    changes.push('removed person');
+                  }
+
+                  // If splits changed but no one was added/removed (e.g. manual adjustments)
+                  if (changes.length === 0) {
+                    const splitsChanged = JSON.stringify(newItem.splits) !== JSON.stringify(oldItem.splits);
+                    if (splitsChanged) {
+                      changes.push('updated split');
+                    }
                   }
 
                   if (changes.length > 0) {
+                    // Remove duplicates just in case
+                    const uniqueChanges = [...new Set(changes)];
+
                     changeLogEntries.push({
                       type: 'itemModified',
                       userId: userId || null,
@@ -352,66 +377,66 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                         itemId: newItem.id,
                         itemName: newItem.name,
                         itemAmount: parseFloat(newItem.amount) || 0,
-                        changes: changes,
+                        changes: uniqueChanges,
                       },
                     });
                   }
                 });
               }
-              
+
               // Detect settlement changes
               if (finalUpdateData.settlements) {
-                 const newSettlements = finalUpdateData.settlements;
-                 newSettlements.forEach(newS => {
-                    const oldS = existingSettlements.find(s => 
-                        (s.debtor || s.from) === (newS.debtor || newS.from) &&
-                        (s.creditor || s.to) === (newS.creditor || newS.to)
-                    );
-                    
-                    const oldStatus = oldS?.status || 'noAction';
-                    const newStatus = newS.status || 'noAction';
-                    
-                    if (oldStatus !== newStatus) {
-                        const isSettled = ['markedAsPaid', 'confirmed', 'complete'].includes(newStatus);
-                        const wasSettled = ['markedAsPaid', 'confirmed', 'complete'].includes(oldStatus);
-                        
-                        // Determine peer name
-                        // If current user is debtor, peer is creditor. If current user is creditor, peer is debtor.
-                        // Ideally we want the name of the OTHER person.
-                        // We use actorName to check who performed the action.
-                        // But for the message "{{user}} settled with {{peer}}", {{user}} is the actor.
-                        
-                        const debtor = newS.debtor || newS.from;
-                        const creditor = newS.creditor || newS.to;
-                        const peerName = (creditor === actorName || creditor === 'You') ? debtor : creditor; 
+                const newSettlements = finalUpdateData.settlements;
+                newSettlements.forEach(newS => {
+                  const oldS = existingSettlements.find(s =>
+                    (s.debtor || s.from) === (newS.debtor || newS.from) &&
+                    (s.creditor || s.to) === (newS.creditor || newS.to)
+                  );
 
-                        if (isSettled && !wasSettled) {
-                             changeLogEntries.push({
-                                type: 'settlementAction',
-                                subtype: 'settled',
-                                userId: userId || null,
-                                userName: actorName,
-                                timestamp: new Date().toISOString(),
-                                details: {
-                                    amount: newS.amount,
-                                    peerName: peerName
-                                }
-                             });
-                        } else if (!isSettled && wasSettled) {
-                             changeLogEntries.push({
-                                type: 'settlementAction',
-                                subtype: 'unsettled',
-                                userId: userId || null,
-                                userName: actorName,
-                                timestamp: new Date().toISOString(),
-                                details: {
-                                    amount: newS.amount,
-                                    peerName: peerName
-                                }
-                             });
+                  const oldStatus = oldS?.status || 'noAction';
+                  const newStatus = newS.status || 'noAction';
+
+                  if (oldStatus !== newStatus) {
+                    const isSettled = ['markedAsPaid', 'confirmed', 'complete'].includes(newStatus);
+                    const wasSettled = ['markedAsPaid', 'confirmed', 'complete'].includes(oldStatus);
+
+                    // Determine peer name
+                    // If current user is debtor, peer is creditor. If current user is creditor, peer is debtor.
+                    // Ideally we want the name of the OTHER person.
+                    // We use actorName to check who performed the action.
+                    // But for the message "{{user}} settled with {{peer}}", {{user}} is the actor.
+
+                    const debtor = newS.debtor || newS.from;
+                    const creditor = newS.creditor || newS.to;
+                    const peerName = (creditor === actorName || creditor === 'You') ? debtor : creditor;
+
+                    if (isSettled && !wasSettled) {
+                      changeLogEntries.push({
+                        type: 'settlementAction',
+                        subtype: 'settled',
+                        userId: userId || null,
+                        userName: actorName,
+                        timestamp: new Date().toISOString(),
+                        details: {
+                          amount: newS.amount,
+                          peerName: peerName
                         }
+                      });
+                    } else if (!isSettled && wasSettled) {
+                      changeLogEntries.push({
+                        type: 'settlementAction',
+                        subtype: 'unsettled',
+                        userId: userId || null,
+                        userName: actorName,
+                        timestamp: new Date().toISOString(),
+                        details: {
+                          amount: newS.amount,
+                          peerName: peerName
+                        }
+                      });
                     }
-                 });
+                  }
+                });
               }
 
               // Detect participant changes
@@ -464,14 +489,14 @@ export const updateExpense = async (expenseId, updateData, userId) => {
         console.error('[updateExpense] Failed to recalculate settlements:', recalcError);
       }
     }
-    
+
     const firestoreInstance = getFirestore(getApp());
     await updateDoc(doc(firestoreInstance, 'expenses', expenseId), {
       ...finalUpdateData,
       updatedAt: serverTimestamp()
     });
-    
-    
+
+
   } catch (error) {
     throw error;
   }
@@ -491,25 +516,25 @@ export const getExpenseById = async (expenseId) => {
 
 export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
   try {
-    
+
     const firestoreInstance = getFirestore(getApp());
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
-    
+
     const expenseSnap = await getDoc(expenseRef);
     if (!expenseSnap.exists()) {
       throw new Error('Expense not found');
     }
-    
+
     const expenseData = expenseSnap.data();
     const currentItems = expenseData.items || [];
-    
+
     const updatedItems = currentItems.filter((_, index) => index !== itemIndex);
-    
+
     // Use updateExpense instead of updateDoc to trigger settlement recalculation
     await updateExpense(expenseId, {
       items: updatedItems
     }, userId);
-    
+
     return true;
   } catch (error) {
     throw error;
@@ -518,7 +543,7 @@ export const deleteItemFromExpense = async (expenseId, itemIndex, userId) => {
 
 export const updateExpenseParticipants = async (expenseId, participants, userId) => {
   try {
-    
+
     // Create participantIds array for efficient array-contains queries
     const participantIds = [];
     participants.forEach((participant) => {
@@ -526,12 +551,12 @@ export const updateExpenseParticipants = async (expenseId, participants, userId)
         participantIds.push(participant.userId);
       }
     });
-    
+
     await updateExpense(expenseId, {
       participants,
       participantIds
     }, userId);
-    
+
     return true;
   } catch (error) {
     throw error;
@@ -542,18 +567,18 @@ export const deleteExpense = async (expenseId, userId) => {
   try {
     const firestoreInstance = getFirestore(getApp());
     const expenseRef = doc(firestoreInstance, 'expenses', expenseId);
-    
+
     // Verify the expense exists and user has permission to delete it
     const expenseSnap = await getDoc(expenseRef);
     if (!expenseSnap.exists()) {
       throw new Error('Expense not found');
     }
-    
+
     const expenseData = expenseSnap.data();
     if (expenseData.createdBy !== userId) {
       throw new Error('You do not have permission to delete this expense');
     }
-    
+
     await deleteDoc(expenseRef);
     return true;
   } catch (error) {
@@ -575,7 +600,7 @@ export const getExpenseJoinInfo = async (expenseId, { initializeIfMissing = fals
     }
 
     const expenseData = expenseDoc.data();
-    
+
     if (!expenseData.join && initializeIfMissing) {
       const joinInfo = {
         enabled: true,
@@ -583,7 +608,7 @@ export const getExpenseJoinInfo = async (expenseId, { initializeIfMissing = fals
         token: generateInviteToken(),
         createdAt: serverTimestamp(),
       };
-      
+
       await updateDoc(expenseRef, { join: joinInfo });
       return joinInfo;
     }
@@ -659,13 +684,13 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
         collection(firestoreInstance, 'expenses'),
         where('join.code', '==', code)
       );
-      
+
       const snapshot = await getDocs(expensesQuery);
-      
+
       if (snapshot.empty) {
         throw new Error('Invalid room code');
       }
-      
+
       const expenseDoc = snapshot.docs[0];
       expenseData = expenseDoc.data();
       expenseRef = expenseDoc.ref;
@@ -688,7 +713,7 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
     }
 
     const newParticipant = {
-      name: userProfile.firstName && userProfile.lastName 
+      name: userProfile.firstName && userProfile.lastName
         ? `${userProfile.firstName} ${userProfile.lastName}`.trim()
         : (userProfile.username ? `@${userProfile.username}` : 'Friend'),
       userId: userId,
@@ -699,7 +724,7 @@ export const joinExpense = async ({ expenseId, token, code, userId, userPhone })
     };
 
     const updatedParticipants = [...(expenseData.participants || []), newParticipant];
-    
+
     // Create participantIds array for efficient array-contains queries
     const participantIds = [...(expenseData.participantIds || [])];
     if (!participantIds.includes(userId)) {
@@ -761,8 +786,8 @@ export const settleExpense = async (expenseId, userId) => {
       settledBy: userId,
       updatedAt: serverTimestamp()
     });
-    
-    
+
+
     return { success: true };
   } catch (error) {
     throw error;
@@ -773,14 +798,14 @@ export const createPaymentRequest = async ({ fromUserId, toUserId, amount, expen
   try {
     const functions = getFunctions(getApp());
     const sendPaymentRequest = httpsCallable(functions, 'sendPaymentRequest');
-    
+
     const result = await sendPaymentRequest({
       toUserId, // Person who should pay
       amount,
       expenseId,
       expenseTitle,
     });
-    
+
     return {
       success: true,
       requestId: result.data.requestId || 'req_' + Date.now() // Fallback ID since we don't store it
