@@ -87,57 +87,62 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     const total = parseFloat(item.amount) || 0;
     const consumers = item.selectedConsumers || [];
 
-    const manualTotal = consumers.reduce((sum, pIndex) => {
-      return sum + (manualSplits[pIndex] || 0);
-    }, 0);
+    if (consumers.length === 0 || total <= 0) {
+      return [];
+    }
 
+    // Calculate manual total
+    const manualTotal = consumers.reduce((sum, pIndex) =>
+      sum + (manualSplits[pIndex] || 0), 0);
+
+    // If manual splits exceed total, scale them down proportionally
+    if (manualTotal > total) {
+      const scaleFactor = total / manualTotal;
+      return consumers.map(pIndex => {
+        const manualAmount = manualSplits[pIndex];
+        return manualAmount !== undefined
+          ? Math.round(manualAmount * scaleFactor * 100) / 100
+          : 0;
+      });
+    }
+
+    // Calculate remaining balance for auto-split
     const remainingBalance = total - manualTotal;
-    const autoParticipants = consumers.filter(
-      (pIndex) => manualSplits[pIndex] === undefined
-    );
-    const autoSplitAmounts = smartRoundSplit(
-      remainingBalance,
-      autoParticipants.length
-    );
+    const autoConsumers = consumers.filter(pIndex => manualSplits[pIndex] === undefined);
+    const autoAmounts = smartRoundSplit(remainingBalance, autoConsumers.length);
 
-    return participants.map((_, pIndex) => {
-      if (!consumers.includes(pIndex)) return { amount: 0 };
-      if (manualSplits[pIndex] !== undefined)
-        return { amount: manualSplits[pIndex] };
-      const autoIndex = autoParticipants.indexOf(pIndex);
-      return { amount: autoSplitAmounts[autoIndex] || 0 };
-    });
-  }, [item.amount, item.selectedConsumers, manualSplits, participants]);
+    // Map splits in order of consumers
+    let autoIndex = 0;
+    return consumers.map(pIndex =>
+      manualSplits[pIndex] !== undefined
+        ? manualSplits[pIndex]
+        : autoAmounts[autoIndex++] || 0
+    );
+  }, [item.amount, item.selectedConsumers, manualSplits]);
 
+  // Sync derived splits to item
   useEffect(() => {
-    const splitsForSelectedConsumers = (item.selectedConsumers || []).map(
-      (consumerIndex) => {
-        const split = derivedSplits[consumerIndex];
-        return split && typeof split.amount === "number" ? split.amount : 0;
-      }
-    );
-    actions.updateItem(index, { splits: splitsForSelectedConsumers });
-  }, [derivedSplits, item.selectedConsumers]);
+    const consumers = item.selectedConsumers || [];
+    if (derivedSplits.length === consumers.length && consumers.length > 0) {
+      actions.updateItem(index, { splits: derivedSplits });
+    }
+  }, [derivedSplits, item.selectedConsumers, index, actions]);
 
   const handleAmountChange = (pIndex, value) => {
-    if (value === "" || value === null || value === undefined) {
-      setManualSplits((prev) => {
-        const newSplits = { ...prev };
-        delete newSplits[pIndex];
-        return newSplits;
-      });
-      return;
-    }
     const numValue = parseFloat(value);
-    if (isNaN(numValue)) {
-      setManualSplits((prev) => {
-        const newSplits = { ...prev };
-        delete newSplits[pIndex];
-        return newSplits;
-      });
-      return;
-    }
-    setManualSplits((prev) => ({ ...prev, [pIndex]: numValue }));
+
+    setManualSplits(prev => {
+      const updated = { ...prev };
+
+      // Clear manual split if value is invalid or empty
+      if (value === "" || value === null || value === undefined || isNaN(numValue)) {
+        delete updated[pIndex];
+      } else {
+        updated[pIndex] = numValue;
+      }
+
+      return updated;
+    });
   };
 
   const handleFocus = (pIndex) => {
@@ -158,18 +163,33 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
   };
 
   const toggleConsumer = (pIndex) => {
-    setManualSplits((prev) => {
-      const newSplits = { ...prev };
-      delete newSplits[pIndex];
-      return newSplits;
-    });
-    const newConsumers = item.selectedConsumers.includes(pIndex)
-      ? item.selectedConsumers.filter((i) => i !== pIndex)
+    const isSelected = item.selectedConsumers.includes(pIndex);
+    const newConsumers = isSelected
+      ? item.selectedConsumers.filter(i => i !== pIndex)
       : [...item.selectedConsumers, pIndex];
-    if (newConsumers.length > 0)
-      actions.updateItem(index, { selectedConsumers: newConsumers });
-    if ((validationErrors.consumers || validationErrors.splitMismatch) && newConsumers.length > 0) {
-      setValidationErrors(prev => ({ ...prev, consumers: false, splitMismatch: false }));
+
+    // Must have at least one consumer
+    if (newConsumers.length === 0) return;
+
+    // Clear manual split for removed consumer
+    if (isSelected && manualSplits[pIndex] !== undefined) {
+      setManualSplits(prev => {
+        const updated = { ...prev };
+        delete updated[pIndex];
+        return updated;
+      });
+    }
+
+    // Update selected consumers
+    actions.updateItem(index, { selectedConsumers: newConsumers });
+
+    // Clear validation errors
+    if (validationErrors.consumers || validationErrors.splitMismatch) {
+      setValidationErrors(prev => ({
+        ...prev,
+        consumers: false,
+        splitMismatch: false
+      }));
     }
   };
 

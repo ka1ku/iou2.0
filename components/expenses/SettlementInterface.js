@@ -115,14 +115,7 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
   };
 
   return (
-    <Animated.View style={pending === 0 ? undefined : styles.summaryCard}>
-      {pending === 0 && settlements.length > 0 ? (
-        <EmptySettlementState 
-          title={t('components.expenses.settlementInterface.summary.allSettled')}
-          body={t('components.expenses.settlementInterface.empty.body')}
-        />
-      ) : (
-        <>
+      <Animated.View style={styles.summaryCard}>
           {youOwe > 0 && (
             <View style={styles.summaryRow}>
               <View style={[styles.dot, { backgroundColor: Colors.error }]} />
@@ -143,14 +136,12 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
           )}
           {youOwe === 0 && youreOwed === 0 && (
             <View style={styles.summaryRow}>
-              <Ionicons name="swap-horizontal" size={18} color={Colors.textSecondary} />
-              <Text style={styles.summaryLabel}>
-                {t('components.expenses.settlementInterface.summary.pendingSettled', { pending, settled })}
+              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
+              <Text style={[styles.summaryLabel, { color: Colors.success, fontWeight: '600' }]}>
+                 {t('components.expenses.settlementInterface.summary.allSettled')}
               </Text>
             </View>
           )}
-        </>
-      )}
       
       {pending > 0 && (
         <View style={styles.pillRow}>

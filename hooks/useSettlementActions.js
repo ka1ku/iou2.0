@@ -179,7 +179,7 @@ export default function useSettlementActions({
       if (!latest) throw new Error('Expense not found');
 
       let rows = latest.settlements || [];
-      const previousStatus = rows.find(s => makeKey(s) === makeKey(settlement))?.status || 'noAction';
+      const previousStatus = rows.find(s => makePairKey(s) === makePairKey(settlement))?.status || 'noAction';
 
       // Bootstrap: if Firestore has no settlements yet, seed from local calc
       if (rows.length === 0 && calculatedSettlements.length > 0) {
@@ -194,8 +194,11 @@ export default function useSettlementActions({
       }
 
       let found = false;
+      const pairKey = makePairKey(settlement);
+      
       const updated = rows.map((s) => {
-        if (makeKey(s) === makeKey(settlement)) {
+        // Use pairKey (debtor/creditor) to match, ignoring amount changes
+        if (makePairKey(s) === pairKey) {
           found = true;
           return {
             ...s,
@@ -203,6 +206,8 @@ export default function useSettlementActions({
             updatedAt: new Date().toISOString(),
             // Ensure associatedItems from the local settlement are saved
             associatedItems: settlement.associatedItems || s.associatedItems || [],
+            // Update amount to match current proposed amount
+            amount: settlement.amount,
           };
         }
         return s;

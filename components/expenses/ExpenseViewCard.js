@@ -74,8 +74,13 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
         const consumer = participants[consumerIndex];
         // Skip current user
         if (consumer?.name === 'Me') return null;
-        
-        const splitAmount = parseFloat(splits[i]) || 0;
+
+        // Validate split amount exists and is a number
+        const splitValue = splits[i];
+        const splitAmount = (splitValue !== undefined && !isNaN(parseFloat(splitValue)))
+          ? parseFloat(splitValue)
+          : 0;
+
         return {
           name: consumer?.name || `Person ${consumerIndex + 1}`,
           profilePhoto: consumer?.profilePhoto,

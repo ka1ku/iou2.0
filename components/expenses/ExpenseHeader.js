@@ -15,6 +15,7 @@ const ExpenseHeader = ({
   hideSettings = false,
   activeTab,
   onTabChange,
+  onSavePress,
 }) => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -57,7 +58,18 @@ const ExpenseHeader = ({
           </TouchableOpacity>
         )}
 
-        {!hideSettings ? (
+        {onSavePress && (
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={onSavePress}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="checkmark" size={28} color={Colors.accent} />
+          </TouchableOpacity>
+        )}
+
+        {!hideSettings && !onSavePress ? (
           <TouchableOpacity 
             style={styles.iconButton}
             onPress={onSettingsPress}
@@ -66,9 +78,9 @@ const ExpenseHeader = ({
           >
             <Ionicons name="ellipsis-horizontal" size={26} color={Colors.textPrimary} />
           </TouchableOpacity>
-        ) : (
+        ) : !onSavePress ? (
           <View style={styles.iconButton} />
-        )}
+        ) : null}
       </View>
       
       {activeTab && onTabChange && (

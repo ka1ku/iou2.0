@@ -168,13 +168,21 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     let newFee;
     const feeId = Date.now().toString();
     if (customFeeMode === 'percentage') {
-      const feeAmount = (itemsSubtotal * (value / 100)).toFixed(2);
+      const percentageValue = parseFloat(value);
+
+      // Validate percentage is a valid number
+      if (isNaN(percentageValue) || percentageValue < 0 || percentageValue > 100) {
+        Alert.alert(t('common.error'), 'Please enter a valid percentage between 0 and 100');
+        return;
+      }
+
+      const feeAmount = (itemsSubtotal * (percentageValue / 100)).toFixed(2);
       newFee = {
         id: feeId,
-        name: selectedFeeType === 'Tip' ? `${value}% ${t('addReceipt.feeTypes.tip')}` : `${feeName} (${value}%)`,
+        name: selectedFeeType === 'Tip' ? `${percentageValue}% ${t('addReceipt.feeTypes.tip')}` : `${feeName} (${percentageValue}%)`,
         amount: parseFloat(feeAmount),
         type: 'percentage',
-        percentage: value / 100,
+        percentage: percentageValue / 100,
         splitType: 'proportional',
         splits: []
       };
@@ -191,14 +199,67 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
     // Add animation feedback
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    handleAddFee(newFee);
+    
+    // Immediate save to Firestore with splits calculated
+    const saveToFirestore = async () => {
+        try {
+            const currentUser = getCurrentUser();
+            if (currentUser && expense?.id) {
+                // Prepare temporary expense data to calculate splits for the new fee
+                // We need to include the new fee in the calculation
+                const tempFees = [...state.fees, newFee];
+                const tempExpenseData = {
+                    items: state.items,
+                    fees: tempFees,
+                    participants: state.participants,
+                    selectedPayers: state.selectedPayers || [0]
+                };
+
+                // Calculate splits for ALL fees including the new one
+                const participantProportions = calculateParticipantProportionsFromConsumption(
+                    tempExpenseData.items,
+                    tempExpenseData.participants
+                );
+                
+                const expenseDataWithSplits = applyProportionalFeeSplits(
+                    tempExpenseData,
+                    participantProportions
+                );
+                
+                // Get the updated fees array (which now includes splits for the new fee)
+                const finalFees = expenseDataWithSplits.fees;
+
+                await updateExpense(expense.id, { 
+                    fees: finalFees,
+                    selectedPayers: state.selectedPayers,
+                    participants: state.participants,
+                    title: state.title,
+                }, currentUser.uid);
+                
+                // Update local state with the fee that HAS splits
+                // access the specific new fee from the result
+                const savedNewFee = finalFees.find(f => f.id === newFee.id) || newFee;
+                handleAddFee(savedNewFee);
+            } else {
+                // If not saved yet, just add to local state (splits will be calculated on next autosave or full save)
+                handleAddFee(newFee);
+            }
+        } catch (error) {
+            console.error("Failed to save fee immediately:", error);
+            Alert.alert(t('common.error'), t('addExpense.saveError'));
+            // Fallback to local add
+            handleAddFee(newFee);
+        }
+    };
+    
+    saveToFirestore();
     
     // Clear input and highlight
     setCustomFeeInput('');
     setCustomFeeName('');
     setNewlyAddedFee(feeId);
     setTimeout(() => setNewlyAddedFee(null), 2000);
-  }, [customFeeInput, selectedFeeType, customFeeName, customFeeMode, itemsSubtotal, handleAddFee]);
+  }, [customFeeInput, selectedFeeType, customFeeName, customFeeMode, itemsSubtotal, handleAddFee, expense?.id, state.fees, state.selectedPayers, state.participants, state.title]);
 
   // Auto-save for Fees and Payers
   useEffect(() => {
@@ -350,56 +411,71 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     return true;
   };
 
-  const calculateParticipantProportions = (items, participants, fees = []) => {
-    const totalItemAmount = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const participantAmounts = participants.map((participant, index) => {
-      let participantTotal = 0;
-      
+  const calculateParticipantProportionsFromConsumption = (items, participants) => {
+    // Calculate total value of items each participant CONSUMED (was assigned to)
+    const participantConsumption = participants.map((participant, participantIndex) => {
+      let totalConsumed = 0;
+
       items.forEach(item => {
         const itemAmount = parseFloat(item.amount) || 0;
         const itemConsumers = item.selectedConsumers || [];
-        const itemSplits = item.splits || [];
-        
-        if (itemConsumers.includes(index)) {
-          const consumerIndex = itemConsumers.indexOf(index);
-          if (itemSplits[consumerIndex] !== undefined && itemSplits[consumerIndex] !== null) {
-            const splitAmount = typeof itemSplits[consumerIndex] === 'object' 
-              ? parseFloat(itemSplits[consumerIndex].amount) || 0
-              : parseFloat(itemSplits[consumerIndex]) || 0;
-            participantTotal += splitAmount;
-          } else {
-            const amountPerConsumer = itemAmount / itemConsumers.length;
-            participantTotal += amountPerConsumer;
-          }
+
+        // If this participant is one of the consumers for this item
+        if (itemConsumers.includes(participantIndex)) {
+          // Split the item amount equally among all consumers
+          const amountConsumedByThisPerson = itemConsumers.length > 0 ? itemAmount / itemConsumers.length : 0;
+          totalConsumed += amountConsumedByThisPerson;
         }
       });
-      
+
       return {
-        participant,
-        index,
-        amount: participantTotal,
-        proportion: totalItemAmount > 0 ? participantTotal / totalItemAmount : 0
+        index: participantIndex,
+        amount: totalConsumed
       };
     });
-    
-    const totalFees = fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-    
-    return participantAmounts;
+
+    // Calculate total items amount
+    const totalItemAmount = items.reduce((sum, item) =>
+      sum + (parseFloat(item.amount) || 0), 0);
+
+    // Calculate proportions
+    return participantConsumption.map(({ index, amount }) => ({
+      index,
+      amount,
+      proportion: totalItemAmount > 0 ? amount / totalItemAmount : 0
+    }));
   };
 
   const applyProportionalFeeSplits = (expenseData, participantProportions) => {
     const totalFees = expenseData.fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-    
+
     if (totalFees === 0) {
       return expenseData;
     }
-    
+
     const updatedFees = expenseData.fees.map(fee => {
       const feeAmount = parseFloat(fee.amount) || 0;
-      const proportionalSplits = participantProportions.map(({ index, proportion }) => ({
-        participantIndex: index,
-        amount: feeAmount * proportion
-      }));
+
+      // Calculate proportional splits
+      const proportionalSplits = participantProportions.map(({ index, proportion }) => {
+        const splitAmount = Math.round(feeAmount * proportion * 100) / 100;
+        return {
+          participantIndex: index,
+          amount: splitAmount
+        };
+      });
+
+      // Adjust for rounding errors - ensure splits sum to fee amount
+      const totalSplits = proportionalSplits.reduce((sum, s) => sum + s.amount, 0);
+      const roundingError = Math.round((feeAmount - totalSplits) * 100) / 100;
+
+      if (roundingError !== 0 && proportionalSplits.length > 0) {
+        // Add rounding error to first non-zero split
+        const firstNonZero = proportionalSplits.find(s => s.amount > 0);
+        if (firstNonZero) {
+          firstNonZero.amount = Math.round((firstNonZero.amount + roundingError) * 100) / 100;
+        }
+      }
 
       return {
         ...fee,
@@ -417,12 +493,19 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
 
 
+  // Ref to track which expense ID we've already initialized
+  const initializedIdRef = useRef(null);
+
   useEffect(() => {
     // Tab bar hiding is handled centrally in App.js via getTabBarStyle
     if (expense && (isEditing || isNewExpense)) {
-      actions.initializeFromExpense(expense, isEditing, isNewExpense);
+      // Only initialize if we haven't initialized this expense ID yet
+      if (initializedIdRef.current !== expense.id) {
+        actions.initializeFromExpense(expense, isEditing, isNewExpense);
+        initializedIdRef.current = expense.id;
+      }
     }
-  }, [expense, isEditing, isNewExpense, navigation, actions]);
+  }, [expense?.id, isEditing, isNewExpense, actions]);
 
   useEffect(() => {
     const currentUserId = getCurrentUser()?.uid;
@@ -525,7 +608,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     updateScannedItems();
   }, [scannedReceipt, fromReceiptScan, isNewExpense, expense?.id, actions]);
 
-  // handleSaveExpense removed - saving now handled per-item and via auto-save
+
 
   return (
     <View style={styles.container}>
@@ -590,13 +673,12 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                 setSavingItemId(item.id);
                 try {
                     const expenseData = await prepareExpenseData();
-                    const participantProportions = calculateParticipantProportions(
-                        expenseData.items, 
-                        expenseData.participants, 
-                        expenseData.fees
+                    const participantProportions = calculateParticipantProportionsFromConsumption(
+                        expenseData.items,
+                        expenseData.participants
                     );
                     const expenseDataWithFeeSplits = applyProportionalFeeSplits(
-                        expenseData, 
+                        expenseData,
                         participantProportions
                     );
                     
@@ -698,7 +780,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                                 keyboardType="decimal-pad"
                                 value={customFeeInput}
                                 onChangeText={setCustomFeeInput}
-                                returnKeyType="done"
                             />
                             <Text style={styles.currencySuffix}>
                                 {customFeeMode === 'percentage' ? '%' : ''}
@@ -754,33 +835,78 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             */}
             {state.fees.length > 0 && (
               <View style={[styles.cardContainer, { marginTop: Spacing.md }]}>
-                {state.fees.map((fee, index) => (
-                  <View key={fee.id}>
+                {state.fees.map((fee, index) => {
+                  const isLocked = lockedItemIds && lockedItemIds.has(fee.id);
+                  return (
+                  <View key={fee.id} style={{ position: 'relative', overflow: 'hidden', borderRadius: Radius.md, marginBottom: index < state.fees.length - 1 ? 0 : 0 }}>
                     <View style={[
                         styles.feeRow,
-                        newlyAddedFee === fee.id && styles.feeRowHighlighted
+                        newlyAddedFee === fee.id && styles.feeRowHighlighted,
+                        isLocked && { opacity: 0.5, backgroundColor: Colors.surface }
                     ]}>
                         <View style={styles.feeInfo}>
-                            <Text style={styles.feeName}>{fee.name}</Text>
+                            <View style={styles.feeNameRow}>
+                                <Text style={[
+                                    styles.feeName, 
+                                    isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
+                                ]}>{fee.name}</Text>
+                            </View>
                             <Text style={styles.feeSubtitle}>
-                                {fee.type === 'percentage' ? `${(fee.percentage * 100).toFixed(0)}%` : 'Fixed amount'}
+                                {fee.type === 'percentage' && fee.percentage != null && !isNaN(fee.percentage)
+                                  ? `${(fee.percentage * 100).toFixed(0)}%`
+                                  : fee.type === 'percentage' ? 'Percentage fee' : 'Fixed amount'}
                             </Text>
                         </View>
                         <View style={styles.feeRight}>
-                             <Text style={styles.feeAmount}>
+                             <Text style={[
+                                 styles.feeAmount, 
+                                 isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
+                             ]}>
                                 +${(parseFloat(fee.amount) || 0).toFixed(2)}
                             </Text>
-                            <TouchableOpacity 
-                                onPress={() => handleRemoveFee(index)} 
-                                style={styles.removeFeeBtn}
-                            >
-                                <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
-                            </TouchableOpacity>
+                            {!isLocked && (
+                                <TouchableOpacity 
+                                    onPress={() => handleRemoveFee(index)} 
+                                    style={styles.removeFeeBtn}
+                                >
+                                    <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
-                    {index < state.fees.length - 1 && <View style={styles.separator} />}
+                    
+                    {isLocked && (
+                         <View style={{
+                             position: 'absolute',
+                             top: 0, bottom: 0, left: 0, right: 0,
+                             backgroundColor: Colors.surface + "DD",
+                             alignItems: 'center',
+                             justifyContent: 'center',
+                         }}>
+                             <View style={{
+                                 flexDirection: 'row',
+                                 alignItems: 'center',
+                                 justifyContent: 'center',
+                                 gap: 6,
+                                 backgroundColor: Colors.warning + "15",
+                                 paddingHorizontal: Spacing.md,
+                                 paddingVertical: 4,
+                                 borderRadius: Radius.pill,
+                                 borderWidth: 1,
+                                 borderColor: Colors.warning + "40",
+                             }}>
+                                <Ionicons name="lock-closed" size={14} color={Colors.warning} />
+                                <Text style={{ ...Typography.caption, color: Colors.warning, fontWeight: '600' }}>
+                                    {t('components.expenses.expenseItemCard.settled')}
+                                </Text>
+                             </View>
+                         </View>
+                     )}
+
+                    {index < state.fees.length - 1 && !isLocked && <View style={styles.separator} />}
                   </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </View>

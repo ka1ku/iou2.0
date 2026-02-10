@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, Spacing, Radius, Typography, Shadows } from "../design/tokens";
 import { getCurrentUser } from "../services/authService";
+import { getUserProfile } from "../services/friendService";
 import {
   createExpense,
   updateExpense,

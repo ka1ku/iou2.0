@@ -35,8 +35,13 @@ const PaidBySection = () => {
   return (
     <View style={styles.paidByContainer}>
       {/* Label removed to avoid duplication with screen header */}
-      
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
+      >
         <View style={styles.paidByGrid}>
             {participants && participants.length > 0 ? participants.map((participant, pIndex) => {
             const isSelected = selectedPayers.includes(pIndex);
@@ -102,9 +107,12 @@ const styles = StyleSheet.create({
   paidByContainer: {
     // Clean container
   },
+  scrollView: {
+    marginHorizontal: -Spacing.md, // Extend beyond parent padding
+  },
   scrollContent: {
-      paddingVertical: 4, // ample space for shadows/selection
-      paddingHorizontal: 2, 
+    paddingVertical: 4, // ample space for shadows/selection
+    paddingHorizontal: Spacing.md, // Re-add the padding as content padding
   },
   paidByGrid: {
     flexDirection: 'row',
