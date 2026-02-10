@@ -479,6 +479,7 @@ const HomeScreen = ({ navigation }) => {
             Keyboard.dismiss();
           }}
           style={styles.list}
+          showsVerticalScrollIndicator={false}
         />
       )}
 

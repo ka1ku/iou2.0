@@ -639,34 +639,48 @@ exports.onExpenseSettled = functions.firestore
     }
   });
 
-// Trigger: Payment request sent
-exports.onPaymentRequestSent = functions.firestore
-  .document('paymentRequests/{requestId}')
-  .onCreate(async (snap, context) => {
-    const request = snap.data();
-    const requestId = context.params.requestId;
-    
-    try {
-      // Get sender info
-      const senderDoc = await admin.firestore().collection('users').doc(request.fromUserId).get();
-      const senderData = senderDoc.data();
-      const senderName = `${senderData.firstName} ${senderData.lastName}`.trim();
-      
-      // Send notification to recipient
-      const title = 'Payment Request';
-      const body = `${senderName} requested $${request.amount} from you`;
+// Callable: Send payment request
+exports.sendPaymentRequest = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
 
-      await sendNotificationsToUsers([request.toUserId], title, body, {
-        type: 'payments',
-        route: 'settle',
-        requestId: requestId,
-        amount: request.amount.toString(),
-        actorUserId: request.fromUserId // Added for client-side filtering
-      });
-    } catch (error) {
-      console.error('Error in onPaymentRequestSent:', error);
+  try {
+    const { toUserId, amount, expenseId, expenseTitle } = data;
+    const fromUserId = context.auth.uid;
+
+    if (!toUserId || !amount) {
+      throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
     }
-  });
+
+    // Get sender info
+    const senderDoc = await admin.firestore().collection('users').doc(fromUserId).get();
+    const senderData = senderDoc.data();
+    const senderName = `${senderData.firstName} ${senderData.lastName}`.trim();
+
+    // Send notification to recipient
+    const title = 'Payment Request';
+    const body = `${senderName} requested $${amount} from you${expenseTitle ? ` for "${expenseTitle}"` : ''}`;
+
+    await sendNotificationsToUsers([toUserId], title, body, {
+      type: 'payments',
+      route: 'settle',
+      // We don't have a requestId anymore since we aren't storing it, 
+      // but we can pass a temporary ID if needed or just omission is fine
+      // The current app logic ignores requestId anyway
+      requestId: `req_${Date.now()}`, 
+      amount: amount.toString(),
+      actorUserId: fromUserId,
+      expenseId: expenseId // Optional, but good context
+    });
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Error sending payment request:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to send payment request: ' + error.message);
+  }
+});
 
 // Trigger: User joins expense via join code
 exports.onExpenseJoin = functions.firestore

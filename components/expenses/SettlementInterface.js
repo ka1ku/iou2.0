@@ -109,6 +109,27 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
         return t('components.expenses.settlementInterface.activity.types.participantAdded', { user, participant: e.details?.participantName });
       case 'participantRemoved':
         return t('components.expenses.settlementInterface.activity.types.participantRemoved', { user, participant: e.details?.participantName });
+      case 'itemModified':
+        return t('components.expenses.settlementInterface.activity.types.itemModified', { 
+            user, 
+            item: e.details?.itemName,
+            amount: parseFloat(e.details?.itemAmount || 0).toFixed(2)
+        });
+      case 'settlementAction':
+        if (e.subtype === 'settled') {
+             return t('components.expenses.settlementInterface.activity.types.settled', {
+                user,
+                peer: e.details?.peerName || 'someone',
+                amount: parseFloat(e.details?.amount || 0).toFixed(2)
+             });
+        } else if (e.subtype === 'unsettled') {
+             return t('components.expenses.settlementInterface.activity.types.unsettled', {
+                user,
+                peer: e.details?.peerName || 'someone',
+                amount: parseFloat(e.details?.amount || 0).toFixed(2)
+             });
+        }
+        return t('components.expenses.settlementInterface.activity.types.default', { user });
       default:
         return t('components.expenses.settlementInterface.activity.types.default', { user });
     }

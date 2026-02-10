@@ -82,6 +82,7 @@ const ItemRow = memo(({
   index,
   isEditing,
   isLocked,
+  isLockedBySettlement = false, // NEW: indicates item is locked because receipt is settled
   participants,
   onToggleEdit,
   onSave,
@@ -258,10 +259,18 @@ const ItemRow = memo(({
             style={[styles.viewModeRow, isLocked && styles.viewModeRowLocked]}
             onPress={() => {
               if (isLocked) {
-                Alert.alert(
-                  t('components.expenses.receiptBreakdown.lockedTitle'),
-                  t('components.expenses.receiptBreakdown.lockedMsg')
-                );
+                // Show different message based on why it's locked
+                if (isLockedBySettlement) {
+                  Alert.alert(
+                    'Receipt Is Settled',
+                    'This receipt has been settled. No items can be added or modified.\n\nTo make changes:\n1. Go to the Split tab\n2. Unsettle the receipt\n3. Return here to modify items'
+                  );
+                } else {
+                  Alert.alert(
+                    t('components.expenses.receiptBreakdown.lockedTitle'),
+                    t('components.expenses.receiptBreakdown.lockedMsg')
+                  );
+                }
                 return;
               }
               onToggleEdit(item.id);
@@ -279,8 +288,14 @@ const ItemRow = memo(({
                 </Text>
                 {isLocked && (
                   <View style={styles.settledBadge}>
-                    <Ionicons name="checkmark-circle" size={12} color={Colors.success} />
-                    <Text style={styles.settledBadgeText}>{t('components.expenses.receiptBreakdown.settled')}</Text>
+                    <Ionicons
+                      name={isLockedBySettlement ? "lock-closed" : "checkmark-circle"}
+                      size={12}
+                      color={isLockedBySettlement ? Colors.warning : Colors.success}
+                    />
+                    <Text style={[styles.settledBadgeText, isLockedBySettlement && { color: Colors.warning }]}>
+                      {isLockedBySettlement ? 'Locked (Settled)' : t('components.expenses.receiptBreakdown.settled')}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -344,6 +359,7 @@ const ItemRow = memo(({
     prevProps.index === nextProps.index &&
     prevProps.isEditing === nextProps.isEditing &&
     prevProps.isLocked === nextProps.isLocked &&
+    prevProps.isLockedBySettlement === nextProps.isLockedBySettlement &&
     prevProps.participants === nextProps.participants &&
     prevProps.onToggleEdit === nextProps.onToggleEdit &&
     prevProps.onSave === nextProps.onSave &&
@@ -358,6 +374,7 @@ const ReceiptBreakdown = ({
   items,
   participants,
   lockedItemIds,
+  isSettled = false, // NEW: blocks everything when receipt is settled
   onAddItem,
   onUpdateItem,
   onRemoveItem,
@@ -508,7 +525,8 @@ const ReceiptBreakdown = ({
                 item={item}
                 index={index}
                 isEditing={editingItemId === item.id}
-                isLocked={lockedItemIds?.has(item.id) || false}
+                isLocked={lockedItemIds?.has(item.id) || isSettled}
+                isLockedBySettlement={isSettled && !lockedItemIds?.has(item.id)}
                 isSaving={isSavingItemId === item.id}
                 participants={participants}
                 onToggleEdit={toggleEditMode}
@@ -522,12 +540,17 @@ const ReceiptBreakdown = ({
             </View>
           ))}
           
-          <TouchableOpacity 
-            style={styles.addItemButton} 
+          <TouchableOpacity
+            style={[styles.addItemButton, isSettled && { opacity: 0.5 }]}
             onPress={() => {
+              if (isSettled) {
+                Alert.alert('Receipt Settled', 'Cannot add items to a settled receipt. Go to Split tab and unsettle first.');
+                return;
+              }
               userManualAddRef.current = true;
               onAddItem();
-            }} 
+            }}
+            disabled={isSettled}
             activeOpacity={0.7}
           >
             <View style={styles.addItemIconContainer}>

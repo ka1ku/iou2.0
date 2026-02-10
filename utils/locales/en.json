@@ -728,8 +728,11 @@
                         "itemAddedAmount": "{{user}} added {{item}} for ${{amount}}",
                         "itemRemoved": "{{user}} removed \"{{item}}\"",
                         "itemRemovedAmount": "{{user}} removed {{item}} (${{amount}})",
+                        "itemModified": "{{user}} edited {{item}} for ${{amount}}",
                         "participantAdded": "{{user}} added {{participant}}",
                         "participantRemoved": "{{user}} removed {{participant}}",
+                        "settled": "{{user}} settled with {{peer}} for ${{amount}}",
+                        "unsettled": "{{user}} unsettled ${{amount}} with {{peer}}",
                         "default": "{{user}} made a change"
                     }
                 },

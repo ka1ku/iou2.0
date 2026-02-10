@@ -87,6 +87,21 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     selectedPayers: expense?.selectedPayers || state.selectedPayers,
   });
 
+  // Wrap settlement actions with validation
+  const handleSettlementActionWithValidation = useCallback(async (type, settlement, customAmount) => {
+    // Only validate for settlement actions (markAsPaid, etc.), not for undo actions
+    const SETTLEMENT_ACTIONS = ['markAsPaid', 'makePayment', 'requestPayment'];
+
+    if (SETTLEMENT_ACTIONS.includes(type)) {
+      if (!validateForSettlement()) {
+        return; // Validation failed, don't proceed
+      }
+    }
+
+    // Validation passed or it's an undo action, proceed with the action
+    return handleSettlementAction(type, settlement, customAmount);
+  }, [handleSettlementAction, validateForSettlement]);
+
   // Calculate totals
   const itemsSubtotal = useMemo(
     () => state.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0),
@@ -340,6 +355,46 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     };
   };
 
+  // Validate that everything is ready for settlement
+  const validateForSettlement = () => {
+    // Check if there's a payer
+    if (!state.selectedPayers?.length) {
+      Alert.alert(
+        'Cannot Settle',
+        'Please select who paid for this receipt before settling.'
+      );
+      return false;
+    }
+
+    // Check if all items are assigned
+    const unassignedItems = state.items.filter(
+      item => !item.selectedConsumers || item.selectedConsumers.length === 0
+    );
+
+    if (unassignedItems.length > 0) {
+      Alert.alert(
+        'Cannot Settle',
+        `${unassignedItems.length} item${unassignedItems.length > 1 ? 's are' : ' is'} not assigned to anyone. Please assign all items before settling.\n\nUnassigned:\n${unassignedItems.map(i => `• ${i.name}`).join('\n')}`
+      );
+      return false;
+    }
+
+    // Check if all items have valid amounts
+    const invalidItems = state.items.filter(
+      item => !item.amount || parseFloat(item.amount) <= 0
+    );
+
+    if (invalidItems.length > 0) {
+      Alert.alert(
+        'Cannot Settle',
+        'All items must have a valid price greater than $0.00'
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   const validateExpense = () => {
     if (state.participants.some((p) => !p.name.trim())) {
       Alert.alert(t('common.error'), t('addExpense.validationError'));
@@ -371,32 +426,32 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       );
       return false;
     }
-    
+
     // Check for items with no assigned people or zero price
     const errors = {};
     let hasErrors = false;
-    
+
     state.items.forEach((item, index) => {
       const itemErrors = {};
-      
+
       // Check if item has zero or negative price
       const amount = parseFloat(item.amount);
       if (!amount || amount <= 0 || isNaN(amount)) {
         itemErrors.amount = true;
         hasErrors = true;
       }
-      
+
       // Check if item has no assigned consumers
       if (!item.selectedConsumers || item.selectedConsumers.length === 0) {
         itemErrors.consumers = true;
         hasErrors = true;
       }
-      
+
       if (Object.keys(itemErrors).length > 0) {
         errors[item.id] = itemErrors;
       }
     });
-    
+
     if (hasErrors) {
       setItemValidationErrors(errors);
       Alert.alert(
@@ -405,7 +460,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       );
       return false;
     }
-    
+
     // Clear any previous validation errors
     setItemValidationErrors({});
     return true;
@@ -610,6 +665,14 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
 
 
+  // Check if ANYTHING is settled - if so, lock EVERYTHING
+  const isSettled = useMemo(() => {
+    return settlements.some(s =>
+      ['markedAsPaid', 'confirmed', 'complete', 'partial'].includes(s.status) ||
+      (s.settledAmount && s.settledAmount > 0)
+    );
+  }, [settlements]);
+
   return (
     <View style={styles.container}>
         <ExpenseHeader
@@ -646,14 +709,32 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         
         {activeTab === 'track' && (
           <>
+        {/* Settlement Warning Banner */}
+        {isSettled && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="lock-closed" size={20} color={Colors.warning} />
+            <View style={{ flex: 1, marginLeft: Spacing.md }}>
+              <Text style={styles.warningBannerTitle}>Receipt Is Settled</Text>
+              <Text style={styles.warningBannerText}>
+                This receipt has been settled. No items or fees can be added or modified. To make changes, go to Split tab and unsettle first.
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Paid By Section */}
         <View style={styles.sectionContainer}>
           <View style={styles.headerRow}>
             <Text style={styles.sectionHeaderText}>{t('addReceipt.paidBy')}</Text>
+            {isSettled && (
+              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 8 }}>
+                (Settled - cannot change)
+              </Text>
+            )}
           </View>
           <View style={styles.cardContainer}>
             <View style={styles.paidByWrapper}>
-                <PaidBySection />
+                <PaidBySection disabled={isSettled} />
             </View>
           </View>
         </View>
@@ -663,6 +744,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             items={state.items}
             participants={state.participants}
             lockedItemIds={lockedItemIds}
+            isSettled={isSettled}
             onAddItem={handleAddItem}
             onUpdateItem={handleUpdateItem}
             onRemoveItem={handleRemoveItem}
@@ -719,9 +801,14 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
           <View style={styles.sectionContainer}>
             <View style={styles.headerRow}>
               <Text style={styles.sectionHeaderText}>{t('addReceipt.extraCharges')}</Text>
+              {isSettled && (
+                <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 8 }}>
+                  (Settled - cannot change)
+                </Text>
+              )}
             </View>
-            
-            <View style={styles.cardContainer}>
+
+            <View style={[styles.cardContainer, isSettled && { opacity: 0.5 }]}>
                  {/* Fee Type Selector */}
                 <View style={styles.feeTypeRow}>
                 {['Tip', 'Tax', 'Service', 'Custom'].map((type, index) => {
@@ -735,7 +822,8 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                         isSelected && styles.feeTypeButtonSelected,
                         !isLast && styles.feeTypeBorderRight
                         ]}
-                        onPress={() => setSelectedFeeType(type)}
+                        onPress={() => !isSettled && setSelectedFeeType(type)}
+                        disabled={isSettled}
                         activeOpacity={0.7}
                     >
                         <Text style={[
@@ -763,6 +851,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                             value={customFeeName}
                             onChangeText={setCustomFeeName}
                             autoCorrect={false}
+                            editable={!isSettled}
                         />
                          <View style={styles.separator} />
                         </View>
@@ -780,6 +869,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                                 keyboardType="decimal-pad"
                                 value={customFeeInput}
                                 onChangeText={setCustomFeeInput}
+                                editable={!isSettled}
                             />
                             <Text style={styles.currencySuffix}>
                                 {customFeeMode === 'percentage' ? '%' : ''}
@@ -788,21 +878,27 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                         
                         {/* Toggle */}
                         <View style={styles.toggleWrapper}>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.toggleOption, customFeeMode === 'fixed' && styles.toggleOptionActive]}
                                 onPress={() => {
-                                setCustomFeeMode('fixed');
-                                setCustomFeeInput('');
+                                if (!isSettled) {
+                                  setCustomFeeMode('fixed');
+                                  setCustomFeeInput('');
+                                }
                                 }}
+                                disabled={isSettled}
                             >
                                 <Text style={[styles.toggleText, customFeeMode === 'fixed' && styles.toggleTextActive]}>$</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 style={[styles.toggleOption, customFeeMode === 'percentage' && styles.toggleOptionActive]}
                                 onPress={() => {
-                                setCustomFeeMode('percentage');
-                                setCustomFeeInput('');
+                                if (!isSettled) {
+                                  setCustomFeeMode('percentage');
+                                  setCustomFeeInput('');
+                                }
                                 }}
+                                disabled={isSettled}
                             >
                                 <Text style={[styles.toggleText, customFeeMode === 'percentage' && styles.toggleTextActive]}>%</Text>
                             </TouchableOpacity>
@@ -812,14 +908,14 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
                  <View style={styles.separator} />
                  
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[
                     styles.addItemButton,
-                    (!customFeeInput || parseFloat(customFeeInput) <= 0 || 
+                    (isSettled || !customFeeInput || parseFloat(customFeeInput) <= 0 ||
                     (selectedFeeType === 'Custom' && !customFeeName.trim())) && styles.addItemButtonDisabled
                     ]}
-                    onPress={handleCustomFeeAdd}
-                    disabled={!customFeeInput || parseFloat(customFeeInput) <= 0 || 
+                    onPress={isSettled ? () => Alert.alert('Receipt Settled', 'Cannot add fees to a settled receipt. Unsettle first.') : handleCustomFeeAdd}
+                    disabled={isSettled || !customFeeInput || parseFloat(customFeeInput) <= 0 ||
                     (selectedFeeType === 'Custom' && !customFeeName.trim())}
                     activeOpacity={0.7}
                 >
@@ -845,7 +941,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                         isLocked && { opacity: 0.5, backgroundColor: Colors.surface }
                     ]}>
                         <View style={styles.feeInfo}>
-                            <View style={styles.feeNameRow}>
+                            <View>
                                 <Text style={[
                                     styles.feeName, 
                                     isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
@@ -943,7 +1039,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
               settlements={settlements}
               participants={state.participants}
               currentUserId={currentUserId}
-              handleAction={handleSettlementAction}
+              handleAction={handleSettlementActionWithValidation}
               handleItemToggle={handleItemToggle}
               handleBulkSettle={handleBulkSettle}
               handleBulkAction={handleBulkAction}
@@ -1204,6 +1300,30 @@ const styles = StyleSheet.create({
   // Settlement Split Tab Styles
   splitViewContainer: {
     paddingTop: Spacing.sm,
+  },
+
+  // Warning Banner Styles
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: Colors.warning + '15',
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.warning,
+    padding: Spacing.md,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+    borderRadius: Radius.md,
+  },
+  warningBannerTitle: {
+    ...Typography.body1,
+    fontWeight: '600',
+    color: Colors.warning,
+    marginBottom: 4,
+  },
+  warningBannerText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
 
 });

@@ -146,7 +146,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
   };
 
   const handleFocus = (pIndex) => {
-    const initialValue = derivedSplits[pIndex]?.amount;
+    const consumerPosition = item.selectedConsumers.indexOf(pIndex);
+    const initialValue = consumerPosition >= 0 ? derivedSplits[consumerPosition] : 0;
     setActiveInput({
       index: pIndex,
       value: initialValue === 0 ? "0" : String(initialValue || ""),
@@ -223,14 +224,14 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     setValidationErrors(errors);
 
     const hasErrors = Object.values(errors).some(error => error);
-    
+
     if (hasErrors) {
       const missingFields = [];
       if (errors.name) missingFields.push(t('components.expenses.expenseItemCard.fields.name'));
       if (errors.amount) missingFields.push(t('components.expenses.expenseItemCard.fields.price'));
       if (errors.payers) missingFields.push(t('components.expenses.expenseItemCard.fields.payer'));
       if (errors.consumers) missingFields.push(t('components.expenses.expenseItemCard.fields.consumer'));
-      
+
       Alert.alert(
         t('components.expenses.expenseItemCard.alerts.incomplete'),
         t('components.expenses.expenseItemCard.alerts.incompleteDesc', { fields: missingFields.join(", ") })
@@ -238,9 +239,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       return false;
     }
 
-    const allocatedTotal = (item.selectedConsumers || []).reduce((sum, consumerIndex) => {
-      const split = derivedSplits[consumerIndex];
-      return sum + (split && typeof split.amount === "number" ? split.amount : 0);
+    const allocatedTotal = derivedSplits.reduce((sum, splitAmount) => {
+      return sum + (typeof splitAmount === "number" ? splitAmount : 0);
     }, 0);
     const totalAmount = parseFloat(item.amount) || 0;
 
@@ -315,9 +315,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
     }
   };
 
-  const totalAllocated = (item.selectedConsumers || []).reduce((sum, consumerIndex) => {
-    const split = derivedSplits[consumerIndex];
-    return sum + (split && typeof split.amount === "number" ? split.amount : 0);
+  const totalAllocated = derivedSplits.reduce((sum, splitAmount) => {
+    return sum + (typeof splitAmount === "number" ? splitAmount : 0);
   }, 0);
   const totalAmount = parseFloat(item.amount) || 0;
   const remainingAmount = totalAmount - totalAllocated;
@@ -461,7 +460,8 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
             )}
           </View>
           {participants.map((participant, pIndex) => {
-            const split = derivedSplits[pIndex] || { amount: 0 };
+            const consumerPosition = item.selectedConsumers.indexOf(pIndex);
+            const splitAmount = consumerPosition >= 0 ? derivedSplits[consumerPosition] : 0;
             const isSelected = item.selectedConsumers.includes(pIndex);
             const isAuto = isSelected && manualSplits[pIndex] === undefined;
             return (
@@ -493,7 +493,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
                     value={
                       activeInput && activeInput.index === pIndex
                         ? activeInput.value
-                        : split.amount
+                        : splitAmount
                     }
                     onChangeText={(text) => handleLiveTextChange(pIndex, text)}
                     onFocus={() => handleFocus(pIndex)}

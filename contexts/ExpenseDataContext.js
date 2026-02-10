@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { getCurrentUser, onAuthStateChange } from '../services/authService';
 import { getFirestore, doc, onSnapshot, query, where, orderBy, collection, limit, startAfter, getDocs } from '@react-native-firebase/firestore';
 import { getApp } from '@react-native-firebase/app';
@@ -104,7 +104,7 @@ export const ExpenseDataProvider = ({ children }) => {
         id: doc.id,
         ...doc.data()
       }));
-      
+
       // Update pagination state
       if (snapshot.docs.length > 0) {
         lastDocRef.current = snapshot.docs[snapshot.docs.length - 1];
@@ -113,16 +113,42 @@ export const ExpenseDataProvider = ({ children }) => {
         lastDocRef.current = null;
         setHasMore(false);
       }
-      
-      // Merge with existing expenses to handle real-time updates
+
+      // Replace expenses intelligently to handle removals
       setExpenses(prevExpenses => {
-        // On first load, replace. On updates, merge.
+        // On first load, just use the snapshot results
         if (prevExpenses.length === 0 && !hasReceivedInitialSnapshot.current) {
           return userExpenses;
         }
-        return mergeAndSortExpenses(prevExpenses, userExpenses);
+
+        // The onSnapshot only covers the first PAGE_SIZE expenses
+        // So we need to:
+        // 1. Use the snapshot results as the source of truth for the first PAGE_SIZE
+        // 2. Keep any expenses beyond PAGE_SIZE that were loaded via pagination
+
+        // Get IDs from the snapshot
+        const snapshotIds = new Set(userExpenses.map(e => e.id));
+
+        // Keep only expenses that were loaded via pagination (not in the first PAGE_SIZE from onSnapshot)
+        // These are expenses beyond the initial query that we loaded with loadMoreExpenses
+        const paginatedExpenses = prevExpenses.filter(e => {
+          // If the expense is in the snapshot, it will be replaced
+          if (snapshotIds.has(e.id)) return false;
+
+          // Keep expenses that are likely from pagination (beyond PAGE_SIZE)
+          // We identify these by checking if they're older than the last snapshot expense
+          const lastSnapshotTime = userExpenses.length > 0
+            ? getTimestampMs(userExpenses[userExpenses.length - 1].createdAt)
+            : Infinity;
+          const expenseTime = getTimestampMs(e.createdAt);
+
+          return expenseTime < lastSnapshotTime;
+        });
+
+        // Combine snapshot results with paginated expenses
+        return [...userExpenses, ...paginatedExpenses];
       });
-      
+
       // Only set loading to false after we've received the initial snapshot
       if (!hasReceivedInitialSnapshot.current) {
         hasReceivedInitialSnapshot.current = true;
@@ -154,7 +180,7 @@ export const ExpenseDataProvider = ({ children }) => {
   }, [currentUser]);
 
   // Function to load more expenses
-  const loadMoreExpenses = async () => {
+  const loadMoreExpenses = useCallback(async () => {
     if (!currentUser || loadingMore || !hasMore || !lastDocRef.current) {
       return;
     }
@@ -163,7 +189,7 @@ export const ExpenseDataProvider = ({ children }) => {
 
     try {
       const firestoreInstance = getFirestore(getApp());
-      
+
       // Build query with pagination
       const expensesQuery = query(
         collection(firestoreInstance, 'expenses'),
@@ -174,7 +200,7 @@ export const ExpenseDataProvider = ({ children }) => {
       );
 
       const snapshot = await getDocs(expensesQuery);
-      
+
       if (snapshot.empty) {
         setHasMore(false);
         setLoadingMore(false);
@@ -203,7 +229,7 @@ export const ExpenseDataProvider = ({ children }) => {
     } finally {
       setLoadingMore(false);
     }
-  };
+  }, [currentUser, loadingMore, hasMore]);
 
   // Calculate balances only when expenses or user changes
   useEffect(() => {
@@ -247,7 +273,7 @@ export const ExpenseDataProvider = ({ children }) => {
     return unsubscribeProfile;
   }, [currentUser]);
 
-  const value = {
+  const value = useMemo(() => ({
     expenses,
     balances,
     userProfile,
@@ -255,7 +281,7 @@ export const ExpenseDataProvider = ({ children }) => {
     loadingMore,
     hasMore,
     loadMoreExpenses,
-  };
+  }), [expenses, balances, userProfile, loading, loadingMore, hasMore, loadMoreExpenses]);
 
   return (
     <ExpenseDataContext.Provider value={value}>

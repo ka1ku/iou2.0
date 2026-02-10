@@ -12,12 +12,13 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/token
 import { useExpense } from '../../contexts/ExpenseContext';
 import { useTranslation } from '../../contexts/LanguageContext';
 
-const PaidBySection = () => {
+const PaidBySection = ({ disabled = false }) => {
   const { t } = useTranslation();
   const { state, actions } = useExpense();
   const { participants, selectedPayers, items } = state;
 
   const togglePayer = (participantIndex) => {
+    if (disabled) return;
     const newPayers = selectedPayers.includes(participantIndex)
       ? selectedPayers.filter(i => i !== participantIndex)
       : [...selectedPayers, participantIndex];
@@ -33,7 +34,7 @@ const PaidBySection = () => {
   };
 
   return (
-    <View style={styles.paidByContainer}>
+    <View style={[styles.paidByContainer, disabled && styles.disabledContainer]}>
       {/* Label removed to avoid duplication with screen header */}
 
       <ScrollView
@@ -56,6 +57,7 @@ const PaidBySection = () => {
                     togglePayer(pIndex);
                 }}
                 activeOpacity={0.7}
+                disabled={disabled}
                 >
                 <View style={styles.paidByItemContent}>
                     <View style={styles.paidByAvatar}>
@@ -106,6 +108,9 @@ const PaidBySection = () => {
 const styles = StyleSheet.create({
   paidByContainer: {
     // Clean container
+  },
+  disabledContainer: {
+    opacity: 0.5,
   },
   scrollView: {
     marginHorizontal: -Spacing.md, // Extend beyond parent padding

@@ -12,6 +12,7 @@ import {
   getDoc,
   getDocs
 } from '@react-native-firebase/firestore';
+import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { getApp } from '@react-native-firebase/app';
 import { Linking, Platform } from 'react-native';
 import { calculateSettlementWithPartialSettlements, calculateSettlement } from '../utils/settlementCalculator';
@@ -100,11 +101,11 @@ export const updateExpense = async (expenseId, updateData, userId) => {
 
     // Track whether we need to log changes (price/item/participant changes)
     const shouldLogChanges =
-      !updateData.settlements && // Don't log for pure settlement status changes
       (updateData.items !== undefined ||
        updateData.participants !== undefined ||
        updateData.fees !== undefined ||
-       updateData.total !== undefined);
+       updateData.total !== undefined ||
+       updateData.settlements !== undefined);
 
     if (shouldRecalculateSettlements || shouldLogChanges) {
       try {
@@ -216,6 +217,17 @@ export const updateExpense = async (expenseId, updateData, userId) => {
               const roundOld = Math.round(oldTotal * 100) / 100;
               const roundNew = Math.round(newTotal * 100) / 100;
 
+              // Resolve actor name once
+              let actorName = 'Someone';
+              if (userId) {
+                try {
+                  const profile = await getUserProfile(userId);
+                  if (profile) {
+                    actorName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || 'Someone';
+                  }
+                } catch (_) { /* use default */ }
+              }
+
               // Detect total change
               if (Math.abs(roundOld - roundNew) > 0.01) {
                 // Find affected settlements (non-noAction ones)
@@ -228,16 +240,8 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                     return `${from}|||${to}|||${amt}`;
                   });
 
-                // Get user name for the log
-                let userName = 'Someone';
-                if (userId) {
-                  try {
-                    const profile = await getUserProfile(userId);
-                    if (profile) {
-                      userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || 'Someone';
-                    }
-                  } catch (_) { /* use default */ }
-                }
+                // Get user name (already resolved as actorName)
+                const userName = actorName;
 
                 changeLogEntries.push({
                   type: 'priceChange',
@@ -284,16 +288,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                   return payersChanged || consumersChanged || splitsChanged;
                 });
 
-                let userName = null;
-                if ((addedItems.length > 0 || removedItems.length > 0 || modifiedItems.length > 0) && userId) {
-                  try {
-                    const profile = await getUserProfile(userId);
-                    if (profile) {
-                      userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || 'Someone';
-                    }
-                  } catch (_) { /* use default */ }
-                }
-                const actorName = userName || 'Someone';
+                // Actor name already resolved
 
                 // Log Added (only log items with a valid amount)
                 addedItems.forEach(item => {
@@ -356,11 +351,67 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                       details: {
                         itemId: newItem.id,
                         itemName: newItem.name,
+                        itemAmount: parseFloat(newItem.amount) || 0,
                         changes: changes,
                       },
                     });
                   }
                 });
+              }
+              
+              // Detect settlement changes
+              if (finalUpdateData.settlements) {
+                 const newSettlements = finalUpdateData.settlements;
+                 newSettlements.forEach(newS => {
+                    const oldS = existingSettlements.find(s => 
+                        (s.debtor || s.from) === (newS.debtor || newS.from) &&
+                        (s.creditor || s.to) === (newS.creditor || newS.to)
+                    );
+                    
+                    const oldStatus = oldS?.status || 'noAction';
+                    const newStatus = newS.status || 'noAction';
+                    
+                    if (oldStatus !== newStatus) {
+                        const isSettled = ['markedAsPaid', 'confirmed', 'complete'].includes(newStatus);
+                        const wasSettled = ['markedAsPaid', 'confirmed', 'complete'].includes(oldStatus);
+                        
+                        // Determine peer name
+                        // If current user is debtor, peer is creditor. If current user is creditor, peer is debtor.
+                        // Ideally we want the name of the OTHER person.
+                        // We use actorName to check who performed the action.
+                        // But for the message "{{user}} settled with {{peer}}", {{user}} is the actor.
+                        
+                        const debtor = newS.debtor || newS.from;
+                        const creditor = newS.creditor || newS.to;
+                        const peerName = (creditor === actorName || creditor === 'You') ? debtor : creditor; 
+
+                        if (isSettled && !wasSettled) {
+                             changeLogEntries.push({
+                                type: 'settlementAction',
+                                subtype: 'settled',
+                                userId: userId || null,
+                                userName: actorName,
+                                timestamp: new Date().toISOString(),
+                                details: {
+                                    amount: newS.amount,
+                                    peerName: peerName
+                                }
+                             });
+                        } else if (!isSettled && wasSettled) {
+                             changeLogEntries.push({
+                                type: 'settlementAction',
+                                subtype: 'unsettled',
+                                userId: userId || null,
+                                userName: actorName,
+                                timestamp: new Date().toISOString(),
+                                details: {
+                                    amount: newS.amount,
+                                    peerName: peerName
+                                }
+                             });
+                        }
+                    }
+                 });
               }
 
               // Detect participant changes
@@ -373,14 +424,9 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                 const removedParticipants = oldParticipants.filter(p => p.userId && !newUserIds.has(p.userId));
 
                 let userName = null;
-                if ((addedParticipants.length > 0 || removedParticipants.length > 0) && userId) {
-                  try {
-                    const profile = await getUserProfile(userId);
-                    if (profile) {
-                      userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || profile.username || 'Someone';
-                    }
-                  } catch (_) { /* use default */ }
-                }
+                // Reuse actorName if possible, but keep local logic if strictly needed. 
+                // Actually we can just use actorName.
+                userName = actorName;
 
                 addedParticipants.forEach(p => {
                   changeLogEntries.push({
@@ -725,25 +771,19 @@ export const settleExpense = async (expenseId, userId) => {
 // Function to create a payment request and trigger notification
 export const createPaymentRequest = async ({ fromUserId, toUserId, amount, expenseId, expenseTitle }) => {
   try {
-    const firestoreInstance = getFirestore(getApp());
+    const functions = getFunctions(getApp());
+    const sendPaymentRequest = httpsCallable(functions, 'sendPaymentRequest');
     
-    const paymentRequest = {
-      fromUserId, // Person requesting payment
+    const result = await sendPaymentRequest({
       toUserId, // Person who should pay
       amount,
       expenseId,
       expenseTitle,
-      status: 'pending',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-    
-    // Creating this document will trigger the Cloud Function that sends the notification
-    const docRef = await addDoc(collection(firestoreInstance, 'paymentRequests'), paymentRequest);
+    });
     
     return {
       success: true,
-      requestId: docRef.id
+      requestId: result.data.requestId || 'req_' + Date.now() // Fallback ID since we don't store it
     };
   } catch (error) {
     console.error('Error creating payment request:', error);
