@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import LottieView from 'lottie-react-native';
 import Purchases from 'react-native-purchases';
+import { initializeRevenueCat } from './services/revenueCatService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -116,9 +117,9 @@ const NotificationNavigationSetup = () => {
     // Create navigation handler
     const handleNotificationNavigation = (data) => {
       if (!data) return;
-      
+
       const { route, expenseId, userId, screen } = data;
-      
+
       try {
         switch (route) {
           case 'expense':
@@ -180,6 +181,7 @@ const MainTabs = () => {
   const navigation = useNavigation();
   const bottomSheetRef = useRef(null);
   const { isReceiptScanning, showScanningOverlay } = useReceiptScanning();
+  const lastActiveTabRef = useRef('Home');
 
   const getTabBarIcon = (routeName, focused, color, size) => {
     const iconMap = {
@@ -190,9 +192,14 @@ const MainTabs = () => {
     return <Ionicons name={iconMap[routeName]} size={size} color={color} />;
   };
 
-  const handleTabPress = (routeName) => {
+  const handleTabPress = useCallback((routeName) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
+    if (routeName !== 'Create') {
+      lastActiveTabRef.current = routeName;
+    }
+  }, []);
+
+  const getLastActiveTab = useCallback(() => lastActiveTabRef.current, []);
 
   return (
     <View style={{ flex: 1 }}>
@@ -201,7 +208,7 @@ const MainTabs = () => {
           tabBarIcon: ({ focused, color, size }) => getTabBarIcon(route.name, focused, color, size),
           tabBarActiveTintColor: Colors.tabActive,
           tabBarInactiveTintColor: Colors.tabInactive,
-          
+
           tabBarStyle: {
             backgroundColor: Colors.surface,
             borderTopWidth: 0,
@@ -219,8 +226,8 @@ const MainTabs = () => {
           headerShown: false,
         })}
       >
-        <Tab.Screen 
-          name="Home" 
+        <Tab.Screen
+          name="Home"
           component={HomeStack}
           options={{
             tabBarLabel: t('navigation.home'),
@@ -250,8 +257,8 @@ const MainTabs = () => {
             tabBarLabel: '',
           }}
         />
-        <Tab.Screen 
-          name="Profile" 
+        <Tab.Screen
+          name="Profile"
           component={ProfileStack}
           options={{
             tabBarLabel: t('navigation.profile'),
@@ -261,16 +268,17 @@ const MainTabs = () => {
           }}
         />
       </Tab.Navigator>
-      
-      <CreateBottomSheet 
+
+      <CreateBottomSheet
         ref={bottomSheetRef}
         navigation={navigation}
+        getLastActiveTab={getLastActiveTab}
       />
-      
+
       {isReceiptScanning && (
         <View style={[StyleSheet.absoluteFillObject, { zIndex: 1000, backgroundColor: 'white' }]} />
       )}
-      
+
       {showScanningOverlay && (
         <View style={styles.scanningOverlay}>
           <LottieView
@@ -311,7 +319,7 @@ const RootStack = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MainTabs} />
-      
+
       {/* Global Screens (Push over tabs) */}
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="ProfileSettings" component={ProfileSettingsScreen} />
@@ -319,7 +327,7 @@ const RootStack = () => {
       <Stack.Screen name="LanguageRegion" component={LanguageRegionSettingsScreen} />
 
       <Stack.Screen name="FriendProfile" component={FriendProfileScreen} />
-      
+
       {/* Expense Flow Screens */}
       <Stack.Screen name="SetupExpense" component={SetupExpenseScreenWithProvider} />
       <Stack.Screen name="AddExpense" component={AddExpenseScreenWithProvider} />
@@ -330,23 +338,29 @@ const RootStack = () => {
 };
 
 const AppContent = ({ user, loading }) => {
-  const { userProfile } = useExpenseData();
+  const { userProfile, isProfileLoading } = useExpenseData();
+
+
 
   if (loading) {
-     return <LoadingScreen />;
+    return <LoadingScreen />;
   }
 
   if (user) {
     // If we have a user but profile hasn't loaded yet, show loading
-    if (!userProfile) {
-       return <LoadingScreen />;
+    if (isProfileLoading) {
+      return <LoadingScreen />;
     }
-    
 
-    
+    // If profile loaded but is null, we're likely signing out in the useEffect above
+    // So show loading to prevent flash of content or errors
+    if (!userProfile) {
+      return <LoadingScreen />;
+    }
+
     return <RootStack />;
   }
-  
+
   return <AuthStack />;
 };
 
@@ -369,17 +383,14 @@ export default function App() {
 
   useEffect(() => {
     const initializeServices = async () => {
+
       try {
-        await Purchases.configure({
-          apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
-          appUserID: null,
-        });
-
-        Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
-
-        await Purchases.getOfferings();
-
+        const success = await initializeRevenueCat(null); // Initial anonymous setup
+        if (!success) {
+          console.error('RevenueCat failed to initialize');
+        }
       } catch (error) {
+        console.error('Error during RevenueCat initialization:', error);
       }
 
       try {
@@ -417,7 +428,7 @@ export default function App() {
     const unsubscribe = onAuthStateChange(async (user) => {
       setUser(user);
       setLoading(false);
-      
+
       if (user?.uid) {
         // Sync preferences from Firebase
         try {
@@ -425,16 +436,16 @@ export default function App() {
           if (preferences) {
             const { language, region, currency } = preferences;
             const store = useSettingsStore.getState();
-            
+
             if (language) {
-               store.setLanguage(language);
-               i18n.locale = language;
+              store.setLanguage(language);
+              i18n.locale = language;
             }
             if (region) store.setRegion(region);
             if (currency) store.setCurrency(currency);
           }
         } catch (error) {
-           console.error('Failed to sync preferences:', error);
+          console.error('Failed to sync preferences:', error);
         }
 
       }

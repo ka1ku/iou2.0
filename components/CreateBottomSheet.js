@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useRef, useCallback, useMemo, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useCallback, useMemo, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -26,8 +26,6 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
   const insets = useSafeAreaInsets();
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['50%'], []);
-  const [index, setIndex] = useState(-1);
-  const [scanningReceipt, setScanningReceipt] = useState(false);
   const [showScanOptions, setShowScanOptions] = useState(false);
   const [showJoinOptions, setShowJoinOptions] = useState(false);
   const [joinInput, setJoinInput] = useState('');
@@ -103,9 +101,6 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
     },
   }));
 
-  const handleSheetChanges = useCallback((idx) => {
-    setIndex(idx);
-  }, []);
 
   const handleAddExpense = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -134,14 +129,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
       takePhoto(
         (imageUri) => processReceiptImage(
           imageUri,
-          () => {
-            setScanningReceipt(true);
-            startScanningAnimation();
-          },
-          () => {
-            setScanningReceipt(false);
-            stopScanningAnimation();
-          },
+          startScanningAnimation,
+          stopScanningAnimation,
           (receiptData) => {
             // Increment usage count on success
             incrementScanUsage();
@@ -211,14 +200,8 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
       pickImage(
         (imageUri) => processReceiptImage(
           imageUri,
-          () => {
-            setScanningReceipt(true);
-            startScanningAnimation();
-          },
-          () => {
-            setScanningReceipt(false);
-            stopScanningAnimation();
-          },
+          startScanningAnimation,
+          stopScanningAnimation,
           (receiptData) => {
             // Increment usage count on success
             incrementScanUsage();
@@ -252,159 +235,172 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
     []
   );
 
+  // Memoize the main options content
+  const mainContent = useMemo(() => (
+    <>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>{t('components.createBottomSheet.title')}</Text>
+      </View>
+
+      <View style={styles.optionsContainer}>
+        <TouchableOpacity
+          style={styles.option}
+          onPress={handleAddExpense}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIcon, { backgroundColor: Colors.brandLight }]}>
+            <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{t('components.createBottomSheet.addExpense')}</Text>
+            <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.addExpenseDesc')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.option, { marginTop: Spacing.md }]}
+          onPress={handleScanReceipt}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '10' }]}>
+            <Ionicons name="camera-outline" size={28} color={Colors.blue} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{t('components.createBottomSheet.scanReceipt')}</Text>
+            <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.scanReceiptDesc')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.option, { marginTop: Spacing.md }]}
+          onPress={handleJoinExpense}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIcon, { backgroundColor: Colors.accent + '10' }]}>
+            <Ionicons name="enter-outline" size={28} color={Colors.accent} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{t('components.createBottomSheet.joinExpense')}</Text>
+            <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.joinExpenseDesc')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    </>
+  ), [t, handleAddExpense, handleScanReceipt, handleJoinExpense]);
+
+  // Memoize the scan options content
+  const scanContent = useMemo(() => (
+    <>
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={() => setShowScanOptions(false)}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.title}>{t('components.createBottomSheet.scanTitle')}</Text>
+        <View style={styles.backButtonPlaceholder} />
+      </View>
+
+      <View style={styles.optionsContainer}>
+        <TouchableOpacity
+          style={styles.option}
+          onPress={handleTakePhoto}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
+            <Ionicons name="camera" size={28} color={Colors.blue} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{t('components.createBottomSheet.takePhoto')}</Text>
+            <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.takePhotoDesc')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.option, { marginTop: Spacing.md }]}
+          onPress={handlePickFromGallery}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
+            <Ionicons name="images-outline" size={28} color={Colors.blue} />
+          </View>
+          <View style={styles.optionContent}>
+            <Text style={styles.optionTitle}>{t('components.createBottomSheet.chooseGallery')}</Text>
+            <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.chooseGalleryDesc')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    </>
+  ), [t, handleTakePhoto, handlePickFromGallery]);
+
+  // Memoize the join options content
+  const handleBackToMain = useCallback(() => {
+    setShowJoinOptions(false);
+    Keyboard.dismiss();
+  }, []);
+
+  const joinContent = useMemo(() => (
+    <>
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={handleBackToMain}
+          style={styles.backButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.title}>{t('components.createBottomSheet.joinTitle')}</Text>
+        <View style={styles.backButtonPlaceholder} />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>{t('components.createBottomSheet.enterLink')}</Text>
+        <TextInput
+          style={styles.input}
+          placeholder={t('components.createBottomSheet.linkPlaceholder')}
+          value={joinInput}
+          onChangeText={setJoinInput}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholderTextColor={Colors.textSecondary}
+        />
+
+        <TouchableOpacity
+          style={[styles.actionButton, !joinInput.trim() && styles.disabledButton]}
+          onPress={handleProcessJoin}
+          disabled={!joinInput.trim()}
+        >
+          <Text style={styles.actionButtonText}>{t('components.createBottomSheet.joinButton')}</Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  ), [t, handleBackToMain, joinInput, handleProcessJoin]);
+
   return (
     <BottomSheet
       ref={bottomSheetRef}
-      index={index}
+      index={-1}
       snapPoints={snapPoints}
-      onChange={handleSheetChanges}
       enablePanDownToClose
+      enableOverDrag={false}
       backdropComponent={renderBackdrop}
       backgroundStyle={styles.bottomSheetBackground}
       handleIndicatorStyle={styles.handleIndicator}
+      animateOnMount={false}
     >
       <BottomSheetView style={[styles.contentContainer, { paddingBottom: insets.bottom + Spacing.lg }]}>
-        {showScanOptions ? (
-          <>
-            <View style={styles.headerRow}>
-              <TouchableOpacity
-                onPress={() => setShowScanOptions(false)}
-                style={styles.backButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-              </TouchableOpacity>
-              <Text style={styles.title}>{t('components.createBottomSheet.scanTitle')}</Text>
-              <View style={styles.backButtonPlaceholder} />
-            </View>
-            
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity
-                style={styles.option}
-                onPress={handleTakePhoto}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
-                  <Ionicons name="camera" size={28} color={Colors.blue} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.takePhoto')}</Text>
-                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.takePhotoDesc')}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.option, { marginTop: Spacing.md }]}
-                onPress={handlePickFromGallery}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '20' }]}>
-                  <Ionicons name="images-outline" size={28} color={Colors.blue} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.chooseGallery')}</Text>
-                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.chooseGalleryDesc')}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : showJoinOptions ? (
-          <>
-             <View style={styles.headerRow}>
-              <TouchableOpacity
-                onPress={() => { setShowJoinOptions(false); Keyboard.dismiss(); }}
-                style={styles.backButton}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-              </TouchableOpacity>
-              <Text style={styles.title}>{t('components.createBottomSheet.joinTitle')}</Text>
-              <View style={styles.backButtonPlaceholder} />
-            </View>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>{t('components.createBottomSheet.enterLink')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder={t('components.createBottomSheet.linkPlaceholder')}
-                value={joinInput}
-                onChangeText={setJoinInput}
-                autoCapitalize="none"
-                autoCorrect={false}
-                placeholderTextColor={Colors.textSecondary}
-              />
-              
-              <TouchableOpacity
-                style={[styles.actionButton, !joinInput.trim() && styles.disabledButton]}
-                onPress={handleProcessJoin}
-                disabled={!joinInput.trim()}
-              >
-                <Text style={styles.actionButtonText}>{t('components.createBottomSheet.joinButton')}</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={styles.headerRow}>
-              <Text style={styles.title}>{t('components.createBottomSheet.title')}</Text>
-            </View>
-            
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity
-                style={styles.option}
-                onPress={handleAddExpense}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.brandLight }]}>
-                  <Ionicons name="receipt-outline" size={28} color={Colors.accent} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.addExpense')}</Text>
-                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.addExpenseDesc')}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.option, { marginTop: Spacing.md }]}
-                onPress={handleScanReceipt}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.blue + '10' }]}>
-                  <Ionicons name="camera-outline" size={28} color={Colors.blue} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.scanReceipt')}</Text>
-                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.scanReceiptDesc')}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.option, { marginTop: Spacing.md }]}
-                onPress={handleJoinExpense}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.optionIcon, { backgroundColor: Colors.accent + '10' }]}>
-                  <Ionicons name="enter-outline" size={28} color={Colors.accent} />
-                </View>
-                <View style={styles.optionContent}>
-                  <Text style={styles.optionTitle}>{t('components.createBottomSheet.joinExpense')}</Text>
-                  <Text style={styles.optionSubtitle}>{t('components.createBottomSheet.joinExpenseDesc')}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+        {showScanOptions ? scanContent : showJoinOptions ? joinContent : mainContent}
       </BottomSheetView>
     </BottomSheet>
   );
 });
-
-CreateBottomSheet.displayName = 'CreateBottomSheet';
 
 const styles = StyleSheet.create({
   bottomSheetBackground: {
@@ -510,4 +506,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CreateBottomSheet;
+export default memo(CreateBottomSheet);

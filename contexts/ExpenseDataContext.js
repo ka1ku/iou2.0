@@ -32,7 +32,7 @@ const mergeAndSortExpenses = (existingExpenses, newExpenses) => {
   newExpenses.forEach(expense => {
     expenseMap.set(expense.id, expense);
   });
-  
+
   return Array.from(expenseMap.values()).sort((a, b) => {
     const aTime = getTimestampMs(a.createdAt);
     const bTime = getTimestampMs(b.createdAt);
@@ -57,6 +57,8 @@ export const ExpenseDataProvider = ({ children }) => {
   const unsubscribeExpensesRef = useRef(null);
   const hasReceivedInitialSnapshot = useRef(false);
 
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+
   // Listen for authentication state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChange((user) => {
@@ -65,7 +67,10 @@ export const ExpenseDataProvider = ({ children }) => {
         setExpenses([]);
         setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
         setUserProfile(null);
+        setIsProfileLoading(false); // No user, so profile loading is done (it's null)
         setLoading(false);
+      } else {
+        setIsProfileLoading(true); // User exists, start loading profile
       }
     });
 
@@ -90,7 +95,7 @@ export const ExpenseDataProvider = ({ children }) => {
     hasReceivedInitialSnapshot.current = false;
 
     const firestoreInstance = getFirestore(getApp());
-    
+
     // Build the optimized query using participantIds array
     const buildQuery = () => query(
       collection(firestoreInstance, 'expenses'),
@@ -237,7 +242,7 @@ export const ExpenseDataProvider = ({ children }) => {
       setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
       return;
     }
-    
+
     const calculatedBalances = calculateUserTotalBalance(expenses, currentUser.uid);
     setBalances(calculatedBalances);
   }, [expenses, currentUser]);
@@ -264,9 +269,12 @@ export const ExpenseDataProvider = ({ children }) => {
         } else {
           setUserProfile(null);
         }
+        setIsProfileLoading(false); // Profile load attempt complete (found or not found)
       },
       (error) => {
+        console.error('Error fetching user profile:', error);
         setUserProfile(null);
+        setIsProfileLoading(false); // Profile load attempt complete (failed)
       }
     );
 
@@ -277,11 +285,12 @@ export const ExpenseDataProvider = ({ children }) => {
     expenses,
     balances,
     userProfile,
+    isProfileLoading,
     loading,
     loadingMore,
     hasMore,
     loadMoreExpenses,
-  }), [expenses, balances, userProfile, loading, loadingMore, hasMore, loadMoreExpenses]);
+  }), [expenses, balances, userProfile, isProfileLoading, loading, loadingMore, hasMore, loadMoreExpenses]);
 
   return (
     <ExpenseDataContext.Provider value={value}>

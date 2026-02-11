@@ -132,10 +132,10 @@ const VerifyOTPScreen = ({ navigation, route }) => {
             
             setLoadingMessage(t('auth.verifyOTP.loading.securing'));
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+
             setLoading(false);
             setLoadingMessage('');
-            navigation.navigate('Home');
+            // Navigation handled automatically by auth state listener in App.js
           } catch (profileError) {
             
             setLoadingMessage('');

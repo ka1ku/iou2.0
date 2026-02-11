@@ -7,12 +7,12 @@ import * as FileSystem from 'expo-file-system';
 export const checkCameraPermissions = async () => {
   try {
     let { status: cameraStatus } = await ImagePicker.getCameraPermissionsAsync();
-    
+
     if (cameraStatus !== 'granted') {
       const { status: newCameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
       cameraStatus = newCameraStatus;
     }
-    
+
     if (cameraStatus !== 'granted') {
       Alert.alert(
         'Camera Permission Needed',
@@ -24,7 +24,7 @@ export const checkCameraPermissions = async () => {
       );
       return false;
     }
-    
+
     return true;
   } catch (error) {
     Alert.alert('Error', 'Failed to access camera');
@@ -35,12 +35,12 @@ export const checkCameraPermissions = async () => {
 export const checkMediaLibraryPermissions = async () => {
   try {
     let { status: libraryStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
-    
+
     if (libraryStatus !== 'granted') {
       const { status: newLibraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       libraryStatus = newLibraryStatus;
     }
-    
+
     if (libraryStatus !== 'granted') {
       Alert.alert(
         'Photo Library Permission Needed',
@@ -52,7 +52,7 @@ export const checkMediaLibraryPermissions = async () => {
       );
       return false;
     }
-    
+
     return true;
   } catch (error) {
     Alert.alert('Error', 'Failed to access photo library');
@@ -63,7 +63,7 @@ export const checkMediaLibraryPermissions = async () => {
 export const takePhoto = async (onImageSelected, onError, onStateChange) => {
   try {
     if (onStateChange) onStateChange(true);
-    
+
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
@@ -73,7 +73,7 @@ export const takePhoto = async (onImageSelected, onError, onStateChange) => {
     if (!result.canceled && result.assets && result.assets[0]) {
       await onImageSelected(result.assets[0].uri);
     }
-    
+
     if (onStateChange) onStateChange(false);
   } catch (error) {
     if (onError) onError('Failed to take photo');
@@ -84,7 +84,7 @@ export const takePhoto = async (onImageSelected, onError, onStateChange) => {
 export const pickImage = async (onImageSelected, onError, onStateChange) => {
   try {
     if (onStateChange) onStateChange(true);
-    
+
     const result = await ImagePicker.launchImageLibraryAsync({
       quality: 0.8,
     });
@@ -92,7 +92,7 @@ export const pickImage = async (onImageSelected, onError, onStateChange) => {
     if (!result.canceled && result.assets && result.assets[0]) {
       await onImageSelected(result.assets[0].uri);
     }
-    
+
     if (onStateChange) onStateChange(false);
   } catch (error) {
     if (onError) onError('Failed to pick image');
@@ -142,14 +142,14 @@ export const downloadImageFromUrl = async (imageUrl) => {
     // Create a temporary file path
     const filename = `temp_profile_${Date.now()}.jpg`;
     const localUri = `${FileSystem.cacheDirectory}${filename}`;
-    
+
     // Download the image
     const downloadResult = await FileSystem.downloadAsync(imageUrl, localUri);
-    
+
     if (downloadResult.status !== 200) {
       throw new Error('Failed to download image');
     }
-    
+
     return downloadResult.uri;
   } catch (error) {
     throw new Error(`Failed to download image: ${error.message}`);
@@ -167,13 +167,13 @@ export const uploadImageToStorage = async (localUri, userId) => {
     // Create a reference to the storage location
     const filename = `profile_${userId}_${Date.now()}.jpg`;
     const storageRef = storage().ref(`profile_pictures/${userId}/${filename}`);
-    
+
     // Upload the file
     await storageRef.putFile(localUri);
-    
+
     // Get the download URL
     const downloadUrl = await storageRef.getDownloadURL();
-    
+
     return downloadUrl;
   } catch (error) {
     throw new Error(`Failed to upload image to storage: ${error.message}`);
@@ -188,26 +188,34 @@ export const uploadImageToStorage = async (localUri, userId) => {
  */
 export const downloadAndUploadImage = async (imageUrl, userId) => {
   let localUri = null;
-  
+
   try {
     // Skip if it's a ui-avatars fallback
     if (imageUrl.includes('ui-avatars.com')) {
       return imageUrl;
     }
-    
+
+    // Check if it's already a local file
+    if (imageUrl.startsWith('file://')) {
+      // It's a local file, upload directly
+      const storageUrl = await uploadImageToStorage(imageUrl, userId);
+      return storageUrl;
+    }
+
+    // It's a remote URL, download it first
     // Download the image to local storage
     localUri = await downloadImageFromUrl(imageUrl);
-    
+
     // Upload to Firebase Storage
     const storageUrl = await uploadImageToStorage(localUri, userId);
-    
+
     // Clean up the temporary file
     try {
       await FileSystem.deleteAsync(localUri, { idempotent: true });
     } catch (cleanupError) {
       // Ignore cleanup errors
     }
-    
+
     return storageUrl;
   } catch (error) {
     // Clean up on error

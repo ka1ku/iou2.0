@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/tokens';
-import { sendOTP, handleMultiFactorError } from '../../services/authService';
+import { sendOTP, handleMultiFactorError, checkPhoneNumberExistsInAuth } from '../../services/authService';
 
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { useTranslation } from '../../contexts/LanguageContext';
@@ -26,7 +26,7 @@ const SignInScreen = ({ navigation }) => {
 
   const formatPhoneNumber = (text) => {
     const cleaned = text.replace(/\D/g, '');
-    
+
     if (cleaned.length <= 3) {
       return cleaned;
     } else if (cleaned.length <= 6) {
@@ -55,15 +55,34 @@ const SignInScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const result = await sendOTP(`+1${digits}`, true); // Skip existence check for sign-in
-      
-      navigation.navigate('VerifyOTP', { 
-        phoneNumber: `+1${digits}`,
+      // Check if account exists first
+      const formattedPhone = `+1${digits}`;
+      const exists = await checkPhoneNumberExistsInAuth(formattedPhone);
+
+      if (!exists) {
+        Alert.alert(
+          'No Account Found',
+          'This phone number is not registered. Please create an account to use IOU.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Create Account',
+              onPress: () => navigation.navigate('SignUp')
+            }
+          ]
+        );
+        return;
+      }
+
+      const result = await sendOTP(formattedPhone, true); // Skip existence check for sign-in since we just did it
+
+      navigation.navigate('VerifyOTP', {
+        phoneNumber: formattedPhone,
         verificationId: result.verificationId,
         isInitialAuth: true
       });
     } catch (error) {
-      
+
       try {
         const mfaResult = await handleMultiFactorError(error);
         if (mfaResult.type === 'multi-factor-required') {
@@ -78,8 +97,8 @@ const SignInScreen = ({ navigation }) => {
         }
       } catch (mfaError) {
       }
-      
-      
+
+
       Alert.alert(t('common.error'), error.message || t('common.error'));
     } finally {
       setLoading(false);
@@ -96,7 +115,7 @@ const SignInScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
@@ -156,11 +175,11 @@ const SignInScreen = ({ navigation }) => {
               ) : (
                 <>
                   <Text style={styles.sendButtonText}>{t('auth.signIn.button')}</Text>
-                  <Ionicons 
-                    name="arrow-forward" 
-                    size={20} 
-                    color="white" 
-                    style={styles.buttonIcon} 
+                  <Ionicons
+                    name="arrow-forward"
+                    size={20}
+                    color="white"
+                    style={styles.buttonIcon}
                   />
                 </>
               )}

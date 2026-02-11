@@ -9,11 +9,13 @@ import {
   UIManager,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import Animated, { useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import PriceInput from './PriceInput'; 
+import PriceInput from './PriceInput';
 import LoadingSpinner from '../LoadingSpinner';
 import { Colors, Spacing, Radius, Shadows, Typography } from '../../design/tokens';
 import { useTranslation } from '../../contexts/LanguageContext';
@@ -43,11 +45,18 @@ const getRelativeTime = (timestamp, t) => {
   return t('components.expenses.receiptBreakdown.time.weeksAgo', { count: diffWeeks });
 };
 
-const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
+// Helper function to truncate item names longer than 15 characters
+const truncateItemName = (name, maxLength = 20) => {
+  if (!name || name.length <= maxLength) return name;
+  return name.substring(0, maxLength) + '...';
+};
+
+const ParticipantChip = memo(({ participant, isSelected, onPress, disabled = false }) => (
   <TouchableOpacity
-    style={[styles.chip, isSelected && styles.chipSelected]}
+    style={[styles.chip, isSelected && styles.chipSelected, disabled && styles.chipDisabled]}
     onPress={onPress}
     activeOpacity={0.7}
+    disabled={disabled}
   >
     <View style={styles.chipAvatarContainer}>
       {participant.profilePhoto ? (
@@ -59,7 +68,7 @@ const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
       )}
       {isSelected && (
         <View style={styles.checkmarkOverlay}>
-           <Ionicons name="checkmark" size={10} color={Colors.white} />
+          <Ionicons name="checkmark" size={10} color={Colors.white} />
         </View>
       )}
     </View>
@@ -73,7 +82,8 @@ const ParticipantChip = memo(({ participant, isSelected, onPress }) => (
     prevProps.participant.name === nextProps.participant.name &&
     prevProps.participant.profilePhoto === nextProps.participant.profilePhoto &&
     prevProps.isSelected === nextProps.isSelected &&
-    prevProps.onPress === nextProps.onPress
+    prevProps.onPress === nextProps.onPress &&
+    prevProps.disabled === nextProps.disabled
   );
 });
 
@@ -91,24 +101,27 @@ const ItemRow = memo(({
   onRemove,
   isSaving,
   validationErrors,
-  onClearValidationError
+  onClearValidationError,
+  onToggleParticipant,
+  togglingState,
+  isLast, // NEW prop
 }) => {
   const { t } = useTranslation();
   const itemErrors = validationErrors?.[item.id] || {};
   const [localValidationErrors, setLocalValidationErrors] = useState({});
-  
+
   useEffect(() => {
     if (!isEditing) {
       setLocalValidationErrors({});
     }
   }, [isEditing]);
-  
+
   const handleParticipantPress = useCallback((pIndex) => {
     const isSelected = item.selectedConsumers?.includes(pIndex);
     const current = item.selectedConsumers || [];
     const newConsumers = isSelected ? current.filter(i => i !== pIndex) : [...current, pIndex];
     onUpdate('item', index, 'selectedConsumers', newConsumers);
-    
+
     if (onClearValidationError && newConsumers.length > 0) {
       onClearValidationError(item.id, 'consumers');
     }
@@ -120,15 +133,35 @@ const ItemRow = memo(({
     if (!amount || amount <= 0 || isNaN(amount)) {
       errors.amount = true;
     }
-    
+
     if (Object.keys(errors).length > 0) {
       setLocalValidationErrors(errors);
       return;
     }
-    
+
     setLocalValidationErrors({});
     onSave(index);
   }, [item.amount, index, onSave]);
+
+  const handleViewModeParticipantToggle = useCallback(async (pIndex) => {
+    // Block if locked
+    if (isLocked) {
+      Alert.alert(
+        isLockedBySettlement ? 'Receipt Is Settled' : t('components.expenses.receiptBreakdown.lockedTitle'),
+        isLockedBySettlement
+          ? 'This receipt has been settled. No items can be modified.\n\nTo make changes:\n1. Go to the Split tab\n2. Unsettle the receipt\n3. Return here to modify items'
+          : t('components.expenses.receiptBreakdown.lockedMsg')
+      );
+      return;
+    }
+
+    try {
+      await onToggleParticipant(index, pIndex);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      // Error already handled by parent
+    }
+  }, [isLocked, isLockedBySettlement, onToggleParticipant, index, t]);
 
   const editCardAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -145,10 +178,6 @@ const ItemRow = memo(({
     };
   }, [isEditing]);
 
-  const selectedParticipants = useMemo(() => {
-    return (item.selectedConsumers || []).map(idx => participants[idx]).filter(Boolean);
-  }, [item.selectedConsumers, participants]);
-
   return (
     <View style={styles.itemWrapper}>
       {/* Edit Mode */}
@@ -158,7 +187,7 @@ const ItemRow = memo(({
             <View style={styles.editHeader}>
               <Text style={styles.editTitle}>{t('components.expenses.receiptBreakdown.editItem')}</Text>
               <TouchableOpacity onPress={() => onRemove(index)} style={styles.deleteIconBtn}>
-                 <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                <Ionicons name="trash-outline" size={18} color={Colors.danger} />
               </TouchableOpacity>
             </View>
 
@@ -239,7 +268,7 @@ const ItemRow = memo(({
                 disabled={isSaving}
               >
                 {isSaving ? (
-                   <LoadingSpinner size="small" color={Colors.white} />
+                  <LoadingSpinner size="small" color={Colors.white} />
                 ) : (
                   <>
                     <Ionicons name="checkmark" size={18} color={Colors.white} style={{ marginRight: 4 }} />
@@ -277,14 +306,10 @@ const ItemRow = memo(({
             }}
             activeOpacity={isLocked ? 0.8 : 0.6}
           >
-            <View style={styles.itemIconContainer}>
-               <Ionicons name={isLocked ? "lock-closed" : "receipt-outline"} size={20} color={isLocked ? Colors.textSecondary : Colors.textPrimary} />
-            </View>
-
             <View style={styles.viewModeMain}>
               <View style={styles.viewModeNameRow}>
                 <Text style={[styles.viewModeName, isLocked && styles.viewModeNameLocked]} numberOfLines={1}>
-                  {item.name || t('components.expenses.receiptBreakdown.itemDefault', { index: index + 1 })}
+                  {truncateItemName(item.name || t('components.expenses.receiptBreakdown.itemDefault', { index: index + 1 }))}
                 </Text>
                 {isLocked && (
                   <View style={styles.settledBadge}>
@@ -299,57 +324,55 @@ const ItemRow = memo(({
                   </View>
                 )}
               </View>
-              <View style={styles.viewModeSecondRow}>
-                <View style={styles.assignedAvatars}>
-                {selectedParticipants.length > 0 ? (
-                  selectedParticipants.slice(0, 5).map((p, i) => (
-                    <View key={p.id} style={[styles.miniAvatarContainer, { zIndex: 5 - i, marginLeft: i > 0 ? -8 : 0 }]}>
-                      {p.profilePhoto ? (
-                        <Image source={{ uri: p.profilePhoto }} style={styles.miniAvatar} />
-                      ) : (
-                        <View style={[styles.miniAvatar, styles.miniAvatarInitials]}>
-                          <Text style={styles.miniAvatarText}>{(p.name?.[0] || 'U').toUpperCase()}</Text>
-                        </View>
-                      )}
-                    </View>
-                  ))
-                ) : (
-                   <Text style={[styles.unassignedText, itemErrors.consumers && { color: Colors.danger }]}>
-                     {itemErrors.consumers ? t('components.expenses.receiptBreakdown.assignSomeone') : t('components.expenses.receiptBreakdown.noOneAssigned')}
-                   </Text>
-                )}
-                {selectedParticipants.length > 5 && (
-                  <View style={[styles.miniAvatarContainer, { zIndex: 0, marginLeft: -8 }]}>
-                    <View style={[styles.miniAvatar, styles.miniAvatarMore]}>
-                      <Text style={styles.miniAvatarMoreText}>+{selectedParticipants.length - 5}</Text>
-                    </View>
-                  </View>
-                )}
+
+              {/* View mode participant selector */}
+              <View style={styles.viewModeParticipantSection}>
+                <Text style={styles.splitWithLabel}>{t('components.expenses.receiptBreakdown.splitWith')}</Text>
+                <View style={styles.viewModeChipContainer}>
+                  {participants.map((participant, pIndex) => {
+                    const isSelected = item.selectedConsumers?.includes(pIndex);
+                    const isToggling = togglingState?.itemId === item.id &&
+                      togglingState?.participantIndex === pIndex;
+
+                    return (
+                      <View key={participant.id} style={styles.chipWrapper}>
+                        <ParticipantChip
+                          participant={participant}
+                          isSelected={isSelected}
+                          onPress={() => handleViewModeParticipantToggle(pIndex)}
+                          disabled={isLocked || isToggling}
+                        />
+                        {isToggling && (
+                          <View style={styles.chipLoadingOverlay}>
+                            <ActivityIndicator size="small" color={Colors.accent} />
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
                 </View>
-                {item.createdAt && (
-                  <Text style={styles.timestampText}>
-                    {getRelativeTime(item.createdAt, t)}
-                  </Text>
-                )}
               </View>
             </View>
 
             <View style={styles.amountContainer}>
-               <Text style={[styles.viewModeAmount, isLocked && styles.viewModeAmountLocked]}>
+              <Text style={[styles.viewModeAmount, isLocked && styles.viewModeAmountLocked]}>
                 ${(parseFloat(item.amount) || 0).toFixed(2)}
-               </Text>
+              </Text>
             </View>
 
             <Ionicons name={isLocked ? "lock-closed" : "chevron-forward"} size={16} color={Colors.textSecondary} style={{ marginLeft: Spacing.sm }} />
           </TouchableOpacity>
         </Animated.View>
       )}
-      <View style={styles.separator} />
+      {!isLast && <View style={styles.separator} />}
     </View>
   );
 }, (prevProps, nextProps) => {
   const prevErrors = prevProps.validationErrors?.[prevProps.item.id] || {};
   const nextErrors = nextProps.validationErrors?.[nextProps.item.id] || {};
+
+  const prevToggling = prevProps.togglingState?.itemId === prevProps.item.id;
+  const nextToggling = nextProps.togglingState?.itemId === nextProps.item.id;
 
   return (
     prevProps.item.id === nextProps.item.id &&
@@ -359,6 +382,7 @@ const ItemRow = memo(({
     prevProps.index === nextProps.index &&
     prevProps.isEditing === nextProps.isEditing &&
     prevProps.isLocked === nextProps.isLocked &&
+    prevProps.isLast === nextProps.isLast &&
     prevProps.isLockedBySettlement === nextProps.isLockedBySettlement &&
     prevProps.participants === nextProps.participants &&
     prevProps.onToggleEdit === nextProps.onToggleEdit &&
@@ -366,6 +390,9 @@ const ItemRow = memo(({
     prevProps.onCancel === nextProps.onCancel &&
     prevProps.onUpdate === nextProps.onUpdate &&
     prevProps.onRemove === nextProps.onRemove &&
+    prevProps.onToggleParticipant === nextProps.onToggleParticipant &&
+    prevToggling === nextToggling &&
+    (prevToggling === false || JSON.stringify(prevProps.togglingState) === JSON.stringify(nextProps.togglingState)) &&
     JSON.stringify(prevErrors) === JSON.stringify(nextErrors)
   );
 });
@@ -385,13 +412,15 @@ const ReceiptBreakdown = ({
   validationErrors = {},
   onClearValidationError,
   visibleHeaderHeight = 100, // Default fallback
+  onToggleParticipant,
 }) => {
   const { t } = useTranslation();
-  const [editingItemId, setEditingItemId] = useState(null); 
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [togglingState, setTogglingState] = useState(null); // { itemId, participantIndex }
   const prevItemsLengthRef = useRef(items.length);
   const itemLayoutMapRef = useRef({});
   const userManualAddRef = useRef(false);
-  const newlyAddedItemIdsRef = useRef(new Set()); 
+  const newlyAddedItemIdsRef = useRef(new Set());
 
   const scrollItemToTop = (itemId, delay = 0) => {
     setTimeout(() => {
@@ -400,11 +429,11 @@ const ReceiptBreakdown = ({
         // Calculate dynamic offset
         // receiptContainerY is stored in scrollRef.current by parent
         const containerY = scrollRef.current.receiptContainerY || 0;
-        
+
         // Target Y is: Container Position + Item Position - Header/Tab Height
         // padding top in ScrollView contentContainerStyle is handled by the scroll view itself usually,
         // but we need to ensure the item ends up visible below the header.
-        
+
         // If contentContainer has paddingTop, that pushes content down.
         // scrollTo(0) is the very top of content.
         // We want the item at 'visibleHeaderHeight' from the top of the SCREEN.
@@ -412,18 +441,18 @@ const ReceiptBreakdown = ({
         // The ScrollView content starts at y=0.
         // The visible area matches the content coordinates if no inset.
         // But we have insets. 
-        
+
         // Let's rely on relative calculation:
         // We want the item top to be at the top of the "safe" viewing area.
         // safe area top = visibleHeaderHeight (passed from parent).
-        
+
         // Absolute Y of item in ScrollView content = containerY + itemY
         // We want to scroll s.t. (containerY + itemY) - scrollY = visibleHeaderHeight + margin
         // scrollY = (containerY + itemY) - (visibleHeaderHeight + margin)
-        
+
         const margin = 20; // Increased margin for better visibility
         const targetScrollY = Math.max(0, containerY + itemY - visibleHeaderHeight - margin);
-        
+
         scrollRef.current.scrollTo({ y: targetScrollY, animated: true });
       }
     }, delay);
@@ -501,6 +530,21 @@ const ReceiptBreakdown = ({
     }
   }, [items, onRemoveItem]);
 
+  const handleToggleParticipantWithState = useCallback(async (itemIndex, participantIndex) => {
+    const item = items[itemIndex];
+    if (!item) return;
+
+    setTogglingState({ itemId: item.id, participantIndex });
+
+    try {
+      await onToggleParticipant(itemIndex, participantIndex);
+    } catch (error) {
+      // Error already handled by parent
+    } finally {
+      setTogglingState(null);
+    }
+  }, [items, onToggleParticipant]);
+
   const handleItemLayout = useCallback((itemId, event) => {
     itemLayoutMapRef.current[itemId] = event.nativeEvent.layout.y;
   }, []);
@@ -516,48 +560,49 @@ const ReceiptBreakdown = ({
       </View>
 
       <View style={styles.cardContainer}>
-          {items.map((item, index) => (
-            <View
-              key={item.id}
-              onLayout={(e) => handleItemLayout(item.id, e)}
-            >
-              <ItemRow
-                item={item}
-                index={index}
-                isEditing={editingItemId === item.id}
-                isLocked={lockedItemIds?.has(item.id) || isSettled}
-                isLockedBySettlement={isSettled && !lockedItemIds?.has(item.id)}
-                isSaving={isSavingItemId === item.id}
-                participants={participants}
-                onToggleEdit={toggleEditMode}
-                onSave={saveItemChanges}
-                onCancel={cancelEdit}
-                onUpdate={handleUpdate}
-                onRemove={onRemoveItem}
-                validationErrors={validationErrors}
-                onClearValidationError={onClearValidationError}
-              />
-            </View>
-          ))}
-          
-          <TouchableOpacity
-            style={[styles.addItemButton, isSettled && { opacity: 0.5 }]}
-            onPress={() => {
-              if (isSettled) {
-                Alert.alert('Receipt Settled', 'Cannot add items to a settled receipt. Go to Split tab and unsettle first.');
-                return;
-              }
-              userManualAddRef.current = true;
-              onAddItem();
-            }}
-            disabled={isSettled}
-            activeOpacity={0.7}
+        {items.map((item, index) => (
+          <View
+            key={item.id}
+            onLayout={(e) => handleItemLayout(item.id, e)}
           >
-            <View style={styles.addItemIconContainer}>
-                <Ionicons name="add" size={20} color={Colors.accent} />
-            </View>
-            <Text style={styles.addItemText}>{t('components.expenses.receiptBreakdown.addItem')}</Text>
-          </TouchableOpacity>
+            <ItemRow
+              item={item}
+              index={index}
+              isEditing={editingItemId === item.id}
+              isLocked={lockedItemIds?.has(item.id) || isSettled}
+              isLockedBySettlement={isSettled && !lockedItemIds?.has(item.id)}
+              isSaving={isSavingItemId === item.id}
+              participants={participants}
+              onToggleEdit={toggleEditMode}
+              onSave={saveItemChanges}
+              onCancel={cancelEdit}
+              onUpdate={handleUpdate}
+              onRemove={onRemoveItem}
+              validationErrors={validationErrors}
+              onClearValidationError={onClearValidationError}
+              onToggleParticipant={handleToggleParticipantWithState}
+              togglingState={togglingState}
+              isLast={index === items.length - 1} // Pass isLast
+            />
+          </View>
+        ))}
+
+        <TouchableOpacity
+          style={[styles.addItemButton, isSettled && { opacity: 0.5 }]}
+          onPress={() => {
+            if (isSettled) {
+              Alert.alert('Receipt Settled', 'Cannot add items to a settled receipt. Go to Split tab and unsettle first.');
+              return;
+            }
+            userManualAddRef.current = true;
+            onAddItem();
+          }}
+          disabled={isSettled}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add" size={20} color={Colors.accent} />
+          <Text style={styles.addItemText}>{t('components.expenses.receiptBreakdown.addItem')}</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -583,12 +628,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     overflow: 'hidden',
     ...Shadows.card,
-    elevation: 2, 
+    elevation: 2,
     shadowOpacity: 0.05,
     borderWidth: 1,
     borderColor: Colors.surface,
   },
-  
+
   // Item Row
   itemWrapper: {
     backgroundColor: Colors.surface,
@@ -597,20 +642,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.lg,
+    paddingVertical: Spacing.xl, // More vertical padding
     backgroundColor: Colors.surface,
-    minHeight: 56,
+    minHeight: 70, // Slightly taller
   },
   viewModeRowLocked: {
     opacity: 0.6,
-  },
-  itemIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
   },
   viewModeMain: {
     flex: 1,
@@ -631,25 +668,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   viewModeAmount: {
-    ...Typography.body2,
-    color: Colors.textSecondary,
+    ...Typography.body1,
+    fontSize: 18, // Larger amount
+    color: Colors.textPrimary,
     fontFamily: Typography.familySemiBold,
   },
   viewModeNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: 4,
-  },
-  viewModeSecondRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  timestampText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    fontFamily: Typography.familyRegular,
+    marginBottom: Spacing.sm,
   },
   viewModeNameLocked: {
     textDecorationLine: 'line-through',
@@ -678,68 +706,52 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: Colors.divider,
-    marginLeft: 16 + 32 + 12, // Align with text
+    marginLeft: Spacing.lg, // Align with text
   },
 
-  // Avatars in view mode
-  assignedAvatars: {
+  // View mode participant section
+  viewModeParticipantSection: {
+    marginTop: Spacing.sm, // Reduced top margin
+    // borderTopWidth: 1, // REMOVED DASH
+    // borderTopColor: Colors.divider, // REMOVED DASH
+  },
+  splitWithLabel: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    fontWeight: '500',
+  },
+  viewModeChipContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    height: 20,
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
-  miniAvatarContainer: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.surface,
-    backgroundColor: Colors.surface,
-    overflow: 'hidden',
+  chipWrapper: {
+    position: 'relative',
   },
-  miniAvatar: {
-    width: '100%',
-    height: '100%',
-  },
-  miniAvatarInitials: {
-    backgroundColor: Colors.surfaceLight,
+  chipLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.surface + 'CC',
+    borderRadius: Radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    height: '100%',
   },
-  miniAvatarText: {
-    fontSize: 9,
-    fontFamily: Typography.familyBold,
-    color: Colors.textSecondary,
-  },
-  miniAvatarMore: {
-    backgroundColor: Colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    height: '100%',
-  },
-  miniAvatarMoreText: {
-    fontSize: 8,
-    fontFamily: Typography.familyBold,
-    color: Colors.textSecondary,
+  chipDisabled: {
+    opacity: 0.5,
   },
 
   // Add Item Button
   addItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: Spacing.lg,
     backgroundColor: Colors.surface,
-  },
-  addItemIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.sm,
-    backgroundColor: Colors.accent + '15', // Transparent accent
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
+    gap: Spacing.xs,
   },
   addItemText: {
     ...Typography.body1,
@@ -791,15 +803,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.divider,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.sm, 
-    height: 40,
+    borderColor: Colors.divider,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    height: 48, // Taller input
     color: Colors.textPrimary,
     fontFamily: Typography.familyMedium,
-    fontSize: 15,
+    fontSize: 16, // Larger font
   },
   priceInputStyle: {
     backgroundColor: Colors.surfaceLight,
-    height: 40,
+    height: 48, // Match name input height
   },
   participantsSection: {
     marginBottom: Spacing.lg,
@@ -816,7 +830,7 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
     borderRadius: Radius.sm,
   },
-  
+
   // Chip Styles
   chip: {
     flexDirection: 'row',
@@ -837,8 +851,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   chipAvatar: {
-    width: 28, 
-    height: 28, 
+    width: 28,
+    height: 28,
     borderRadius: 14,
   },
   chipInitialsWrapper: {

@@ -16,9 +16,15 @@ exports.syncUserToAlgolia = functions.firestore
   .onWrite(async (change, context) => {
     const userId = context.params.userId;
     const userData = change.after.exists ? change.after.data() : null;
-    
+
     try {
       if (change.after.exists && userData) {
+        // Check if user is soft-deleted
+        if (userData.accountStatus === 'deleted' || userData.isDeleted === true) {
+          await usersIndex.deleteObject(userId);
+          return;
+        }
+
         const searchableUser = {
           objectID: userId,
           profilePhoto: userData.profilePhoto || '',
@@ -33,7 +39,7 @@ exports.syncUserToAlgolia = functions.firestore
             `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
           ].filter(Boolean).join(' ').toLowerCase()
         };
-        
+
         await usersIndex.saveObject(searchableUser);
       } else {
         await usersIndex.deleteObject(userId);
@@ -50,71 +56,71 @@ exports.onUserProfileUpdate = functions.firestore
     const userId = context.params.userId;
     const before = change.before.data();
     const after = change.after.data();
-    
+
     try {
       // Check if firstName, lastName, or username changed
       const firstNameChanged = before.firstName !== after.firstName;
       const lastNameChanged = before.lastName !== after.lastName;
       const usernameChanged = before.username !== after.username;
       const profilePhotoChanged = before.profilePhoto !== after.profilePhoto;
-      
+
       // Only proceed if relevant fields changed
       if (!firstNameChanged && !lastNameChanged && !usernameChanged && !profilePhotoChanged) {
         return null;
       }
-      
+
       // Prepare updated user data
       const updatedName = `${after.firstName || ''} ${after.lastName || ''}`.trim();
       const updatedUsername = after.username || '';
       const updatedProfilePhoto = after.profilePhoto || null;
-      
+
       // Query all expenses where this user is a participant
       const db = admin.firestore();
       const expensesQuery = db.collection('expenses').where('participantIds', 'array-contains', userId);
       const expensesSnapshot = await expensesQuery.get();
-      
+
       if (expensesSnapshot.empty) {
         return null;
       }
-      
-      
+
+
       // Batch write updates (Firestore allows up to 500 operations per batch)
       const batchSize = 500;
       const expenses = expensesSnapshot.docs;
-      
+
       for (let i = 0; i < expenses.length; i += batchSize) {
         const batch = db.batch();
         const batchDocs = expenses.slice(i, i + batchSize);
-        
+
         for (const expenseDoc of batchDocs) {
           const expenseData = expenseDoc.data();
           const participants = expenseData.participants || [];
-          
+
           // Find and update the participant data for this user
           const updatedParticipants = participants.map(participant => {
             if (participant.userId === userId) {
               const updatedParticipant = { ...participant };
-              
+
               // Update name if firstName or lastName changed
               if (firstNameChanged || lastNameChanged) {
                 updatedParticipant.name = updatedName || participant.name;
               }
-              
+
               // Update username if it changed
               if (usernameChanged) {
                 updatedParticipant.username = updatedUsername || participant.username;
               }
-              
+
               // Update profilePhoto if it changed
               if (profilePhotoChanged) {
                 updatedParticipant.profilePhoto = updatedProfilePhoto || participant.profilePhoto;
               }
-              
+
               return updatedParticipant;
             }
             return participant;
           });
-          
+
           // Only update if the participant was found and updated
           const participantFound = participants.some(p => p.userId === userId);
           if (participantFound) {
@@ -124,11 +130,11 @@ exports.onUserProfileUpdate = functions.firestore
             });
           }
         }
-        
+
         // Commit this batch
         await batch.commit();
       }
-      
+
       return null;
     } catch (error) {
       console.error(`Error updating user info in expenses for user ${userId}:`, error);
@@ -143,20 +149,20 @@ exports.syncExpenseToAlgolia = functions.firestore
   .onWrite(async (change, context) => {
     const expenseId = context.params.expenseId;
     const expenseData = change.after.exists ? change.after.data() : null;
-    
+
     try {
       if (change.after.exists && expenseData) {
         // Extract searchable fields
         const title = expenseData.title || '';
         const expenseType = expenseData.expenseType || '';
-        
+
         // Extract participant names and usernames
         const participantNames = (expenseData.participants || []).map(p => p.name || '').filter(Boolean);
         const participantUsernames = (expenseData.participants || []).map(p => p.username || '').filter(Boolean);
-        
+
         // Extract item names
         const itemNames = (expenseData.items || []).map(item => item.name || '').filter(Boolean);
-        
+
         // Create searchable text combining all searchable fields
         const searchableText = [
           title,
@@ -165,11 +171,11 @@ exports.syncExpenseToAlgolia = functions.firestore
           ...participantUsernames,
           ...itemNames
         ].filter(Boolean).join(' ').toLowerCase();
-        
+
         // Get timestamps for sorting
         let createdAt = 0;
         let updatedAt = 0;
-        
+
         if (expenseData.createdAt) {
           if (expenseData.createdAt.toMillis) {
             createdAt = expenseData.createdAt.toMillis();
@@ -179,7 +185,7 @@ exports.syncExpenseToAlgolia = functions.firestore
             createdAt = expenseData.createdAt.getTime();
           }
         }
-        
+
         if (expenseData.updatedAt) {
           if (expenseData.updatedAt.toMillis) {
             updatedAt = expenseData.updatedAt.toMillis();
@@ -189,7 +195,7 @@ exports.syncExpenseToAlgolia = functions.firestore
             updatedAt = expenseData.updatedAt.getTime();
           }
         }
-        
+
         const searchableExpense = {
           objectID: expenseId,
           title: title,
@@ -206,7 +212,7 @@ exports.syncExpenseToAlgolia = functions.firestore
           // Include full expense data for retrieval (or minimal fields)
           total: expenseData.total || 0,
         };
-        
+
         await expensesIndex.saveObject(searchableExpense);
       } else {
         await expensesIndex.deleteObject(expenseId);
@@ -243,7 +249,7 @@ async function sendExpoPushNotification(pushToken, title, body, data = {}) {
     });
 
     const result = await response.json();
-    
+
     if (result.data && result.data.status === 'ok') {
       return { success: true, id: result.data.id };
     } else {
@@ -264,9 +270,9 @@ exports.sendExpoTestNotification = functions.https.onCall(async (data, context) 
 
   try {
     const userId = context.auth.uid;
-    
+
     const userDoc = await admin.firestore().collection('users').doc(userId).get();
-    
+
     if (!userDoc.exists) {
       throw new functions.https.HttpsError('not-found', 'User profile not found');
     }
@@ -317,13 +323,13 @@ exports.sendNotificationToUser = functions.https.onCall(async (data, context) =>
 
   try {
     const { targetUserId, title, body, data: notificationData } = data;
-    
+
     if (!targetUserId || !title || !body) {
       throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
     }
 
     const userDoc = await admin.firestore().collection('users').doc(targetUserId).get();
-    
+
     if (!userDoc.exists) {
       throw new functions.https.HttpsError('not-found', 'Target user not found');
     }
@@ -366,11 +372,11 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
   for (const userId of userIds) {
     try {
       const userDoc = await db.collection('users').doc(userId).get();
-      
+
       if (userDoc.exists) {
         const userData = userDoc.data();
         const expoPushToken = userData.expoPushToken;
-        
+
         if (expoPushToken) {
           // Check user notification preferences
           const preferences = userData.notificationPreferences || {
@@ -378,9 +384,9 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
             payments: true,
             settlements: true
           };
-          
+
           const notificationType = notificationData.type || 'expenses';
-          
+
           // Check if user wants to receive this type of notification
           if (preferences[notificationType] !== false) {
             // Check do not disturb
@@ -388,13 +394,13 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
             if (preferences.doNotDisturb && preferences.doNotDisturb.enabled) {
               const now = new Date();
               const currentTime = now.getHours() * 60 + now.getMinutes();
-              
+
               const [startHour, startMin] = preferences.doNotDisturb.start.split(':').map(Number);
               const [endHour, endMin] = preferences.doNotDisturb.end.split(':').map(Number);
-              
+
               const startTime = startHour * 60 + startMin;
               const endTime = endHour * 60 + endMin;
-              
+
               if (startTime > endTime) {
                 // Overnight DND
                 if (currentTime >= startTime || currentTime <= endTime) {
@@ -407,7 +413,7 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
                 }
               }
             }
-            
+
             if (shouldSend) {
               notifications.push({
                 token: expoPushToken,
@@ -435,7 +441,7 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
 
   for (let i = 0; i < notifications.length; i += batchSize) {
     const batch = notifications.slice(i, i + batchSize);
-    
+
     try {
       // Send batch to Expo
       const messages = batch.map(notif => ({
@@ -461,7 +467,7 @@ async function sendNotificationsToUsers(userIds, title, body, notificationData =
       });
 
       const result = await response.json();
-      
+
       if (Array.isArray(result.data)) {
         result.data.forEach((item, index) => {
           if (item.status === 'ok') {
@@ -492,16 +498,19 @@ exports.onExpenseCreated = functions.firestore
   .onCreate(async (snap, context) => {
     const expense = snap.data();
     const expenseId = context.params.expenseId;
-    
+
     try {
       // Get creator info
       const creatorDoc = await admin.firestore().collection('users').doc(expense.createdBy).get();
       const creatorData = creatorDoc.data();
       const creatorName = `${creatorData.firstName} ${creatorData.lastName}`.trim();
-      
-      // Get all participant user IDs (excluding creator)
-      const participantIds = (expense.participantIds || []).filter(id => id !== expense.createdBy);
-      
+
+      // Identify the actor (user who triggered the function)
+      const actorId = context.auth ? context.auth.uid : expense.createdBy;
+
+      // Get all participant user IDs (excluding creator and actor)
+      const participantIds = (expense.participantIds || []).filter(id => id !== expense.createdBy && id !== actorId);
+
       if (participantIds.length > 0) {
         const title = 'New Expense Added';
         const body = `${creatorName} added a new expense: ${expense.title || 'Untitled'}`;
@@ -526,13 +535,13 @@ exports.onExpenseUpdated = functions.firestore
     const before = change.before.data();
     const after = change.after.data();
     const expenseId = context.params.expenseId;
-    
+
     try {
       // Only notify if significant changes occurred
       const significantChanges = [
         'title', 'totalAmount', 'items', 'participantIds'
       ];
-      
+
       const hasSignificantChange = significantChanges.some(field => {
         return JSON.stringify(before[field]) !== JSON.stringify(after[field]);
       });
@@ -540,13 +549,17 @@ exports.onExpenseUpdated = functions.firestore
       if (!hasSignificantChange) return;
 
       // Get updater info
-      const updaterDoc = await admin.firestore().collection('users').doc(after.updatedBy || after.createdBy).get();
+      const updaterId = after.updatedBy || after.createdBy;
+      const updaterDoc = await admin.firestore().collection('users').doc(updaterId).get();
       const updaterData = updaterDoc.data();
       const updaterName = `${updaterData.firstName} ${updaterData.lastName}`.trim();
 
-      // Get all participant user IDs (excluding updater)
+      // Identify the actor
+      const actorId = context.auth ? context.auth.uid : updaterId;
+
+      // Get all participant user IDs (excluding updater and actor)
       const participantIds = (after.participantIds || []).filter(id =>
-        id !== (after.updatedBy || after.createdBy)
+        id !== updaterId && id !== actorId
       );
 
       // Check if total changed and there are paid settlements - send specific notification
@@ -575,7 +588,7 @@ exports.onExpenseUpdated = functions.firestore
           });
         });
 
-        const affectedIds = [...affectedUserIds].filter(id => id !== (after.updatedBy || after.createdBy));
+        const affectedIds = [...affectedUserIds].filter(id => id !== updaterId && id !== actorId);
         if (affectedIds.length > 0) {
           const priceTitle = 'Settlement May Have Changed';
           const priceBody = `${updaterName} updated ${after.title || 'an expense'}. Your settlement amount may have changed.`;
@@ -584,8 +597,8 @@ exports.onExpenseUpdated = functions.firestore
             type: 'settlements',
             route: 'expense',
             expenseId: expenseId,
-            updatedBy: after.updatedBy || after.createdBy,
-            actorUserId: after.updatedBy || after.createdBy // Added for client-side filtering
+            updatedBy: updaterId,
+            actorUserId: actorId // Added for client-side filtering
           });
         }
       }
@@ -614,14 +627,16 @@ exports.onExpenseSettled = functions.firestore
     const before = change.before.data();
     const after = change.after.data();
     const expenseId = context.params.expenseId;
-    
+
     try {
       // Check if expense was just settled
       if (!before.settled && after.settled) {
         // Get all participant user IDs (excluding the person who settled it)
         const settledBy = after.settledBy || after.updatedBy || after.createdBy;
-        const participantIds = (after.participantIds || []).filter(id => id !== settledBy);
-        
+        const actorId = context.auth ? context.auth.uid : settledBy;
+
+        const participantIds = (after.participantIds || []).filter(id => id !== settledBy && id !== actorId);
+
         if (participantIds.length > 0) {
           const title = 'Expense Settled';
           const body = `The expense "${after.title || 'Untitled'}" has been settled!`;
@@ -630,7 +645,7 @@ exports.onExpenseSettled = functions.firestore
             type: 'settlements',
             route: 'expense',
             expenseId: expenseId,
-            actorUserId: settledBy // Added for client-side filtering
+            actorUserId: actorId // Added for client-side filtering
           });
         }
       }
@@ -668,7 +683,7 @@ exports.sendPaymentRequest = functions.https.onCall(async (data, context) => {
       // We don't have a requestId anymore since we aren't storing it, 
       // but we can pass a temporary ID if needed or just omission is fine
       // The current app logic ignores requestId anyway
-      requestId: `req_${Date.now()}`, 
+      requestId: `req_${Date.now()}`,
       amount: amount.toString(),
       actorUserId: fromUserId,
       expenseId: expenseId // Optional, but good context
@@ -689,24 +704,25 @@ exports.onExpenseJoin = functions.firestore
     const before = change.before.data();
     const after = change.after.data();
     const expenseId = context.params.expenseId;
-    
+
     try {
       // Check if someone new joined
       const beforeParticipants = before.participantIds || [];
       const afterParticipants = after.participantIds || [];
-      
+
       const newParticipants = afterParticipants.filter(id => !beforeParticipants.includes(id));
-      
+
       if (newParticipants.length > 0) {
         // Get joiner info
         const joinerId = newParticipants[0];
         const joinerDoc = await admin.firestore().collection('users').doc(joinerId).get();
         const joinerData = joinerDoc.data();
         const joinerName = `${joinerData.firstName} ${joinerData.lastName}`.trim();
-        
+
         // Notify all existing participants (excluding the joiner)
-        const existingParticipants = beforeParticipants.filter(id => id !== joinerId);
-        
+        const actorId = context.auth ? context.auth.uid : joinerId;
+        const existingParticipants = beforeParticipants.filter(id => id !== joinerId && id !== actorId);
+
         if (existingParticipants.length > 0) {
           const title = 'Someone Joined Your Expense';
           const body = `${joinerName} joined the expense: ${after.title || 'Untitled'}`;
@@ -716,7 +732,7 @@ exports.onExpenseJoin = functions.firestore
             route: 'expense',
             expenseId: expenseId,
             joinedBy: joinerId,
-            actorUserId: joinerId // Added for client-side filtering
+            actorUserId: actorId // Added for client-side filtering
           });
         }
       }
@@ -733,13 +749,13 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
 
   try {
     const { numUsers = 10 } = data;
-    
+
     if (numUsers < 1 || numUsers > 100) {
       throw new functions.https.HttpsError('invalid-argument', 'numUsers must be between 1 and 100');
     }
 
     const db = admin.firestore();
-    
+
     // Arrays of random names
     const firstNames = [
       'Alex', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery', 'Quinn',
@@ -751,7 +767,7 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
       'David', 'Joseph', 'Emily', 'Madison', 'Charlotte', 'Amelia', 'Harper', 'Evelyn',
       'Abigail', 'Mia', 'Elizabeth', 'Sofia', 'Avery', 'Ella', 'Scarlett', 'Grace'
     ];
-    
+
     const lastNames = [
       'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis',
       'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Wilson', 'Anderson', 'Thomas', 'Taylor',
@@ -786,7 +802,7 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
       const areaCodeSecond = Math.floor(Math.random() * 10); // 0-9
       const areaCodeThird = Math.floor(Math.random() * 10); // 0-9
       const areaCode = `${areaCodeFirst}${areaCodeSecond}${areaCodeThird}`;
-      
+
       // Exchange: 200-999 (first digit 2-9, avoid ending in 11)
       const exchangeFirst = Math.floor(Math.random() * 8) + 2; // 2-9
       const exchangeSecond = Math.floor(Math.random() * 10); // 0-9
@@ -796,7 +812,7 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
         exchangeThird = (exchangeThird + 1) % 10;
       }
       const exchange = `${exchangeFirst}${exchangeSecond}${exchangeThird}`;
-      
+
       // Last 4 digits
       const number = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
       return `+1${areaCode}${exchange}${number}`;
@@ -877,7 +893,7 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
     if (batchCount > 0) {
       await userBatch.commit();
     }
-    
+
 
     // Create synthetic expenses
     const expenseTitles = [
@@ -899,7 +915,7 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
 
     for (let i = 0; i < numExpenses; i++) {
       const expenseBatch = db.batch();
-      
+
       // Select random participants (2-5 users)
       const numParticipants = Math.min(Math.floor(Math.random() * 4) + 2, userIds.length);
       const shuffledUsers = [...userIds].sort(() => Math.random() - 0.5);
@@ -947,7 +963,7 @@ exports.createSyntheticData = functions.https.onCall(async (data, context) => {
         }
 
         // Calculate splits (equal split for simplicity)
-        const splits = selectedConsumers.map(() => 
+        const splits = selectedConsumers.map(() =>
           Math.round((itemAmount / selectedConsumers.length) * 100) / 100
         );
 
@@ -1015,11 +1031,11 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
 
   try {
     const db = admin.firestore();
-    
+
     // Delete synthetic expenses
     const expensesQuery = db.collection('expenses').where('synthetic', '==', true);
     const expensesSnapshot = await expensesQuery.get();
-    
+
     let expensesDeleted = 0;
     let expenseBatch = db.batch();
     let expenseBatchCount = 0;
@@ -1046,7 +1062,7 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
     // Delete synthetic users (both Firestore and Auth)
     const usersQuery = db.collection('users').where('synthetic', '==', true);
     const usersSnapshot = await usersQuery.get();
-    
+
     let usersDeleted = 0;
     let authUsersDeleted = 0;
     let userBatch = db.batch();
@@ -1081,7 +1097,7 @@ exports.deleteSyntheticData = functions.https.onCall(async (data, context) => {
       try {
         const deleteResult = await admin.auth().deleteUsers(batch);
         authUsersDeleted += deleteResult.successCount;
-        
+
         if (deleteResult.errors && deleteResult.errors.length > 0) {
           console.error('Errors deleting Auth users:', deleteResult.errors);
         }
@@ -1113,18 +1129,36 @@ exports.deleteAccount = functions.https.onCall(async (data, context) => {
 
   const userId = context.auth.uid;
   const db = admin.firestore();
-  
+
   try {
-    // 1. Delete user document from Firestore
-    await db.collection('users').doc(userId).delete();
-    
+    // 1. Soft-delete user document in Firestore (anonymize)
+    const timestamp = admin.firestore.FieldValue.serverTimestamp();
+
+    await db.collection('users').doc(userId).update({
+      firstName: 'Deleted',
+      lastName: 'User',
+      username: `deleted_user_${userId}`, // Unique placeholder to satisfy uniqueness constraints if any
+      phoneNumber: null, // Remove phone number to release it
+      profilePhoto: 'https://ui-avatars.com/api/?name=Deleted+User&background=ebecf0&color=6b7c93&size=200',
+      accountStatus: 'deleted',
+      isDeleted: true,
+      deletedAt: timestamp,
+      venmoUsername: null,
+      expoPushToken: null, // Stop notifications
+      notificationPreferences: null,
+      updatedAt: timestamp
+    });
+
     // 2. Delete user from Firebase Authentication
+    // This prevents them from logging in again
     await admin.auth().deleteUser(userId);
-    
-    // Note: The syncUserToAlgolia trigger will automatically remove the user from Algolia
-    // Note: We are keeping expenses/transactions for historical integrity for other users,
-    // but the user's personal data (name, etc.) is removed from the user doc.
-    
+
+    // Note: The onUserProfileUpdate trigger will automatically propagate 
+    // the "Deleted User" name to all expenses where this user is a participant.
+
+    // Note: The syncUserToAlgolia trigger will see the 'deleted' status 
+    // and remove the user from the search index.
+
     return { success: true };
   } catch (error) {
     console.error('Error deleting account:', error);
@@ -1140,7 +1174,7 @@ exports.reportUser = functions.https.onCall(async (data, context) => {
 
   const { reportedUserId, reason, description } = data;
   const reporterId = context.auth.uid;
-  
+
   if (!reportedUserId || !reason) {
     throw new functions.https.HttpsError('invalid-argument', 'Missing required fields');
   }

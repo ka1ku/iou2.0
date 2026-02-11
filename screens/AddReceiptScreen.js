@@ -43,6 +43,16 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   // Use live expense if available, otherwise fall back to initial expense
   const expense = liveExpense || initialExpense;
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[AddReceiptScreen] Expense updated:', {
+      hasExpense: !!expense,
+      expenseId: expense?.id,
+      feesCount: expense?.fees?.length || 0,
+      fees: expense?.fees?.map(f => ({ id: f.id, name: f.name, amount: f.amount })) || [],
+    });
+  }, [expense]);
+
   const isEditing = !!expense && !isNewExpense;
   const insets = useSafeAreaInsets();
   const currentUserId = getCurrentUser()?.uid || null;
@@ -50,11 +60,11 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   const isFocused = useIsFocused();
 
   const { state, actions, total } = useExpense();
-  
+
   // Active tab state
   const [activeTab, setActiveTab] = useState('track');
   const [showMembersModal, setShowMembersModal] = useState(false);
-  
+
   // Validation errors state for items
   const [itemValidationErrors, setItemValidationErrors] = useState({});
   const [savingItemId, setSavingItemId] = useState(null);
@@ -159,6 +169,57 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     );
   }, [isEditing, expense?.id, actions, t]);
 
+  const handleToggleParticipant = useCallback(async (itemIndex, participantIndex) => {
+    const item = state.items[itemIndex];
+    if (!item || !expense?.id) return;
+
+    // Calculate new consumers array
+    const currentConsumers = item.selectedConsumers || [];
+    const isSelected = currentConsumers.includes(participantIndex);
+    const newConsumers = isSelected
+      ? currentConsumers.filter(i => i !== participantIndex)
+      : [...currentConsumers, participantIndex];
+
+    // Store original consumers for rollback
+    const originalConsumers = [...currentConsumers];
+
+    // Optimistic update - update local state immediately
+    actions.updateItem(itemIndex, { selectedConsumers: newConsumers });
+
+    // Save to Firestore (reuse existing onSaveItem logic)
+    try {
+      const expenseData = await prepareExpenseData();
+
+      // Update the specific item with the new consumers
+      expenseData.items[itemIndex].selectedConsumers = newConsumers;
+
+      const participantProportions = calculateParticipantProportionsFromConsumption(
+        expenseData.items,
+        expenseData.participants
+      );
+      const expenseDataWithFeeSplits = applyProportionalFeeSplits(
+        expenseData,
+        participantProportions
+      );
+
+      const currentUser = getCurrentUser();
+      const { participants, ...otherFields } = expenseDataWithFeeSplits;
+
+      await updateExpenseParticipants(expense.id, participants, currentUser.uid);
+      await updateExpense(expense.id, otherFields, currentUser.uid);
+
+      // Success haptic feedback is handled in ReceiptBreakdown
+    } catch (error) {
+      console.error('Failed to toggle participant:', error);
+
+      // Rollback optimistic update on error
+      actions.updateItem(itemIndex, { selectedConsumers: originalConsumers });
+
+      Alert.alert(t('common.error'), 'Failed to update split. Please try again.');
+      throw error; // Re-throw so ReceiptBreakdown knows it failed
+    }
+  }, [state.items, expense?.id, actions, prepareExpenseData, calculateParticipantProportionsFromConsumption, applyProportionalFeeSplits, t]);
+
   const handleAddFee = useCallback((feeData) => {
     actions.addFee(feeData);
   }, [actions]);
@@ -214,61 +275,61 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
     // Add animation feedback
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    
+
     // Immediate save to Firestore with splits calculated
     const saveToFirestore = async () => {
-        try {
-            const currentUser = getCurrentUser();
-            if (currentUser && expense?.id) {
-                // Prepare temporary expense data to calculate splits for the new fee
-                // We need to include the new fee in the calculation
-                const tempFees = [...state.fees, newFee];
-                const tempExpenseData = {
-                    items: state.items,
-                    fees: tempFees,
-                    participants: state.participants,
-                    selectedPayers: state.selectedPayers || [0]
-                };
+      try {
+        const currentUser = getCurrentUser();
+        if (currentUser && expense?.id) {
+          // Prepare temporary expense data to calculate splits for the new fee
+          // We need to include the new fee in the calculation
+          const tempFees = [...state.fees, newFee];
+          const tempExpenseData = {
+            items: state.items,
+            fees: tempFees,
+            participants: state.participants,
+            selectedPayers: state.selectedPayers || [0]
+          };
 
-                // Calculate splits for ALL fees including the new one
-                const participantProportions = calculateParticipantProportionsFromConsumption(
-                    tempExpenseData.items,
-                    tempExpenseData.participants
-                );
-                
-                const expenseDataWithSplits = applyProportionalFeeSplits(
-                    tempExpenseData,
-                    participantProportions
-                );
-                
-                // Get the updated fees array (which now includes splits for the new fee)
-                const finalFees = expenseDataWithSplits.fees;
+          // Calculate splits for ALL fees including the new one
+          const participantProportions = calculateParticipantProportionsFromConsumption(
+            tempExpenseData.items,
+            tempExpenseData.participants
+          );
 
-                await updateExpense(expense.id, { 
-                    fees: finalFees,
-                    selectedPayers: state.selectedPayers,
-                    participants: state.participants,
-                    title: state.title,
-                }, currentUser.uid);
-                
-                // Update local state with the fee that HAS splits
-                // access the specific new fee from the result
-                const savedNewFee = finalFees.find(f => f.id === newFee.id) || newFee;
-                handleAddFee(savedNewFee);
-            } else {
-                // If not saved yet, just add to local state (splits will be calculated on next autosave or full save)
-                handleAddFee(newFee);
-            }
-        } catch (error) {
-            console.error("Failed to save fee immediately:", error);
-            Alert.alert(t('common.error'), t('addExpense.saveError'));
-            // Fallback to local add
-            handleAddFee(newFee);
+          const expenseDataWithSplits = applyProportionalFeeSplits(
+            tempExpenseData,
+            participantProportions
+          );
+
+          // Get the updated fees array (which now includes splits for the new fee)
+          const finalFees = expenseDataWithSplits.fees;
+
+          await updateExpense(expense.id, {
+            fees: finalFees,
+            selectedPayers: state.selectedPayers,
+            participants: state.participants,
+            title: state.title,
+          }, currentUser.uid);
+
+          // Update local state with the fee that HAS splits
+          // access the specific new fee from the result
+          const savedNewFee = finalFees.find(f => f.id === newFee.id) || newFee;
+          handleAddFee(savedNewFee);
+        } else {
+          // If not saved yet, just add to local state (splits will be calculated on next autosave or full save)
+          handleAddFee(newFee);
         }
+      } catch (error) {
+        console.error("Failed to save fee immediately:", error);
+        Alert.alert(t('common.error'), t('addExpense.saveError'));
+        // Fallback to local add
+        handleAddFee(newFee);
+      }
     };
-    
+
     saveToFirestore();
-    
+
     // Clear input and highlight
     setCustomFeeInput('');
     setCustomFeeName('');
@@ -278,27 +339,64 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   // Auto-save for Fees and Payers
   useEffect(() => {
-    if ((!isEditing && !isNewExpense) || !expense?.id || !isFocused) return;
-    
+    console.log('[AddReceiptScreen] ⏰ Auto-save effect triggered:', {
+      hasInitialized: hasInitialized.current,
+      isEditing,
+      isNewExpense,
+      hasExpenseId: !!expense?.id,
+      isFocused,
+      feesCount: state.fees.length,
+      fees: state.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount })),
+    });
+
+    // Don't auto-save until initialization is complete
+    if (!hasInitialized.current) {
+      console.log('[AddReceiptScreen] ❌ Skipping auto-save - not initialized yet');
+      return;
+    }
+
+    if ((!isEditing && !isNewExpense) || !expense?.id || !isFocused) {
+      console.log('[AddReceiptScreen] ❌ Skipping auto-save - conditions not met');
+      return;
+    }
+
+    // Don't auto-save immediately after sync (prevents infinite loop)
+    const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
+    if (timeSinceLastSync < 2000) {
+      console.log('[AddReceiptScreen] ❌ Skipping auto-save, just synced from Firestore');
+      return;
+    }
+
+    console.log('[AddReceiptScreen] ✅ Auto-save will fire in 1.5s...');
+
     const timer = setTimeout(async () => {
       try {
         const currentUser = getCurrentUser();
         if (!currentUser) return;
-        
+
+        console.log('[AddReceiptScreen] 🔥 AUTO-SAVE FIRING NOW with fees:',
+          state.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount }))
+        );
+
         // Use the common updateExpense which also recalculates settlements
-        await updateExpense(expense.id, { 
+        await updateExpense(expense.id, {
           fees: state.fees,
           selectedPayers: state.selectedPayers,
           participants: state.participants,
           title: state.title,
         }, currentUser.uid);
+
+        console.log('[AddReceiptScreen] ✅ Auto-save completed successfully');
       } catch (error) {
-        console.error("Auto-save fees/payers/title failed:", error);
+        console.error('[AddReceiptScreen] ❌ Auto-save failed:', error);
       }
     }, 1500);
-    
-    return () => clearTimeout(timer);
-  }, [state.fees, state.selectedPayers, state.participants, state.title]);
+
+    return () => {
+      console.log('[AddReceiptScreen] 🧹 Cleaning up auto-save timer');
+      clearTimeout(timer);
+    };
+  }, [state.fees, state.selectedPayers, state.participants, state.title, isEditing, isNewExpense, expense?.id, isFocused]);
 
 
 
@@ -550,17 +648,84 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   // Ref to track which expense ID we've already initialized
   const initializedIdRef = useRef(null);
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
     // Tab bar hiding is handled centrally in App.js via getTabBarStyle
     if (expense && (isEditing || isNewExpense)) {
       // Only initialize if we haven't initialized this expense ID yet
       if (initializedIdRef.current !== expense.id) {
+        console.log('[AddReceiptScreen] Initializing from expense:', {
+          expenseId: expense.id,
+          feesCount: expense.fees?.length || 0,
+          fees: expense.fees?.map(f => ({ id: f.id, name: f.name, amount: f.amount })) || [],
+        });
         actions.initializeFromExpense(expense, isEditing, isNewExpense);
         initializedIdRef.current = expense.id;
+        hasInitialized.current = true; // Mark as initialized
       }
     }
   }, [expense?.id, isEditing, isNewExpense, actions]);
+
+  // Sync fees, items, participants from Firestore when they change (prevents stale data from overwriting DB)
+  // Use ref to track last sync to prevent auto-save from triggering immediately after sync
+  const lastSyncTimeRef = useRef(0);
+
+  useEffect(() => {
+    if (!expense || !isEditing) return;
+
+    // Sync fees - ONLY if Firestore has more/different data than local state
+    // Never sync if it would delete local data (Firestore empty but local has data)
+    if (expense.fees && expense.fees.length > 0) {
+      const firestoreFeeIds = new Set(expense.fees.map(f => `${f.id}:${f.amount}`));
+      const stateFeeIds = new Set(state.fees.map(f => `${f.id}:${f.amount}`));
+      const feesChanged =
+        firestoreFeeIds.size !== stateFeeIds.size ||
+        ![...firestoreFeeIds].every(id => stateFeeIds.has(id));
+
+      if (feesChanged) {
+        console.log('[AddReceiptScreen] Syncing fees from Firestore:', {
+          firestoreFees: expense.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount })),
+          stateFees: state.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount })),
+        });
+        actions.setFees(expense.fees);
+        lastSyncTimeRef.current = Date.now();
+      }
+    } else if (expense.fees && expense.fees.length === 0 && state.fees.length === 0) {
+      // Both empty, sync to ensure consistency
+      actions.setFees([]);
+      lastSyncTimeRef.current = Date.now();
+    }
+    // If Firestore is empty but local has fees, DON'T sync (preserve local data)
+
+    // Sync items
+    if (expense.items) {
+      const firestoreItemIds = new Set(expense.items.map(i => `${i.id}:${i.amount}:${i.name}`));
+      const stateItemIds = new Set(state.items.map(i => `${i.id}:${i.amount}:${i.name}`));
+      const itemsChanged =
+        firestoreItemIds.size !== stateItemIds.size ||
+        ![...firestoreItemIds].every(id => stateItemIds.has(id));
+
+      if (itemsChanged) {
+        const itemsWithPayers = expense.items.map(item => ({
+          ...item,
+          selectedPayers: item.selectedPayers || [0],
+          selectedConsumers: item.selectedConsumers || [0],
+        }));
+        actions.setItems(itemsWithPayers);
+      }
+    }
+
+    // Sync selectedPayers
+    if (expense.selectedPayers && JSON.stringify(expense.selectedPayers) !== JSON.stringify(state.selectedPayers)) {
+      actions.setSelectedPayers(expense.selectedPayers);
+    }
+
+    // Sync title
+    if (expense.title && expense.title !== state.title) {
+      actions.setTitle(expense.title);
+    }
+  }, [expense, isEditing, state.fees, state.items, state.selectedPayers, state.title, actions]);
 
   useEffect(() => {
     const currentUserId = getCurrentUser()?.uid;
@@ -598,7 +763,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       ...item,
       selectedPayers: state.selectedPayers || [0]
     }));
-    
+
     const itemsChanged = JSON.stringify(updatedItems) !== JSON.stringify(state.items);
     if (itemsChanged) {
       actions.setItems(updatedItems);
@@ -611,10 +776,10 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     const updateScannedItems = async () => {
       if (scannedReceipt && fromReceiptScan && !hasUpdatedScannedItems.current) {
         actions.setTitle(scannedReceipt.title || '');
-        
+
         let formattedItems = [];
         let formattedFees = [];
-        
+
         if (scannedReceipt.items && scannedReceipt.items.length > 0) {
           formattedItems = scannedReceipt.items.map((item, index) => ({
             id: Date.now().toString() + index,
@@ -626,22 +791,22 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
           }));
           actions.setItems(formattedItems);
         }
-        
+
         actions.setSelectedPayers([0]);
-        
+
         if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
           formattedFees = scannedReceipt.fees.map((fee, index) => ({
-              id: Date.now().toString() + 'fee' + index,
-              name: fee.name || t('addReceipt.feeTypes.custom'),
+            id: Date.now().toString() + 'fee' + index,
+            name: fee.name || t('addReceipt.feeTypes.custom'),
             amount: parseFloat(fee.amount) || 0,
             type: fee.type || 'fixed',
             percentage: fee.percentage || null,
-              splitType: 'proportional',
-              splits: []
+            splitType: 'proportional',
+            splits: []
           }));
           actions.setFees(formattedFees);
         }
-        
+
         if (isNewExpense && expense?.id) {
           try {
             const currentUser = getCurrentUser();
@@ -659,7 +824,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         }
       }
     };
-    
+
     updateScannedItems();
   }, [scannedReceipt, fromReceiptScan, isNewExpense, expense?.id, actions]);
 
@@ -675,10 +840,11 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-        <ExpenseHeader
-          title={state.title || (isEditing ? t('addReceipt.editReceiptTitle') : t('addReceipt.addReceiptTitle'))}
-          onBackPress={() => navigation.goBack()}
-          onSettingsPress={() => navigation.navigate('ExpenseSettings', { expense: { 
+      <ExpenseHeader
+        title={state.title || (isEditing ? t('addReceipt.editReceiptTitle') : t('addReceipt.addReceiptTitle'))}
+        onBackPress={() => navigation.goBack()}
+        onSettingsPress={() => navigation.navigate('ExpenseSettings', {
+          expense: {
             id: expense?.id,
             title: state.title,
             participants: state.participants,
@@ -686,370 +852,378 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             fees: state.fees,
             createdBy: getCurrentUser()?.uid,
             join: { enabled: state.joinEnabled }
-          }})}
-          isEditing={isEditing}
-          onPeoplePress={() => setShowMembersModal(true)}
-          participantCount={state.participants.filter(p => p.userId !== currentUserId).length}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
-      
-      <KeyboardAvoidingView 
+          }
+        })}
+        isEditing={isEditing}
+        onPeoplePress={() => setShowMembersModal(true)}
+        participantCount={state.participants.filter(p => p.userId !== currentUserId).length}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
+
+      <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
+        <ScrollView
           ref={scrollRef}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ 
+          contentContainerStyle={{
             paddingTop: insets.top + 156,
-            paddingBottom: activeTab === 'split' ? 120 : 120 
+            paddingBottom: activeTab === 'split' ? 120 : 120
           }}
         >
-        
-        {activeTab === 'track' && (
-          <>
-        {/* Settlement Warning Banner */}
-        {isSettled && (
-          <View style={styles.warningBanner}>
-            <Ionicons name="lock-closed" size={20} color={Colors.warning} />
-            <View style={{ flex: 1, marginLeft: Spacing.md }}>
-              <Text style={styles.warningBannerTitle}>Receipt Is Settled</Text>
-              <Text style={styles.warningBannerText}>
-                This receipt has been settled. No items or fees can be added or modified. To make changes, go to Split tab and unsettle first.
-              </Text>
-            </View>
-          </View>
-        )}
 
-        {/* Paid By Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.headerRow}>
-            <Text style={styles.sectionHeaderText}>{t('addReceipt.paidBy')}</Text>
-            {isSettled && (
-              <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 8 }}>
-                (Settled - cannot change)
-              </Text>
-            )}
-          </View>
-          <View style={styles.cardContainer}>
-            <View style={styles.paidByWrapper}>
-                <PaidBySection disabled={isSettled} />
-            </View>
-          </View>
-        </View>
+          {activeTab === 'track' && (
+            <>
+              {/* Settlement Warning Banner */}
+              {isSettled && (
+                <View style={styles.warningBanner}>
+                  <Ionicons name="lock-closed" size={20} color={Colors.warning} />
+                  <View style={{ flex: 1, marginLeft: Spacing.md }}>
+                    <Text style={styles.warningBannerTitle}>Receipt Is Settled</Text>
+                    <Text style={styles.warningBannerText}>
+                      This receipt has been settled. No items or fees can be added or modified. To make changes, go to Split tab and unsettle first.
+                    </Text>
+                  </View>
+                </View>
+              )}
 
-        {/* Receipt Items Section (handled by component, acts as a section) */}
-          <ReceiptBreakdown
-            items={state.items}
-            participants={state.participants}
-            lockedItemIds={lockedItemIds}
-            isSettled={isSettled}
-            onAddItem={handleAddItem}
-            onUpdateItem={handleUpdateItem}
-            onRemoveItem={handleRemoveItem}
-            onSaveItem={async (index) => {
-                const item = state.items[index];
-                if (!item || !expense?.id) return;
+              {/* Paid By Section */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.headerRow}>
+                  <Text style={styles.sectionHeaderText}>{t('addReceipt.paidBy')}</Text>
+                  {isSettled && (
+                    <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 8 }}>
+                      (Settled - cannot change)
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.cardContainer}>
+                  <View style={styles.paidByWrapper}>
+                    <PaidBySection disabled={isSettled} />
+                  </View>
+                </View>
+              </View>
 
-                setSavingItemId(item.id);
-                try {
-                    const expenseData = await prepareExpenseData();
-                    const participantProportions = calculateParticipantProportionsFromConsumption(
+              {/* Receipt Items Section (handled by component, acts as a section) */}
+              <View onLayout={(e) => {
+                if (scrollRef.current) {
+                  scrollRef.current.receiptContainerY = e.nativeEvent.layout.y;
+                }
+              }}>
+                <ReceiptBreakdown
+                  items={state.items}
+                  participants={state.participants}
+                  lockedItemIds={lockedItemIds}
+                  isSettled={isSettled}
+                  onAddItem={handleAddItem}
+                  onUpdateItem={handleUpdateItem}
+                  onRemoveItem={handleRemoveItem}
+                  onSaveItem={async (index) => {
+                    const item = state.items[index];
+                    if (!item || !expense?.id) return;
+
+                    setSavingItemId(item.id);
+                    try {
+                      const expenseData = await prepareExpenseData();
+                      const participantProportions = calculateParticipantProportionsFromConsumption(
                         expenseData.items,
                         expenseData.participants
-                    );
-                    const expenseDataWithFeeSplits = applyProportionalFeeSplits(
+                      );
+                      const expenseDataWithFeeSplits = applyProportionalFeeSplits(
                         expenseData,
                         participantProportions
-                    );
-                    
-                    const currentUser = getCurrentUser();
-                    const { participants, ...otherFields } = expenseDataWithFeeSplits;
-                    
-                    await updateExpenseParticipants(expense.id, participants, currentUser.uid);
-                    await updateExpense(expense.id, otherFields, currentUser.uid);
-                } catch (error) {
-                    Alert.alert(t('common.error'), t('components.expenses.expenseItemCard.alerts.saveError', { error: error.message }));
-                } finally {
-                    setSavingItemId(null);
-                }
-            }}
-            isSavingItemId={savingItemId}
-            scrollRef={scrollRef}
-            isFocused={isFocused}
-            validationErrors={itemValidationErrors}
-            onClearValidationError={(itemId, field) => {
-              setItemValidationErrors(prev => {
-                const newErrors = { ...prev };
-                if (newErrors[itemId]) {
-                  const itemErrors = { ...newErrors[itemId] };
-                  delete itemErrors[field];
-                  if (Object.keys(itemErrors).length === 0) {
-                    delete newErrors[itemId];
-                  } else {
-                    newErrors[itemId] = itemErrors;
-                  }
-                }
-                return newErrors;
-              });
-            }}
-            visibleHeaderHeight={insets.top + 156}
-          />
+                      );
 
-          {/* Tips & Fees Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.headerRow}>
-              <Text style={styles.sectionHeaderText}>{t('addReceipt.extraCharges')}</Text>
-              {isSettled && (
-                <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 8 }}>
-                  (Settled - cannot change)
-                </Text>
-              )}
-            </View>
+                      const currentUser = getCurrentUser();
+                      const { participants, ...otherFields } = expenseDataWithFeeSplits;
 
-            <View style={[styles.cardContainer, isSettled && { opacity: 0.5 }]}>
-                 {/* Fee Type Selector */}
-                <View style={styles.feeTypeRow}>
-                {['Tip', 'Tax', 'Service', 'Custom'].map((type, index) => {
-                    const isSelected = selectedFeeType === type;
-                    const isLast = index === 3;
-                    return (
-                    <TouchableOpacity
-                        key={type}
-                        style={[
-                        styles.feeTypeButton,
-                        isSelected && styles.feeTypeButtonSelected,
-                        !isLast && styles.feeTypeBorderRight
-                        ]}
-                        onPress={() => !isSettled && setSelectedFeeType(type)}
-                        disabled={isSettled}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={[
-                        styles.feeTypeLabel,
-                        isSelected && styles.feeTypeLabelSelected
-                        ]}>
-                        {t(`addReceipt.feeTypes.${type.toLowerCase()}`)}
-                        </Text>
-                    </TouchableOpacity>
-                    );
-                })}
+                      await updateExpenseParticipants(expense.id, participants, currentUser.uid);
+                      await updateExpense(expense.id, otherFields, currentUser.uid);
+                    } catch (error) {
+                      Alert.alert(t('common.error'), t('components.expenses.expenseItemCard.alerts.saveError', { error: error.message }));
+                    } finally {
+                      setSavingItemId(null);
+                    }
+                  }}
+                  isSavingItemId={savingItemId}
+                  scrollRef={scrollRef}
+                  isFocused={isFocused}
+                  validationErrors={itemValidationErrors}
+                  onClearValidationError={(itemId, field) => {
+                    setItemValidationErrors(prev => {
+                      const newErrors = { ...prev };
+                      if (newErrors[itemId]) {
+                        const itemErrors = { ...newErrors[itemId] };
+                        delete itemErrors[field];
+                        if (Object.keys(itemErrors).length === 0) {
+                          delete newErrors[itemId];
+                        } else {
+                          newErrors[itemId] = itemErrors;
+                        }
+                      }
+                      return newErrors;
+                    });
+                  }}
+                  visibleHeaderHeight={insets.top + 156}
+                  onToggleParticipant={handleToggleParticipant}
+                />
+              </View>
+
+              {/* Tips & Fees Section */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.headerRow}>
+                  <Text style={styles.sectionHeaderText}>{t('addReceipt.extraCharges')}</Text>
+                  {isSettled && (
+                    <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 8 }}>
+                      (Settled - cannot change)
+                    </Text>
+                  )}
                 </View>
-                
-                <View style={styles.separator} />
 
-                {/* Input Area */}
-                <View style={styles.inputArea}>
+                <View style={[styles.cardContainer, isSettled && { opacity: 0.5 }]}>
+                  {/* Fee Type Selector */}
+                  <View style={styles.feeTypeRow}>
+                    {['Tip', 'Tax', 'Service', 'Custom'].map((type, index) => {
+                      const isSelected = selectedFeeType === type;
+                      const isLast = index === 3;
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={[
+                            styles.feeTypeButton,
+                            isSelected && styles.feeTypeButtonSelected,
+                            !isLast && styles.feeTypeBorderRight
+                          ]}
+                          onPress={() => !isSettled && setSelectedFeeType(type)}
+                          disabled={isSettled}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[
+                            styles.feeTypeLabel,
+                            isSelected && styles.feeTypeLabelSelected
+                          ]}>
+                            {t(`addReceipt.feeTypes.${type.toLowerCase()}`)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.separator} />
+
+                  {/* Input Area */}
+                  <View style={styles.inputArea}>
                     {/* Custom Name Input */}
                     {selectedFeeType === 'Custom' && (
-                        <View style={styles.customNameContainer}>
+                      <View style={styles.customNameContainer}>
                         <TextInput
-                            style={styles.inlineInput}
-                            placeholder={t('addReceipt.placeholders.feeName')}
-                            placeholderTextColor={Colors.textSecondary}
-                            value={customFeeName}
-                            onChangeText={setCustomFeeName}
-                            autoCorrect={false}
-                            editable={!isSettled}
+                          style={styles.inlineInput}
+                          placeholder={t('addReceipt.placeholders.feeName')}
+                          placeholderTextColor={Colors.textSecondary}
+                          value={customFeeName}
+                          onChangeText={setCustomFeeName}
+                          autoCorrect={false}
+                          editable={!isSettled}
                         />
-                         <View style={styles.separator} />
-                        </View>
+                        <View style={styles.separator} />
+                      </View>
                     )}
 
                     <View style={styles.amountRow}>
-                        <View style={styles.amountInputContainer}>
-                            <Text style={styles.currencyPrefix}>
-                                {customFeeMode === 'fixed' ? '$' : ''}
-                            </Text>
-                            <TextInput
-                                style={styles.amountInput}
-                                placeholder="0.00"
-                                placeholderTextColor={Colors.textSecondary + '60'}
-                                keyboardType="decimal-pad"
-                                value={customFeeInput}
-                                onChangeText={setCustomFeeInput}
-                                editable={!isSettled}
-                            />
-                            <Text style={styles.currencySuffix}>
-                                {customFeeMode === 'percentage' ? '%' : ''}
-                            </Text>
-                        </View>
-                        
-                        {/* Toggle */}
-                        <View style={styles.toggleWrapper}>
-                            <TouchableOpacity
-                                style={[styles.toggleOption, customFeeMode === 'fixed' && styles.toggleOptionActive]}
-                                onPress={() => {
-                                if (!isSettled) {
-                                  setCustomFeeMode('fixed');
-                                  setCustomFeeInput('');
-                                }
-                                }}
-                                disabled={isSettled}
-                            >
-                                <Text style={[styles.toggleText, customFeeMode === 'fixed' && styles.toggleTextActive]}>$</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.toggleOption, customFeeMode === 'percentage' && styles.toggleOptionActive]}
-                                onPress={() => {
-                                if (!isSettled) {
-                                  setCustomFeeMode('percentage');
-                                  setCustomFeeInput('');
-                                }
-                                }}
-                                disabled={isSettled}
-                            >
-                                <Text style={[styles.toggleText, customFeeMode === 'percentage' && styles.toggleTextActive]}>%</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </View>
+                      <View style={styles.amountInputContainer}>
+                        <Text style={styles.currencyPrefix}>
+                          {customFeeMode === 'fixed' ? '$' : ''}
+                        </Text>
+                        <TextInput
+                          placeholder={customFeeMode === 'percentage' ? '15' : '0.00'}
+                          placeholderTextColor={Colors.textSecondary + '60'}
+                          keyboardType="decimal-pad"
+                          value={customFeeInput}
+                          onChangeText={setCustomFeeInput}
+                          editable={!isSettled}
+                          style={styles.amountInput}
+                        />
+                        <Text style={styles.currencySuffix}>
+                          {customFeeMode === 'percentage' ? '%' : ''}
+                        </Text>
+                      </View>
 
-                 <View style={styles.separator} />
-                 
-                <TouchableOpacity
+                      {/* Toggle */}
+                      <View style={styles.toggleWrapper}>
+                        <TouchableOpacity
+                          style={[styles.toggleOption, customFeeMode === 'fixed' && styles.toggleOptionActive]}
+                          onPress={() => {
+                            if (!isSettled) {
+                              setCustomFeeMode('fixed');
+                              setCustomFeeInput('');
+                            }
+                          }}
+                          disabled={isSettled}
+                        >
+                          <Text style={[styles.toggleText, customFeeMode === 'fixed' && styles.toggleTextActive]}>$</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.toggleOption, customFeeMode === 'percentage' && styles.toggleOptionActive]}
+                          onPress={() => {
+                            if (!isSettled) {
+                              setCustomFeeMode('percentage');
+                              setCustomFeeInput('');
+                            }
+                          }}
+                          disabled={isSettled}
+                        >
+                          <Text style={[styles.toggleText, customFeeMode === 'percentage' && styles.toggleTextActive]}>%</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.separator} />
+
+                  <TouchableOpacity
                     style={[
-                    styles.addItemButton,
-                    (isSettled || !customFeeInput || parseFloat(customFeeInput) <= 0 ||
-                    (selectedFeeType === 'Custom' && !customFeeName.trim())) && styles.addItemButtonDisabled
+                      styles.addItemButton,
+                      (isSettled || !customFeeInput || parseFloat(customFeeInput) <= 0 ||
+                        (selectedFeeType === 'Custom' && !customFeeName.trim())) && styles.addItemButtonDisabled
                     ]}
                     onPress={isSettled ? () => Alert.alert('Receipt Settled', 'Cannot add fees to a settled receipt. Unsettle first.') : handleCustomFeeAdd}
                     disabled={isSettled || !customFeeInput || parseFloat(customFeeInput) <= 0 ||
-                    (selectedFeeType === 'Custom' && !customFeeName.trim())}
+                      (selectedFeeType === 'Custom' && !customFeeName.trim())}
                     activeOpacity={0.7}
-                >
+                  >
                     <Text style={[styles.addItemText, (!customFeeInput || parseFloat(customFeeInput) <= 0) && { color: Colors.textSecondary }]}>
-                        {t('addReceipt.addFee', { type: selectedFeeType })}
+                      {t('addReceipt.addFee', { type: selectedFeeType })}
                     </Text>
-                </TouchableOpacity>
-            </View>
+                  </TouchableOpacity>
+                </View>
 
-            {/* Added Fees List - Outside the input card, maybe as separate small cards or rows? 
+                {/* Added Fees List - Outside the input card, maybe as separate small cards or rows? 
                 Let's put them in a separate card if they exist, or appended to the list?
                 For "Settings" look, list items usually appear in a group.
             */}
-            {state.fees.length > 0 && (
-              <View style={[styles.cardContainer, { marginTop: Spacing.md }]}>
-                {state.fees.map((fee, index) => {
-                  const isLocked = lockedItemIds && lockedItemIds.has(fee.id);
-                  return (
-                  <View key={fee.id} style={{ position: 'relative', overflow: 'hidden', borderRadius: Radius.md, marginBottom: index < state.fees.length - 1 ? 0 : 0 }}>
-                    <View style={[
-                        styles.feeRow,
-                        newlyAddedFee === fee.id && styles.feeRowHighlighted,
-                        isLocked && { opacity: 0.5, backgroundColor: Colors.surface }
-                    ]}>
-                        <View style={styles.feeInfo}>
-                            <View>
+                {state.fees.length > 0 && (
+                  <View style={[styles.cardContainer, { marginTop: Spacing.md }]}>
+                    {state.fees.map((fee, index) => {
+                      const isLocked = lockedItemIds && lockedItemIds.has(fee.id);
+                      return (
+                        <View key={fee.id} style={{ position: 'relative', overflow: 'hidden', borderRadius: Radius.md, marginBottom: index < state.fees.length - 1 ? 0 : 0 }}>
+                          <View style={[
+                            styles.feeRow,
+                            newlyAddedFee === fee.id && styles.feeRowHighlighted,
+                            isLocked && { opacity: 0.5, backgroundColor: Colors.surface }
+                          ]}>
+                            <View style={styles.feeInfo}>
+                              <View>
                                 <Text style={[
-                                    styles.feeName, 
-                                    isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
+                                  styles.feeName,
+                                  isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
                                 ]}>{fee.name}</Text>
-                            </View>
-                            <Text style={styles.feeSubtitle}>
+                              </View>
+                              <Text style={styles.feeSubtitle}>
                                 {fee.type === 'percentage' && fee.percentage != null && !isNaN(fee.percentage)
                                   ? `${(fee.percentage * 100).toFixed(0)}%`
                                   : fee.type === 'percentage' ? 'Percentage fee' : 'Fixed amount'}
-                            </Text>
-                        </View>
-                        <View style={styles.feeRight}>
-                             <Text style={[
-                                 styles.feeAmount, 
-                                 isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
-                             ]}>
+                              </Text>
+                            </View>
+                            <View style={styles.feeRight}>
+                              <Text style={[
+                                styles.feeAmount,
+                                isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
+                              ]}>
                                 +${(parseFloat(fee.amount) || 0).toFixed(2)}
-                            </Text>
-                            {!isLocked && (
-                                <TouchableOpacity 
-                                    onPress={() => handleRemoveFee(index)} 
-                                    style={styles.removeFeeBtn}
+                              </Text>
+                              {!isLocked && (
+                                <TouchableOpacity
+                                  onPress={() => handleRemoveFee(index)}
+                                  style={styles.removeFeeBtn}
                                 >
-                                    <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
+                                  <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
                                 </TouchableOpacity>
-                            )}
-                        </View>
-                    </View>
-                    
-                    {isLocked && (
-                         <View style={{
-                             position: 'absolute',
-                             top: 0, bottom: 0, left: 0, right: 0,
-                             backgroundColor: Colors.surface + "DD",
-                             alignItems: 'center',
-                             justifyContent: 'center',
-                         }}>
-                             <View style={{
-                                 flexDirection: 'row',
-                                 alignItems: 'center',
-                                 justifyContent: 'center',
-                                 gap: 6,
-                                 backgroundColor: Colors.warning + "15",
-                                 paddingHorizontal: Spacing.md,
-                                 paddingVertical: 4,
-                                 borderRadius: Radius.pill,
-                                 borderWidth: 1,
-                                 borderColor: Colors.warning + "40",
-                             }}>
+                              )}
+                            </View>
+                          </View>
+
+                          {isLocked && (
+                            <View style={{
+                              position: 'absolute',
+                              top: 0, bottom: 0, left: 0, right: 0,
+                              backgroundColor: Colors.surface + "DD",
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                backgroundColor: Colors.warning + "15",
+                                paddingHorizontal: Spacing.md,
+                                paddingVertical: 4,
+                                borderRadius: Radius.pill,
+                                borderWidth: 1,
+                                borderColor: Colors.warning + "40",
+                              }}>
                                 <Ionicons name="lock-closed" size={14} color={Colors.warning} />
                                 <Text style={{ ...Typography.caption, color: Colors.warning, fontWeight: '600' }}>
-                                    {t('components.expenses.expenseItemCard.settled')}
+                                  {t('components.expenses.expenseItemCard.settled')}
                                 </Text>
-                             </View>
-                         </View>
-                     )}
+                              </View>
+                            </View>
+                          )}
 
-                    {index < state.fees.length - 1 && !isLocked && <View style={styles.separator} />}
+                          {index < state.fees.length - 1 && !isLocked && <View style={styles.separator} />}
+                        </View>
+                      );
+                    })}
                   </View>
-                  );
-                })}
+                )}
               </View>
-            )}
-          </View>
 
-          {/* Totals Section */}
-          <View style={styles.sectionContainer}>
-             <View style={styles.headerRow}>
-              <Text style={styles.sectionHeaderText}>{t('addReceipt.totals')}</Text>
-            </View>
-            <View style={styles.cardContainer}>
-                <View style={styles.totalRow}>
+              {/* Totals Section */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.headerRow}>
+                  <Text style={styles.sectionHeaderText}>{t('addReceipt.totals')}</Text>
+                </View>
+                <View style={styles.cardContainer}>
+                  <View style={styles.totalRow}>
                     <Text style={styles.totalLabel}>{t('addReceipt.subtotal')}</Text>
                     <Text style={styles.totalValue}>${itemsSubtotal.toFixed(2)}</Text>
-                </View>
-                <View style={styles.separator} />
-                <View style={styles.totalRow}>
+                  </View>
+                  <View style={styles.separator} />
+                  <View style={styles.totalRow}>
                     <Text style={styles.totalLabel}>{t('addReceipt.feesAndTip')}</Text>
                     <Text style={styles.totalValue}>${feesSubtotal.toFixed(2)}</Text>
-                </View>
-                <View style={styles.separator} />
-                <View style={styles.totalRow}>
+                  </View>
+                  <View style={styles.separator} />
+                  <View style={styles.totalRow}>
                     <Text style={styles.grandTotalLabel}>{t('addReceipt.total')}</Text>
                     <Text style={styles.grandTotalValue}>${calculatedTotal.toFixed(2)}</Text>
+                  </View>
                 </View>
+              </View>
+
+            </>
+          )}
+
+          {activeTab === 'split' && (
+            <View style={styles.splitViewContainer}>
+              <SplitTab
+                settlements={settlements}
+                participants={state.participants}
+                currentUserId={currentUserId}
+                handleAction={handleSettlementActionWithValidation}
+                handleItemToggle={handleItemToggle}
+                handleBulkSettle={handleBulkSettle}
+                handleBulkAction={handleBulkAction}
+                changeLog={expense?.changeLog}
+                recalculationInfo={recalculationInfo}
+                onDismissRecalculation={() => setRecalculationInfo(null)}
+                onAddPeople={() => setShowMembersModal(true)}
+              />
             </View>
-          </View>
-
-          </>
-        )}
-
-        {activeTab === 'split' && (
-          <View style={styles.splitViewContainer}>
-            <SplitTab
-              settlements={settlements}
-              participants={state.participants}
-              currentUserId={currentUserId}
-              handleAction={handleSettlementActionWithValidation}
-              handleItemToggle={handleItemToggle}
-              handleBulkSettle={handleBulkSettle}
-              handleBulkAction={handleBulkAction}
-              changeLog={expense?.changeLog}
-              recalculationInfo={recalculationInfo}
-              onDismissRecalculation={() => setRecalculationInfo(null)}
-              onAddPeople={() => setShowMembersModal(true)}
-            />
-          </View>
-        )}
+          )}
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1089,88 +1263,88 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   countBadge: {
-      backgroundColor: Colors.accent,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: Radius.pill,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
   },
   countText: {
-      ...Typography.caption,
-      color: Colors.white,
-      fontWeight: '700',
-      fontSize: 10,
+    ...Typography.caption,
+    color: Colors.white,
+    fontWeight: '700',
+    fontSize: 10,
   },
   cardContainer: {
     backgroundColor: Colors.surface,
     borderRadius: Radius.lg,
     overflow: 'hidden',
     ...Shadows.card,
-    elevation: 2, 
+    elevation: 2,
     shadowOpacity: 0.05,
     borderWidth: 1,
     borderColor: Colors.surface,
   },
   participantsWrapper: {
-      padding: Spacing.md,
+    padding: Spacing.md,
   },
   paidByWrapper: {
-      padding: Spacing.md,
+    padding: Spacing.md,
   },
   separator: {
     height: 1,
     backgroundColor: Colors.divider,
   },
-  
+
   // Fee Selector
   feeTypeRow: {
-      flexDirection: 'row',
+    flexDirection: 'row',
   },
   feeTypeButton: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: Spacing.md,
-      backgroundColor: Colors.surface,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.surface,
   },
   feeTypeButtonSelected: {
-      backgroundColor: Colors.brandLight,
+    backgroundColor: Colors.brandLight,
   },
   feeTypeBorderRight: {
-      borderRightWidth: 1,
-      borderRightColor: Colors.divider,
+    borderRightWidth: 1,
+    borderRightColor: Colors.divider,
   },
   feeTypeLabel: {
-      ...Typography.caption,
-      color: Colors.textSecondary,
-      fontWeight: '600',
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontWeight: '600',
   },
   feeTypeLabelSelected: {
-      color: Colors.accent,
+    color: Colors.accent,
   },
-  
+
   // Inputs
   inputArea: {
-      padding: Spacing.lg,
-      paddingBottom: 0,
+    padding: Spacing.lg,
+    paddingBottom: 0,
   },
   customNameContainer: {
     marginBottom: Spacing.md,
   },
   inlineInput: {
-      ...Typography.body1,
-      paddingVertical: Spacing.sm,
-      color: Colors.textPrimary,
+    ...Typography.body1,
+    paddingVertical: Spacing.sm,
+    color: Colors.textPrimary,
   },
   amountRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: Spacing.lg,
-      marginTop: Spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.lg,
+    marginTop: Spacing.xs,
   },
   amountInputContainer: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   currencyPrefix: {
     ...Typography.h3,
@@ -1183,120 +1357,121 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   amountInput: {
-      ...Typography.h3,
-      flex: 1,
-      color: Colors.textPrimary,
-      height: 40,
+    ...Typography.h3,
+    color: Colors.textPrimary,
+    height: 40,
+    minWidth: 100,
+    textAlign: 'left',
   },
   toggleWrapper: {
-      flexDirection: 'row',
-      backgroundColor: Colors.surfaceLight,
-      borderRadius: Radius.md,
-      padding: 3,
+    flexDirection: 'row',
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: Radius.md,
+    padding: 3,
   },
   toggleOption: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: Radius.sm - 2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.sm - 2,
   },
   toggleOptionActive: {
-      backgroundColor: Colors.white,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 1,
-      elevation: 1,
+    backgroundColor: Colors.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   toggleText: {
-      ...Typography.caption,
-      fontWeight: '600',
-      color: Colors.textSecondary,
+    ...Typography.caption,
+    fontWeight: '600',
+    color: Colors.textSecondary,
   },
   toggleTextActive: {
-      color: Colors.textPrimary,
+    color: Colors.textPrimary,
   },
-  
+
   addItemButton: {
-      paddingVertical: Spacing.md,
-      alignItems: 'center',
-      justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addItemButtonDisabled: {
-      opacity: 0.5,
+    opacity: 0.5,
   },
   addItemText: {
-      ...Typography.body1,
-      color: Colors.accent,
-      fontWeight: '600',
+    ...Typography.body1,
+    color: Colors.accent,
+    fontWeight: '600',
   },
 
   // Fee List Items
   feeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: Spacing.md,
-      backgroundColor: Colors.surface,
-      justifyContent: 'space-between',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    backgroundColor: Colors.surface,
+    justifyContent: 'space-between',
   },
   feeRowHighlighted: {
-     backgroundColor: Colors.brandLight,
+    backgroundColor: Colors.brandLight,
   },
   feeInfo: {
-      flex: 1,
+    flex: 1,
   },
   feeName: {
-      ...Typography.body1,
-      color: Colors.textPrimary,
-      fontWeight: '500',
+    ...Typography.body1,
+    color: Colors.textPrimary,
+    fontWeight: '500',
   },
   feeSubtitle: {
-      ...Typography.caption,
-      color: Colors.textSecondary,
+    ...Typography.caption,
+    color: Colors.textSecondary,
   },
   feeRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   feeAmount: {
-      ...Typography.body1,
-      fontFamily: Typography.familyBold,
-      color: Colors.textPrimary,
-      marginRight: Spacing.md,
+    ...Typography.body1,
+    fontFamily: Typography.familyBold,
+    color: Colors.textPrimary,
+    marginRight: Spacing.md,
   },
   removeFeeBtn: {
-      padding: 4,
+    padding: 4,
   },
-  
+
   // Total Rows
   totalRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: Spacing.md,
-      minHeight: 50,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.md,
+    minHeight: 50,
   },
   totalLabel: {
-      ...Typography.body1,
-      color: Colors.textSecondary,
+    ...Typography.body1,
+    color: Colors.textSecondary,
   },
   totalValue: {
-      ...Typography.body1,
-      fontFamily: Typography.familyMedium,
-      color: Colors.textPrimary,
+    ...Typography.body1,
+    fontFamily: Typography.familyMedium,
+    color: Colors.textPrimary,
   },
   grandTotalLabel: {
-      ...Typography.title, // or h3
-      fontSize: 18,
-      color: Colors.textPrimary,
-      fontWeight: '700',
+    ...Typography.title, // or h3
+    fontSize: 18,
+    color: Colors.textPrimary,
+    fontWeight: '700',
   },
   grandTotalValue: {
-      ...Typography.title,
-      fontSize: 18,
-      color: Colors.accent,
-      fontWeight: '700',
+    ...Typography.title,
+    fontSize: 18,
+    color: Colors.accent,
+    fontWeight: '700',
   },
-  
+
   // Settlement Split Tab Styles
   splitViewContainer: {
     paddingTop: Spacing.sm,

@@ -780,6 +780,11 @@
                         "message": "Mark {{amount}} as settled? This records the payment without using Venmo.",
                         "cancel": "Cancel",
                         "confirm": "Settle"
+                    },
+                    "unsettle": {
+                        "title": "Unsettle Expense",
+                        "message": "Are you sure you want to unsettle all items?",
+                        "confirm": "Unsettle"
                     }
                 }
             }

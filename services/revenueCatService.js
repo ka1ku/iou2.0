@@ -2,8 +2,13 @@ import Purchases from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 
 
+import { Platform } from 'react-native';
+
 const REVENUECAT_CONFIG = {
-  apiKey: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
+  apiKey: Platform.select({
+    ios: 'appl_pgTAldGQhisRrPVshAixwbYUgYe',
+    android: 'goog_PLACEHOLDER_KEY', // TODO: Add your Android RevenueCat API Key here
+  }),
   logLevel: Purchases.LOG_LEVEL.DEBUG,
 };
 
@@ -19,18 +24,26 @@ export const initializeRevenueCat = async (userId = null) => {
     });
 
     Purchases.setLogLevel(REVENUECAT_CONFIG.logLevel);
-    
-    
+
+    // Test connection to verify configuration
     await testRevenueCatConnection();
-    
+
+    console.log('[RevenueCat] Initialized successfully');
+    return true;
   } catch (error) {
+    console.error('[RevenueCat] Initialization failed:', error);
+    // In development or if needed for debugging, we might want to alert this
+    if (__DEV__) {
+      console.warn('RevenueCat Init Error:', error.message);
+    }
+    return false;
   }
 };
 
 export const testRevenueCatConnection = async () => {
   try {
     const offerings = await Purchases.getOfferings();
-    
+
     if (offerings.current) {
     } else {
     }
@@ -74,9 +87,10 @@ export const getOfferings = async () => {
 export const presentPaywall = async (options = {}) => {
   try {
     const offerings = await getOfferings();
-    
+
     if (!offerings.current) {
-      return PAYWALL_RESULT.ERROR;
+      console.error('[RevenueCat] No current offering found. Check RevenueCat dashboard.');
+      throw new Error('No current offering found');
     }
 
     const paywallResult = await RevenueCatUI.presentPaywall({
@@ -89,7 +103,8 @@ export const presentPaywall = async (options = {}) => {
 
     return paywallResult;
   } catch (error) {
-    return PAYWALL_RESULT.PURCHASED;
+    console.error('[RevenueCat] Error presenting paywall:', error);
+    throw error;
   }
 };
 
@@ -118,7 +133,7 @@ export const presentReceiptScanningPaywall = async () => {
 export const handleReceiptScanningAccess = async () => {
   try {
     const hasAccess = await hasReceiptScanningAccess();
-    
+
     if (hasAccess) {
       return true;
     }
