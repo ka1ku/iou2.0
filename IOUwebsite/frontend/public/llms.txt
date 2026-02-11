@@ -1,0 +1,32 @@
+# Project: MacSpoof
+
+## Overview
+MacSpoof is a macOS utility application designed to change or reset the MAC address of network interfaces. It helps users bypass Wi-Fi time limits, resolve network blocks, and protect their privacy. The project consists of a landing page/web interface and a downloadable macOS application.
+
+
+## File Structure
+- **frontend/**: Root of the web application.
+  - **public/**: Static assets served as-is (e.g., this file).
+  - **src/js/**: JavaScript source files.
+    - `main.js`: Main entry point and core logic for the landing page.
+    - `auth.js`: Authentication logic (Sign In/Up).
+    - `authUtils.js`: Shared authentication utilities.
+    - `pricing.js`: Logic for the pricing/plans page.
+    - `help.js`: Logic for the help and settings page.
+    - `animations.js`: UI animation utilities.
+    - `firebaseConfig.js`: Firebase configuration and initialization.
+  - **index.html**: Main landing page.
+  - **auth.html**: Authentication page.
+  - **plans.html**: Pricing and plans page.
+  - **help.html**: Help center and user settings.
+  - **privacy.html**: Privacy Policy.
+  - **terms.html**: Terms of Service.
+  - **style.css**: Global stylesheet containing the design system and variables.
+  - **vite.config.js**: Vite build configuration.
+
+## Key Features
+- **MAC Address Spoofing**: Randomize or set custom MAC addresses.
+- **Network Interface Management**: Support for Wi-Fi and Ethernet.
+- **User Accounts**: Firebase Authentication (Email/Password, Google).
+- **Subscription Plans**: Stripe integration for Pro and Lifetime plans.
+- **Modern UI**: Dark mode, glassmorphism aesthetics, responsive design.
