@@ -70,12 +70,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   const [savingItemId, setSavingItemId] = useState(null);
 
   // Tips & Fees state
-  const [newlyAddedFee, setNewlyAddedFee] = useState(null);
-  const [customFeeInput, setCustomFeeInput] = useState('');
-  const [customFeeMode, setCustomFeeMode] = useState('percentage'); // 'percentage' or 'fixed'
-  const [selectedFeeType, setSelectedFeeType] = useState('Tip'); // 'Tip', 'Tax', 'Service', 'Custom'
-  const [customFeeName, setCustomFeeName] = useState('');
-
   // Settlement hook (lifted to screen level for lockedItemIds)
   const {
     settlements,
@@ -89,8 +83,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   } = useSettlementActions({
     expense,
     participants: state.participants,
-    items: state.items,
-    fees: state.fees,
+    items: state.items, // Items now include fees
     total,
     title: expense?.title || state.title,
     currentUserId,
@@ -113,17 +106,19 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   }, [handleSettlementAction, validateForSettlement]);
 
   // Calculate totals
-  const itemsSubtotal = useMemo(
-    () => state.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0),
-    [state.items]
-  );
+  const { itemsSubtotal, fees, calculatedTotal } = useMemo(() => {
+    const regularItems = state.items.filter(item => !item.isExtraFee);
+    const feeItems = state.items.filter(item => item.isExtraFee);
 
-  const feesSubtotal = useMemo(
-    () => state.fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0),
-    [state.fees]
-  );
+    const subtotal = regularItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const feesTotal = feeItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
-  const calculatedTotal = itemsSubtotal + feesSubtotal;
+    return {
+      itemsSubtotal: subtotal,
+      fees: feeItems,
+      calculatedTotal: subtotal + feesTotal
+    };
+  }, [state.items]);
 
   const handleAddItem = useCallback(() => {
     // Only add item to local state - don't persist to Firestore
@@ -193,17 +188,8 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       // Update the specific item with the new consumers
       expenseData.items[itemIndex].selectedConsumers = newConsumers;
 
-      const participantProportions = calculateParticipantProportionsFromConsumption(
-        expenseData.items,
-        expenseData.participants
-      );
-      const expenseDataWithFeeSplits = applyProportionalFeeSplits(
-        expenseData,
-        participantProportions
-      );
-
       const currentUser = getCurrentUser();
-      const { participants, ...otherFields } = expenseDataWithFeeSplits;
+      const { participants, ...otherFields } = expenseData;
 
       await updateExpenseParticipants(expense.id, participants, currentUser.uid);
       await updateExpense(expense.id, otherFields, currentUser.uid);
@@ -218,187 +204,30 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       Alert.alert(t('common.error'), 'Failed to update split. Please try again.');
       throw error; // Re-throw so ReceiptBreakdown knows it failed
     }
-  }, [state.items, expense?.id, actions, prepareExpenseData, calculateParticipantProportionsFromConsumption, applyProportionalFeeSplits, t]);
+  }, [state.items, expense?.id, actions, prepareExpenseData, t]);
 
-  const handleAddFee = useCallback((feeData) => {
-    actions.addFee(feeData);
-  }, [actions]);
+  const handleTogglePayer = useCallback(async (participantIndex) => {
+    if (!expense?.id) return;
 
-  const handleUpdateFee = useCallback((index, field, value) => {
-    actions.updateFee(index, { [field]: value });
-  }, [actions]);
+    try {
+      const currentUser = getCurrentUser();
+      if (!currentUser) throw new Error('Not authenticated');
 
-  const handleRemoveFee = useCallback((index) => {
-    actions.removeFee(index);
-  }, [actions]);
+      // Single selection only - always set to the clicked participant
+      const newPayers = [participantIndex];
 
-  const handleCustomFeeAdd = useCallback(() => {
-    const value = parseFloat(customFeeInput);
-    if (!value || value <= 0) return;
+      // Update Firestore directly - snapshot listener will update UI
+      await updateExpense(expense.id, {
+        selectedPayers: newPayers,
+      }, currentUser.uid);
 
-    let feeName = selectedFeeType;
-    if (selectedFeeType === 'Custom') {
-      feeName = customFeeName.trim() || t('addReceipt.feeTypes.custom');
+      // Success haptic
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.error('Failed to toggle payer:', error);
+      Alert.alert('Error', 'Failed to update payer. Please try again.');
     }
-
-    let newFee;
-    const feeId = Date.now().toString();
-    if (customFeeMode === 'percentage') {
-      const percentageValue = parseFloat(value);
-
-      // Validate percentage is a valid number
-      if (isNaN(percentageValue) || percentageValue < 0 || percentageValue > 100) {
-        Alert.alert(t('common.error'), 'Please enter a valid percentage between 0 and 100');
-        return;
-      }
-
-      const feeAmount = (itemsSubtotal * (percentageValue / 100)).toFixed(2);
-      newFee = {
-        id: feeId,
-        name: selectedFeeType === 'Tip' ? `${percentageValue}% ${t('addReceipt.feeTypes.tip')}` : `${feeName} (${percentageValue}%)`,
-        amount: parseFloat(feeAmount),
-        type: 'percentage',
-        percentage: percentageValue / 100,
-        splitType: 'proportional',
-        splits: []
-      };
-    } else {
-      newFee = {
-        id: feeId,
-        name: feeName,
-        amount: value,
-        type: 'fixed',
-        splitType: 'proportional',
-        splits: []
-      };
-    }
-
-    // Add animation feedback
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-
-    // Immediate save to Firestore with splits calculated
-    const saveToFirestore = async () => {
-      try {
-        const currentUser = getCurrentUser();
-        if (currentUser && expense?.id) {
-          // Prepare temporary expense data to calculate splits for the new fee
-          // We need to include the new fee in the calculation
-          const tempFees = [...state.fees, newFee];
-          const tempExpenseData = {
-            items: state.items,
-            fees: tempFees,
-            participants: state.participants,
-            selectedPayers: state.selectedPayers || [0]
-          };
-
-          // Calculate splits for ALL fees including the new one
-          const participantProportions = calculateParticipantProportionsFromConsumption(
-            tempExpenseData.items,
-            tempExpenseData.participants
-          );
-
-          const expenseDataWithSplits = applyProportionalFeeSplits(
-            tempExpenseData,
-            participantProportions
-          );
-
-          // Get the updated fees array (which now includes splits for the new fee)
-          const finalFees = expenseDataWithSplits.fees;
-
-          await updateExpense(expense.id, {
-            fees: finalFees,
-            selectedPayers: state.selectedPayers,
-            participants: state.participants,
-            title: state.title,
-          }, currentUser.uid);
-
-          // Update local state with the fee that HAS splits
-          // access the specific new fee from the result
-          const savedNewFee = finalFees.find(f => f.id === newFee.id) || newFee;
-          handleAddFee(savedNewFee);
-        } else {
-          // If not saved yet, just add to local state (splits will be calculated on next autosave or full save)
-          handleAddFee(newFee);
-        }
-      } catch (error) {
-        console.error("Failed to save fee immediately:", error);
-        Alert.alert(t('common.error'), t('addExpense.saveError'));
-        // Fallback to local add
-        handleAddFee(newFee);
-      }
-    };
-
-    saveToFirestore();
-
-    // Clear input and highlight
-    setCustomFeeInput('');
-    setCustomFeeName('');
-    setNewlyAddedFee(feeId);
-    setTimeout(() => setNewlyAddedFee(null), 2000);
-  }, [customFeeInput, selectedFeeType, customFeeName, customFeeMode, itemsSubtotal, handleAddFee, expense?.id, state.fees, state.selectedPayers, state.participants, state.title]);
-
-  // Auto-save for Fees and Payers
-  useEffect(() => {
-    console.log('[AddReceiptScreen] ⏰ Auto-save effect triggered:', {
-      hasInitialized: hasInitialized.current,
-      isEditing,
-      isNewExpense,
-      hasExpenseId: !!expense?.id,
-      isFocused,
-      feesCount: state.fees.length,
-      fees: state.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount })),
-    });
-
-    // Don't auto-save until initialization is complete
-    if (!hasInitialized.current) {
-      console.log('[AddReceiptScreen] ❌ Skipping auto-save - not initialized yet');
-      return;
-    }
-
-    if ((!isEditing && !isNewExpense) || !expense?.id || !isFocused) {
-      console.log('[AddReceiptScreen] ❌ Skipping auto-save - conditions not met');
-      return;
-    }
-
-    // Don't auto-save immediately after sync (prevents infinite loop)
-    const timeSinceLastSync = Date.now() - lastSyncTimeRef.current;
-    if (timeSinceLastSync < 2000) {
-      console.log('[AddReceiptScreen] ❌ Skipping auto-save, just synced from Firestore');
-      return;
-    }
-
-    console.log('[AddReceiptScreen] ✅ Auto-save will fire in 1.5s...');
-
-    const timer = setTimeout(async () => {
-      try {
-        const currentUser = getCurrentUser();
-        if (!currentUser) return;
-
-        console.log('[AddReceiptScreen] 🔥 AUTO-SAVE FIRING NOW with fees:',
-          state.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount }))
-        );
-
-        // Use the common updateExpense which also recalculates settlements
-        await updateExpense(expense.id, {
-          fees: state.fees,
-          selectedPayers: state.selectedPayers,
-          participants: state.participants,
-          title: state.title,
-        }, currentUser.uid);
-
-        console.log('[AddReceiptScreen] ✅ Auto-save completed successfully');
-      } catch (error) {
-        console.error('[AddReceiptScreen] ❌ Auto-save failed:', error);
-      }
-    }, 1500);
-
-    return () => {
-      console.log('[AddReceiptScreen] 🧹 Cleaning up auto-save timer');
-      clearTimeout(timer);
-    };
-  }, [state.fees, state.selectedPayers, state.participants, state.title, isEditing, isNewExpense, expense?.id, isFocused]);
-
-
+  }, [expense?.id]);
 
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
@@ -440,13 +269,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         selectedConsumers: item.selectedConsumers || [0],
         selectedPayers: item.selectedPayers || [0],
         splits: item.splits || [],
-      })),
-      fees: state.fees.map((fee) => ({
-        id: fee.id,
-        name: fee.name.trim(),
-        amount: parseFloat(fee.amount) || 0,
-        type: fee.type || "fixed",
-        splits: fee.splits || [],
+        isExtraFee: item.isExtraFee || false, // Preserve isExtraFee flag
       })),
       selectedPayers: state.selectedPayers || [0],
       join: { enabled: state.joinEnabled },
@@ -513,10 +336,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       );
       return false;
     }
-    if (state.fees.some((fee) => !fee.name.trim())) {
-      Alert.alert(t('common.error'), t('addReceipt.feeNameMissing'));
-      return false;
-    }
     if (!state.selectedPayers?.length) {
       Alert.alert(
         t('common.error'),
@@ -564,88 +383,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     return true;
   };
 
-  const calculateParticipantProportionsFromConsumption = (items, participants) => {
-    // Calculate total value of items each participant CONSUMED (was assigned to)
-    const participantConsumption = participants.map((participant, participantIndex) => {
-      let totalConsumed = 0;
-
-      items.forEach(item => {
-        const itemAmount = parseFloat(item.amount) || 0;
-        const itemConsumers = item.selectedConsumers || [];
-
-        // If this participant is one of the consumers for this item
-        if (itemConsumers.includes(participantIndex)) {
-          // Split the item amount equally among all consumers
-          const amountConsumedByThisPerson = itemConsumers.length > 0 ? itemAmount / itemConsumers.length : 0;
-          totalConsumed += amountConsumedByThisPerson;
-        }
-      });
-
-      return {
-        index: participantIndex,
-        amount: totalConsumed
-      };
-    });
-
-    // Calculate total items amount
-    const totalItemAmount = items.reduce((sum, item) =>
-      sum + (parseFloat(item.amount) || 0), 0);
-
-    // Calculate proportions
-    return participantConsumption.map(({ index, amount }) => ({
-      index,
-      amount,
-      proportion: totalItemAmount > 0 ? amount / totalItemAmount : 0
-    }));
-  };
-
-  const applyProportionalFeeSplits = (expenseData, participantProportions) => {
-    const totalFees = expenseData.fees.reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-
-    if (totalFees === 0) {
-      return expenseData;
-    }
-
-    const updatedFees = expenseData.fees.map(fee => {
-      const feeAmount = parseFloat(fee.amount) || 0;
-
-      // Calculate proportional splits
-      const proportionalSplits = participantProportions.map(({ index, proportion }) => {
-        const splitAmount = Math.round(feeAmount * proportion * 100) / 100;
-        return {
-          participantIndex: index,
-          amount: splitAmount
-        };
-      });
-
-      // Adjust for rounding errors - ensure splits sum to fee amount
-      const totalSplits = proportionalSplits.reduce((sum, s) => sum + s.amount, 0);
-      const roundingError = Math.round((feeAmount - totalSplits) * 100) / 100;
-
-      if (roundingError !== 0 && proportionalSplits.length > 0) {
-        // Add rounding error to first non-zero split
-        const firstNonZero = proportionalSplits.find(s => s.amount > 0);
-        if (firstNonZero) {
-          firstNonZero.amount = Math.round((firstNonZero.amount + roundingError) * 100) / 100;
-        }
-      }
-
-      return {
-        ...fee,
-        splits: proportionalSplits
-      };
-    });
-
-    return {
-      ...expenseData,
-      fees: updatedFees
-    };
-  };
-
-
-
-
-
   // Ref to track which expense ID we've already initialized
   const initializedIdRef = useRef(null);
   const hasInitialized = useRef(false);
@@ -657,8 +394,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       if (initializedIdRef.current !== expense.id) {
         console.log('[AddReceiptScreen] Initializing from expense:', {
           expenseId: expense.id,
-          feesCount: expense.fees?.length || 0,
-          fees: expense.fees?.map(f => ({ id: f.id, name: f.name, amount: f.amount })) || [],
+          itemsCount: expense.items?.length || 0,
         });
         actions.initializeFromExpense(expense, isEditing, isNewExpense);
         initializedIdRef.current = expense.id;
@@ -667,36 +403,9 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     }
   }, [expense?.id, isEditing, isNewExpense, actions]);
 
-  // Sync fees, items, participants from Firestore when they change (prevents stale data from overwriting DB)
-  // Use ref to track last sync to prevent auto-save from triggering immediately after sync
-  const lastSyncTimeRef = useRef(0);
-
+  // Sync items, participants from Firestore when they change (prevents stale data from overwriting DB)
   useEffect(() => {
     if (!expense || !isEditing) return;
-
-    // Sync fees - ONLY if Firestore has more/different data than local state
-    // Never sync if it would delete local data (Firestore empty but local has data)
-    if (expense.fees && expense.fees.length > 0) {
-      const firestoreFeeIds = new Set(expense.fees.map(f => `${f.id}:${f.amount}`));
-      const stateFeeIds = new Set(state.fees.map(f => `${f.id}:${f.amount}`));
-      const feesChanged =
-        firestoreFeeIds.size !== stateFeeIds.size ||
-        ![...firestoreFeeIds].every(id => stateFeeIds.has(id));
-
-      if (feesChanged) {
-        console.log('[AddReceiptScreen] Syncing fees from Firestore:', {
-          firestoreFees: expense.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount })),
-          stateFees: state.fees.map(f => ({ id: f.id, name: f.name, amount: f.amount })),
-        });
-        actions.setFees(expense.fees);
-        lastSyncTimeRef.current = Date.now();
-      }
-    } else if (expense.fees && expense.fees.length === 0 && state.fees.length === 0) {
-      // Both empty, sync to ensure consistency
-      actions.setFees([]);
-      lastSyncTimeRef.current = Date.now();
-    }
-    // If Firestore is empty but local has fees, DON'T sync (preserve local data)
 
     // Sync items
     if (expense.items) {
@@ -725,7 +434,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     if (expense.title && expense.title !== state.title) {
       actions.setTitle(expense.title);
     }
-  }, [expense, isEditing, state.fees, state.items, state.selectedPayers, state.title, actions]);
+  }, [expense, isEditing, state.items, state.selectedPayers, state.title, actions]);
 
   useEffect(() => {
     const currentUserId = getCurrentUser()?.uid;
@@ -777,9 +486,8 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       if (scannedReceipt && fromReceiptScan && !hasUpdatedScannedItems.current) {
         actions.setTitle(scannedReceipt.title || '');
 
+        // All items including fees (fees have isExtraFee: true)
         let formattedItems = [];
-        let formattedFees = [];
-
         if (scannedReceipt.items && scannedReceipt.items.length > 0) {
           formattedItems = scannedReceipt.items.map((item, index) => ({
             id: Date.now().toString() + index,
@@ -787,33 +495,20 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             amount: parseFloat(item.amount) || 0,
             selectedConsumers: [],
             selectedPayers: [0],
-            splits: []
+            splits: [],
+            isExtraFee: item.isExtraFee || false // Preserve the isExtraFee flag from scanner
           }));
           actions.setItems(formattedItems);
         }
 
         actions.setSelectedPayers([0]);
 
-        if (scannedReceipt.fees && scannedReceipt.fees.length > 0) {
-          formattedFees = scannedReceipt.fees.map((fee, index) => ({
-            id: Date.now().toString() + 'fee' + index,
-            name: fee.name || t('addReceipt.feeTypes.custom'),
-            amount: parseFloat(fee.amount) || 0,
-            type: fee.type || 'fixed',
-            percentage: fee.percentage || null,
-            splitType: 'proportional',
-            splits: []
-          }));
-          actions.setFees(formattedFees);
-        }
-
         if (isNewExpense && expense?.id) {
           try {
             const currentUser = getCurrentUser();
             if (currentUser) {
               await updateExpense(expense.id, {
-                items: formattedItems,
-                fees: formattedFees,
+                items: formattedItems, // Use formatted items directly, not state
                 title: scannedReceipt.title || ''
               }, currentUser.uid);
               hasUpdatedScannedItems.current = true;
@@ -832,10 +527,25 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   // Check if ANYTHING is settled - if so, lock EVERYTHING
   const isSettled = useMemo(() => {
-    return settlements.some(s =>
+    const hasSettled = settlements.some(s =>
       ['markedAsPaid', 'confirmed', 'complete', 'partial'].includes(s.status) ||
       (s.settledAmount && s.settledAmount > 0)
     );
+
+    // Enhanced debug logging
+    console.log('[AddReceiptScreen] isSettled check:', {
+      settlementsCount: settlements.length,
+      settlements: settlements.map(s => ({
+        from: s.from,
+        to: s.to,
+        status: s.status,
+        settledAmount: s.settledAmount,
+        amount: s.amount,
+      })),
+      hasSettled,
+    });
+
+    return hasSettled;
   }, [settlements]);
 
   return (
@@ -848,8 +558,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             id: expense?.id,
             title: state.title,
             participants: state.participants,
-            items: state.items,
-            fees: state.fees,
+            items: state.items, // Items now include fees with isExtraFee flag
             createdBy: getCurrentUser()?.uid,
             join: { enabled: state.joinEnabled }
           }
@@ -901,7 +610,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                 </View>
                 <View style={styles.cardContainer}>
                   <View style={styles.paidByWrapper}>
-                    <PaidBySection disabled={isSettled} />
+                    <PaidBySection disabled={isSettled} onTogglePayer={handleTogglePayer} />
                   </View>
                 </View>
               </View>
@@ -927,17 +636,9 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                     setSavingItemId(item.id);
                     try {
                       const expenseData = await prepareExpenseData();
-                      const participantProportions = calculateParticipantProportionsFromConsumption(
-                        expenseData.items,
-                        expenseData.participants
-                      );
-                      const expenseDataWithFeeSplits = applyProportionalFeeSplits(
-                        expenseData,
-                        participantProportions
-                      );
 
                       const currentUser = getCurrentUser();
-                      const { participants, ...otherFields } = expenseDataWithFeeSplits;
+                      const { participants, ...otherFields } = expenseData;
 
                       await updateExpenseParticipants(expense.id, participants, currentUser.uid);
                       await updateExpense(expense.id, otherFields, currentUser.uid);
@@ -971,232 +672,30 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                 />
               </View>
 
-              {/* Tips & Fees Section */}
-              <View style={styles.sectionContainer}>
-                <View style={styles.headerRow}>
-                  <Text style={styles.sectionHeaderText}>{t('addReceipt.extraCharges')}</Text>
-                  {isSettled && (
-                    <Text style={{ fontSize: 12, color: Colors.textSecondary, marginLeft: 8 }}>
-                      (Settled - cannot change)
-                    </Text>
-                  )}
-                </View>
-
-                <View style={[styles.cardContainer, isSettled && { opacity: 0.5 }]}>
-                  {/* Fee Type Selector */}
-                  <View style={styles.feeTypeRow}>
-                    {['Tip', 'Tax', 'Service', 'Custom'].map((type, index) => {
-                      const isSelected = selectedFeeType === type;
-                      const isLast = index === 3;
-                      return (
-                        <TouchableOpacity
-                          key={type}
-                          style={[
-                            styles.feeTypeButton,
-                            isSelected && styles.feeTypeButtonSelected,
-                            !isLast && styles.feeTypeBorderRight
-                          ]}
-                          onPress={() => !isSettled && setSelectedFeeType(type)}
-                          disabled={isSettled}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[
-                            styles.feeTypeLabel,
-                            isSelected && styles.feeTypeLabelSelected
-                          ]}>
-                            {t(`addReceipt.feeTypes.${type.toLowerCase()}`)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  <View style={styles.separator} />
-
-                  {/* Input Area */}
-                  <View style={styles.inputArea}>
-                    {/* Custom Name Input */}
-                    {selectedFeeType === 'Custom' && (
-                      <View style={styles.customNameContainer}>
-                        <TextInput
-                          style={styles.inlineInput}
-                          placeholder={t('addReceipt.placeholders.feeName')}
-                          placeholderTextColor={Colors.textSecondary}
-                          value={customFeeName}
-                          onChangeText={setCustomFeeName}
-                          autoCorrect={false}
-                          editable={!isSettled}
-                        />
-                        <View style={styles.separator} />
-                      </View>
-                    )}
-
-                    <View style={styles.amountRow}>
-                      <View style={styles.amountInputContainer}>
-                        <Text style={styles.currencyPrefix}>
-                          {customFeeMode === 'fixed' ? '$' : ''}
-                        </Text>
-                        <TextInput
-                          placeholder={customFeeMode === 'percentage' ? '15' : '0.00'}
-                          placeholderTextColor={Colors.textSecondary + '60'}
-                          keyboardType="decimal-pad"
-                          value={customFeeInput}
-                          onChangeText={setCustomFeeInput}
-                          editable={!isSettled}
-                          style={styles.amountInput}
-                        />
-                        <Text style={styles.currencySuffix}>
-                          {customFeeMode === 'percentage' ? '%' : ''}
-                        </Text>
-                      </View>
-
-                      {/* Toggle */}
-                      <View style={styles.toggleWrapper}>
-                        <TouchableOpacity
-                          style={[styles.toggleOption, customFeeMode === 'fixed' && styles.toggleOptionActive]}
-                          onPress={() => {
-                            if (!isSettled) {
-                              setCustomFeeMode('fixed');
-                              setCustomFeeInput('');
-                            }
-                          }}
-                          disabled={isSettled}
-                        >
-                          <Text style={[styles.toggleText, customFeeMode === 'fixed' && styles.toggleTextActive]}>$</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.toggleOption, customFeeMode === 'percentage' && styles.toggleOptionActive]}
-                          onPress={() => {
-                            if (!isSettled) {
-                              setCustomFeeMode('percentage');
-                              setCustomFeeInput('');
-                            }
-                          }}
-                          disabled={isSettled}
-                        >
-                          <Text style={[styles.toggleText, customFeeMode === 'percentage' && styles.toggleTextActive]}>%</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.separator} />
-
-                  <TouchableOpacity
-                    style={[
-                      styles.addItemButton,
-                      (isSettled || !customFeeInput || parseFloat(customFeeInput) <= 0 ||
-                        (selectedFeeType === 'Custom' && !customFeeName.trim())) && styles.addItemButtonDisabled
-                    ]}
-                    onPress={isSettled ? () => Alert.alert('Receipt Settled', 'Cannot add fees to a settled receipt. Unsettle first.') : handleCustomFeeAdd}
-                    disabled={isSettled || !customFeeInput || parseFloat(customFeeInput) <= 0 ||
-                      (selectedFeeType === 'Custom' && !customFeeName.trim())}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.addItemText, (!customFeeInput || parseFloat(customFeeInput) <= 0) && { color: Colors.textSecondary }]}>
-                      {t('addReceipt.addFee', { type: selectedFeeType })}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Added Fees List - Outside the input card, maybe as separate small cards or rows? 
-                Let's put them in a separate card if they exist, or appended to the list?
-                For "Settings" look, list items usually appear in a group.
-            */}
-                {state.fees.length > 0 && (
-                  <View style={[styles.cardContainer, { marginTop: Spacing.md }]}>
-                    {state.fees.map((fee, index) => {
-                      const isLocked = lockedItemIds && lockedItemIds.has(fee.id);
-                      return (
-                        <View key={fee.id} style={{ position: 'relative', overflow: 'hidden', borderRadius: Radius.md, marginBottom: index < state.fees.length - 1 ? 0 : 0 }}>
-                          <View style={[
-                            styles.feeRow,
-                            newlyAddedFee === fee.id && styles.feeRowHighlighted,
-                            isLocked && { opacity: 0.5, backgroundColor: Colors.surface }
-                          ]}>
-                            <View style={styles.feeInfo}>
-                              <View>
-                                <Text style={[
-                                  styles.feeName,
-                                  isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
-                                ]}>{fee.name}</Text>
-                              </View>
-                              <Text style={styles.feeSubtitle}>
-                                {fee.type === 'percentage' && fee.percentage != null && !isNaN(fee.percentage)
-                                  ? `${(fee.percentage * 100).toFixed(0)}%`
-                                  : fee.type === 'percentage' ? 'Percentage fee' : 'Fixed amount'}
-                              </Text>
-                            </View>
-                            <View style={styles.feeRight}>
-                              <Text style={[
-                                styles.feeAmount,
-                                isLocked && { color: Colors.textSecondary, textDecorationLine: 'line-through' }
-                              ]}>
-                                +${(parseFloat(fee.amount) || 0).toFixed(2)}
-                              </Text>
-                              {!isLocked && (
-                                <TouchableOpacity
-                                  onPress={() => handleRemoveFee(index)}
-                                  style={styles.removeFeeBtn}
-                                >
-                                  <Ionicons name="trash-outline" size={18} color={Colors.textSecondary} />
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                          </View>
-
-                          {isLocked && (
-                            <View style={{
-                              position: 'absolute',
-                              top: 0, bottom: 0, left: 0, right: 0,
-                              backgroundColor: Colors.surface + "DD",
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}>
-                              <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
-                                backgroundColor: Colors.warning + "15",
-                                paddingHorizontal: Spacing.md,
-                                paddingVertical: 4,
-                                borderRadius: Radius.pill,
-                                borderWidth: 1,
-                                borderColor: Colors.warning + "40",
-                              }}>
-                                <Ionicons name="lock-closed" size={14} color={Colors.warning} />
-                                <Text style={{ ...Typography.caption, color: Colors.warning, fontWeight: '600' }}>
-                                  {t('components.expenses.expenseItemCard.settled')}
-                                </Text>
-                              </View>
-                            </View>
-                          )}
-
-                          {index < state.fees.length - 1 && !isLocked && <View style={styles.separator} />}
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-
               {/* Totals Section */}
               <View style={styles.sectionContainer}>
                 <View style={styles.headerRow}>
                   <Text style={styles.sectionHeaderText}>{t('addReceipt.totals')}</Text>
                 </View>
                 <View style={styles.cardContainer}>
+                  {/* Subtotal (regular items) */}
                   <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>{t('addReceipt.subtotal')}</Text>
+                    <Text style={styles.totalLabel}>{t('addReceipt.subtotal') || 'Subtotal'}</Text>
                     <Text style={styles.totalValue}>${itemsSubtotal.toFixed(2)}</Text>
                   </View>
-                  <View style={styles.separator} />
-                  <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>{t('addReceipt.feesAndTip')}</Text>
-                    <Text style={styles.totalValue}>${feesSubtotal.toFixed(2)}</Text>
-                  </View>
-                  <View style={styles.separator} />
+
+                  {/* Fees */}
+                  {fees.map((fee, index) => (
+                    <View key={fee.id || index} style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>{fee.name}</Text>
+                      <Text style={styles.totalValue}>${(parseFloat(fee.amount) || 0).toFixed(2)}</Text>
+                    </View>
+                  ))}
+
+                  {/* Separator before total if there are fees */}
+                  {fees.length > 0 && <View style={styles.separator} />}
+
+                  {/* Grand Total */}
                   <View style={styles.totalRow}>
                     <Text style={styles.grandTotalLabel}>{t('addReceipt.total')}</Text>
                     <Text style={styles.grandTotalValue}>${calculatedTotal.toFixed(2)}</Text>
@@ -1221,6 +720,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                 recalculationInfo={recalculationInfo}
                 onDismissRecalculation={() => setRecalculationInfo(null)}
                 onAddPeople={() => setShowMembersModal(true)}
+                expenseType="receipt"
               />
             </View>
           )}
@@ -1499,6 +999,35 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textSecondary,
     lineHeight: 18,
+  },
+
+  // Add Fee Button Styles
+  addFeeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.accent + '10',
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    borderStyle: 'dashed',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+  },
+  addFeeIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.sm,
+  },
+  addFeeText: {
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 16,
   },
 
 });

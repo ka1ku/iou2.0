@@ -17,6 +17,7 @@ const SplitTab = ({
   onDismissRecalculation,
   onAddPeople,
   containerStyle,
+  expenseType = 'expense', // 'receipt' | 'expense'
 }) => {
   if (participants.length < 2) {
     return (
@@ -52,6 +53,7 @@ const SplitTab = ({
         readOnly={false}
         recalculationInfo={recalculationInfo}
         onDismissRecalculation={onDismissRecalculation}
+        expenseType={expenseType}
       />
     </View>
   );

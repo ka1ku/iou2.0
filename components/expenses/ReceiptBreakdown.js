@@ -253,6 +253,22 @@ const ItemRow = memo(({
               )}
             </View>
 
+            {/* Extra Fee Toggle */}
+            <TouchableOpacity
+              style={styles.extraFeeToggle}
+              onPress={() => onUpdate('item', index, 'isExtraFee', !item.isExtraFee)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={item.isExtraFee ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={item.isExtraFee ? Colors.accent : Colors.textSecondary}
+              />
+              <Text style={styles.extraFeeLabel}>
+                {t('components.expenses.receiptBreakdown.extraFee') || 'Mark as extra fee (tip, tax, etc.)'}
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.editActions}>
               <TouchableOpacity
                 onPress={() => onCancel(item.id)}
@@ -311,6 +327,18 @@ const ItemRow = memo(({
                 <Text style={[styles.viewModeName, isLocked && styles.viewModeNameLocked]} numberOfLines={1}>
                   {truncateItemName(item.name || t('components.expenses.receiptBreakdown.itemDefault', { index: index + 1 }))}
                 </Text>
+                {item.isExtraFee && !isLocked && (
+                  <View style={[styles.settledBadge, { backgroundColor: Colors.accent + '15' }]}>
+                    <Ionicons
+                      name="pricetag"
+                      size={10}
+                      color={Colors.accent}
+                    />
+                    <Text style={[styles.settledBadgeText, { color: Colors.accent }]}>
+                      {t('components.expenses.receiptBreakdown.fee') || 'Fee'}
+                    </Text>
+                  </View>
+                )}
                 {isLocked && (
                   <View style={styles.settledBadge}>
                     <Ionicons
@@ -946,6 +974,19 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.7,
+  },
+  extraFeeToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+    marginBottom: Spacing.md,
+  },
+  extraFeeLabel: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontFamily: Typography.familyRegular,
   },
 });
 

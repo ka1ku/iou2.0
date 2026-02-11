@@ -118,8 +118,8 @@ export const updateExpense = async (expenseId, updateData, userId) => {
           const currentExpense = { id: expenseSnap.id, ...expenseSnap.data() };
           const existingSettlements = currentExpense.settlements || [];
 
-          // Only recalculate if settlements already exist
-          if (existingSettlements.length > 0) {
+          // Only recalculate if settlements already exist AND we're not explicitly setting them
+          if (shouldRecalculateSettlements && existingSettlements.length > 0) {
             // Merge the update data with current expense data to get the complete expense
             const updatedExpense = {
               ...currentExpense,

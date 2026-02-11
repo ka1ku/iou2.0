@@ -269,10 +269,11 @@ const StatusPill = ({ status }) => {
 /* ─────────────────────────────────────────────────────────────────────────────
    Associated Items List
    ───────────────────────────────────────────────────────────────────────── */
-const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection }) => {
+const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection, expenseType = 'expense' }) => {
   const { t } = useTranslation();
   if (!items || items.length === 0) return null;
 
+  const isReceiptMode = expenseType === 'receipt';
   const unsettledItems = items.filter(i => !i.settled);
   const allUnsettledSelected = unsettledItems.length > 0 && unsettledItems.every(i => selectedItemIds?.has(i.id));
 
@@ -280,9 +281,9 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
     <View style={styles.assocContainer}>
       <View style={styles.assocHeader}>
         <Text style={styles.assocTitle}>
-          {t('components.expenses.settlementInterface.items.title')} {!readOnly && !selectedItemIds && t('components.expenses.settlementInterface.items.tapToSettle')}
+          {t('components.expenses.settlementInterface.items.title')} {!readOnly && !selectedItemIds && !isReceiptMode && t('components.expenses.settlementInterface.items.tapToSettle')}
         </Text>
-        {!readOnly && selectedItemIds && unsettledItems.length > 1 && (
+        {!readOnly && selectedItemIds && !isReceiptMode && unsettledItems.length > 1 && (
           <TouchableOpacity
             onPress={() => {
               if (allUnsettledSelected) {
@@ -307,6 +308,10 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
         if (isSettled) {
           iconName = 'checkmark-circle';
           iconColor = Colors.success;
+        } else if (isReceiptMode) {
+          // Receipt mode: no checkbox, just show item
+          iconName = null;
+          iconColor = null;
         } else if (isSelected) {
           iconName = 'checkbox';
           iconColor = Colors.accent;
@@ -316,7 +321,7 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
         }
 
         const handlePress = () => {
-          if (readOnly) return;
+          if (readOnly || isReceiptMode) return; // No interaction in receipt mode
           if (isSettled) {
             onToggleItem?.(settlement, item);
           } else if (onToggleSelection) {
@@ -329,26 +334,28 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
             key={item.id || i}
             style={styles.assocRow}
             onPress={handlePress}
-            disabled={readOnly}
-            activeOpacity={0.7}
+            disabled={readOnly || isReceiptMode}
+            activeOpacity={isReceiptMode ? 1 : 0.7}
           >
-            <Ionicons
-              name={iconName}
-              size={18}
-              color={iconColor}
-              style={{ marginRight: 8 }}
-            />
+            {iconName && (
+              <Ionicons
+                name={iconName}
+                size={18}
+                color={iconColor}
+                style={{ marginRight: 8 }}
+              />
+            )}
             <Text style={[
               styles.assocName,
               isSettled && styles.assocNameSettled,
-              !isSettled && !isSelected && selectedItemIds && styles.assocNameDeselected,
+              !isSettled && !isSelected && selectedItemIds && !isReceiptMode && styles.assocNameDeselected,
             ]} numberOfLines={1}>
               {item.name}
             </Text>
             <Text style={[
               styles.assocAmount,
               isSettled && styles.assocAmountSettled,
-              !isSettled && !isSelected && selectedItemIds && styles.assocAmountDeselected,
+              !isSettled && !isSelected && selectedItemIds && !isReceiptMode && styles.assocAmountDeselected,
             ]}>
               ${item.amount.toFixed(2)}
             </Text>
@@ -362,7 +369,7 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
 /* ─────────────────────────────────────────────────────────────────────────────
    Settlement Card
    ───────────────────────────────────────────────────────────────────────── */
-const SettlementCard = ({ settlement, index, participants, currentUserId, currentUserName, onAction, onToggleItem, onBulkSettle, onBulkAction, readOnly }) => {
+const SettlementCard = ({ settlement, index, participants, currentUserId, currentUserName, onAction, onToggleItem, onBulkSettle, onBulkAction, readOnly, expenseType = 'expense' }) => {
   const { t } = useTranslation();
   const fromName = settlement.debtor || settlement.from;
   const toName = settlement.creditor || settlement.to;
@@ -382,11 +389,17 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     (settlement.associatedItems || []).filter(i => !i.settled).map(i => i.id),
     [settlement.associatedItems]
   );
-  const [selectedItemIds, setSelectedItemIds] = useState(() => new Set(unsettledItemIds));
+
+  // For receipt flow, always select ALL items (no state needed)
+  // For expense flow, use stateful selection
+  const isReceiptMode = expenseType === 'receipt';
+  const [selectedItemIdsState, setSelectedItemIdsState] = useState(() => new Set(unsettledItemIds));
+  const selectedItemIds = isReceiptMode ? new Set(unsettledItemIds) : selectedItemIdsState;
 
   // Sync selection when unsettled items change (e.g. after settling/unsettling)
   useEffect(() => {
-    setSelectedItemIds(prev => {
+    if (isReceiptMode) return; // No state updates in receipt mode
+    setSelectedItemIdsState(prev => {
       const unsettledSet = new Set(unsettledItemIds);
       const next = new Set();
       // Keep existing selections that are still unsettled
@@ -399,16 +412,17 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
       });
       return next;
     });
-  }, [unsettledItemIds.join(',')]);
+  }, [unsettledItemIds.join(','), isReceiptMode]);
 
   const toggleSelection = useCallback((itemId) => {
-    setSelectedItemIds(prev => {
+    if (isReceiptMode) return; // No toggling in receipt mode
+    setSelectedItemIdsState(prev => {
       const next = new Set(prev);
       if (next.has(itemId)) next.delete(itemId);
       else next.add(itemId);
       return next;
     });
-  }, []);
+  }, [isReceiptMode]);
 
   // Calculate selected amount for bulk actions
   const selectedAmount = useMemo(() => {
@@ -468,7 +482,25 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     if (readOnly) return null;
 
     if (status === 'complete') {
-      return btn(t('components.expenses.settlementInterface.actions.allSettled'), 'checkmark-circle', 'disabled');
+      const confirmUnsettleAll = () => {
+        Alert.alert(
+          t('components.expenses.settlementInterface.alerts.unsettleAll.title') || 'Unsettle All Items',
+          t('components.expenses.settlementInterface.alerts.unsettleAll.message') || 'This will mark all items as unsettled. Are you sure?',
+          [
+            { text: t('common.cancel') || 'Cancel', style: 'cancel' },
+            { text: t('components.expenses.settlementInterface.alerts.unsettleAll.confirm') || 'Unsettle',
+              style: 'destructive',
+              onPress: () => fire('undoMarkAsPaid')
+            },
+          ],
+        );
+      };
+      return btn(
+        t('components.expenses.settlementInterface.actions.allSettled'),
+        'checkmark-circle',
+        'success',
+        confirmUnsettleAll
+      );
     }
 
     const confirmMarkSettled = () => {
@@ -626,8 +658,9 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               settlement={settlement}
               onToggleItem={onToggleItem}
               readOnly={readOnly}
-              selectedItemIds={!readOnly ? selectedItemIds : undefined}
-              onToggleSelection={!readOnly ? toggleSelection : undefined}
+              selectedItemIds={!readOnly && !isReceiptMode ? selectedItemIds : undefined}
+              onToggleSelection={!readOnly && !isReceiptMode ? toggleSelection : undefined}
+              expenseType={expenseType}
             />
 
             {/* Actions */}
@@ -661,6 +694,7 @@ const SettlementInterface = ({
   readOnly = false,
   recalculationInfo = null,
   onDismissRecalculation,
+  expenseType = 'expense', // 'receipt' | 'expense'
 }) => {
   const { t } = useTranslation();
   const current = participants.find((p) => p.userId === currentUserId) || {};
@@ -720,6 +754,7 @@ const SettlementInterface = ({
           onBulkSettle={onBulkSettle}
           onBulkAction={onBulkAction}
           readOnly={readOnly}
+          expenseType={expenseType}
         />
       ))}
     </View>

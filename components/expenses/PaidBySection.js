@@ -12,26 +12,32 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '../../design/token
 import { useExpense } from '../../contexts/ExpenseContext';
 import { useTranslation } from '../../contexts/LanguageContext';
 
-const PaidBySection = ({ disabled = false }) => {
+const PaidBySection = ({ disabled = false, onTogglePayer }) => {
   const { t } = useTranslation();
   const { state, actions } = useExpense();
   const { participants, selectedPayers, items } = state;
 
-  const togglePayer = (participantIndex) => {
-    if (disabled) return;
-    const newPayers = selectedPayers.includes(participantIndex)
-      ? selectedPayers.filter(i => i !== participantIndex)
-      : [...selectedPayers, participantIndex];
+  const togglePayer = async (participantIndex) => {
+    if (disabled) {
+      console.log('[PaidBySection] Toggle blocked - disabled is true');
+      return;
+    }
 
-    actions.setSelectedPayers(newPayers);
-    
-    // Update all items to have the same payers
-    const updatedItems = items.map(item => ({
-      ...item,
-      selectedPayers: newPayers
-    }));
-    actions.setItems(updatedItems);
+    // Just call the callback - parent handles all logic
+    if (onTogglePayer) {
+      await onTogglePayer(participantIndex);
+    }
   };
+
+  // Debug logging on render
+  React.useEffect(() => {
+    console.log('[PaidBySection] Render state:', {
+      disabled,
+      participantsCount: participants.length,
+      selectedPayers,
+      itemsCount: items.length,
+    });
+  }, [disabled, participants.length, selectedPayers, items.length]);
 
   return (
     <View style={[styles.paidByContainer, disabled && styles.disabledContainer]}>
@@ -53,8 +59,8 @@ const PaidBySection = ({ disabled = false }) => {
                     styles.paidByItem,
                     isSelected && styles.paidByItemSelected
                 ]}
-                onPress={() => {
-                    togglePayer(pIndex);
+                onPress={async () => {
+                    await togglePayer(pIndex);
                 }}
                 activeOpacity={0.7}
                 disabled={disabled}

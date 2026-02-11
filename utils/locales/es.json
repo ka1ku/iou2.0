@@ -702,6 +702,8 @@
                 "settled": "Liquidado",
                 "assignSomeone": "Asignar a alguien",
                 "noOneAssigned": "Nadie asignado",
+                "extraFee": "Marcar como cargo extra (propina, impuesto, etc.)",
+                "fee": "Cargo",
                 "time": {
                     "justNow": "ahora mismo",
                     "minutesAgo": "hace {{count}}m",

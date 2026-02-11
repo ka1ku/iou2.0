@@ -1,8 +1,9 @@
 /**
  * Build a map of participant name → { paidFor: Set<itemId>, consumed: Set<itemId> }
  * This tracks which items each participant paid for and consumed.
+ * Items with isExtraFee flag are treated the same as regular items.
  */
-export const buildItemAssociationMap = (expense, participants, items, fees = []) => {
+export const buildItemAssociationMap = (expense, participants, items) => {
   const map = new Map(); // name → { paidFor: Set, consumed: Set }
   participants.forEach(p => map.set(p.name, { paidFor: new Set(), consumed: new Set() }));
 
@@ -22,20 +23,6 @@ export const buildItemAssociationMap = (expense, participants, items, fees = [])
     });
   });
 
-  fees.forEach(fee => {
-    if (!fee.id) return;
-    const payers = expense.selectedPayers || [0];
-    payers.forEach(idx => {
-      const name = participants[idx]?.name;
-      if (name && map.has(name)) map.get(name).paidFor.add(fee.id);
-    });
-
-    (fee.splits || []).forEach(split => {
-        const name = participants[split.participantIndex]?.name;
-        if (name && map.has(name)) map.get(name).consumed.add(fee.id);
-    });
-  });
-
   return map;
 };
 
@@ -43,15 +30,17 @@ export const buildItemAssociationMap = (expense, participants, items, fees = [])
  * Given a settlement (from→to) and the association map + items array,
  * return the associated items: items the creditor paid for that the debtor consumed.
  * The amount field will be the debtor's split (how much they owe), not the full item price.
+ * Items with isExtraFee flag are treated the same as regular items.
  */
-const getAssociatedItems = (fromName, toName, assocMap, items, fees = [], participants) => {
+const getAssociatedItems = (fromName, toName, assocMap, items, participants, expense) => {
   const creditorPaid = assocMap.get(toName)?.paidFor;
   const debtorConsumed = assocMap.get(fromName)?.consumed;
   if (!creditorPaid || !debtorConsumed) return [];
 
-  // Find debtor's index
+  // Find debtor's and creditor's indices
   const debtorIndex = participants.findIndex(p => p.name === fromName);
-  if (debtorIndex === -1) return [];
+  const creditorIndex = participants.findIndex(p => p.name === toName);
+  if (debtorIndex === -1 || creditorIndex === -1) return [];
 
   const result = [];
   items.forEach(item => {
@@ -77,46 +66,49 @@ const getAssociatedItems = (fromName, toName, assocMap, items, fees = [], partic
         }
       }
 
-      result.push({
-        id: item.id,
-        name: item.name || 'Item',
-        amount: debtorOwes  // Debtor's split, not full item price
-      });
-    }
-  });
+      // IMPORTANT: Adjust for multiple payers
+      // If multiple people paid for this item, the debtor only owes this creditor
+      // a fraction based on how much the creditor contributed
+      const itemPayers = item.selectedPayers || [];
+      const payersToUse = itemPayers.length > 0 ? itemPayers : (expense?.selectedPayers || [0]);
 
-  fees.forEach(fee => {
-      if (!fee.id) return;
-      if (creditorPaid.has(fee.id) && debtorConsumed.has(fee.id)) {
-          const split = (fee.splits || []).find(s => s.participantIndex === debtorIndex);
-          if (split) {
-              result.push({
-                  id: fee.id,
-                  name: fee.name || 'Fee',
-                  amount: parseFloat(split.amount) || 0
-              });
-          }
+      if (payersToUse.includes(creditorIndex)) {
+        // Creditor is one of the payers - calculate their fraction
+        const numPayers = payersToUse.length;
+        const creditorFraction = 1 / numPayers;
+        debtorOwes = Math.round(debtorOwes * creditorFraction * 100) / 100;
+      } else {
+        // Creditor didn't actually pay for this item - shouldn't happen, but handle it
+        debtorOwes = 0;
       }
+
+      if (debtorOwes > 0) {
+        result.push({
+          id: item.id,
+          name: item.name || 'Item',
+          amount: debtorOwes,  // Debtor's split adjusted for creditor's contribution
+          isExtraFee: item.isExtraFee || false // Preserve flag for display
+        });
+      }
+    }
   });
 
   return result;
 };
 
 export const calculateSettlement = (expense) => {
-  const { participants, items, fees } = expense;
+  const { participants, items } = expense;
   if (!participants || !items) {
     return { settlements: [], totalSettlements: 0 };
   }
-  const itemsTotal = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-  const feesTotal = (fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0);
-  const total = itemsTotal + feesTotal;
+  const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
 
-  const balances = calculateParticipantBalances(expense, participants, items, fees, total);
-  const assocMap = buildItemAssociationMap(expense, participants, items, fees);
+  const balances = calculateParticipantBalances(expense, participants, items, total);
+  const assocMap = buildItemAssociationMap(expense, participants, items);
   const rawSettlements = generateSettlementProposal(balances);
   const settlements = rawSettlements.map(s => ({
     ...s,
-    associatedItems: getAssociatedItems(s.from, s.to, assocMap, items, fees, participants),
+    associatedItems: getAssociatedItems(s.from, s.to, assocMap, items, participants, expense),
   }));
   return {
     settlements,
@@ -126,7 +118,7 @@ export const calculateSettlement = (expense) => {
   };
 };
 
-export const calculateParticipantBalances = (expense, participants, items, fees, total) => {
+export const calculateParticipantBalances = (expense, participants, items, total) => {
   const balances = participants.map((participant, index) => ({
     name: participant.name,
     index,
@@ -181,33 +173,6 @@ export const calculateParticipantBalances = (expense, participants, items, fees,
             balances[consumerIndex].balance += amountPerConsumer;
           }
         }
-      }
-    });
-  });
-
-  (fees || []).forEach(fee => {
-    const feeSplits = fee.splits || [];
-    const totalFeeAmount = parseFloat(fee.amount) || 0;
-    
-    const feePayers = expense.selectedPayers || [0];
-    if (feePayers.length > 0) {
-      const amountPerPayer = Math.round((totalFeeAmount / feePayers.length) * 100) / 100;
-      feePayers.forEach(payerIndex => {
-        if (payerIndex < balances.length && balances[payerIndex]) {
-          balances[payerIndex].paid += amountPerPayer;
-          balances[payerIndex].balance -= amountPerPayer; // Negative because they paid
-        }
-      });
-    }
-    
-    // Then, add the fee amounts to participants who owe them
-    feeSplits.forEach(split => {
-      const participantIndex = split.participantIndex;
-      const splitAmount = parseFloat(split.amount) || 0;
-      const roundedSplitAmount = Math.round(splitAmount * 100) / 100;
-      if (participantIndex !== undefined && participantIndex < balances.length && balances[participantIndex]) {
-        balances[participantIndex].owed += roundedSplitAmount;
-        balances[participantIndex].balance += roundedSplitAmount; // Positive because they owe
       }
     });
   });
@@ -267,7 +232,7 @@ const generateSettlementProposal = (balances) => {
 
 
 export const calculateSettlementWithPartialSettlements = (expense, existingSettlements = []) => {
-  const { participants, items, fees } = expense;
+  const { participants, items } = expense;
   if (!participants || !items) {
     return { settlements: [], totalSettlements: 0, transferredSettlements: 0, newSettlements: 0 };
   }
@@ -284,10 +249,8 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
     return status === 'noAction';
   });
 
-  const currentBalances = calculateParticipantBalances(expense, participants, items, fees, 
-    items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) + 
-    (fees || []).reduce((sum, fee) => sum + (parseFloat(fee.amount) || 0), 0)
-  );
+  const total = items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  const currentBalances = calculateParticipantBalances(expense, participants, items, total);
 
   // Adjust balances to account for all transferred settlements
   // These settlements represent money that has already been transferred, so we need to
@@ -310,7 +273,7 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
   // This will create settlements for the remaining balance after accounting for transferred amounts
   const newSettlements = generateSettlementProposal(adjustedBalances);
 
-  const assocMap = buildItemAssociationMap(expense, participants, items, fees);
+  const assocMap = buildItemAssociationMap(expense, participants, items);
 
   // Combine preserved transferred settlements with new settlements
   const allSettlements = [
@@ -320,13 +283,13 @@ export const calculateSettlementWithPartialSettlements = (expense, existingSettl
       amount: s.amount, // Keep original amount - money already transferred
       status: s.status, // Preserve original status
       preserved: true,
-      associatedItems: s.associatedItems || getAssociatedItems(s.debtor || s.from, s.creditor || s.to, assocMap, items, fees, participants),
+      associatedItems: s.associatedItems || getAssociatedItems(s.debtor || s.from, s.creditor || s.to, assocMap, items, participants, expense),
     })),
     ...newSettlements.map(s => ({
       ...s,
       status: 'noAction',
       preserved: false,
-      associatedItems: getAssociatedItems(s.from, s.to, assocMap, items, fees, participants),
+      associatedItems: getAssociatedItems(s.from, s.to, assocMap, items, participants, expense),
     }))
   ];
 

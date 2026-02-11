@@ -35,8 +35,7 @@ const makePairKey = (settlement) => {
  * @param {object}  opts
  * @param {object}  opts.expense           – the Firestore expense document (may be null)
  * @param {Array}   opts.participants      – current participant list
- * @param {Array}   opts.items             – current items list
- * @param {Array}   opts.fees              – current fees list
+ * @param {Array}   opts.items             – current items list (includes fees with isExtraFee flag)
  * @param {number}  opts.total             – calculated total
  * @param {string}  opts.title             – expense display title
  * @param {string}  opts.currentUserId     – current user's UID
@@ -47,7 +46,6 @@ export default function useSettlementActions({
   expense,
   participants = [],
   items = [],
-  fees = [],
   total = 0,
   title = '',
   currentUserId,
@@ -69,8 +67,7 @@ export default function useSettlementActions({
         title: title || 'Expense',
         total,
         participants,
-        items,
-        fees,
+        items, // Items now include fees with isExtraFee flag
         selectedPayers: selectedPayers || [0],
       };
 
@@ -96,11 +93,16 @@ export default function useSettlementActions({
       console.error('[useSettlementActions] Error calculating settlements:', error);
       return [];
     }
-  }, [expense?.settlements, title, total, participants, items, fees, selectedPayers]);
+  }, [expense?.settlements, title, total, participants, items, selectedPayers]);
 
-  // Seed payment-flow status overrides on expense load (once per expense)
+  // Sync overrides from Firestore whenever settlements change
   useEffect(() => {
-    if (!expense?.settlements?.length) return;
+    if (!expense?.settlements) return;
+    console.log('[SYNC] expense.settlements changed, resetting overrides. Settlements:', expense.settlements.map(s => ({
+      pairKey: makePairKey(s),
+      status: s.status,
+      items: (s.associatedItems || []).map(i => ({ id: i.id, settled: i.settled })),
+    })));
     const PAYMENT_FLOW_STATUSES = ['markedAsPaid', 'reminderSent', 'confirmed'];
     const initial = {};
     expense.settlements.forEach((s) => {
@@ -110,9 +112,10 @@ export default function useSettlementActions({
         initial[key] = status;
       }
     });
+    console.log('[SYNC] New statusOverrides:', initial);
     setStatusOverrides(initial);
     setItemOverrides({});
-  }, [expense?.id]);
+  }, [expense?.settlements]);
 
   // ─── derived settlements with overrides applied ───────────────────────
   const settlements = useMemo(() => {
@@ -201,14 +204,31 @@ export default function useSettlementActions({
         // Use pairKey (debtor/creditor) to match, ignoring amount changes
         if (makePairKey(s) === pairKey) {
           found = true;
+
+          // If unsettling, mark all associatedItems as unsettled
+          const SETTLED_STATES = ['markedAsPaid', 'confirmed', 'complete', 'partial'];
+          const isUnsettling = SETTLED_STATES.includes(previousStatus) && newStatus === 'noAction';
+
+          let updatedAssociatedItems = settlement.associatedItems || s.associatedItems || [];
+          if (isUnsettling) {
+            updatedAssociatedItems = updatedAssociatedItems.map(item => ({
+              ...item,
+              settled: false,
+              settledAt: null,
+            }));
+          }
+
           return {
             ...s,
             status: newStatus,
             updatedAt: new Date().toISOString(),
-            // Ensure associatedItems from the local settlement are saved
-            associatedItems: settlement.associatedItems || s.associatedItems || [],
+            // Use updated associatedItems if unsettling, otherwise keep current
+            associatedItems: updatedAssociatedItems,
             // Update amount to match current proposed amount
             amount: settlement.amount,
+            // Reset settled amounts when unsettling
+            settledAmount: isUnsettling ? 0 : s.settledAmount,
+            remainingAmount: isUnsettling ? settlement.amount : s.remainingAmount,
           };
         }
         return s;
@@ -227,8 +247,9 @@ export default function useSettlementActions({
 
       // Update items with settled flags (only on manual mark-as-paid, not Venmo payment statuses)
       const MANUAL_SETTLE = ['markedAsPaid', 'confirmed'];
+      const SETTLED_STATES = ['markedAsPaid', 'confirmed', 'complete', 'partial'];
       const isSettling = previousStatus === 'noAction' && MANUAL_SETTLE.includes(newStatus);
-      const isUnsettling = MANUAL_SETTLE.includes(previousStatus) && newStatus === 'noAction';
+      const isUnsettling = SETTLED_STATES.includes(previousStatus) && newStatus === 'noAction';
 
       let updatedItems = latest.items || [];
 
@@ -659,9 +680,64 @@ export default function useSettlementActions({
           break;
 
         // ── undo mark as paid ──────────────────────────────────────
-        case 'undoMarkAsPaid':
-          await optimistic(settlement, 'noAction', prev);
+        case 'undoMarkAsPaid': {
+          if (!expense?.id) return;
+
+          const latest = await getExpenseById(expense.id);
+          if (!latest) return;
+
+          const pairKey = makePairKey(settlement);
+
+          console.log('[UNSETTLE] pairKey:', pairKey);
+          console.log('[UNSETTLE] Firestore settlements:', (latest.settlements || []).map(s => ({
+            pairKey: makePairKey(s),
+            status: s.status,
+            items: (s.associatedItems || []).map(i => ({ id: i.id, settled: i.settled })),
+          })));
+
+          // Reset this settlement in Firestore: status → noAction, all items → unsettled
+          let matched = false;
+          const updatedSettlements = (latest.settlements || []).map(s => {
+            if (makePairKey(s) !== pairKey) return s;
+            matched = true;
+            return {
+              ...s,
+              status: 'noAction',
+              settledAmount: 0,
+              remainingAmount: s.amount,
+              updatedAt: new Date().toISOString(),
+              associatedItems: (s.associatedItems || []).map(item => ({
+                ...item,
+                settled: false,
+                settledAt: null,
+              })),
+            };
+          });
+
+          console.log('[UNSETTLE] Matched settlement?', matched);
+          console.log('[UNSETTLE] Updated settlements:', updatedSettlements.map(s => ({
+            pairKey: makePairKey(s),
+            status: s.status,
+            items: (s.associatedItems || []).map(i => ({ id: i.id, settled: i.settled })),
+          })));
+
+          // Clear settledAt/settledBy from the items array too
+          const assocIds = new Set((settlement.associatedItems || []).map(i => i.id));
+          const updatedItems = (latest.items || []).map(item => {
+            if (!assocIds.has(item.id)) return item;
+            const { settledAt, settledBy, ...rest } = item;
+            return rest;
+          });
+
+          const uid = getCurrentUser()?.uid;
+          await updateExpense(expense.id, {
+            settlements: updatedSettlements,
+            items: updatedItems,
+          }, uid);
+
+          console.log('[UNSETTLE] Firestore write complete');
           break;
+        }
 
         // ── pay via Venmo ──────────────────────────────────────────
         case 'makePayment': {

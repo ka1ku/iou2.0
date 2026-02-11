@@ -702,6 +702,8 @@
                 "settled": "Settled",
                 "assignSomeone": "Assign someone",
                 "noOneAssigned": "No one assigned",
+                "extraFee": "Mark as extra fee (tip, tax, etc.)",
+                "fee": "Fee",
                 "time": {
                     "justNow": "just now",
                     "minutesAgo": "{{count}}m ago",

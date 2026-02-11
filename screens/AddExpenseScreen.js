@@ -545,6 +545,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
                 onDismissRecalculation={() => setRecalculationInfo(null)}
                 onAddPeople={() => setShowMembersModal(true)}
                 containerStyle={{ paddingHorizontal: 0 }}
+                expenseType="expense"
               />
             </View>
           )}

@@ -44,11 +44,13 @@ export const scanReceiptWithAI = async (base64Image) => {
   "title": "Business name",
   "date": "YYYY-MM-DD",
   "subtotal": "number",
-  "total": "number", 
+  "total": "number",
   "items": [{"name": "item", "amount": "number", "quantity": "number"}],
-  "fees": [{"name": "fee", "type": "percentage|fixed", "percentage": "number", "amount": "number"}],
+  "fees": [{"name": "fee (e.g., Tax, Tip, Service Charge)", "amount": "number"}],
   "participants": [{"name": "You", "paidBy": true}]
 }
+
+Important: Extract any tips, taxes, service charges, or fees into the "fees" array.
 Respond with ONLY valid JSON.`;
 
     const response = await model.generateContent([
@@ -58,31 +60,40 @@ Respond with ONLY valid JSON.`;
 
     const responseText = response.response.text();
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    
+
     if (!jsonMatch) throw new Error('No valid JSON found');
-    
+
     const receiptData = JSON.parse(jsonMatch[0]);
-    
+
     if (receiptData.error === 'Not a receipt') {
       throw new Error('This image does not appear to be a receipt. Please try with a clear receipt image.');
     }
+
+    // Convert regular items
+    const regularItems = (receiptData.items || []).map(item => ({
+      name: item.name || 'Item',
+      amount: Number(item.amount) || 0,
+      quantity: Number(item.quantity) || 1,
+      isExtraFee: false
+    }));
+
+    // Convert fees to items with isExtraFee flag
+    const feeItems = (receiptData.fees || []).map(fee => ({
+      name: fee.name || 'Fee',
+      amount: Number(fee.amount) || 0,
+      quantity: 1,
+      isExtraFee: true // Mark as extra fee
+    }));
+
+    // Combine items and fees into single array (fees at the end)
+    const allItems = [...regularItems, ...feeItems];
 
     return {
       title: receiptData.title || 'Receipt',
       date: receiptData.date || new Date().toISOString().split('T')[0],
       subtotal: Number(receiptData.subtotal) || 0,
       total: Number(receiptData.total) || 0,
-      items: (receiptData.items || []).map(item => ({
-        name: item.name || 'Item',
-        amount: Number(item.amount) || 0,
-        quantity: Number(item.quantity) || 1
-      })),
-      fees: (receiptData.fees || []).map(fee => ({
-        name: fee.name || 'Fee',
-        type: fee.type || 'fixed',
-        percentage: Number(fee.percentage) || null,
-        amount: Number(fee.amount) || 0
-      })),
+      items: allItems, // All items including fees
       participants: receiptData.participants || [{ name: 'You', paidBy: true }]
     };
     
