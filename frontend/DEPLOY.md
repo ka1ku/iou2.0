@@ -21,6 +21,11 @@ Your Vite frontend is already configured for deployment. Output goes to `dist/` 
 
 5. **Save** and deploy. Cloudflare will build and deploy on each push to `main`.
 
+**If using Workers with custom deploy command** (`npx wrangler deploy`):
+- Set **Build command:** `npm run build` (must run first so `dist/` exists)
+- Set **Deploy command:** `npx wrangler deploy`
+- The `wrangler.jsonc` in this folder configures the `dist/` assets.
+
 ---
 
 ## Option 2: Direct deploy with Wrangler CLI
