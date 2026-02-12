@@ -560,16 +560,23 @@ exports.onExpenseUpdated = functions.firestore
     const expenseId = context.params.expenseId;
 
     try {
-      // Only notify if significant changes occurred
-      const significantChanges = [
-        'title', 'totalAmount', 'items', 'participantIds'
-      ];
+      // Only notify for add/remove of items, not for edits. Title/participant changes still notify.
+      const beforeItems = before.items || [];
+      const afterItems = after.items || [];
+      const oldIds = new Set(beforeItems.map(i => i.id).filter(Boolean));
+      const newIds = new Set(afterItems.map(i => i.id).filter(Boolean));
+      const hasItemsAdded = afterItems.some(i => i.id && !oldIds.has(i.id));
+      const hasItemsRemoved = beforeItems.some(i => i.id && !newIds.has(i.id));
+      const hasItemsAddedOrRemoved = hasItemsAdded || hasItemsRemoved;
 
-      const hasSignificantChange = significantChanges.some(field => {
-        return JSON.stringify(before[field]) !== JSON.stringify(after[field]);
-      });
+      const titleChanged = before.title !== after.title;
+      const participantsChanged = JSON.stringify(before.participantIds) !== JSON.stringify(after.participantIds);
 
-      if (!hasSignificantChange) return;
+      // Skip notification if items changed but only edits (no add/remove)
+      const itemsChanged = JSON.stringify(before.items) !== JSON.stringify(after.items);
+      if (itemsChanged && !hasItemsAddedOrRemoved) return; // edits only - no notification
+
+      if (!titleChanged && !participantsChanged && !hasItemsAddedOrRemoved) return;
 
       // Get updater info
       const updaterId = after.updatedBy || after.createdBy;
@@ -598,8 +605,8 @@ exports.onExpenseUpdated = functions.firestore
         return status !== 'noAction';
       });
 
-      if (totalChanged && hasPaidSettlements && participantIds.length > 0) {
-        // Find participants affected by paid settlements
+      if (totalChanged && hasPaidSettlements && hasItemsAddedOrRemoved && participantIds.length > 0) {
+        // Find participants affected by paid settlements (only when items add/remove, not edits)
         const paidSettlements = (after.settlements || []).filter(s => (s.status || 'noAction') !== 'noAction');
         const affectedUserIds = new Set();
         paidSettlements.forEach(s => {
