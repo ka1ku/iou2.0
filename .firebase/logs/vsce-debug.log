@@ -59636,3 +59636,43 @@ E0211 23:20:33.300549   63477 watch.go:116] watchAllDir unable to walk dir `/Use
  {"metadata":{"emulator":{"name":"dataconnect"},"message":"E0211 23:20:43.304693   63477 watch.go:40] Failed to load config from \"/Users/kailee/code/IOU-2.0/dataconnect\": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`\n"}}
 [debug] [2026-02-12T05:20:53.302Z] E0211 23:20:53.302845   63477 watch.go:40] Failed to load config from "/Users/kailee/code/IOU-2.0/dataconnect": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`
  {"metadata":{"emulator":{"name":"dataconnect"},"message":"E0211 23:20:53.302845   63477 watch.go:40] Failed to load config from \"/Users/kailee/code/IOU-2.0/dataconnect\": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`\n"}}
+[debug] [2026-02-12T05:21:03.301Z] E0211 23:21:03.301236   63477 watch.go:40] Failed to load config from "/Users/kailee/code/IOU-2.0/dataconnect": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"E0211 23:21:03.301236   63477 watch.go:40] Failed to load config from \"/Users/kailee/code/IOU-2.0/dataconnect\": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`\n"}}
+[info] [Firebase Plugin] Stopping Data Connect toolkit
+[debug] [2026-02-12T05:21:32.789Z] [Firebase Plugin] Activating Firebase extension.
+[info] [Firebase Plugin] Checked firebase-tools, is up to date!
+[debug] [2026-02-12T05:21:34.590Z] [Firebase Plugin] requireAuthWrapper
+[debug] [2026-02-12T05:21:34.591Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-02-12T05:21:34.591Z] > authorizing via signed-in user (kaikualexander@gmail.com)
+[debug] [2026-02-12T05:21:34.592Z] Checked if tokens are valid: false, expires at: 1770867551524
+[debug] [2026-02-12T05:21:34.592Z] Checked if tokens are valid: false, expires at: 1770867551524
+[debug] [2026-02-12T05:21:34.592Z] > refreshing access token with scopes: []
+[debug] [2026-02-12T05:21:34.593Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-02-12T05:21:34.593Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-12T05:21:34.595Z] [Firebase Plugin] VSCode notification server listening on port 40001
+[info] [Firebase Plugin] Starting Data Connect toolkit (version 3.1.1) on port 50001
+[debug] [2026-02-12T05:21:34.891Z] 'fdc build' failed with error: Unable to build your Data Connect schema and connectors (exit code 1): E0211 23:21:34.889413   69801 cmd.go:43] Error loading data connect config: could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"'fdc build' failed with error: Unable to build your Data Connect schema and connectors (exit code 1): E0211 23:21:34.889413   69801 cmd.go:43] Error loading data connect config: could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`\n"}}
+[debug] [2026-02-12T05:21:34.892Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"dataconnect"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2026-02-12T05:21:34.892Z] Ignoring unsupported arg: port {"metadata":{"emulator":{"name":"dataconnect"},"message":"Ignoring unsupported arg: port"}}
+[debug] [2026-02-12T05:21:34.892Z] Starting Data Connect Emulator with command {"binary":"/Users/kailee/.cache/firebase/emulators/dataconnect-emulator-3.1.1","args":["--logtostderr","-v=2","dev","--listen=localhost:50001","--config_dir=/Users/kailee/code/IOU-2.0/dataconnect","--enable_output_schema_extensions=true","--enable_output_generated_sdk=true"],"optionalArgs":["listen","config_dir","enable_output_schema_extensions","enable_output_generated_sdk"],"joinArgs":true,"shell":false,"port":9399} {"metadata":{"emulator":{"name":"dataconnect"},"message":"Starting Data Connect Emulator with command {\"binary\":\"/Users/kailee/.cache/firebase/emulators/dataconnect-emulator-3.1.1\",\"args\":[\"--logtostderr\",\"-v=2\",\"dev\",\"--listen=localhost:50001\",\"--config_dir=/Users/kailee/code/IOU-2.0/dataconnect\",\"--enable_output_schema_extensions=true\",\"--enable_output_generated_sdk=true\"],\"optionalArgs\":[\"listen\",\"config_dir\",\"enable_output_schema_extensions\",\"enable_output_generated_sdk\"],\"joinArgs\":true,\"shell\":false,\"port\":9399}"}}
+[info] i  dataconnect: Data Connect Emulator logging to dataconnect-debug.log {"metadata":{"emulator":{"name":"dataconnect"},"message":"Data Connect Emulator logging to dataconnect-debug.log"}}
+[debug] [2026-02-12T05:21:34.931Z] E0211 23:21:34.929023   69808 dev.go:83] Failed to load initial config from "/Users/kailee/code/IOU-2.0/dataconnect": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"E0211 23:21:34.929023   69808 dev.go:83] Failed to load initial config from \"/Users/kailee/code/IOU-2.0/dataconnect\": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`\n"}}
+[debug] [2026-02-12T05:21:34.933Z] E0211 23:21:34.932182   69808 watch.go:116] watchAllDir unable to walk dir `/Users/kailee/code/IOU-2.0/dataconnect`: lstat /Users/kailee/code/IOU-2.0/dataconnect: no such file or directory
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"E0211 23:21:34.932182   69808 watch.go:116] watchAllDir unable to walk dir `/Users/kailee/code/IOU-2.0/dataconnect`: lstat /Users/kailee/code/IOU-2.0/dataconnect: no such file or directory\n"}}
+[debug] [2026-02-12T05:21:34.934Z] I0211 23:21:34.934633   69808 dev.go:104] Listening on address (HTTP + gRPC): 127.0.0.1:50001
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"I0211 23:21:34.934633   69808 dev.go:104] Listening on address (HTTP + gRPC): 127.0.0.1:50001\n"}}
+[debug] [2026-02-12T05:21:34.981Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-02-12T05:21:34.982Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-02-12T05:21:34.995Z] [Firebase Plugin] User found:  kaikualexander@gmail.com
+[info] [Firebase Plugin] (Core:Project) New user detected, fetching projects
+[debug] [2026-02-12T05:21:34.995Z] Checked if tokens are valid: true, expires at: 1770877293982
+[debug] [2026-02-12T05:21:34.996Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=1000
+[error] [Firebase Plugin] error:  {}
+[debug] [2026-02-12T05:21:35.385Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
+[debug] [2026-02-12T05:21:35.385Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]
+[debug] [2026-02-12T05:21:44.935Z] E0211 23:21:44.935250   69808 watch.go:40] Failed to load config from "/Users/kailee/code/IOU-2.0/dataconnect": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"E0211 23:21:44.935250   69808 watch.go:40] Failed to load config from \"/Users/kailee/code/IOU-2.0/dataconnect\": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`\n"}}
+[debug] [2026-02-12T05:21:54.933Z] E0211 23:21:54.933649   69808 watch.go:40] Failed to load config from "/Users/kailee/code/IOU-2.0/dataconnect": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`
+ {"metadata":{"emulator":{"name":"dataconnect"},"message":"E0211 23:21:54.933649   69808 watch.go:40] Failed to load config from \"/Users/kailee/code/IOU-2.0/dataconnect\": could not find dataconnect.yaml in `/Users/kailee/code/IOU-2.0/dataconnect`\n"}}
