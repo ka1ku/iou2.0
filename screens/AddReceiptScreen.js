@@ -50,6 +50,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   const currentUserId = getCurrentUser()?.uid || null;
   const scrollRef = useRef(null);
   const isFocused = useIsFocused();
+  const lastPayerToggleAtRef = useRef(0);
 
   const { state, actions, total } = useExpense();
 
@@ -216,6 +217,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
       // Update local state immediately for responsive UI
       actions.setSelectedPayers([participantIndex]);
+      lastPayerToggleAtRef.current = Date.now();
 
       // Update Firestore - snapshot listener will confirm for other users
       await updateExpense(expense.id, {
@@ -392,6 +394,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     state,
     actions,
     skipSync: !!savingItemId,
+    lastPayerToggleAtRef,
   });
 
   useEffect(() => {

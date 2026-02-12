@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
  * @param {object} opts.state - Current expense state (items, participants, etc.)
  * @param {object} opts.actions - Expense context actions
  * @param {boolean} opts.skipSync - When true, skip Firestore sync (e.g. during save)
+ * @param {React.MutableRefObject<number>} opts.lastPayerToggleAtRef - Ref with timestamp of last optimistic payer toggle; skip selectedPayers sync for 1s after to prevent flicker
  */
 export default function useExpenseInitSync({
   expense,
@@ -19,6 +20,7 @@ export default function useExpenseInitSync({
   state,
   actions,
   skipSync = false,
+  lastPayerToggleAtRef,
 }) {
   const initializedIdRef = useRef(null);
   const lastSyncedExpenseRef = useRef(null);
@@ -65,7 +67,9 @@ export default function useExpenseInitSync({
 
     // Map selectedPayers from Firestore order (expense.participants) to local order (state.participants).
     // Each user sees themselves first, so indices differ; use userId to map correctly for cross-user sync.
-    if (expense.selectedPayers && expense.participants?.length) {
+    // Skip syncing for 1s after our own payer toggle to avoid flicker from stale snapshot overwriting optimistic update.
+    const recentlyToggledPayer = lastPayerToggleAtRef?.current && (Date.now() - lastPayerToggleAtRef.current < 1000);
+    if (expense.selectedPayers && expense.participants?.length && !recentlyToggledPayer) {
       const mapped = expense.selectedPayers
         .map((firestoreIdx) => {
           const payer = expense.participants[firestoreIdx];
@@ -84,7 +88,7 @@ export default function useExpenseInitSync({
     }
 
     lastSyncedExpenseRef.current = expense;
-  }, [expense, isEditing, skipSync, state.items, state.selectedPayers, state.title, actions]);
+  }, [expense, isEditing, skipSync, state.items, state.selectedPayers, state.title, actions, lastPayerToggleAtRef]);
 
   return { initializedIdRef };
 }
