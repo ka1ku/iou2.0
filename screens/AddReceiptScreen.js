@@ -23,6 +23,7 @@ import { createExpense, updateExpense, updateExpenseParticipants, deleteItemFrom
 import { ExpenseProvider, useExpense } from '../contexts/ExpenseContext';
 import useSettlementActions from '../hooks/useSettlementActions';
 import useExpenseSnapshot from '../hooks/useExpenseSnapshot';
+import useExpenseInitSync from '../hooks/useExpenseInitSync';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import GroupMembersModal from '../components/expenses/GroupMembersModal';
 import PaidBySection from '../components/expenses/PaidBySection';
@@ -43,15 +44,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   // Use live expense if available, otherwise fall back to initial expense
   const expense = liveExpense || initialExpense;
 
-  // Debug logging
-  useEffect(() => {
-    console.log('[AddReceiptScreen] Expense updated:', {
-      hasExpense: !!expense,
-      expenseId: expense?.id,
-      feesCount: expense?.fees?.length || 0,
-      fees: expense?.fees?.map(f => ({ id: f.id, name: f.name, amount: f.amount })) || [],
-    });
-  }, [expense]);
 
   const isEditing = !!expense && !isNewExpense;
   const insets = useSafeAreaInsets();
@@ -271,6 +263,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         splits: item.splits || [],
         isExtraFee: item.isExtraFee || false, // Preserve isExtraFee flag
       })),
+      fees: [], // Receipts: fees are items with isExtraFee, not a separate array
       selectedPayers: state.selectedPayers || [0],
       join: { enabled: state.joinEnabled },
     };
@@ -383,58 +376,14 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     return true;
   };
 
-  // Ref to track which expense ID we've already initialized
-  const initializedIdRef = useRef(null);
-  const hasInitialized = useRef(false);
-
-  useEffect(() => {
-    // Tab bar hiding is handled centrally in App.js via getTabBarStyle
-    if (expense && (isEditing || isNewExpense)) {
-      // Only initialize if we haven't initialized this expense ID yet
-      if (initializedIdRef.current !== expense.id) {
-        console.log('[AddReceiptScreen] Initializing from expense:', {
-          expenseId: expense.id,
-          itemsCount: expense.items?.length || 0,
-        });
-        actions.initializeFromExpense(expense, isEditing, isNewExpense);
-        initializedIdRef.current = expense.id;
-        hasInitialized.current = true; // Mark as initialized
-      }
-    }
-  }, [expense?.id, isEditing, isNewExpense, actions]);
-
-  // Sync items, participants from Firestore when they change (prevents stale data from overwriting DB)
-  useEffect(() => {
-    if (!expense || !isEditing) return;
-
-    // Sync items
-    if (expense.items) {
-      const firestoreItemIds = new Set(expense.items.map(i => `${i.id}:${i.amount}:${i.name}`));
-      const stateItemIds = new Set(state.items.map(i => `${i.id}:${i.amount}:${i.name}`));
-      const itemsChanged =
-        firestoreItemIds.size !== stateItemIds.size ||
-        ![...firestoreItemIds].every(id => stateItemIds.has(id));
-
-      if (itemsChanged) {
-        const itemsWithPayers = expense.items.map(item => ({
-          ...item,
-          selectedPayers: item.selectedPayers || [0],
-          selectedConsumers: item.selectedConsumers || [0],
-        }));
-        actions.setItems(itemsWithPayers);
-      }
-    }
-
-    // Sync selectedPayers
-    if (expense.selectedPayers && JSON.stringify(expense.selectedPayers) !== JSON.stringify(state.selectedPayers)) {
-      actions.setSelectedPayers(expense.selectedPayers);
-    }
-
-    // Sync title
-    if (expense.title && expense.title !== state.title) {
-      actions.setTitle(expense.title);
-    }
-  }, [expense, isEditing, state.items, state.selectedPayers, state.title, actions]);
+  useExpenseInitSync({
+    expense,
+    isEditing,
+    isNewExpense,
+    state,
+    actions,
+    skipSync: !!savingItemId,
+  });
 
   useEffect(() => {
     const currentUserId = getCurrentUser()?.uid;

@@ -195,11 +195,10 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
   };
 
   const togglePayer = (participantIndex) => {
-    const newPayers = item.selectedPayers.includes(participantIndex)
-      ? item.selectedPayers.filter((i) => i !== participantIndex)
-      : [...item.selectedPayers, participantIndex];
+    // Single payer only — selecting a payer replaces the current one
+    const newPayers = [participantIndex];
     actions.updateItem(index, { selectedPayers: newPayers });
-    if (validationErrors.payers && newPayers.length > 0) {
+    if (validationErrors.payers) {
       setValidationErrors(prev => ({ ...prev, payers: false }));
     }
   };
@@ -291,7 +290,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       const expenseData = {
         title: state.title,
         items: state.items,
-        fees: state.fees,
+        fees: [],
         selectedPayers: state.selectedPayers,
         participants: state.participants,
         joinEnabled: state.joinEnabled,

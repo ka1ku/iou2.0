@@ -787,6 +787,11 @@
                         "title": "Unsettle Expense",
                         "message": "Are you sure you want to unsettle all items?",
                         "confirm": "Unsettle"
+                    },
+                    "unsettleAll": {
+                        "title": "Unsettle All Items",
+                        "message": "This will mark all items as unsettled. Are you sure?",
+                        "confirm": "Unsettle"
                     }
                 }
             }

@@ -778,6 +778,11 @@
                         "message": "¿Marcar {{amount}} como liquidado? Esto registra el pago sin usar Venmo.",
                         "cancel": "Cancelar",
                         "confirm": "Liquidar"
+                    },
+                    "unsettleAll": {
+                        "title": "Deshacer Liquidación de Todos los Ítems",
+                        "message": "Esto marcará todos los ítems como no liquidados. ¿Estás seguro?",
+                        "confirm": "Deshacer"
                     }
                 }
             }

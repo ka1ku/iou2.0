@@ -265,22 +265,10 @@ const ExpenseSettingsScreen = ({ route, navigation }) => {
             return { ...item, selectedConsumers: validSelectedConsumers, splits: validSplits };
           }).filter(Boolean) || [];
 
-      const updatedFees = expense.fees?.map((fee) => {
-            if (!fee || !fee.name) return null;
-            const validSplits = fee.splits?.filter(
-                    (split) => split.participantIndex !== currentUserIndex && split.participantIndex >= 0 && split.participantIndex < expense.participants.length
-                ).map((split) => ({
-                  ...split,
-                  participantIndex: split.participantIndex > currentUserIndex ? split.participantIndex - 1 : split.participantIndex,
-                })).filter((split) => split.participantIndex >= 0) || [];
-
-            return { ...fee, splits: validSplits };
-          }).filter(Boolean) || [];
-
       const updateData = {
         participants: updatedParticipants.filter((p) => p && p.name && p.userId),
         items: updatedItems.filter((item) => item && item.name && typeof item.amount === "number"),
-        fees: updatedFees.filter((fee) => fee && fee.name && typeof fee.amount === "number"),
+        fees: [],
       };
 
       const cleanUpdateData = JSON.parse(JSON.stringify(updateData));

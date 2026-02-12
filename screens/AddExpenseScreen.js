@@ -31,6 +31,7 @@ import GroupMembersModal from "../components/expenses/GroupMembersModal";
 import SplitTab from "../components/expenses/SplitTab";
 import useSettlementActions from "../hooks/useSettlementActions";
 import useExpenseSnapshot from "../hooks/useExpenseSnapshot";
+import useExpenseInitSync from "../hooks/useExpenseInitSync";
 import { useTranslation } from '../contexts/LanguageContext';
 
 const SPLIT_TOLERANCE = 0.01;
@@ -60,6 +61,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
   const itemLayoutMapRef = useRef({});
   const prevItemsLengthRef = useRef(state.items.length);
   const manualAddRef = useRef(false);
+  const hasAutoExpandedFirstRef = useRef(false);
+  const prevExpenseIdRef = useRef(null);
 
   const currentUserId = getCurrentUser()?.uid;
 
@@ -77,19 +80,20 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     expense,
     participants: state.participants,
     items: state.items,
-    fees: state.fees,
     total,
     title: expense?.title || state.title,
     currentUserId,
     selectedPayers: expense?.selectedPayers || state.selectedPayers,
   });
 
-  useEffect(() => {
-    // Tab bar hiding is handled centrally in App.js via getTabBarStyle
-    if (expense && (isEditing || isNewExpense)) {
-      actions.initializeFromExpense(expense, isEditing, isNewExpense);
-    }
-  }, [expense, isEditing, isNewExpense, navigation, actions]);
+  useExpenseInitSync({
+    expense,
+    isEditing,
+    isNewExpense,
+    state,
+    actions,
+    skipSync: false,
+  });
 
   useEffect(() => {
     const itemsAdded = state.items.length - prevItemsLengthRef.current;
@@ -103,14 +107,20 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     prevItemsLengthRef.current = state.items.length;
   }, [state.items.length]);
 
+  // Reset auto-expand when we switch to a different expense
   useEffect(() => {
-    if (!isEditing && state.items.length > 0) {
-      setEditingItems(prev => {
-        if (prev.size === 0) {
-          return new Set([0]);
-        }
-        return prev;
-      });
+    if (expense?.id && prevExpenseIdRef.current !== expense.id) {
+      prevExpenseIdRef.current = expense.id;
+      hasAutoExpandedFirstRef.current = false;
+    }
+  }, [expense?.id]);
+
+  // Only auto-expand first item once when we first get items (new expense flow).
+  // Don't revert to edit mode when user has intentionally collapsed items.
+  useEffect(() => {
+    if (!isEditing && state.items.length > 0 && !hasAutoExpandedFirstRef.current) {
+      hasAutoExpandedFirstRef.current = true;
+      setEditingItems(prev => (prev.size === 0 ? new Set([0]) : prev));
     }
   }, [isEditing, state.items.length]);
 
@@ -186,13 +196,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         selectedPayers: item.selectedPayers || [0],
         splits: item.splits || [],
       })),
-      fees: state.fees.map((fee) => ({
-        id: fee.id,
-        name: fee.name.trim(),
-        amount: parseFloat(fee.amount) || 0,
-        type: fee.type || "fixed",
-        splits: fee.splits || [],
-      })),
+      fees: [], // Manual expenses: use items only (add fee-type items with isExtraFee if needed)
       selectedPayers: state.selectedPayers || [0],
       join: { enabled: state.joinEnabled },
     };
@@ -216,10 +220,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         t('common.error'),
         t('addExpense.validationError')
       );
-      return false;
-    }
-    if (state.fees.some((fee) => !fee.name.trim())) {
-      Alert.alert(t('common.error'), t('addExpense.validation.feeNames'));
       return false;
     }
     if (!state.selectedPayers?.length) {
@@ -421,7 +421,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
               title: state.title,
               participants: state.participants,
               items: state.items,
-              fees: state.fees,
               createdBy: currentUserId,
               join: { enabled: state.joinEnabled },
             },

@@ -356,8 +356,9 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
               styles.assocAmount,
               isSettled && styles.assocAmountSettled,
               !isSettled && !isSelected && selectedItemIds && !isReceiptMode && styles.assocAmountDeselected,
+              item.isOffset && styles.assocAmountOffset,
             ]}>
-              ${item.amount.toFixed(2)}
+              {item.amount >= 0 ? `$${item.amount.toFixed(2)}` : `−$${Math.abs(item.amount).toFixed(2)}`}
             </Text>
           </TouchableOpacity>
         );
@@ -477,6 +478,9 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
   /* ── action button ─────────────────────────────────────────────────── */
   const hasItems = (settlement.associatedItems || []).length > 0;
   const noSelection = hasItems && selectedItemIds.size === 0;
+  const displayAmount = status === 'partial' ? (settlement.remainingAmount ?? settlement.amount) : settlement.amount;
+  const isFlipped = displayAmount < 0;
+  const absAmount = hasItems ? Math.abs(selectedAmount) : Math.abs(settlement.amount);
 
   const actionBtn = () => {
     if (readOnly) return null;
@@ -504,7 +508,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     }
 
     const confirmMarkSettled = () => {
-      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      const amt = `$${absAmount.toFixed(2)}`;
       Alert.alert(
         t('components.expenses.settlementInterface.alerts.markSettled.title'),
         t('components.expenses.settlementInterface.alerts.markSettled.message', { amount: amt }),
@@ -515,13 +519,16 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
       );
     };
 
+    // When flipped (negative amount), debtor is owed → shows Request; creditor owes → shows Pay
     if (isDebtor) {
       if (noSelection)
         return btn(t('components.expenses.settlementInterface.actions.selectToSettle'), 'checkbox-outline', 'disabled');
-      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      const amt = `$${absAmount.toFixed(2)}`;
       return (
         <View style={styles.actionBtnGroup}>
-          {btn(t('components.expenses.settlementInterface.actions.pay', { amount: amt }), 'logo-venmo', 'venmo', () => fire('makePayment'))}
+          {isFlipped
+            ? btn(t('components.expenses.settlementInterface.actions.request', { amount: amt }), 'logo-venmo', 'venmo', () => fire('requestPayment'))
+            : btn(t('components.expenses.settlementInterface.actions.pay', { amount: amt }), 'logo-venmo', 'venmo', () => fire('makePayment'))}
           {onBulkSettle && btn(t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }), 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
         </View>
       );
@@ -529,10 +536,12 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     if (isCreditor) {
       if (noSelection)
         return btn(t('components.expenses.settlementInterface.actions.selectToSettle'), 'checkbox-outline', 'disabled');
-      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      const amt = `$${absAmount.toFixed(2)}`;
       return (
         <View style={styles.actionBtnGroup}>
-          {btn(t('components.expenses.settlementInterface.actions.request', { amount: amt }), 'logo-venmo', 'venmo', () => fire('requestPayment'))}
+          {isFlipped
+            ? btn(t('components.expenses.settlementInterface.actions.pay', { amount: amt }), 'logo-venmo', 'venmo', () => fire('makePayment'))
+            : btn(t('components.expenses.settlementInterface.actions.request', { amount: amt }), 'logo-venmo', 'venmo', () => fire('requestPayment'))}
           {onBulkSettle && btn(t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }), 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
         </View>
       );
@@ -618,35 +627,47 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               </View>
             </View>
 
-            {/* Who owes who label */}
-            <View style={styles.oweLabel}>
-              {isDebtor && (
-                <Text style={styles.oweLabelText}>
-                  {t('components.expenses.settlementInterface.relationships.youOwe', { name: toName?.split(' ')[0] })}
-                </Text>
-              )}
-              {isCreditor && (
-                <Text style={styles.oweLabelText}>
-                  {t('components.expenses.settlementInterface.relationships.owesYou', { name: fromName?.split(' ')[0] })}
-                </Text>
-              )}
-              {isSpectator && (
-                <Text style={styles.oweLabelText}>
-                  {t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
-                </Text>
-              )}
-            </View>
+            {/* Who owes who label — when remainingAmount is negative, direction flips (you're owed / you owe) */}
+            {(() => {
+              const displayAmount = status === 'partial' ? (settlement.remainingAmount ?? settlement.amount) : settlement.amount;
+              const isFlipped = displayAmount < 0;
+              return (
+                <View style={styles.oweLabel}>
+                  {isDebtor && (
+                    <Text style={styles.oweLabelText}>
+                      {isFlipped
+                        ? t('components.expenses.settlementInterface.relationships.owesYou', { name: toName?.split(' ')[0] })
+                        : t('components.expenses.settlementInterface.relationships.youOwe', { name: toName?.split(' ')[0] })}
+                    </Text>
+                  )}
+                  {isCreditor && (
+                    <Text style={styles.oweLabelText}>
+                      {isFlipped
+                        ? t('components.expenses.settlementInterface.relationships.youOwe', { name: fromName?.split(' ')[0] })
+                        : t('components.expenses.settlementInterface.relationships.owesYou', { name: fromName?.split(' ')[0] })}
+                    </Text>
+                  )}
+                  {isSpectator && (
+                    <Text style={styles.oweLabelText}>
+                      {isFlipped
+                        ? t('components.expenses.settlementInterface.relationships.owes', { name: toName?.split(' ')[0], name2: fromName?.split(' ')[0] })
+                        : t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
 
-            {/* Amount */}
+            {/* Amount — use abs when negative (direction shown in label above) */}
             <View style={styles.amtRow}>
               <Text style={[styles.dollar, isSettled && styles.faded]}>$</Text>
               <View style={{ alignItems: 'center' }}>
                 <Text style={[styles.amt, isSettled && styles.amtStruck]}>
-                  {(status === 'partial' ? (settlement.remainingAmount || settlement.amount) : settlement.amount).toFixed(2)}
+                  {Math.abs(status === 'partial' ? (settlement.remainingAmount ?? settlement.amount) : settlement.amount).toFixed(2)}
                 </Text>
                 {status === 'partial' && (
                   <Text style={styles.totalText}>
-                    {t('components.expenses.settlementInterface.total', { amount: settlement.amount.toFixed(2) })}
+                    {t('components.expenses.settlementInterface.total', { amount: Math.abs(settlement.amount).toFixed(2) })}
                   </Text>
                 )}
               </View>
@@ -700,14 +721,18 @@ const SettlementInterface = ({
   const current = participants.find((p) => p.userId === currentUserId) || {};
   const name = current.name || '';
 
-  // Filter settlements to only show those involving the current user
+  // Filter settlements to only show those involving the current user.
+  // Use userId for reliable matching (works regardless of name/display); fallback to name for old data.
   const userSettlements = useMemo(() => {
     return settlements.filter(s => {
+      if (s.debtorUserId || s.creditorUserId) {
+        return s.debtorUserId === currentUserId || s.creditorUserId === currentUserId;
+      }
       const debtor = s.debtor || s.from;
       const creditor = s.creditor || s.to;
       return debtor === name || creditor === name;
     });
-  }, [settlements, name]);
+  }, [settlements, name, currentUserId]);
 
   if (!userSettlements.length && !readOnly) {
     return (
@@ -829,6 +854,7 @@ const styles = StyleSheet.create({
   assocNameSettled: { textDecorationLine: 'line-through', color: Colors.textSecondary },
   assocAmount: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginLeft: Spacing.sm },
   assocAmountSettled: { textDecorationLine: 'line-through', opacity: 0.6 },
+  assocAmountOffset: { color: Colors.success },
   assocNameDeselected: { opacity: 0.5 },
   assocAmountDeselected: { opacity: 0.5 },
 

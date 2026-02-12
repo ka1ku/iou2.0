@@ -15,7 +15,7 @@ import {
 import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { getApp } from '@react-native-firebase/app';
 import { Linking, Platform } from 'react-native';
-import { calculateSettlementWithPartialSettlements, calculateSettlement } from '../utils/settlementCalculator';
+import { recomputeSettlementsForSave } from '../utils/settlementCalculator';
 import { getUserProfile } from './friendService';
 import { arrayUnion } from '@react-native-firebase/firestore';
 
@@ -118,8 +118,8 @@ export const updateExpense = async (expenseId, updateData, userId) => {
           const currentExpense = { id: expenseSnap.id, ...expenseSnap.data() };
           const existingSettlements = currentExpense.settlements || [];
 
-          // Only recalculate if settlements already exist AND we're not explicitly setting them
-          if (shouldRecalculateSettlements && existingSettlements.length > 0) {
+          // Recalculate whenever items/participants/fees change (handles direction flips, new items, etc.)
+          if (shouldRecalculateSettlements) {
             // Merge the update data with current expense data to get the complete expense
             const updatedExpense = {
               ...currentExpense,
@@ -130,75 +130,31 @@ export const updateExpense = async (expenseId, updateData, userId) => {
               fees: updateData.fees !== undefined ? updateData.fees : currentExpense.fees,
             };
 
-            // Recalculate settlements preserving paid ones
-            const settlementResult = calculateSettlementWithPartialSettlements(
+            // Recompute settlements from items, preserving Firestore settled state (handles direction flips)
+            const recalculatedSettlements = recomputeSettlementsForSave(
               updatedExpense,
               existingSettlements
-            );
-
-            // Format settlements for Firestore (use debtor/creditor format)
-            // The calculateSettlementWithPartialSettlements function preserves settlements where
-            // money has been transferred (status !== 'noAction') and marks them with preserved: true
-            const recalculatedSettlements = settlementResult.settlements.map(s => {
-              // If this settlement was preserved (money already transferred), keep it fixed
-              // Preserved settlements maintain their original amount and status because money was already transferred
-              if (s.preserved === true) {
-                // Find the original settlement to preserve all its metadata exactly
-                const originalSettlement = existingSettlements.find(existing => {
-                  const existingFrom = existing.debtor || existing.from;
-                  const existingTo = existing.creditor || existing.to;
-                  const existingAmount = existing.amount;
-                  const settlementFrom = s.from || s.debtor;
-                  const settlementTo = s.to || s.creditor;
-                  const settlementAmount = s.amount;
-
-                  // Round amounts for comparison
-                  const roundedExisting = Math.round(existingAmount * 100) / 100;
-                  const roundedSettlement = Math.round(settlementAmount * 100) / 100;
-
-                  return existingFrom === settlementFrom &&
-                    existingTo === settlementTo &&
-                    roundedExisting === roundedSettlement;
-                });
-
-                // Use original settlement data exactly as it was (money already transferred)
-                // This preserves the original amount, status (markedAsPaid, paymentMade, paymentRequested), and metadata
-                if (originalSettlement) {
-                  return {
-                    debtor: originalSettlement.debtor || originalSettlement.from,
-                    creditor: originalSettlement.creditor || originalSettlement.to,
-                    amount: originalSettlement.amount, // Keep original amount - money already transferred
-                    status: originalSettlement.status, // Preserve status (markedAsPaid, paymentMade, paymentRequested, etc.)
-                    updatedAt: originalSettlement.updatedAt || new Date().toISOString(),
-                    associatedItems: originalSettlement.associatedItems || [],
-                  };
-                } else {
-                  // Fallback if original not found (shouldn't happen, but safety net)
-                  // Use the preserved settlement data from the calculator
-                  return {
-                    debtor: s.from,
-                    creditor: s.to,
-                    amount: s.amount, // Preserved amount from calculator
-                    status: s.status, // Should be markedAsPaid, paymentMade, paymentRequested, etc.
-                    updatedAt: new Date().toISOString(),
-                    associatedItems: [],
-                  };
-                }
-              } else {
-                // This is a new settlement (no money transferred yet)
-                // Generated based on adjusted balances after accounting for transferred settlements
-                return {
-                  debtor: s.from,
-                  creditor: s.to,
-                  amount: s.amount,
-                  status: 'noAction', // New settlements start with noAction
-                  updatedAt: new Date().toISOString(),
-                  associatedItems: s.associatedItems || [],
-                };
-              }
+            ).map((s) => {
+              const pairKey = (a, b) => `${a}|||${b}`;
+              const original = existingSettlements.find(
+                (ex) =>
+                  pairKey(ex.debtor || ex.from, ex.creditor || ex.to) === pairKey(s.debtor || s.from, s.creditor || s.to) ||
+                  pairKey(ex.debtor || ex.from, ex.creditor || ex.to) === pairKey(s.creditor || s.to, s.debtor || s.from)
+              );
+              return {
+                debtor: s.debtor || s.from,
+                creditor: s.creditor || s.to,
+                debtorUserId: s.debtorUserId,
+                creditorUserId: s.creditorUserId,
+                amount: s.amount,
+                status: s.status,
+                updatedAt: original?.updatedAt || new Date().toISOString(),
+                associatedItems: s.associatedItems || [],
+                settledAmount: s.settledAmount,
+                remainingAmount: s.remainingAmount,
+              };
             });
 
-            // Add recalculated settlements to update data
             finalUpdateData.settlements = recalculatedSettlements;
           }
 

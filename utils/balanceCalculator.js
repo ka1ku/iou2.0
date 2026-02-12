@@ -13,11 +13,8 @@ export const calculateUserBalanceForExpense = (expense, userId) => {
   }
 
   const items = expense.items || [];
-  const fees = expense.fees || [];
-  
-  // Calculate balances using the centralized logic
-  // Pass 0 for total since it's not currently used in the calculation logic
-  const allBalances = calculateParticipantBalances(expense, participants, items, fees, 0);
+  const total = items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
+  const allBalances = calculateParticipantBalances(expense, participants, items, total);
   
   const userBalance = allBalances[currentUserIndex];
   
@@ -99,14 +96,6 @@ export const getBalanceColor = (balance, colors) => {
 
 export const calculateExpenseTotal = (expense) => {
   if (!expense) return 0;
-  
-  const itemsTotal = (expense.items || []).reduce((sum, item) => {
-    return sum + (parseFloat(item.amount) || 0);
-  }, 0);
-  
-  const feesTotal = (expense.fees || []).reduce((sum, fee) => {
-    return sum + (parseFloat(fee.amount) || 0);
-  }, 0);
-  
-  return Math.round((itemsTotal + feesTotal) * 100) / 100;
+  const items = expense.items || [];
+  return Math.round(items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0) * 100) / 100;
 };

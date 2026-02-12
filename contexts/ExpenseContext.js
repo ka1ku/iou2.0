@@ -224,13 +224,16 @@ const expenseReducer = (state, action) => {
           selectedConsumers: item.selectedConsumers || [0],
         })) || state.items;
 
+      // Fees are items with isExtraFee, not a separate array. Don't load old fees.
+      const feesToUse = [];
+
       return {
         ...state,
         selectedFriends: existingFriends,
         participants: newParticipants,
         title: expense.title || '',
         joinEnabled: expense.join?.enabled ?? true,
-        fees: expense.fees || [],
+        fees: feesToUse,
         items: itemsWithPayers,
         selectedPayers: expense.selectedPayers || [0],
       };
