@@ -64,7 +64,6 @@ export const getCurrentUserReferralLink = async (userId) => {
             tier2: { unlocked: false, unlockedAt: null }
           }
         });
-        console.log('Generated referral code for legacy user:', referralCode);
       } catch (updateError) {
         console.error('Error updating user with referral code:', updateError);
       }
@@ -175,11 +174,7 @@ export const parseReferralCode = (url) => {
  */
 export const trackReferralConversion = async (referrerId, referredUserId) => {
   try {
-    // This will be handled by Cloud Function, but we can add client-side logging
-    console.log('Referral conversion tracked:', {
-      referrer: referrerId,
-      referred: referredUserId
-    });
+    // Handled by Cloud Function
   } catch (error) {
     console.error('Error tracking referral conversion:', error);
   }

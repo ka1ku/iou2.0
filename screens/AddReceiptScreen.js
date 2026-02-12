@@ -82,20 +82,19 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     selectedPayers: expense?.selectedPayers || state.selectedPayers,
   });
 
-  // Wrap settlement actions with validation
+  // Wrap settlement actions with validation (all items must be assigned before settling)
   const handleSettlementActionWithValidation = useCallback(async (type, settlement, customAmount) => {
-    // Only validate for settlement actions (markAsPaid, etc.), not for undo actions
     const SETTLEMENT_ACTIONS = ['markAsPaid', 'makePayment', 'requestPayment'];
-
-    if (SETTLEMENT_ACTIONS.includes(type)) {
-      if (!validateForSettlement()) {
-        return; // Validation failed, don't proceed
-      }
-    }
-
-    // Validation passed or it's an undo action, proceed with the action
+    if (SETTLEMENT_ACTIONS.includes(type) && !validateForSettlement()) return;
     return handleSettlementAction(type, settlement, customAmount);
   }, [handleSettlementAction, validateForSettlement]);
+
+  // Wrap bulk action with validation (markAsSettled, makePayment, requestPayment)
+  const handleBulkActionWithValidation = useCallback(async (type, settlement, selectedItemIds) => {
+    const SETTLEMENT_ACTIONS = ['markAsSettled', 'makePayment', 'requestPayment'];
+    if (SETTLEMENT_ACTIONS.includes(type) && !validateForSettlement()) return;
+    return handleBulkAction(type, settlement, selectedItemIds);
+  }, [handleBulkAction, validateForSettlement]);
 
   // Calculate totals
   const { itemsSubtotal, fees, calculatedTotal } = useMemo(() => {
@@ -205,10 +204,20 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       const currentUser = getCurrentUser();
       if (!currentUser) throw new Error('Not authenticated');
 
-      // Single selection only - always set to the clicked participant
-      const newPayers = [participantIndex];
+      // Map local participant index to Firestore participants order.
+      // Each user sees themselves first (index 0), so we must save indices in expense.participants order for cross-user sync.
+      const localParticipant = state.participants[participantIndex];
+      const payerUserId = localParticipant?.userId;
+      const expenseParticipants = expense?.participants || [];
+      const firestoreIdx = payerUserId != null
+        ? expenseParticipants.findIndex((p) => p.userId === payerUserId)
+        : participantIndex;
+      const newPayers = [firestoreIdx >= 0 ? firestoreIdx : participantIndex];
 
-      // Update Firestore directly - snapshot listener will update UI
+      // Update local state immediately for responsive UI
+      actions.setSelectedPayers([participantIndex]);
+
+      // Update Firestore - snapshot listener will confirm for other users
       await updateExpense(expense.id, {
         selectedPayers: newPayers,
       }, currentUser.uid);
@@ -219,7 +228,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       console.error('Failed to toggle payer:', error);
       Alert.alert('Error', 'Failed to update payer. Please try again.');
     }
-  }, [expense?.id]);
+  }, [expense?.id, expense?.participants, state.participants, actions]);
 
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
@@ -476,25 +485,10 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   // Check if ANYTHING is settled - if so, lock EVERYTHING
   const isSettled = useMemo(() => {
-    const hasSettled = settlements.some(s =>
+    return settlements.some(s =>
       ['markedAsPaid', 'confirmed', 'complete', 'partial'].includes(s.status) ||
       (s.settledAmount && s.settledAmount > 0)
     );
-
-    // Enhanced debug logging
-    console.log('[AddReceiptScreen] isSettled check:', {
-      settlementsCount: settlements.length,
-      settlements: settlements.map(s => ({
-        from: s.from,
-        to: s.to,
-        status: s.status,
-        settledAmount: s.settledAmount,
-        amount: s.amount,
-      })),
-      hasSettled,
-    });
-
-    return hasSettled;
   }, [settlements]);
 
   return (
@@ -664,7 +658,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                 handleAction={handleSettlementActionWithValidation}
                 handleItemToggle={handleItemToggle}
                 handleBulkSettle={handleBulkSettle}
-                handleBulkAction={handleBulkAction}
+                handleBulkAction={handleBulkActionWithValidation}
                 changeLog={expense?.changeLog}
                 recalculationInfo={recalculationInfo}
                 onDismissRecalculation={() => setRecalculationInfo(null)}

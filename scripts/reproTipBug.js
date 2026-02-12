@@ -75,35 +75,18 @@ let expenseData = {
     selectedPayers: [0] // Alice paid for fees
 };
 
-console.log('--- 1. Calculating Spltis ---');
 const props = calculateParticipantProportionsFromConsumption(items, participants);
 expenseData = applyProportionalFeeSplits(expenseData, props);
 
-console.log('Fees after split calculation:');
-expenseData.fees.forEach(f => {
-    console.log(`- ${f.name}:`, JSON.stringify(f.splits));
-});
-
-console.log('\n--- 2. Calculating Settlement ---');
+// Calculating Settlement
 // Bob owes Alice for Item 2 + His share of Tax + His share of Tip
 const result = calculateSettlement(expenseData);
 const settlement = result.settlements.find(s => s.from === 'Bob' && s.to === 'Alice');
 
 if (settlement) {
-    console.log(`Settlement found: ${settlement.amount}`);
-    console.log('Associated Items:');
-    settlement.associatedItems.forEach(i => {
-        console.log(`- ${i.name}: ${i.amount}`);
-    });
-
     const hasTax = settlement.associatedItems.some(i => i.name === 'Tax');
     const hasTip = settlement.associatedItems.some(i => i.name === 'Tip');
-
-    if (hasTax && hasTip) {
-        console.log('\nSUCCESS: Both Tax and Tip are present.');
-    } else {
-        console.log(`\nFAILURE: Missing items. Tax: ${hasTax}, Tip: ${hasTip}`);
-    }
+    // Validation: hasTax && hasTip
 } else {
-    console.log('No settlement found.');
+    // No settlement found
 }

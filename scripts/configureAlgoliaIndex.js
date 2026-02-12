@@ -17,8 +17,6 @@ const client = algoliasearch(ALGOLIA_APP_ID, ALGOLIA_ADMIN_KEY);
 
 async function configureExpensesIndex() {
   try {
-    console.log('Configuring expenses index...');
-
     // Algolia v5 API - set index settings
     const settings = {
       // Searchable attributes - what fields to search in
@@ -66,9 +64,6 @@ async function configureExpensesIndex() {
       indexSettings: settings,
     });
 
-    console.log('✅ Successfully configured expenses index!');
-    console.log('Settings applied:', JSON.stringify(settings, null, 2));
-
   } catch (error) {
     console.error('❌ Error configuring index:', error);
     console.error('Error details:', error.message);
@@ -78,8 +73,6 @@ async function configureExpensesIndex() {
 
 async function configureUsersIndex() {
   try {
-    console.log('\nConfiguring users index...');
-
     // Algolia v5 API - set index settings for users
     const settings = {
       // Searchable attributes - what fields to search in
@@ -115,9 +108,6 @@ async function configureUsersIndex() {
       indexSettings: settings,
     });
 
-    console.log('✅ Successfully configured users index!');
-    console.log('Settings applied:', JSON.stringify(settings, null, 2));
-
   } catch (error) {
     console.error('❌ Error configuring users index:', error);
     console.error('Error details:', error.message);
@@ -133,9 +123,6 @@ async function configureAllIndexes() {
 
 configureAllIndexes()
   .then(() => {
-    console.log('\n✅ All indexes configured successfully!');
-    console.log('- Expenses: search by title, participant names/usernames, item names');
-    console.log('- Users: search by name, username, venmo username');
     process.exit(0);
   })
   .catch((error) => {

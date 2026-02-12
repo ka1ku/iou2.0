@@ -160,7 +160,7 @@ export const getSubscriptionStatus = async () => {
         remainingScans = Math.max(0, SCAN_LIMIT_PER_WEEK - count);
       }
     } catch (e) {
-      console.log('Error fetching stats for status', e);
+      // Error fetching stats for status
     }
 
     const isActive = customerInfo.entitlements.active[ENTITLEMENTS.RECEIPT_SCANNING] !== undefined || isInvitePremium;

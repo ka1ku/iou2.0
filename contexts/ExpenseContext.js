@@ -217,6 +217,18 @@ const expenseReducer = (state, action) => {
         })),
       ];
 
+      // Map selectedPayers from Firestore order (expense.participants) to local order (newParticipants).
+      // Each user sees themselves first, so indices differ; use userId to map correctly for cross-user sync.
+      const firestorePayers = expense.selectedPayers || [0];
+      const selectedPayersMapped = firestorePayers
+        .map((firestoreIdx) => {
+          const payer = expense.participants?.[firestoreIdx];
+          if (!payer?.userId) return firestoreIdx; // fallback for legacy
+          const localIdx = newParticipants.findIndex((p) => p.userId === payer.userId);
+          return localIdx >= 0 ? localIdx : -1;
+        })
+        .filter((i) => i >= 0);
+
       const itemsWithPayers =
         expense.items?.map((item) => ({
           ...item,
@@ -235,7 +247,7 @@ const expenseReducer = (state, action) => {
         joinEnabled: expense.join?.enabled ?? true,
         fees: feesToUse,
         items: itemsWithPayers,
-        selectedPayers: expense.selectedPayers || [0],
+        selectedPayers: selectedPayersMapped.length > 0 ? selectedPayersMapped : [0],
       };
 
     default:

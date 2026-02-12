@@ -18,26 +18,13 @@ const PaidBySection = ({ disabled = false, onTogglePayer }) => {
   const { participants, selectedPayers, items } = state;
 
   const togglePayer = async (participantIndex) => {
-    if (disabled) {
-      console.log('[PaidBySection] Toggle blocked - disabled is true');
-      return;
-    }
+    if (disabled) return;
 
     // Just call the callback - parent handles all logic
     if (onTogglePayer) {
       await onTogglePayer(participantIndex);
     }
   };
-
-  // Debug logging on render
-  React.useEffect(() => {
-    console.log('[PaidBySection] Render state:', {
-      disabled,
-      participantsCount: participants.length,
-      selectedPayers,
-      itemsCount: items.length,
-    });
-  }, [disabled, participants.length, selectedPayers, items.length]);
 
   return (
     <View style={[styles.paidByContainer, disabled && styles.disabledContainer]}>

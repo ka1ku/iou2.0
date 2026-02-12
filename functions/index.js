@@ -1273,7 +1273,6 @@ exports.onNewUserSignup = functions.firestore
     try {
       // Check if user was referred
       if (!newUser.referredBy || !newUser.referredBy.userId) {
-        console.log('User was not referred, skipping referral tracking');
         return null;
       }
 
@@ -1317,7 +1316,6 @@ exports.onNewUserSignup = functions.firestore
       // Check and grant tier rewards
       await checkAndGrantRewards(referrerRef, referrerData, friendsJoined);
 
-      console.log(`Referral conversion tracked: ${newUserId} referred by ${referrerId}`);
       return null;
     } catch (error) {
       console.error('Error tracking referral conversion:', error);
@@ -1357,8 +1355,6 @@ async function checkAndGrantRewards(referrerRef, referrerData, friendsJoined) {
     updates['inviteStats.premiumUnlocked'] = true;
 
     currentPremiumUntil = newPremiumUntil;
-
-    console.log(`Tier 1 reward granted to ${referrerRef.id}: 1 month premium`);
   }
 
   // Tier 2: 5 referrals = additional 2 months (total 3 months)
@@ -1374,8 +1370,6 @@ async function checkAndGrantRewards(referrerRef, referrerData, friendsJoined) {
 
     updates['inviteStats.premiumUntil'] = admin.firestore.Timestamp.fromDate(newPremiumUntil);
     updates['inviteStats.premiumUnlocked'] = true;
-
-    console.log(`Tier 2 reward granted to ${referrerRef.id}: additional 2 months premium`);
   }
 
   // Apply updates if any rewards were granted

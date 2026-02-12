@@ -340,13 +340,12 @@ export const createUserProfile = async (userData, phoneNumber) => {
         try {
           cleanUserData.profilePhoto = await downloadAndUploadImage(contactPhotoUri, user.uid);
           profilePhotoSet = true;
-          console.log('Using Apple contact photo as profile picture');
         } catch (uploadError) {
-          console.log('Failed to upload contact photo, falling back to Venmo or avatar');
+          // Fall back to Venmo or avatar
         }
       }
     } catch (contactError) {
-      console.log('Could not get contact photo, falling back to Venmo or avatar');
+      // Fall back to Venmo or avatar
     }
 
     // 2. If no contact photo, try Venmo profile pic
@@ -360,7 +359,6 @@ export const createUserProfile = async (userData, phoneNumber) => {
           try {
             cleanUserData.profilePhoto = await downloadAndUploadImage(userData.venmoProfilePic.trim(), user.uid);
             profilePhotoSet = true;
-            console.log('Using Venmo profile photo');
           } catch (uploadError) {
             // If upload fails, fallback to the original Venmo URL
             cleanUserData.profilePhoto = userData.venmoProfilePic.trim();
@@ -368,14 +366,13 @@ export const createUserProfile = async (userData, phoneNumber) => {
           }
         }
       } catch (urlError) {
-        console.log('Failed to process Venmo photo');
+        // Failed to process Venmo photo
       }
     }
 
     // 3. If neither contact photo nor Venmo photo, use generated avatar
     if (!profilePhotoSet) {
       cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
-      console.log('Using generated avatar');
     }
 
     // Generate referral code for new user

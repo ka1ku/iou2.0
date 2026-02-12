@@ -28,7 +28,6 @@ export const initializeRevenueCat = async (userId = null) => {
     // Test connection to verify configuration
     await testRevenueCatConnection();
 
-    console.log('[RevenueCat] Initialized successfully');
     return true;
   } catch (error) {
     console.error('[RevenueCat] Initialization failed:', error);

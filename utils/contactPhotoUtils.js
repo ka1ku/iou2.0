@@ -12,7 +12,6 @@ export const getUserContactPhoto = async (phoneNumber) => {
     if (status !== 'granted') {
       const { status: newStatus } = await Contacts.requestPermissionsAsync();
       if (newStatus !== 'granted') {
-        console.log('Contact permissions not granted');
         return null;
       }
     }
@@ -30,7 +29,6 @@ export const getUserContactPhoto = async (phoneNumber) => {
     });
 
     if (!data || data.length === 0) {
-      console.log('No contacts found on device');
       return null;
     }
 
@@ -51,31 +49,26 @@ export const getUserContactPhoto = async (phoneNumber) => {
         if (userLast10 === contactLast10) {
           // Found matching contact - check if they have an image
           if (contact.image && contact.image.uri) {
-            console.log('Found user contact photo:', contact.name);
             return contact.image.uri;
           } else if (contact.imageAvailable) {
-            console.log('Contact has image but URI not available:', contact.name);
             // Try to get the full contact with image
             try {
               const fullContact = await Contacts.getContactByIdAsync(contact.id, [
                 Contacts.Fields.Image
               ]);
               if (fullContact && fullContact.image && fullContact.image.uri) {
-                console.log('Retrieved full contact photo');
                 return fullContact.image.uri;
               }
             } catch (err) {
-              console.log('Error getting full contact:', err);
+              // Error getting full contact
             }
           }
 
-          console.log('Contact found but no image available');
           return null;
         }
       }
     }
 
-    console.log('No matching contact found for phone number');
     return null;
 
   } catch (error) {
@@ -95,7 +88,6 @@ export const getContactPhotoForProfile = async (phoneNumber) => {
     const photoUri = await getUserContactPhoto(phoneNumber);
 
     if (photoUri) {
-      console.log('Successfully retrieved contact photo for profile');
       return photoUri;
     }
 
