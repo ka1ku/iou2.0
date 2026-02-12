@@ -395,40 +395,7 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                 });
               }
 
-              // Detect participant changes
-              if (updateData.participants !== undefined) {
-                const oldParticipants = currentExpense.participants || [];
-                const newParticipants = updateData.participants;
-                const oldUserIds = new Set(oldParticipants.map(p => p.userId).filter(Boolean));
-                const newUserIds = new Set(newParticipants.map(p => p.userId).filter(Boolean));
-                const addedParticipants = newParticipants.filter(p => p.userId && !oldUserIds.has(p.userId));
-                const removedParticipants = oldParticipants.filter(p => p.userId && !newUserIds.has(p.userId));
-
-                let userName = null;
-                // Reuse actorName if possible, but keep local logic if strictly needed. 
-                // Actually we can just use actorName.
-                userName = actorName;
-
-                addedParticipants.forEach(p => {
-                  changeLogEntries.push({
-                    type: 'participantAdded',
-                    userId: userId || null,
-                    userName: userName || 'Someone',
-                    timestamp: new Date().toISOString(),
-                    details: { participantName: p.name || 'Unknown' },
-                  });
-                });
-
-                removedParticipants.forEach(p => {
-                  changeLogEntries.push({
-                    type: 'participantRemoved',
-                    userId: userId || null,
-                    userName: userName || 'Someone',
-                    timestamp: new Date().toISOString(),
-                    details: { participantName: p.name || 'Unknown' },
-                  });
-                });
-              }
+              // Participant add/remove does not add to activity (per product requirement)
 
               // Append change log entries using arrayUnion
               if (changeLogEntries.length > 0) {
