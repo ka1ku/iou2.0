@@ -234,7 +234,7 @@ body {
     align-items: center;
 }
 
-/* Frame sized to match animation.mov aspect ratio (1170×2532) */
+/* Frame sized to match animation.mp4 aspect ratio (1170×2532) */
 .iphone-mockup {
     --iphone-bezel: 10px;
     --iphone-radius: 44px;
