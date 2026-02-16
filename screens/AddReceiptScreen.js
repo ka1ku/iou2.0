@@ -205,32 +205,20 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       const currentUser = getCurrentUser();
       if (!currentUser) throw new Error('Not authenticated');
 
-      // Map local participant index to Firestore participants order.
-      // Each user sees themselves first (index 0), so we must save indices in expense.participants order for cross-user sync.
-      const localParticipant = state.participants[participantIndex];
-      const payerUserId = localParticipant?.userId;
-      const expenseParticipants = expense?.participants || [];
-      const firestoreIdx = payerUserId != null
-        ? expenseParticipants.findIndex((p) => p.userId === payerUserId)
-        : participantIndex;
-      const newPayers = [firestoreIdx >= 0 ? firestoreIdx : participantIndex];
-
-      // Update local state immediately for responsive UI
+      // Participant order is consistent across devices (expense.participants), so index is correct.
       actions.setSelectedPayers([participantIndex]);
       lastPayerToggleAtRef.current = Date.now();
 
-      // Update Firestore - snapshot listener will confirm for other users
       await updateExpense(expense.id, {
-        selectedPayers: newPayers,
+        selectedPayers: [participantIndex],
       }, currentUser.uid);
 
-      // Success haptic
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error) {
       console.error('Failed to toggle payer:', error);
       Alert.alert('Error', 'Failed to update payer. Please try again.');
     }
-  }, [expense?.id, expense?.participants, state.participants, actions]);
+  }, [expense?.id, actions]);
 
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
@@ -396,37 +384,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     skipSync: !!savingItemId,
     lastPayerToggleAtRef,
   });
-
-  useEffect(() => {
-    const currentUserId = getCurrentUser()?.uid;
-    const meParticipant = state.participants.find((p) => p.userId === currentUserId);
-    const allParticipants = [
-      meParticipant || {
-        name: getCurrentUser()?.fullName || getCurrentUser()?.firstName || "Unknown User",
-        id: "me-participant",
-        userId: currentUserId,
-        placeholder: false,
-        phoneNumber: null,
-        username: getCurrentUser()?.username || null,
-        profilePhoto: getCurrentUser()?.profilePhoto || null,
-      },
-      ...state.selectedFriends.map((friend, index) => ({
-        name: friend.name || "",
-        id: `friend-${friend.id || index}`,
-        userId: friend.id || null,
-        phoneNumber: friend.phoneNumber || null,
-        username: friend.username || null,
-        profilePhoto: friend.profilePhoto || null,
-        placeholder: false,
-      })),
-    ];
-
-    const participantsChanged =
-      JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
-    if (participantsChanged) {
-      actions.setParticipants(allParticipants);
-    }
-  }, [state.selectedFriends, state.participants, actions]);
 
   useEffect(() => {
     const updatedItems = state.items.map(item => ({

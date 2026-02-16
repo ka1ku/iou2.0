@@ -65,21 +65,11 @@ export default function useExpenseInitSync({
       }
     }
 
-    // Map selectedPayers from Firestore order (expense.participants) to local order (state.participants).
-    // Each user sees themselves first, so indices differ; use userId to map correctly for cross-user sync.
-    // Skip syncing for 1s after our own payer toggle to avoid flicker from stale snapshot overwriting optimistic update.
+    // Participant order is consistent across devices; use expense.selectedPayers directly.
     const recentlyToggledPayer = lastPayerToggleAtRef?.current && (Date.now() - lastPayerToggleAtRef.current < 1000);
-    if (expense.selectedPayers && expense.participants?.length && !recentlyToggledPayer) {
-      const mapped = expense.selectedPayers
-        .map((firestoreIdx) => {
-          const payer = expense.participants[firestoreIdx];
-          if (!payer?.userId) return firestoreIdx;
-          const localIdx = (state.participants || []).findIndex((p) => p.userId === payer.userId);
-          return localIdx >= 0 ? localIdx : -1;
-        })
-        .filter((i) => i >= 0);
-      if (mapped.length > 0 && JSON.stringify(mapped) !== JSON.stringify(state.selectedPayers)) {
-        actions.setSelectedPayers(mapped);
+    if (expense.selectedPayers?.length && !recentlyToggledPayer) {
+      if (JSON.stringify(expense.selectedPayers) !== JSON.stringify(state.selectedPayers)) {
+        actions.setSelectedPayers(expense.selectedPayers);
       }
     }
 

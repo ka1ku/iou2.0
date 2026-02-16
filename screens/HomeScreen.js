@@ -85,8 +85,8 @@ const HomeScreen = ({ navigation }) => {
     const currentUserParticipant = expense.participants?.find(p => p.userId === currentUserId);
     const currentUserName = currentUserParticipant?.name;
 
-    const allSettled = expense.settlements.every(settlement => 
-      ['markedAsPaid', 'complete', 'confirmed'].includes(settlement.status)
+    const allSettled = expense.settlements.every(settlement =>
+      ['markedAsPaid', 'complete', 'confirmed', 'partial'].includes(settlement.status)
     );
 
     if (allSettled) {

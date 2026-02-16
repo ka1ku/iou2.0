@@ -29,26 +29,80 @@ const generateJoinCode = () => {
   return result;
 };
 
+/** Sort participants by userId and remap item indices for consistent order across devices */
+const sortParticipantsAndRemapItems = (participants, items, expenseSelectedPayers) => {
+  const parts = participants || [];
+  const its = items || [];
+  const remap = (idx) => {
+    if (!oldIdxToNewIdx) return idx;
+    return oldIdxToNewIdx[idx] ?? idx;
+  };
+  let oldIdxToNewIdx = null;
+  if (!parts.length) return { participants: [], items: its, selectedPayers: expenseSelectedPayers };
+  if (!its.length) {
+    const withOrigIdx = parts.map((p, i) => ({ ...p, _origIdx: i }));
+    const sorted = withOrigIdx.sort((a, b) => {
+      const keyA = a.userId ?? `z-${a._origIdx}`;
+      const keyB = b.userId ?? `z-${b._origIdx}`;
+      return keyA.localeCompare(keyB);
+    });
+    oldIdxToNewIdx = [];
+    sorted.forEach((p, newIdx) => { oldIdxToNewIdx[p._origIdx] = newIdx; });
+    return {
+      participants: sorted.map(({ _origIdx, ...p }) => p),
+      items: its,
+      selectedPayers: (expenseSelectedPayers || [0]).map(remap),
+    };
+  }
+  const withOrigIdx = parts.map((p, i) => ({ ...p, _origIdx: i }));
+  const sorted = withOrigIdx.sort((a, b) => {
+    const keyA = a.userId ?? `z-${a._origIdx}`;
+    const keyB = b.userId ?? `z-${b._origIdx}`;
+    return keyA.localeCompare(keyB);
+  });
+  oldIdxToNewIdx = [];
+  sorted.forEach((p, newIdx) => { oldIdxToNewIdx[p._origIdx] = newIdx; });
+  const participantsOut = sorted.map(({ _origIdx, ...p }) => p);
+  const itemsOut = its.map((item) => ({
+    ...item,
+    selectedPayers: (item.selectedPayers || [0]).map(remap),
+    selectedConsumers: (item.selectedConsumers || [0]).map(remap),
+  }));
+  return {
+    participants: participantsOut,
+    items: itemsOut,
+    selectedPayers: (expenseSelectedPayers || [0]).map(remap),
+  };
+};
 
 export const createExpense = async (expenseData, userId) => {
   try {
+    let participants = expenseData.participants || [];
+    let items = expenseData.items || [];
+    let selectedPayers = expenseData.selectedPayers || [0];
+    if (participants.length) {
+      const sorted = sortParticipantsAndRemapItems(participants, items, selectedPayers);
+      participants = sorted.participants;
+      items = sorted.items;
+      selectedPayers = sorted.selectedPayers;
+    }
 
     // Create participantIds array for efficient array-contains queries
     const participantIds = [];
-    if (expenseData.participants) {
-      expenseData.participants.forEach((participant) => {
-        if (participant.userId && !participantIds.includes(participant.userId)) {
-          participantIds.push(participant.userId);
-        }
-      });
-    }
+    participants.forEach((participant) => {
+      if (participant.userId && !participantIds.includes(participant.userId)) {
+        participantIds.push(participant.userId);
+      }
+    });
 
     const expense = {
       ...expenseData,
+      participants,
+      items,
+      selectedPayers,
       createdBy: userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      items: expenseData.items || [],
       participantIds,
       join: {
         enabled: true,
@@ -76,10 +130,27 @@ export const updateExpense = async (expenseId, updateData, userId) => {
 
     let finalUpdateData = { ...updateData };
 
-    // Create participantIds array for efficient array-contains queries
+    // Sort participants and remap item indices for consistent order across devices
     if (updateData.participants) {
+      const itemsToUse = updateData.items ?? (await (async () => {
+        const expenseRef = doc(getFirestore(getApp()), 'expenses', expenseId);
+        const snap = await getDoc(expenseRef);
+        return snap.exists() ? (snap.data().items || []) : [];
+      })());
+      const { participants: sortedParticipants, items: remappedItems, selectedPayers: remappedSelectedPayers } = sortParticipantsAndRemapItems(
+        updateData.participants,
+        itemsToUse,
+        updateData.selectedPayers
+      );
+      finalUpdateData.participants = sortedParticipants;
+      if (itemsToUse.length > 0) finalUpdateData.items = remappedItems;
+      if (updateData.selectedPayers) finalUpdateData.selectedPayers = remappedSelectedPayers;
+    }
+
+    // Create participantIds array for efficient array-contains queries
+    if (finalUpdateData.participants) {
       const participantIds = [];
-      updateData.participants.forEach((participant) => {
+      finalUpdateData.participants.forEach((participant) => {
         if (participant.userId && !participantIds.includes(participant.userId)) {
           participantIds.push(participant.userId);
         }

@@ -76,13 +76,15 @@ export default function useSettlementActions({
   // Use recomputeSettlementsForSave so settlements with settled items persist even when greedy netting drops them
   const calculatedSettlements = useMemo(() => {
     try {
+      // Use expense data when available for consistent order across all devices.
       const participantsToUse = expense?.participants?.length ? expense.participants : participants;
+      const payersToUse = expense?.selectedPayers?.length ? expense.selectedPayers : selectedPayers;
       const expenseData = {
         title: title || 'Expense',
         total,
         participants: participantsToUse,
         items,
-        selectedPayers: selectedPayers || [0],
+        selectedPayers: payersToUse || [0],
       };
       const firestoreSettlements = (expense?.settlements || []).map(migrateOldSettlement);
       const merged = recomputeSettlementsForSave(expenseData, firestoreSettlements);

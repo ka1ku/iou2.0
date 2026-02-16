@@ -68,8 +68,29 @@ const expenseReducer = (state, action) => {
     case EXPENSE_ACTIONS.SET_PARTICIPANTS:
       return { ...state, participants: action.payload };
 
-    case EXPENSE_ACTIONS.SET_SELECTED_FRIENDS:
-      return { ...state, selectedFriends: action.payload };
+    case EXPENSE_ACTIONS.SET_SELECTED_FRIENDS: {
+      const newSelectedFriends = action.payload;
+      const currentUserId = getCurrentUser()?.uid;
+      const keptParticipants = state.participants.filter(
+        (p) => p.userId === currentUserId || newSelectedFriends.some((f) => f.id === p.userId)
+      );
+      const newFriends = newSelectedFriends.filter(
+        (sf) => !keptParticipants.some((p) => p.userId === sf.id)
+      );
+      const newParticipants = [
+        ...keptParticipants,
+        ...newFriends.map((f, i) => ({
+          name: f.name || '',
+          id: `friend-${f.id || i}`,
+          userId: f.id || null,
+          phoneNumber: f.phoneNumber || null,
+          username: f.username || null,
+          profilePhoto: f.profilePhoto || null,
+          placeholder: false,
+        })),
+      ];
+      return { ...state, selectedFriends: newSelectedFriends, participants: newParticipants };
+    }
 
     case EXPENSE_ACTIONS.SET_ITEMS:
       return { ...state, items: action.payload };
@@ -176,18 +197,36 @@ const expenseReducer = (state, action) => {
       }
 
       const currentUserId = getCurrentUser()?.uid;
-      
-      const currentUserParticipant = expense.participants?.find(p => p.userId === currentUserId);
-      const currentUserName = currentUserParticipant?.name || 
-        (initUserProfile ? `${initUserProfile.firstName || ''} ${initUserProfile.lastName || ''}`.trim() : 'Me');
-      
-      const existingFriends = expense.participants
-        .filter(
-          (p) =>
-            p.userId !== currentUserId &&
-            !p.placeholder &&
-            p.userId
-        )
+
+      // Sort by userId for deterministic order across all devices (fixes split-with index mismatch).
+      const origParticipants = expense.participants || [];
+      const withOrigIdx = origParticipants.map((p, i) => ({ ...p, _origIdx: i }));
+      const sortedParticipants = withOrigIdx.sort((a, b) => {
+        const keyA = a.userId ?? `z-${a._origIdx}`;
+        const keyB = b.userId ?? `z-${b._origIdx}`;
+        return keyA.localeCompare(keyB);
+      });
+      const oldIdxToNewIdx = [];
+      sortedParticipants.forEach((p, newIdx) => {
+        oldIdxToNewIdx[p._origIdx] = newIdx;
+      });
+      const participantsEnriched = sortedParticipants.map((p, i) => {
+        const { _origIdx, ...rest } = p;
+        return {
+          ...rest,
+          id: rest.userId === currentUserId ? 'me-participant' : `friend-${rest.userId || i}`,
+          name: rest.name || '',
+          placeholder: rest.placeholder || false,
+          phoneNumber: rest.phoneNumber || null,
+          username: rest.username || null,
+          profilePhoto: rest.profilePhoto || null,
+        };
+      });
+
+      const remapIndex = (oldIdx) => oldIdxToNewIdx[oldIdx] ?? oldIdx;
+
+      const selectedFriendsEnriched = participantsEnriched
+        .filter((p) => p.userId !== currentUserId && !p.placeholder && p.userId)
         .map((p) => ({
           id: p.userId,
           name: p.name,
@@ -196,58 +235,22 @@ const expenseReducer = (state, action) => {
           profilePhoto: p.profilePhoto,
         }));
 
-      const newParticipants = [
-        {
-          name: currentUserName,
-          id: 'me-participant',
-          userId: currentUserId,
-          placeholder: false,
-          phoneNumber: currentUserParticipant?.phoneNumber || initUserProfile?.phoneNumber || null,
-          username: currentUserParticipant?.username || initUserProfile?.username || null,
-          profilePhoto: currentUserParticipant?.profilePhoto || initUserProfile?.profilePhoto || null,
-        },
-        ...existingFriends.map((friend, index) => ({
-          name: friend.name || '',
-          id: `friend-${friend.id || index}`,
-          userId: friend.id || null,
-          phoneNumber: friend.phoneNumber || null,
-          username: friend.username || null,
-          profilePhoto: friend.profilePhoto || null,
-          placeholder: false,
-        })),
-      ];
-
-      // Map selectedPayers from Firestore order (expense.participants) to local order (newParticipants).
-      // Each user sees themselves first, so indices differ; use userId to map correctly for cross-user sync.
-      const firestorePayers = expense.selectedPayers || [0];
-      const selectedPayersMapped = firestorePayers
-        .map((firestoreIdx) => {
-          const payer = expense.participants?.[firestoreIdx];
-          if (!payer?.userId) return firestoreIdx; // fallback for legacy
-          const localIdx = newParticipants.findIndex((p) => p.userId === payer.userId);
-          return localIdx >= 0 ? localIdx : -1;
-        })
-        .filter((i) => i >= 0);
-
       const itemsWithPayers =
         expense.items?.map((item) => ({
           ...item,
-          selectedPayers: item.selectedPayers || [0],
-          selectedConsumers: item.selectedConsumers || [0],
+          selectedPayers: (item.selectedPayers || [0]).map(remapIndex),
+          selectedConsumers: (item.selectedConsumers || [0]).map(remapIndex),
         })) || state.items;
-
-      // Fees are items with isExtraFee, not a separate array. Don't load old fees.
-      const feesToUse = [];
 
       return {
         ...state,
-        selectedFriends: existingFriends,
-        participants: newParticipants,
+        selectedFriends: selectedFriendsEnriched,
+        participants: participantsEnriched,
         title: expense.title || '',
         joinEnabled: expense.join?.enabled ?? true,
-        fees: feesToUse,
+        fees: [],
         items: itemsWithPayers,
-        selectedPayers: selectedPayersMapped.length > 0 ? selectedPayersMapped : [0],
+        selectedPayers: (expense.selectedPayers?.length ? expense.selectedPayers : [0]).map(remapIndex),
       };
 
     default:

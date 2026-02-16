@@ -124,37 +124,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     }
   }, [isEditing, state.items.length]);
 
-  useEffect(() => {
-    const currentUserId = getCurrentUser()?.uid;
-    const meParticipant = state.participants.find((p) => p.userId === currentUserId);
-    const allParticipants = [
-      meParticipant || {
-        name: getCurrentUser()?.fullName || getCurrentUser()?.firstName || "Unknown User",
-        id: "me-participant",
-        userId: currentUserId,
-        placeholder: false,
-        phoneNumber: null,
-        username: getCurrentUser()?.username || null,
-        profilePhoto: getCurrentUser()?.profilePhoto || null,
-      },
-      ...state.selectedFriends.map((friend, index) => ({
-        name: friend.name || "",
-        id: `friend-${friend.id || index}`,
-        userId: friend.id || null,
-        phoneNumber: friend.phoneNumber || null,
-        username: friend.username || null,
-        profilePhoto: friend.profilePhoto || null,
-        placeholder: false,
-      })),
-    ];
-
-    const participantsChanged =
-      JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
-    if (participantsChanged) {
-      actions.setParticipants(allParticipants);
-    }
-  }, [state.selectedFriends, state.participants, actions]);
-
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
     if (!currentUser) throw new Error("No user signed in");
