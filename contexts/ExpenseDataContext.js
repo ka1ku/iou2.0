@@ -167,7 +167,6 @@ export const ExpenseDataProvider = ({ children }) => {
       expensesQuery,
       handleSnapshot,
       (error) => {
-        console.error('Expenses query failed:', error);
         setExpenses([]);
         setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
         setLoading(false);
@@ -229,7 +228,6 @@ export const ExpenseDataProvider = ({ children }) => {
       });
 
     } catch (error) {
-      console.error('Error loading more expenses:', error);
       setHasMore(false);
     } finally {
       setLoadingMore(false);
@@ -272,7 +270,6 @@ export const ExpenseDataProvider = ({ children }) => {
         setIsProfileLoading(false); // Profile load attempt complete (found or not found)
       },
       (error) => {
-        console.error('Error fetching user profile:', error);
         setUserProfile(null);
         setIsProfileLoading(false); // Profile load attempt complete (failed)
       }

@@ -188,7 +188,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
       // Success haptic feedback is handled in ReceiptBreakdown
     } catch (error) {
-      console.error('Failed to toggle participant:', error);
 
       // Rollback optimistic update on error
       actions.updateItem(itemIndex, { selectedConsumers: originalConsumers });
@@ -215,7 +214,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error) {
-      console.error('Failed to toggle payer:', error);
       Alert.alert('Error', 'Failed to update payer. Please try again.');
     }
   }, [expense?.id, actions]);
@@ -432,7 +430,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
               hasUpdatedScannedItems.current = true;
             }
           } catch (error) {
-            console.error('Failed to update scanned items in Firestore:', error);
           }
         }
       }

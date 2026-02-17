@@ -35,10 +35,8 @@ export const NotificationProvider = ({ children }) => {
           expoNotificationService.cleanupListeners();
         }
       } catch (error) {
-        console.error('Failed to initialize notifications:', error);
         // Don't show alert - just log and continue
         // Notifications will be disabled but app continues to work
-        console.warn('App will continue without push notifications enabled');
       }
     };
 
@@ -88,7 +86,6 @@ export const NotificationProvider = ({ children }) => {
       await expoNotificationService.updateUserNotificationPreferences(currentUser.uid, preferences);
       setNotificationPreferences(preferences);
     } catch (error) {
-      console.error('Failed to update notification preferences:', error);
       Alert.alert('Error', 'Failed to update notification preferences');
     }
   }, [currentUser]);
@@ -100,7 +97,6 @@ export const NotificationProvider = ({ children }) => {
       const result = await expoNotificationService.sendTestNotification(currentUser.uid);
       Alert.alert('Success', result.message || 'Test notification sent!');
     } catch (error) {
-      console.error('Failed to send test notification:', error);
       Alert.alert('Error', 'Failed to send test notification');
     }
   }, [currentUser]);
@@ -119,7 +115,6 @@ export const NotificationProvider = ({ children }) => {
       });
       return result.data;
     } catch (error) {
-      console.error('Failed to send notification to user:', error);
       throw error;
     }
   }, []);
@@ -130,7 +125,6 @@ export const NotificationProvider = ({ children }) => {
     try {
       return await expoNotificationService.shouldReceiveNotification(currentUser.uid, type);
     } catch (error) {
-      console.error('Failed to check notification preferences:', error);
       return true; // Default to allowing notifications on error
     }
   }, [currentUser]);
@@ -146,7 +140,6 @@ export const NotificationProvider = ({ children }) => {
       await expoNotificationService.initialize(currentUser.uid);
       setExpoPushToken(expoNotificationService.getToken());
     } catch (error) {
-      console.error('Failed to refresh Expo push token:', error);
     }
   }, [currentUser]);
 
@@ -154,7 +147,6 @@ export const NotificationProvider = ({ children }) => {
     try {
       return await expoNotificationService.areNotificationsEnabled();
     } catch (error) {
-      console.error('Failed to check notification permissions:', error);
       return false;
     }
   }, []);

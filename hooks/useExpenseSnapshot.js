@@ -44,7 +44,6 @@ export default function useExpenseSnapshot(expenseId) {
         setLoading(false);
       },
       (err) => {
-        console.error('[useExpenseSnapshot] Error:', err);
         setError(err);
         setExpense(null);
         setLoading(false);

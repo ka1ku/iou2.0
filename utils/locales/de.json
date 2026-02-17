@@ -3,19 +3,838 @@
         "title": "Einstellungen",
         "account": "Konto",
         "profile": "Profileinstellungen",
-        "venmo": "Venmo Integration",
+        "venmo": "Venmo-Integration",
         "preferences": "Präferenzen",
         "language": "Sprache",
         "region": "Region",
         "currency": "Währung",
-        "support": "Support",
+        "support": "Hilfe",
         "terms": "Nutzungsbedingungen",
-        "rate": "App bewerten",
+        "privacy": "Datenschutzrichtlinie",
         "signOut": "Abmelden",
-        "deleteAccount": "Konto löschen"
+        "deleteAccount": "Konto löschen",
+        "manageSubscription": "Abonnement verwalten",
+        "restorePurchases": "Käufe wiederherstellen",
+        "restoreSuccess": "Käufe erfolgreich wiederhergestellt",
+        "noSubscriptions": "Keine aktiven Abonnements gefunden",
+        "restoreError": "Fehler beim Wiederherstellen. Bitte versuchen Sie es erneut",
+        "growth": "Wachstum",
+        "buildYourSquad": {
+            "title": "Dein Team aufbauen",
+            "subtitle": "Verdiene Belohnungen für das Einladen von Freunden"
+        },
+        "connectedAccounts": {
+            "title": "Verbundene Konten",
+            "sectionTitle": "Zahlungskonten",
+            "aboutTitle": "Über verbundene Konten",
+            "connected": "Verbunden",
+            "notConnected": "Nicht verbunden",
+            "connect": "Verbinden",
+            "disconnect": "Trennen",
+            "loading": "Konten werden geladen...",
+            "venmo": {
+                "name": "Venmo",
+                "description": "Für Zahlungen und Abrechnungen",
+                "connectTitle": "Venmo verbinden",
+                "connectMessage": "Um Ihr Venmo-Konto zu verbinden, melden Sie sich bitte an oder registrieren Sie sich mit Ihren Venmo-Daten.",
+                "goToSignUp": "Zur Registrierung",
+                "reconnectionSoon": "Venmo-Verbindung wird bald verfügbar sein."
+            },
+            "paypal": {
+                "name": "PayPal",
+                "description": "Demnächst verfügbar"
+            },
+            "zelle": {
+                "name": "Zelle",
+                "description": "Demnächst verfügbar"
+            },
+            "disconnectAlert": {
+                "title": "Konto trennen",
+                "message": "Sind Sie sicher, dass Sie dieses Konto trennen möchten? Sie verlieren möglicherweise Zugriff auf einige Funktionen.",
+                "confirm": "Trennen",
+                "cancel": "Abbrechen",
+                "success": "Konto erfolgreich getrennt",
+                "soon": "Kontotrennung wird bald verfügbar sein."
+            },
+            "info": {
+                "secureTitle": "Sicher & Privat",
+                "secureDesc": "Ihre Zahlungsinformationen werden sicher gespeichert und niemals mit anderen Benutzern geteilt.",
+                "easyTitle": "Einfache Abrechnungen",
+                "easyDesc": "Verbundene Konten erleichtern das Senden und Empfangen von Zahlungen für geteilte Ausgaben."
+            },
+            "soon": "Demnächst",
+            "integrationSoon": "{{name}}-Integration wird bald verfügbar sein."
+        },
+        "profileSettings": {
+            "title": "Profil bearbeiten",
+            "loading": "Profil wird geladen...",
+            "changePhoto": "Profilfoto ändern",
+            "firstName": "Vorname",
+            "lastName": "Nachname",
+            "username": "Benutzername",
+            "paymentMethods": "Zahlungsmethoden",
+            "venmo": "Venmo-Konto",
+            "notConnected": "Nicht verbunden",
+            "visibilityInfo": "Diese Informationen sind für Ihre Freunde auf IOU sichtbar.",
+            "save": "Änderungen speichern",
+            "success": "Erfolg",
+            "error": "Fehler",
+            "selectImageError": "Fehler bei der Bildauswahl",
+            "updateSuccess": "Profil erfolgreich aktualisiert!",
+            "updateError": "Fehler beim Aktualisieren des Profils"
+        },
+        "currencies": {
+            "usd": "US-Dollar (USD)",
+            "eur": "Euro (EUR)",
+            "gbp": "Britisches Pfund (GBP)",
+            "mxn": "Mexikanischer Peso (MXN)",
+            "cad": "Kanadischer Dollar (CAD)",
+            "cny": "Chinesischer Yuan (CNY)",
+            "jpy": "Japanischer Yen (JPY)",
+            "krw": "Südkoreanischer Won (KRW)",
+            "vnd": "Vietnamesischer Dong (VND)"
+        },
+        "termsOfService": {
+            "lastUpdated": "Zuletzt aktualisiert: Dezember 2024",
+            "sections": {
+                "1": {
+                    "title": "1. Annahme der Bedingungen",
+                    "content": "Durch den Zugriff und die Nutzung der IOU-Mobilanwendung (\"App\") akzeptieren Sie diese Vereinbarung und erklären sich damit einverstanden, an diese gebunden zu sein. Wenn Sie diesen Bedingungen nicht zustimmen, nutzen Sie diesen Dienst bitte nicht."
+                },
+                "2": {
+                    "title": "2. Nutzungslizenz",
+                    "content": "Es wird die Erlaubnis erteilt, eine Kopie der IOU-App nur für den persönlichen, nicht-kommerziellen vorübergehenden Gebrauch herunterzuladen. Dies ist die Gewährung einer Lizenz, keine Übertragung des Eigentumsrechts, und unter dieser Lizenz dürfen Sie nicht:",
+                    "bullets": {
+                        "1": "die Materialien ändern oder kopieren",
+                        "2": "die Materialien für kommerzielle Zwecke oder zur öffentlichen Anzeige verwenden",
+                        "3": "versuchen, in der App enthaltene Software zurückzuentwickeln",
+                        "4": "Urheberrechts- oder andere Eigentumsvermerke aus den Materialien entfernen"
+                    }
+                },
+                "3": {
+                    "title": "3. Benutzerkonten",
+                    "content": "Um bestimmte Funktionen der App nutzen zu können, müssen Sie ein Konto erstellen. Sie sind verantwortlich für:",
+                    "bullets": {
+                        "1": "Die Bereitstellung genauer und vollständiger Informationen",
+                        "2": "Die Wahrung der Sicherheit Ihrer Zugangsdaten",
+                        "3": "Alle Aktivitäten, die unter Ihrem Konto stattfinden",
+                        "4": "Die sofortige Benachrichtigung über jede unbefugte Nutzung"
+                    }
+                },
+                "4": {
+                    "title": "4. Zahlungsabwicklung",
+                    "content": "Die App erleichtert die Ausgabenverfolgung und Abrechnung zwischen Benutzern. Wir können Drittanbieter für die Zahlungsabwicklung integrieren. Durch die Nutzung dieser Funktionen stimmen Sie zu:",
+                    "bullets": {
+                        "1": "Die Nutzungsbedingungen von Drittanbietern einzuhalten",
+                        "2": "Zu verstehen, dass wir nicht für die Zahlungsabwicklung verantwortlich sind",
+                        "3": "Alle Gebühren zu tragen, die von Zahlungsabwicklern erhoben werden"
+                    }
+                },
+                "5": {
+                    "title": "5. Datenschutzrichtlinie",
+                    "content": "Ihre Privatsphäre ist uns wichtig. Bitte lesen Sie unsere Datenschutzrichtlinie, die auch Ihre Nutzung der App regelt, um unsere Praktiken zu verstehen."
+                },
+                "6": {
+                    "title": "6. Verbotene Nutzungen",
+                    "content": "Sie dürfen unsere App nicht verwenden:",
+                    "bullets": {
+                        "1": "Für rechtswidrige Zwecke oder um andere zu rechtswidrigen Handlungen aufzufordern",
+                        "2": "Um gegen internationale, bundesstaatliche, provinzielle oder staatliche Vorschriften, Regeln, Gesetze oder lokale Verordnungen zu verstoßen",
+                        "3": "Um unsere geistigen Eigentumsrechte oder die geistigen Eigentumsrechte anderer zu verletzen",
+                        "4": "Um zu belästigen, zu missbrauchen, zu beleidigen, zu schaden, zu diffamieren, zu verleumden, herabzuwürdigen, einzuschüchtern oder zu diskriminieren",
+                        "5": "Um falsche oder irreführende Informationen zu übermitteln"
+                    },
+                    "content2": "Wir haben eine Null-Toleranz-Politik gegenüber anstößigen Inhalten und missbräuchlichen Benutzern. Inhalte, die gegen diese Bedingungen verstoßen, werden entfernt, und Benutzer, die sich so verhalten, werden blockiert und vom Dienst ausgeschlossen."
+                },
+                "7": {
+                    "title": "7. Haftungsausschluss",
+                    "content": "Die Informationen in dieser App werden \"wie besehen\" bereitgestellt. Soweit gesetzlich zulässig, schließt dieses Unternehmen:",
+                    "bullets": {
+                        "1": "alle Zusicherungen und Gewährleistungen in Bezug auf diese App und deren Inhalte aus",
+                        "2": "garantiert nicht die Genauigkeit, Vollständigkeit oder Aktualität von Informationen",
+                        "3": "schließt jegliche Haftung für Schäden aus, die aus oder im Zusammenhang mit Ihrer Nutzung dieser App entstehen"
+                    }
+                },
+                "8": {
+                    "title": "8. Haftungsbeschränkung",
+                    "content": "In keinem Fall haften IOU oder seine Lieferanten für Schäden (einschließlich, ohne Einschränkung, Schäden durch Daten- oder Gewinnverlust oder aufgrund von Betriebsunterbrechungen), die aus der Nutzung oder Unfähigkeit zur Nutzung der App entstehen, selbst wenn IOU oder ein autorisierter Vertreter mündlich oder schriftlich auf die Möglichkeit solcher Schäden hingewiesen wurde."
+                },
+                "9": {
+                    "title": "9. Überarbeitungen",
+                    "content": "Die auf der App erscheinenden Materialien können technische, typografische oder fotografische Fehler enthalten. IOU garantiert nicht, dass die Materialien auf seiner App genau, vollständig oder aktuell sind. IOU kann jederzeit ohne Vorankündigung Änderungen an den Materialien seiner App vornehmen."
+                },
+                "10": {
+                    "title": "10. Geltendes Recht",
+                    "content": "Diese Bedingungen unterliegen den Gesetzen der Vereinigten Staaten und werden in Übereinstimmung mit diesen ausgelegt, und Sie unterwerfen sich unwiderruflich der ausschließlichen Zuständigkeit der Gerichte in diesem Staat oder an diesem Ort."
+                },
+                "11": {
+                    "title": "11. Kontaktinformationen",
+                    "content": "Wenn Sie Fragen zu diesen Nutzungsbedingungen haben, kontaktieren Sie uns bitte unter:",
+                    "email": "E-Mail: legal@iou-app.com",
+                    "support": "Support: support@iou-app.com"
+                }
+            },
+            "footer": "Durch die Nutzung von IOU bestätigen Sie, dass Sie diese Nutzungsbedingungen gelesen und verstanden haben und damit einverstanden sind."
+        }
     },
     "common": {
         "cancel": "Abbrechen",
-        "save": "Speichern"
+        "save": "Speichern",
+        "loading": "Laden...",
+        "error": "Fehler",
+        "success": "Erfolg"
+    },
+    "home": {
+        "title": "Startseite",
+        "headerTitle": "Ausgaben",
+        "searchPlaceholder": "Ausgaben oder Mitglieder suchen...",
+        "noExpensesTitle": "Noch keine Ausgaben",
+        "noExpensesDesc": "Tippen Sie auf Erstellen, um Ihre erste Ausgabe hinzuzufügen",
+        "noSearchResultsTitle": "Keine Ausgaben gefunden",
+        "noSearchResultsDesc": "Versuchen Sie einen anderen Suchbegriff",
+        "settledUp": "Abgerechnet",
+        "youOwe": "Sie schulden",
+        "youAreOwed": "Ihnen wird geschuldet",
+        "confirmPayment": "Zahlung bestätigen",
+        "awaitingConfirmation": "Warte auf Bestätigung",
+        "needsSettlement": "Abrechnung nötig",
+        "receipt": "Beleg",
+        "expense": "Ausgabe",
+        "otherMembers": "Andere Mitglieder"
+    },
+    "profile": {
+        "title": "Profil",
+        "balanceSummary": "Kontostand",
+        "recentExpenses": "Kürzliche Ausgaben",
+        "editProfile": "Profil bearbeiten",
+        "loading": "Profil wird geladen...",
+        "noUsername": "Kein Benutzername",
+        "totalOwedToYou": "Gesamtbetrag, der Ihnen geschuldet wird",
+        "totalYouOwe": "Gesamtbetrag, den Sie schulden",
+        "participants": "Teilnehmer",
+        "createFirstExpense": "Erste Ausgabe erstellen",
+        "startTracking": "Beginnen Sie mit dem Tracking geteilter Ausgaben",
+        "loadMore": "Mehr laden",
+        "remaining": "übrig"
+    },
+    "navigation": {
+        "home": "Startseite",
+        "profile": "Profil"
+    },
+    "addExpense": {
+        "addExpenseTitle": "Ausgabe hinzufügen",
+        "editExpenseTitle": "Ausgabe bearbeiten",
+        "item": "Posten",
+        "items": "Posten",
+        "date": "Datum",
+        "amount": "Betrag",
+        "paidBy": "Bezahlt von",
+        "split": "Aufteilen",
+        "saveSuccess": "Ausgabe erfolgreich gespeichert",
+        "saveError": "Fehler beim Speichern der Ausgabe",
+        "validationError": "Bitte füllen Sie alle erforderlichen Felder aus",
+        "deleteItemParams": {
+            "title": "Posten löschen",
+            "message": "Möchten Sie diesen Posten wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+            "confirm": "Löschen"
+        },
+        "validation": {
+            "feeNames": "Bitte geben Sie alle Gebührennamen an",
+            "unevenSplitTitle": "Ungleiche Aufteilung",
+            "unevenSplitMessage": "Bei einem oder mehreren Posten stimmen die aufgeteilten Beträge nicht mit den Gesamtsummen überein. Bitte überprüfen Sie Ihre Posten.",
+            "unauthenticated": "Benutzer nicht authentifiziert",
+            "deleteError": "Fehler beim Löschen des Postens: {{error}}"
+        },
+        "addFirstItem": "Ersten Posten hinzufügen",
+        "addAnotherItem": "Weiteren Posten hinzufügen",
+        "noItemsTitle": "Noch keine Posten",
+        "noItemsDesc": "Beginnen Sie, indem Sie den ersten Posten hinzufügen"
+    },
+    "addReceipt": {
+        "addReceiptTitle": "Beleg hinzufügen",
+        "editReceiptTitle": "Beleg bearbeiten",
+        "paidBy": "BEZAHLT VON",
+        "extraCharges": "ZUSATZKOSTEN",
+        "totals": "SUMMEN",
+        "addFee": "{{type}} hinzufügen",
+        "feeTypes": {
+            "tip": "Trinkgeld",
+            "tax": "Steuer",
+            "service": "Service",
+            "custom": "Benutzerdefiniert"
+        },
+        "placeholders": {
+            "feeName": "Gebührenname (z.B. Korkgeld)"
+        },
+        "subtotal": "Zwischensumme",
+        "feesAndTip": "Gebühren & Trinkgeld",
+        "total": "Gesamt",
+        "incompleteItems": "Unvollständige Posten",
+        "incompleteItemsDesc": "Bitte stellen Sie sicher, dass alle Posten einen Preis größer als Null haben und mindestens einer Person zugewiesen sind.",
+        "feeNameMissing": "Bitte füllen Sie alle Gebührennamen aus"
+    },
+    "expenseSettings": {
+        "title": "Ausgabeneinstellungen",
+        "expenseName": "Ausgabenname",
+        "changeName": "Name ändern",
+        "untitledExpense": "Unbenannte Ausgabe",
+        "shareExpense": "Ausgabe teilen",
+        "allowJoin": "Anderen beitreten erlauben",
+        "shareLink": "Link teilen",
+        "copyLink": "Link kopieren",
+        "dangerZone": "Gefahrenzone",
+        "leaveExpense": "Ausgabe verlassen",
+        "leaveExpenseSubtitle": "Sich selbst aus dieser Ausgabe entfernen",
+        "errors": {
+            "emptyName": "Ausgabenname darf nicht leer sein",
+            "updateNameError": "Fehler beim Aktualisieren des Ausgabennamens",
+            "leaveError": "Fehler beim Verlassen der Ausgabe",
+            "cannotLeave": "Kann nicht verlassen werden",
+            "cannotLeaveDesc": "Sie können diese Ausgabe nur verlassen, wenn Sie an keinen Posten beteiligt sind. Entfernen Sie sich zuerst von allen Posten."
+        },
+        "success": {
+            "nameUpdated": "Ausgabenname erfolgreich aktualisiert",
+            "leftExpense": "Sie haben die Ausgabe erfolgreich verlassen",
+            "copied": "Kopiert!",
+            "linkCopied": "Einladungslink in die Zwischenablage kopiert"
+        },
+        "confirmLeave": {
+            "title": "Ausgabe verlassen",
+            "message": "Sind Sie sicher, dass Sie diese Ausgabe verlassen möchten? Sie werden von allen Aufteilungen entfernt und können nicht mehr darauf zugreifen."
+        },
+        "shareMessage": "Treten Sie meiner Ausgabe \"{{title}}\" auf IOU bei.\n\nTippen Sie zum Beitritt:\n{{link}}"
+    },
+    "friendProfile": {
+        "title": "Freundesprofil",
+        "options": "Optionen",
+        "report": "Benutzer melden",
+        "block": "Benutzer blockieren",
+        "loading": "Freundesprofil wird geladen...",
+        "balanceSummary": "Kontostand",
+        "netBalance": "Nettosaldo",
+        "theyOweYouOverall": "Schulden Ihnen insgesamt Geld",
+        "youOweThemOverall": "Sie schulden ihnen insgesamt Geld",
+        "theyOweYou": "Sie schulden Ihnen",
+        "youOweThem": "Sie schulden Ihnen",
+        "paymentMethods": "Zahlungsmethoden",
+        "noPaymentMethod": "Keine Zahlungsmethode verfügbar",
+        "sharedExpenses": "Geteilte Ausgaben",
+        "noSharedExpenses": "Noch keine geteilten Ausgaben",
+        "addFirstExpense": "Erste Ausgabe hinzufügen",
+        "owesYou": "Schuldet Ihnen",
+        "youOwe": "Sie schulden",
+        "reportPrompt": {
+            "title": "Benutzer melden",
+            "message": "Bitte teilen Sie uns mit, warum Sie diesen Benutzer melden.",
+            "submit": "Melden"
+        },
+        "blockPrompt": {
+            "title": "Benutzer blockieren",
+            "message": "Sind Sie sicher, dass Sie diesen Benutzer blockieren möchten? Sie werden dessen Inhalte nicht mehr sehen und nicht mehr mit ihm interagieren können.",
+            "confirm": "Blockieren"
+        },
+        "reportSuccess": "Meldung gesendet",
+        "reportSuccessDesc": "Vielen Dank für Ihre Meldung. Wir werden sie in Kürze überprüfen.",
+        "blockSuccess": "Benutzer blockiert",
+        "blockSuccessDesc": "Sie haben diesen Benutzer blockiert."
+    },
+    "setupExpense": {
+        "title": "Wie möchten Sie diese {{type}} nennen?",
+        "titlePlaceholder": "{{type}}-Name eingeben...",
+        "whoSplitting": "Wer teilt sich das?",
+        "addPeople": "Personen hinzufügen",
+        "creating": "Erstellen...",
+        "continue": "Weiter",
+        "errors": {
+            "titleRequired": "Bitte geben Sie einen Titel für diese {{type}} ein",
+            "participantsRequired": "Bitte geben Sie Namen für alle Teilnehmer ein",
+            "noUser": "Kein Benutzer angemeldet",
+            "profileError": "Benutzerprofil konnte nicht abgerufen werden",
+            "createError": "Fehler beim Erstellen von {{type}}: {{message}}"
+        }
+    },
+    "auth": {
+        "common": {
+            "usCountryCode": "🇺🇸 +1"
+        },
+        "welcome": {
+            "title": "Willkommen bei IOU!",
+            "split": "Mit Gruppen teilen",
+            "autoCalculate": "Automatische Berechnung",
+            "realTime": "Echtzeit-Synchronisierung",
+            "createAccount": "Konto erstellen",
+            "signIn": "Anmelden"
+        },
+        "signIn": {
+            "title": "Anmelden",
+            "stepTitle": "Telefonnummer",
+            "stepSubtitle": "Wir senden Ihnen einen Bestätigungscode, um Ihre Nummer zu bestätigen",
+            "inputLabel": "Telefonnummer",
+            "placeholder": "(555) 123-4567",
+            "button": "Bestätigungscode senden",
+            "sending": "Senden...",
+            "noAccount": "Kein Konto?",
+            "createAccount": "Konto erstellen",
+            "infoSms": "Wir senden Ihnen einen Bestätigungscode per SMS",
+            "infoSecure": "Ihre Telefonnummer wird sicher und vertraulich behandelt",
+            "errors": {
+                "missingPhone": "Bitte geben Sie Ihre Telefonnummer ein",
+                "invalidPhone": "Bitte geben Sie eine gültige 10-stellige Telefonnummer ein"
+            }
+        },
+        "signUp": {
+            "stepIndicator": "Schritt {{current}} von {{total}}",
+            "title": "Konto erstellen",
+            "step1": {
+                "title": "Wie heißen Sie?",
+                "subtitle": "Wir verwenden dies, um Sie bei Ihren Freunden zu identifizieren",
+                "firstName": "Vorname",
+                "lastName": "Nachname",
+                "firstNamePlaceholder": "Geben Sie Ihren Vornamen ein",
+                "lastNamePlaceholder": "Geben Sie Ihren Nachnamen ein"
+            },
+            "step2": {
+                "title": "Wählen Sie einen Benutzernamen",
+                "subtitle": "Dies wird Ihr eindeutiger Identifikator in der App sein",
+                "username": "Benutzername",
+                "placeholder": "Benutzernamen eingeben",
+                "hint": "3-20 Zeichen, nur Buchstaben, Zahlen und Unterstriche"
+            },
+            "step3": {
+                "title": "Venmo verknüpfen",
+                "subtitle": "Verbinden Sie Ihr Venmo, um Ausgaben einfacher aufzuteilen (optional)",
+                "label": "Venmo-Benutzername",
+                "placeholder": "ihr-venmo-benutzername",
+                "verified": "Verifiziertes Venmo-Konto",
+                "noProfilePic": "Venmo-Konto (Kein Profilbild)",
+                "change": "Konto ändern",
+                "skip": "Überspringen"
+            },
+            "continue": "Weiter",
+            "alreadyHaveAccount": "Haben Sie bereits ein Konto?",
+            "errors": {
+                "required": "Erforderliches Feld",
+                "firstNameReq": "Bitte geben Sie Ihren Vornamen ein",
+                "lastNameReq": "Bitte geben Sie Ihren Nachnamen ein",
+                "invalidFirst": "Der Vorname darf nur Buchstaben, Leerzeichen, Bindestriche und Apostrophe enthalten",
+                "invalidLast": "Der Nachname darf nur Buchstaben, Leerzeichen, Bindestriche und Apostrophe enthalten",
+                "minFirst": "Der Vorname muss mindestens 2 Zeichen lang sein",
+                "minLast": "Der Nachname muss mindestens 2 Zeichen lang sein",
+                "usernameReq": "Bitte geben Sie einen Benutzernamen ein",
+                "invalidUsername": "Der Benutzername muss 3-20 Zeichen lang sein und darf nur Buchstaben, Zahlen und Unterstriche enthalten",
+                "usernameTaken": "Benutzername vergeben",
+                "usernameTakenDesc": "Dieser Benutzername ist bereits vergeben. Bitte wählen Sie einen anderen.",
+                "checkError": "Verfügbarkeit des Benutzernamens konnte nicht geprüft werden",
+                "saveError": "Fehler beim Speichern Ihrer Informationen. Bitte versuchen Sie es erneut.",
+                "accountExists": "Konto existiert bereits",
+                "accountExistsDesc": "Diese Telefonnummer ist bereits registriert. Sie können sich entweder mit dieser Nummer anmelden oder eine andere Telefonnummer verwenden, um ein neues Konto zu erstellen.",
+                "signInInstead": "Stattdessen anmelden",
+                "useDiffNumber": "Andere Nummer verwenden",
+                "verificationError": "Ungültige Bestätigungsantwort erhalten"
+            }
+        },
+        "verifyOTP": {
+            "title": "Telefonnummer bestätigen",
+            "title2FA": "Zwei-Faktor-Authentifizierung",
+            "subtitle": "Geben Sie den 6-stelligen Code ein, der an\n{{phone}} gesendet wurde",
+            "subtitle2FA": "Geben Sie den 6-stelligen Code ein, der an Ihr registriertes Gerät gesendet wurde",
+            "button": "Code bestätigen",
+            "verifying": "Bestätigen...",
+            "resend": "Code erneut senden",
+            "sending": "Senden...",
+            "resendTimer": "Code erneut senden in {{timer}} Sekunden",
+            "info": "Keinen Code erhalten? Überprüfen Sie Ihr Signal und versuchen Sie es erneut.",
+            "success": {
+                "resend": "Bestätigungscode erfolgreich gesendet"
+            },
+            "errors": {
+                "invalidCodeLength": "Bitte geben Sie den vollständigen 6-stelligen Code ein",
+                "noSession": "Keine Bestätigungssitzung gefunden. Bitte fordern Sie einen neuen Code an.",
+                "signupMissing": "Registrierungsdaten fehlen",
+                "signupMissingDesc": "Profil konnte nicht erstellt werden. Bitte versuchen Sie, sich erneut zu registrieren.",
+                "profileFailed": "Profil erstellen fehlgeschlagen",
+                "profileFailedDesc": "Ihr Telefon wurde bestätigt, aber wir konnten Ihr Profil nicht erstellen: {{message}}",
+                "verificationFailed": "Bestätigung fehlgeschlagen",
+                "noResend2FA": "2FA-Bestätigungscodes können nicht erneut gesendet werden. Bitte versuchen Sie, den Code erneut einzugeben oder melden Sie sich erneut an.",
+                "resendFailed": "Fehler beim erneuten Senden des Bestätigungscodes. Bitte versuchen Sie es erneut."
+            },
+            "loading": {
+                "uploading": "Ihr Profilbild wird hochgeladen...",
+                "creating": "Ihr Profil wird erstellt...",
+                "finalizing": "Ihr Konto wird fertiggestellt...",
+                "securing": "Ihre Daten werden gesichert..."
+            }
+        },
+        "contactInvite": {
+            "title": "Dein Team aufbauen",
+            "subtitle": "IOU macht mehr Spaß mit Freunden. Verbinden Sie Ihre Kontakte, um Bekannte zu finden und Funktionen freizuschalten.",
+            "findFriends": "Freunde finden",
+            "skip": "Vorerst überspringen",
+            "skipLink": "Überspringen",
+            "done": "Fertig",
+            "tiers": {
+                "solo": {
+                    "name": "Solo-Modus",
+                    "description": "Grundfunktionen",
+                    "features": {
+                        "manual": "Manuelle Ausgabeneingabe",
+                        "ratios": "Einfache Aufteilung"
+                    }
+                },
+                "squadStarted": {
+                    "name": "Team gestartet",
+                    "description": "Smarte Funktionen freigeschaltet",
+                    "features": {
+                        "suggestions": "Smarte Kontaktvorschläge",
+                        "friends": "Freunde in der App sehen",
+                        "templates": "Ausgabenvorlagen"
+                    }
+                },
+                "fullSquad": {
+                    "name": "Volles Team",
+                    "description": "Premium-Status",
+                    "features": {
+                        "premium": "1 Monat Premium kostenlos",
+                        "categories": "Benutzerdefinierte Kategorien",
+                        "support": "Priorisierter Support"
+                    }
+                }
+            },
+            "alerts": {
+                "contactsRequired": {
+                    "title": "Kontakte erforderlich",
+                    "message": "Um Ihre Freunde zu finden, benötigen wir Zugriff auf Ihre Kontakte. Bitte aktivieren Sie dies in den Einstellungen.",
+                    "ok": "OK"
+                },
+                "premiumUnlocked": {
+                    "title": "Premium freigeschaltet! 🌟",
+                    "message": "Sie haben automatisch 1 Monat Premium freigeschaltet!"
+                },
+                "featuresUnlocked": {
+                    "title": "Neue Funktionen freigeschaltet! 🚀",
+                    "message": "Sie haben Smart Suggestions und Vorlagen freigeschaltet!"
+                },
+                "error": "Etwas ist schief gelaufen. Bitte versuchen Sie es erneut."
+            }
+        },
+        "twoFactor": {
+            "screenTitle": "Zwei-Faktor-Authentifizierung",
+            "title": "Zwei-Faktor-Authentifizierung",
+            "description": {
+                "title": "Erhöhte Sicherheit",
+                "text": "Die Zwei-Faktor-Authentifizierung fügt Ihrem Konto eine zusätzliche Sicherheitsebene hinzu, indem ein Bestätigungscode von Ihrem Telefon erforderlich ist."
+            },
+            "methods": {
+                "title": "Registrierte Methoden",
+                "empty": "Keine 2FA-Methoden registriert",
+                "emptyDesc": "Fügen Sie eine Telefonnummer hinzu, um mit der Zwei-Faktor-Authentifizierung zu beginnen",
+                "enrolledAt": "Registriert am {{date}}",
+                "remove": {
+                    "title": "2FA-Methode entfernen",
+                    "message": "Sind Sie sicher, dass Sie \"{{name}}\" von Ihrem Konto entfernen möchten?",
+                    "confirm": "Entfernen",
+                    "cancel": "Abbrechen"
+                }
+            },
+            "add": {
+                "button": "Telefonnummer hinzufügen",
+                "title": "Telefonnummer für 2FA hinzufügen",
+                "description": "Geben Sie eine Telefonnummer ein, um Bestätigungscodes für die Zwei-Faktor-Authentifizierung zu erhalten.",
+                "label": "Telefonnummer",
+                "placeholder": "(555) 123-4567",
+                "send": "Code senden",
+                "sending": "Senden...",
+                "cancel": "Abbrechen"
+            },
+            "verify": {
+                "title": "Telefonnummer bestätigen",
+                "description": "Geben Sie den 6-stelligen Code ein, der an Ihr Telefon gesendet wurde.",
+                "label": "Bestätigungscode",
+                "placeholder": "123456",
+                "submit": "Bestätigen & Aktivieren",
+                "verifying": "Bestätigen...",
+                "cancel": "Abbrechen"
+            },
+            "success": {
+                "codeSent": "Bestätigungscode an Ihr Telefon gesendet",
+                "enrolled": "2FA-Registrierung erfolgreich abgeschlossen",
+                "removed": "2FA-Methode erfolgreich entfernt"
+            },
+            "errors": {
+                "loadFailed": "Laden der 2FA-Einstellungen fehlgeschlagen",
+                "missingPhone": "Bitte geben Sie eine Telefonnummer ein",
+                "invalidPhone": "Bitte geben Sie eine gültige 10-stellige Telefonnummer ein",
+                "startFailed": "Starten der 2FA-Registrierung fehlgeschlagen",
+                "invalidCode": "Bitte geben Sie den vollständigen 6-stelligen Code ein",
+                "completeFailed": "Abschließen der 2FA-Registrierung fehlgeschlagen",
+                "removeFailed": "Entfernen der 2FA-Methode fehlgeschlagen"
+            }
+        }
+    },
+    "components": {
+        "createBottomSheet": {
+            "title": "Neu erstellen",
+            "addExpense": "Ausgabe hinzufügen",
+            "addExpenseDesc": "Ausgabe manuell hinzufügen",
+            "scanReceipt": "Beleg scannen",
+            "scanReceiptDesc": "Beleg scannen, um Posten zu extrahieren",
+            "joinExpense": "Ausgabe beitreten",
+            "joinExpenseDesc": "Link oder Code verwenden",
+            "scanTitle": "Beleg scannen",
+            "takePhoto": "Foto aufnehmen",
+            "takePhotoDesc": "Neues Belegfoto aufnehmen",
+            "chooseGallery": "Aus Galerie wählen",
+            "chooseGalleryDesc": "Vorhandenes Foto auswählen",
+            "joinTitle": "Ausgabe beitreten",
+            "enterLink": "Einladungslink oder Code eingeben",
+            "linkPlaceholder": "Link oder Code hier einfügen...",
+            "joinButton": "Beitreten",
+            "missingLinkError": "Bitte geben Sie einen Einladungslink oder Code ein",
+            "scanError": "Fehler beim Belegscan"
+        },
+        "changeVenmo": {
+            "title": "Venmo ändern",
+            "subtitle": "Verbinden Sie Ihr Venmo, um Ausgaben einfacher aufzuteilen",
+            "verified": "Verifiziertes Venmo-Konto",
+            "noProfilePic": "Venmo-Konto (Kein Profilbild)",
+            "changeAccount": "Konto ändern",
+            "usernameLabel": "Venmo-Benutzername",
+            "usernamePlaceholder": "ihr-venmo-benutzername",
+            "removeHint": "Leer lassen, um Ihr Venmo-Konto zu entfernen",
+            "save": "Änderungen speichern",
+            "verificationRequired": "Verifizierung erforderlich",
+            "verificationRequiredDesc": "Bitte warten Sie, bis die Venmo-Verifizierung abgeschlossen ist, oder geben Sie einen gültigen Venmo-Benutzernamen ein.",
+            "verificationInProgress": "Verifizierung läuft",
+            "verificationInProgressDesc": "Bitte warten Sie, bis die Venmo-Verifizierung abgeschlossen ist.",
+            "updateSuccess": "Ihr Venmo-Konto wurde erfolgreich aktualisiert.",
+            "removeSuccess": "Ihr Venmo-Konto wurde erfolgreich entfernt.",
+            "updateError": "Fehler beim Aktualisieren des Venmo-Kontos. Bitte versuchen Sie es erneut.",
+            "userNotFound": "Venmo-Benutzer existiert nicht. Bitte überprüfen Sie den Benutzernamen und versuchen Sie es erneut.",
+            "verifyError": "Venmo-Konto konnte nicht verifiziert werden. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+        },
+        "changeExpenseName": {
+            "title": "Ausgabennamen ändern",
+            "subtitle": "Geben Sie einen neuen Namen für diese Ausgabe ein",
+            "label": "Ausgabenname",
+            "placeholder": "Ausgabennamen eingeben",
+            "save": "Änderungen speichern"
+        },
+        "expenses": {
+            "header": {
+                "edit": "Bearbeiten",
+                "add": "Hinzufügen",
+                "track": "Tracken",
+                "split": "Teilen"
+            },
+            "footer": {
+                "settleUp": "Abrechnen",
+                "processing": "Verarbeitung..."
+            },
+            "paidBy": {
+                "label": "Bezahlt von",
+                "you": "Ihnen",
+                "noParticipants": "Keine Teilnehmer"
+            },
+            "participantsGrid": {
+                "addFriends": "Freunde hinzufügen",
+                "manage": "Verwalten"
+            },
+            "expenseItemCard": {
+                "itemNamePlaceholder": "Artikelname eingeben",
+                "allAllocated": "Alles zugewiesen",
+                "enterPrice": "Preis zum Aufteilen eingeben",
+                "unallocated": "Nicht zugewiesen: ${{amount}}",
+                "totalExceeds": "Gesamt übersteigt Rechnung um ${{amount}}",
+                "payers": "Zahler",
+                "split": "Aufteilen",
+                "cancel": "Abbrechen",
+                "save": "Änderungen speichern",
+                "settled": "In Zahlung abgerechnet",
+                "person": "Person {{index}}",
+                "alerts": {
+                    "incomplete": "Unvollständiger Posten",
+                    "incompleteDesc": "Bitte überprüfen Sie folgendes: {{fields}}",
+                    "uneven": "Ungleiche Aufteilung",
+                    "unevenDesc": "Die aufgeteilten Beträge stimmen nicht mit der Postensumme überein. Bitte passen Sie die Aufteilung oder den Gesamtbetrag an.",
+                    "saveError": "Fehler beim Speichern der Ausgabe: {{error}}"
+                },
+                "fields": {
+                    "name": "Artikelname",
+                    "price": "Preis",
+                    "payer": "mindestens ein Zahler",
+                    "consumer": "mindestens eine Person in der Aufteilung"
+                }
+            },
+            "expenseViewCard": {
+                "paidByUnassigned": "Bezahlt von Unbekannt",
+                "paidByOne": "Bezahlt von {{name}}",
+                "paidByTwo": "Bezahlt von {{name1}} und {{name2}}",
+                "paidByMany": "Bezahlt von {{name}} und {{count}} weiteren",
+                "untitledItem": "Unbenannter Posten",
+                "settled": "Abgerechnet",
+                "splitWith": "Geteilt mit",
+                "actions": {
+                    "title": "Aktionen",
+                    "message": "Was möchten Sie tun?",
+                    "edit": "Bearbeiten",
+                    "delete": "Löschen",
+                    "cancel": "Abbrechen"
+                },
+                "locked": {
+                    "title": "Posten gesperrt",
+                    "message": "Dieser Posten ist Teil einer aktiven Abrechnung. Machen Sie die Abrechnung rückgängig, um diesen Posten zu bearbeiten."
+                }
+            },
+            "receiptBreakdown": {
+                "header": "Belegposten",
+                "addItem": "Posten hinzufügen",
+                "editItem": "Posten bearbeiten",
+                "itemName": "Artikelname",
+                "itemNamePlaceholder": "Artikelname eingeben",
+                "price": "Preis",
+                "splitWith": "Geteilt mit",
+                "selectPerson": "Wählen Sie mindestens eine Person",
+                "cancel": "Abbrechen",
+                "save": "Änderungen speichern",
+                "lockedTitle": "Posten gesperrt",
+                "lockedMsg": "Dieser Posten ist Teil einer aktiven Abrechnung. Machen Sie die Abrechnung rückgängig, um diesen Posten zu bearbeiten.",
+                "itemDefault": "Posten {{index}}",
+                "settled": "Abgerechnet",
+                "assignSomeone": "Jemanden zuweisen",
+                "noOneAssigned": "Niemand zugewiesen",
+                "extraFee": "Als Zusatzgebühr markieren (Trinkgeld, Steuer, etc.)",
+                "fee": "Gebühr",
+                "time": {
+                    "justNow": "gerade eben",
+                    "minutesAgo": "vor {{count}}m",
+                    "hoursAgo": "vor {{count}}h",
+                    "daysAgo": "vor {{count}}t",
+                    "weeksAgo": "vor {{count}}w"
+                }
+            },
+            "settlementInterface": {
+                "summary": {
+                    "allSettled": "Alles abgerechnet!",
+                    "youOwe": "Sie schulden",
+                    "youreOwed": "Ihnen wird geschuldet",
+                    "pendingSettled": "{{pending}} ausstehend · {{settled}} abgerechnet",
+                    "pending": "{{count}} ausstehend",
+                    "settled": "{{count}} abgerechnet"
+                },
+                "activity": {
+                    "title": "Aktivität",
+                    "showMore": "{{count}} mehr anzeigen...",
+                    "types": {
+                        "priceChange": "{{user}} hat die Summe von ${{prev}} auf ${{new}} aktualisiert",
+                        "itemAdded": "{{user}} hat {{item}} hinzugefügt",
+                        "itemAddedAmount": "{{user}} hat {{item}} für ${{amount}} hinzugefügt",
+                        "itemRemoved": "{{user}} hat \"{{item}}\" entfernt",
+                        "itemRemovedAmount": "{{user}} hat {{item}} (${{amount}}) entfernt",
+                        "itemModified": "{{user}} hat {{item}} für ${{amount}} bearbeitet",
+                        "itemModifiedComputed": "{{user}} hat {{item}} bearbeitet: {{changes}}",
+                        "participantAdded": "{{user}} hat {{participant}} hinzugefügt",
+                        "participantRemoved": "{{user}} hat {{participant}} entfernt",
+                        "settled": "{{user}} hat mit {{peer}} für ${{amount}} abgerechnet",
+                        "unsettled": "{{user}} hat Zahlung von ${{amount}} mit {{peer}} rückgängig gemacht",
+                        "default": "{{user}} hat eine Änderung vorgenommen"
+                    }
+                },
+                "status": {
+                    "fullySettled": "Vollständig abgerechnet",
+                    "partiallySettled": "Teilweise abgerechnet",
+                    "settled": "Abgerechnet",
+                    "reminded": "Erinnert",
+                    "awaitingPayment": "Warte auf Zahlung"
+                },
+                "items": {
+                    "title": "Posten",
+                    "tapToSettle": "(zum Abrechnen tippen)",
+                    "selectAll": "Alle auswählen",
+                    "deselectAll": "Alle abwählen"
+                },
+                "actions": {
+                    "allSettled": "Alles abgerechnet",
+                    "selectToSettle": "Posten zum Abrechnen wählen",
+                    "pay": "${{amount}} bezahlen",
+                    "markSettled": "${{amount}} als abgerechnet markieren",
+                    "request": "${{amount}} anfordern",
+                    "reminderSent": "Erinnerung gesendet",
+                    "sendReminder": "Erinnerung senden",
+                    "undoSettlement": "Abrechnung rückgängig machen"
+                },
+                "relationships": {
+                    "youOwe": "Sie schulden {{name}}",
+                    "owesYou": "{{name}} schuldet Ihnen",
+                    "owes": "{{name}} schuldet {{name2}}"
+                },
+                "total": "(${{amount}} gesamt)",
+                "empty": {
+                    "title": "Alles abgerechnet!",
+                    "body": "Niemand schuldet jemandem etwas."
+                },
+                "banner": {
+                    "title": "Abrechnungen aktualisiert wegen Änderungen.",
+                    "sub": "{{new}} neu, {{paid}} bezahlt beibehalten."
+                },
+                "alerts": {
+                    "markSettled": {
+                        "title": "Als abgerechnet markieren",
+                        "message": "${{amount}} als abgerechnet markieren? Dies zeichnet die Zahlung auf, ohne Venmo zu verwenden.",
+                        "cancel": "Abbrechen",
+                        "confirm": "Abrechnen"
+                    },
+                    "unsettle": {
+                        "title": "Abrechnung aufheben",
+                        "message": "Sind Sie sicher, dass Sie alle Posten wieder öffnen möchten?",
+                        "confirm": "Aufheben"
+                    },
+                    "unsettleAll": {
+                        "title": "Alle Posten aufheben",
+                        "message": "Dies markiert alle Posten als nicht abgerechnet. Sind Sie sicher?",
+                        "confirm": "Aufheben"
+                    }
+                }
+            }
+        },
+        "referral": {
+            "progress": {
+                "title": "Empfehlungsfortschritt",
+                "referrals": "{{count}} Empfehlungen",
+                "nextTier": "Noch {{count}} bis zur nächsten Stufe"
+            },
+            "tier1": {
+                "title": "Stufe 1",
+                "requirement": "3 Freunde",
+                "reward": "1 Monat Premium",
+                "benefits": [
+                    "Werbefreies Erlebnis",
+                    "Export in CSV",
+                    "Vorrangiger Support"
+                ]
+            },
+            "tier2": {
+                "title": "Stufe 2",
+                "requirement": "10 Freunde",
+                "reward": "Lebenslang Premium",
+                "benefits": [
+                    "Alle Stufe 1 Vorteile",
+                    "Benutzerdefinierte Kategorien",
+                    "Früher Zugang zu neuen Funktionen"
+                ]
+            },
+            "share": {
+                "title": "Freunde einladen",
+                "description": "Teilen Sie Ihren Empfehlungslink, um Belohnungen zu erhalten",
+                "copyLink": "Link kopieren",
+                "shareLink": "Link teilen",
+                "copied": "In die Zwischenablage kopiert!"
+            },
+            "history": {
+                "title": "Empfehlungshistorie",
+                "confirmed": "Bestätigt",
+                "pending": "Ausstehend",
+                "empty": "Noch keine Empfehlungen"
+            }
+        }
     }
 }

@@ -161,7 +161,6 @@ const HomeScreen = ({ navigation }) => {
         const results = await searchExpensesWithDetails(searchQuery.trim(), 3);
         setSearchResults(results);
       } catch (error) {
-        console.error('Error searching expenses:', error);
         setSearchResults([]);
       } finally {
         setSearchLoading(false);

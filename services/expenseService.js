@@ -473,14 +473,12 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                 finalUpdateData.changeLog = arrayUnion(...changeLogEntries);
               }
             } catch (logError) {
-              console.error('[updateExpense] Failed to generate change log:', logError);
               // Don't block the update if logging fails
             }
           }
         }
       } catch (recalcError) {
         // If recalculation/logging fails, log but don't block the update
-        console.error('[updateExpense] Failed to recalculate settlements:', recalcError);
       }
     }
 
@@ -805,7 +803,6 @@ export const createPaymentRequest = async ({ fromUserId, toUserId, amount, expen
       requestId: result.data.requestId || 'req_' + Date.now() // Fallback ID since we don't store it
     };
   } catch (error) {
-    console.error('Error creating payment request:', error);
     throw error;
   }
 };

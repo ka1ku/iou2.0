@@ -407,7 +407,6 @@ export const createUserProfile = async (userData, phoneNumber) => {
         await AsyncStorage.removeItem('pendingReferralCode');
       }
     } catch (error) {
-      console.error('Error processing referral:', error);
     }
 
     // Create user document with auth UID as document ID
@@ -544,7 +543,6 @@ export const updateUserProfile = async (profileData) => {
         // Upload the new image to Firebase Storage
         updateData.profilePhoto = await downloadAndUploadImage(profileData.profilePhoto, user.uid);
       } catch (uploadError) {
-        console.error('Failed to upload profile photo:', uploadError);
         // Continue without updating photo if upload fails
       }
     } else if (profileData.profilePhoto) {
@@ -655,7 +653,6 @@ export const deleteUserAccount = async () => {
     
     return true;
   } catch (error) {
-    console.error('Error deleting account:', error);
     throw error;
   }
 };
@@ -674,7 +671,6 @@ export const reportUser = async (reportedUserId, reason, description = '') => {
     
     return true;
   } catch (error) {
-    console.error('Error reporting user:', error);
     throw error;
   }
 };
@@ -691,7 +687,6 @@ export const blockUser = async (blockedUserId) => {
     
     return true;
   } catch (error) {
-    console.error('Error blocking user:', error);
     throw error;
   }
 };
@@ -724,7 +719,6 @@ export const updateUserPreferences = async (preferences) => {
     
     return true;
   } catch (error) {
-    console.error('Error updating user preferences:', error);
     return false;
   }
 };
@@ -745,7 +739,6 @@ export const getUserPreferences = async () => {
     }
     return null;
   } catch (error) {
-    console.error('Error getting user preferences:', error);
     return null;
   }
 };

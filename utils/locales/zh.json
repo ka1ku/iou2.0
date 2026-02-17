@@ -1,21 +1,840 @@
 {
     "settings": {
-        "title": "设定",
+        "title": "设置",
         "account": "账户",
         "profile": "个人资料设置",
-        "venmo": "Venmo 集成",
+        "venmo": "Venmo 绑定",
         "preferences": "偏好设置",
         "language": "语言",
         "region": "地区",
         "currency": "货币",
         "support": "支持",
         "terms": "服务条款",
-        "rate": "评价应用",
-        "signOut": "登出",
-        "deleteAccount": "注销账户"
+        "privacy": "隐私政策",
+        "signOut": "退出登录",
+        "deleteAccount": "删除账户",
+        "manageSubscription": "管理订阅",
+        "restorePurchases": "恢复购买",
+        "restoreSuccess": "购买已成功恢复",
+        "noSubscriptions": "未找到有效订阅",
+        "restoreError": "恢复时出错。请重试",
+        "growth": "增长",
+        "buildYourSquad": {
+            "title": "组建你的小队",
+            "subtitle": "邀请好友并获得奖励"
+        },
+        "connectedAccounts": {
+            "title": "已关联账户",
+            "sectionTitle": "支付账户",
+            "aboutTitle": "关于已关联账户",
+            "connected": "已连接",
+            "notConnected": "未连接",
+            "connect": "连接",
+            "disconnect": "断开连接",
+            "loading": "正在加载账户...",
+            "venmo": {
+                "name": "Venmo",
+                "description": "用于付款和收款",
+                "connectTitle": "连接 Venmo",
+                "connectMessage": "要连接您的 Venmo 账户，请使用您的 Venmo 信息登录或注册。",
+                "goToSignUp": "前往注册",
+                "reconnectionSoon": "Venmo 重新连接功能即将推出。"
+            },
+            "paypal": {
+                "name": "PayPal",
+                "description": "即将推出"
+            },
+            "zelle": {
+                "name": "Zelle",
+                "description": "即将推出"
+            },
+            "disconnectAlert": {
+                "title": "断开账户连接",
+                "message": "您确定要断开此账户的连接吗？您可能会失去某些功能的使用权。",
+                "confirm": "断开连接",
+                "cancel": "取消",
+                "success": "账户已成功断开连接",
+                "soon": "断开账户连接功能即将推出。"
+            },
+            "info": {
+                "secureTitle": "安全且私密",
+                "secureDesc": "您的支付信息已安全存储，绝不会与其他用户共享。",
+                "easyTitle": "轻松结算",
+                "easyDesc": "已关联的账户使发送和接收分摊费用的付款变得轻而易举。"
+            },
+            "soon": "即将推出",
+            "integrationSoon": "{{name}} 集成即将推出。"
+        },
+        "profileSettings": {
+            "title": "编辑个人资料",
+            "loading": "正在加载个人资料...",
+            "changePhoto": "更改头像",
+            "firstName": "名",
+            "lastName": "姓",
+            "username": "用户名",
+            "paymentMethods": "支付方式",
+            "venmo": "Venmo 账户",
+            "notConnected": "未连接",
+            "visibilityInfo": "此信息将对您在 IOU 上的朋友可见。",
+            "save": "保存更改",
+            "success": "成功",
+            "error": "错误",
+            "selectImageError": "选择图片时出错",
+            "updateSuccess": "个人资料更新成功！",
+            "updateError": "更新个人资料时出错"
+        },
+        "currencies": {
+            "usd": "美元 (USD)",
+            "eur": "欧元 (EUR)",
+            "gbp": "英镑 (GBP)",
+            "mxn": "墨西哥比索 (MXN)",
+            "cad": "加元 (CAD)",
+            "cny": "人民币 (CNY)",
+            "jpy": "日元 (JPY)",
+            "krw": "韩元 (KRW)",
+            "vnd": "越南盾 (VND)"
+        },
+        "termsOfService": {
+            "lastUpdated": "最后更新：2024年12月",
+            "sections": {
+                "1": {
+                    "title": "1. 接受条款",
+                    "content": "通过访问和使用 IOU 移动应用程序（“应用程序”），您接受并同意受本协议条款和规定的约束。如果您不同意上述条款，请勿使用本服务。"
+                },
+                "2": {
+                    "title": "2. 使用许可",
+                    "content": "允许暂时下载 IOU 应用程序的一份副本，仅供个人、非商业性的临时查看。这是许可的授予，而不是所有权的转让，根据此许可，您不得：",
+                    "bullets": {
+                        "1": "修改或复制材料",
+                        "2": "将材料用于任何商业目的或任何公开展示（商业或非商业）",
+                        "3": "试图反编译或逆向工程应用程序中包含的任何软件",
+                        "4": "从材料中删除任何版权或其他专有符号"
+                    }
+                },
+                "3": {
+                    "title": "3. 用户账户",
+                    "content": "要使用应用程序的某些功能，您必须创建一个账户。您负责：",
+                    "bullets": {
+                        "1": "提供准确和完整的信息",
+                        "2": "维护您账户凭据的安全",
+                        "3": "在您账户下发生的所有活动",
+                        "4": "一旦发现未经授权的使用，立即通知我们"
+                    }
+                },
+                "4": {
+                    "title": "4. 支付处理",
+                    "content": "该应用程序便于用户之间的费用跟踪和结算。我们可能会与第三方支付处理器集成。通过使用这些功能，您同意：",
+                    "bullets": {
+                        "1": "遵守第三方支付提供商的服务条款",
+                        "2": "了解我们不负责处理付款",
+                        "3": "承担支付处理器收取的任何费用"
+                    }
+                },
+                "5": {
+                    "title": "5. 隐私政策",
+                    "content": "您的隐私对我们很重要。请查看我们的隐私政策（该政策也适用于您对应用程序的使用），以了解我们的做法。"
+                },
+                "6": {
+                    "title": "6. 禁止的使用",
+                    "content": "您不得将我们的应用程序用于：",
+                    "bullets": {
+                        "1": "任何非法目的或诱使他人进行或参与任何非法行为",
+                        "2": "违反任何国际、联邦、省或州法规、规则、法律或地方法令",
+                        "3": "侵犯或违反我们的知识产权或他人的知识产权",
+                        "4": "骚扰、虐待、侮辱、伤害、诽谤、中伤、贬低、恐吓或歧视",
+                        "5": "提交虚假或误导性信息"
+                    },
+                    "content2": "我们对令人反感的内容和滥用用户实行零容忍政策。违反这些条款的内容将被删除，从事此类行为的用户将被封锁并禁止使用本服务。"
+                },
+                "7": {
+                    "title": "7. 免责声明",
+                    "content": "本应用程序上的信息是按“原样”提供的。在法律允许的最大范围内，本公司：",
+                    "bullets": {
+                        "1": "排除与本应用程序及其内容相关的所有陈述和保证",
+                        "2": "不保证信息的准确性、完整性或及时性",
+                        "3": "排除因使用本应用程序而产生或与之相关的任何损害责任"
+                    }
+                },
+                "8": {
+                    "title": "8. 责任限制",
+                    "content": "在任何情况下，IOU 或其供应商均不对因使用或无法使用本应用程序而造成的任何损害（包括但不限于数据或利润损失，或由于业务中断造成的损害）承担责任，即使 IOU 或授权代表已被口头或书面通知此类损害的可能性。"
+                },
+                "9": {
+                    "title": "9. 修订",
+                    "content": "应用程序上显示的材料可能包含技术、印刷或摄影错误。IOU 不保证其应用程序上的任何材料是准确、完整或最新的。IOU 可能会随时更改其应用程序中包含的材料，恕不另行通知。"
+                },
+                "10": {
+                    "title": "10. 适用法律",
+                    "content": "这些条款和条件受美国法律管辖并按其解释，您不可撤销地服从该州或地点法院的专属管辖权。"
+                },
+                "11": {
+                    "title": "11. 联系信息",
+                    "content": "如果您对这些服务条款有任何疑问，请通过以下方式联系我们：",
+                    "email": "电子邮箱：legal@iou-app.com",
+                    "support": "支持：support@iou-app.com"
+                }
+            },
+            "footer": "使用 IOU 即表示您承认已阅读并理解这些服务条款，并同意受其约束。"
+        }
     },
     "common": {
         "cancel": "取消",
-        "save": "保存"
+        "save": "保存",
+        "loading": "加载中...",
+        "error": "错误",
+        "success": "成功"
+    },
+    "home": {
+        "title": "主页",
+        "headerTitle": "费用",
+        "searchPlaceholder": "搜索费用或成员...",
+        "noExpensesTitle": "暂无费用",
+        "noExpensesDesc": "点击创建以添加您的第一笔费用",
+        "noSearchResultsTitle": "未找到费用",
+        "noSearchResultsDesc": "请尝试不同的搜索词",
+        "settledUp": "已结清",
+        "youOwe": "您欠",
+        "youAreOwed": "欠您",
+        "confirmPayment": "确认付款",
+        "awaitingConfirmation": "等待确认",
+        "needsSettlement": "需要结算",
+        "receipt": "收据",
+        "expense": "费用",
+        "otherMembers": "其他成员"
+    },
+    "profile": {
+        "title": "个人资料",
+        "balanceSummary": "余额摘要",
+        "recentExpenses": "近期费用",
+        "editProfile": "编辑个人资料",
+        "loading": "正在加载个人资料...",
+        "noUsername": "无用户名",
+        "totalOwedToYou": "欠您的总额",
+        "totalYouOwe": "您欠的总额",
+        "participants": "参与者",
+        "createFirstExpense": "创建您的第一笔费用",
+        "startTracking": "开始追踪共同费用",
+        "loadMore": "加载更多",
+        "remaining": "剩余"
+    },
+    "navigation": {
+        "home": "主页",
+        "profile": "个人资料"
+    },
+    "addExpense": {
+        "addExpenseTitle": "添加费用",
+        "editExpenseTitle": "编辑费用",
+        "item": "项目",
+        "items": "项目",
+        "date": "日期",
+        "amount": "金额",
+        "paidBy": "支付人",
+        "split": "分摊",
+        "saveSuccess": "费用已保存",
+        "saveError": "保存费用时出错",
+        "validationError": "请填写所有必填字段",
+        "deleteItemParams": {
+            "title": "删除项目",
+            "message": "您确定要删除此项目吗？此操作无法撤销。",
+            "confirm": "删除"
+        },
+        "validation": {
+            "feeNames": "请填写所有费用名称",
+            "unevenSplitTitle": "分摊不均",
+            "unevenSplitMessage": "一个或多个项目的分摊金额与总额不符。请检查您的项目。",
+            "unauthenticated": "未认证用户",
+            "deleteError": "删除项目时出错：{{error}}"
+        },
+        "addFirstItem": "添加您的第一个项目",
+        "addAnotherItem": "添加另一个项目",
+        "noItemsTitle": "暂无项目",
+        "noItemsDesc": "通过添加第一个项目开始"
+    },
+    "addReceipt": {
+        "addReceiptTitle": "添加收据",
+        "editReceiptTitle": "编辑收据",
+        "paidBy": "支付人",
+        "extraCharges": "额外费用",
+        "totals": "总计",
+        "addFee": "添加{{type}}",
+        "feeTypes": {
+            "tip": "小费",
+            "tax": "税费",
+            "service": "服务费",
+            "custom": "自定义"
+        },
+        "placeholders": {
+            "feeName": "费用名称（如：开瓶费）"
+        },
+        "subtotal": "小计",
+        "feesAndTip": "费用和小费",
+        "total": "总计",
+        "incompleteItems": "项目不完整",
+        "incompleteItemsDesc": "请确保所有项目的价格大于零，并且至少分配给一个人。",
+        "feeNameMissing": "请填写所有费用名称"
+    },
+    "expenseSettings": {
+        "title": "费用设置",
+        "expenseName": "费用名称",
+        "changeName": "更改名称",
+        "untitledExpense": "无标题费用",
+        "shareExpense": "分享费用",
+        "allowJoin": "允许他人加入",
+        "shareLink": "分享链接",
+        "copyLink": "复制链接",
+        "dangerZone": "危险区域",
+        "leaveExpense": "离开费用",
+        "leaveExpenseSubtitle": "将自己从此费用中移除",
+        "errors": {
+            "emptyName": "费用名称不能为空",
+            "updateNameError": "更新费用名称时出错",
+            "leaveError": "离开费用时出错",
+            "cannotLeave": "无法离开",
+            "cannotLeaveDesc": "只有当您不是任何项目的一部分时，才能离开此费用。请先将自己从所有项目中移除。"
+        },
+        "success": {
+            "nameUpdated": "费用名称已更新",
+            "leftExpense": "您已成功离开费用",
+            "copied": "已复制！",
+            "linkCopied": "邀请链接已复制到剪贴板"
+        },
+        "confirmLeave": {
+            "title": "离开费用",
+            "message": "您确定要离开此费用吗？您将从所有分摊中移除，并且无法再访问它。"
+        },
+        "shareMessage": "在 IOU 上加入我的费用“{{title}}”。\n\n点击加入：\n{{link}}"
+    },
+    "friendProfile": {
+        "title": "好友资料",
+        "options": "选项",
+        "report": "举报用户",
+        "block": "拉黑用户",
+        "loading": "正在加载好友资料...",
+        "balanceSummary": "余额摘要",
+        "netBalance": "净余额",
+        "theyOweYouOverall": "Ta们总共欠您",
+        "youOweThemOverall": "您总共欠Ta们",
+        "theyOweYou": "欠您",
+        "youOweThem": "您欠",
+        "paymentMethods": "支付方式",
+        "noPaymentMethod": "无可用支付方式",
+        "sharedExpenses": "共同费用",
+        "noSharedExpenses": "暂无共同费用",
+        "addFirstExpense": "添加第一笔费用",
+        "owesYou": "欠您",
+        "youOwe": "您欠",
+        "reportPrompt": {
+            "title": "举报用户",
+            "message": "请告诉我们您举报此用户的原因。",
+            "submit": "举报"
+        },
+        "blockPrompt": {
+            "title": "拉黑用户",
+            "message": "您确定要拉黑此用户吗？您将不再看到其内容，也无法与其互动。",
+            "confirm": "拉黑"
+        },
+        "reportSuccess": "举报已提交",
+        "reportSuccessDesc": "感谢您的举报。我们会尽快审核。",
+        "blockSuccess": "用户已拉黑",
+        "blockSuccessDesc": "您已拉黑此用户。"
+    },
+    "setupExpense": {
+        "title": "您想怎么称呼这个{{type}}？",
+        "titlePlaceholder": "输入{{type}}名称...",
+        "whoSplitting": "谁在分摊？",
+        "addPeople": "添加人员",
+        "creating": "正在创建...",
+        "continue": "继续",
+        "errors": {
+            "titleRequired": "请为此{{type}}输入标题",
+            "participantsRequired": "请输入所有参与者的姓名",
+            "noUser": "无登录用户",
+            "profileError": "无法获取用户资料",
+            "createError": "创建{{type}}时出错：{{message}}"
+        }
+    },
+    "auth": {
+        "common": {
+            "usCountryCode": "🇺🇸 +1"
+        },
+        "welcome": {
+            "title": "欢迎使用 IOU！",
+            "split": "与群组分摊",
+            "autoCalculate": "自动计算",
+            "realTime": "实时同步",
+            "createAccount": "创建账户",
+            "signIn": "登录"
+        },
+        "signIn": {
+            "title": "登录",
+            "stepTitle": "电话号码",
+            "stepSubtitle": "我们将发送验证码以确认您的号码",
+            "inputLabel": "电话号码",
+            "placeholder": "(555) 123-4567",
+            "button": "发送验证码",
+            "sending": "正在发送...",
+            "noAccount": "没有账户？",
+            "createAccount": "创建账户",
+            "infoSms": "我们将通过短信发送验证码",
+            "infoSecure": "您的电话号码是安全保密的",
+            "errors": {
+                "missingPhone": "请输入您的电话号码",
+                "invalidPhone": "请输入有效的 10 位号码"
+            }
+        },
+        "signUp": {
+            "stepIndicator": "第 {{current}} 步，共 {{total}} 步",
+            "title": "创建账户",
+            "step1": {
+                "title": "您叫什么名字？",
+                "subtitle": "我们将以此向您的朋友展示您的身份",
+                "firstName": "名",
+                "lastName": "姓",
+                "firstNamePlaceholder": "输入您的名字",
+                "lastNamePlaceholder": "输入您的姓氏"
+            },
+            "step2": {
+                "title": "选择用户名",
+                "subtitle": "这将是您在应用中的唯一 ID",
+                "username": "用户名",
+                "placeholder": "输入用户名",
+                "hint": "3-20 个字符，仅限字母、数字和下划线"
+            },
+            "step3": {
+                "title": "关联您的 Venmo",
+                "subtitle": "连接您的 Venmo 以更轻松地分摊费用（可选）",
+                "label": "Venmo 用户名",
+                "placeholder": "your-venmo-id",
+                "verified": "已验证 Venmo 账户",
+                "noProfilePic": "Venmo 账户（无头像）",
+                "change": "更改账户",
+                "skip": "跳过"
+            },
+            "continue": "继续",
+            "alreadyHaveAccount": "已有账户？",
+            "errors": {
+                "required": "必填字段",
+                "firstNameReq": "请输入您的名字",
+                "lastNameReq": "请输入您的姓氏",
+                "invalidFirst": "名字只能包含字母、空格、连字符和撇号",
+                "invalidLast": "姓氏只能包含字母、空格、连字符和撇号",
+                "minFirst": "名字必须至少包含 2 个字符",
+                "minLast": "姓氏必须至少包含 2 个字符",
+                "usernameReq": "请输入用户名",
+                "invalidUsername": "用户名必须为 3-20 个字符，且仅包含字母、数字和下划线",
+                "usernameTaken": "用户名已被使用",
+                "usernameTakenDesc": "此用户名已被使用。请选择其他的。",
+                "checkError": "无法检查用户名可用性",
+                "saveError": "保存您的信息时出错。请重试。",
+                "accountExists": "账户已存在",
+                "accountExistsDesc": "此电话号码已注册。您可以登录或使用其他号码。",
+                "signInInstead": "改为登录",
+                "useDiffNumber": "使用其他号码",
+                "verificationError": "收到无效的验证响应"
+            }
+        },
+        "verifyOTP": {
+            "title": "验证电话",
+            "title2FA": "双重认证",
+            "subtitle": "输入发送至\n{{phone}} 的 6 位验证码",
+            "subtitle2FA": "输入发送至您设备的 6 位验证码",
+            "button": "验证代码",
+            "verifying": "正在验证...",
+            "resend": "重新发送",
+            "sending": "正在发送...",
+            "resendTimer": "{{timer}} 秒后重新发送",
+            "info": "没收到验证码？检查信号并重试。",
+            "success": {
+                "resend": "验证码已成功重新发送"
+            },
+            "errors": {
+                "invalidCodeLength": "请输入完整的 6 位验证码",
+                "noSession": "未找到验证会话。请请求新验证码。",
+                "signupMissing": "注册数据缺失",
+                "signupMissingDesc": "无法创建您的个人资料。请尝试重新注册。",
+                "profileFailed": "个人资料创建失败",
+                "profileFailedDesc": "您的电话已通过验证，但我们无法创建您的个人资料：{{message}}",
+                "verificationFailed": "验证失败",
+                "noResend2FA": "无法重新发送 2FA 代码。请尝试重新输入代码或重新登录。",
+                "resendFailed": "重新发送验证码时出错。请重试。"
+            },
+            "loading": {
+                "uploading": "正在上传您的头像...",
+                "creating": "正在创建您的个人资料...",
+                "finalizing": "正在完成您的账户...",
+                "securing": "正在保护您的数据..."
+            }
+        },
+        "contactInvite": {
+            "title": "组建你的小队",
+            "subtitle": "和朋友一起用 IOU 更有趣。连接通讯录以查找您认识的人并解锁功能。",
+            "findFriends": "查找好友",
+            "skip": "暂时跳过",
+            "skipLink": "跳过",
+            "done": "完成",
+            "tiers": {
+                "solo": {
+                    "name": "单人模式",
+                    "description": "基本功能",
+                    "features": {
+                        "manual": "手动费用输入",
+                        "ratios": "简单分摊比例"
+                    }
+                },
+                "squadStarted": {
+                    "name": "小队启动",
+                    "description": "智能功能已解锁",
+                    "features": {
+                        "suggestions": "智能联系人建议",
+                        "friends": "在应用中查看好友",
+                        "templates": "费用模板"
+                    }
+                },
+                "fullSquad": {
+                    "name": "完整小队",
+                    "description": "高级会员状态",
+                    "features": {
+                        "premium": "免费 1 个月高级会员",
+                        "categories": "自定义类别",
+                        "support": "优先支持"
+                    }
+                }
+            },
+            "alerts": {
+                "contactsRequired": {
+                    "title": "需要通讯录",
+                    "message": "为了找到您的好友，我们需要访问您的通讯录。请在设置中启用。",
+                    "ok": "好的"
+                },
+                "premiumUnlocked": {
+                    "title": "高级会员已解锁！🌟",
+                    "message": "您已自动解锁 1 个月高级会员！"
+                },
+                "featuresUnlocked": {
+                    "title": "新功能已解锁！🚀",
+                    "message": "您已解锁智能建议和模板！"
+                },
+                "error": "出了点问题。请重试。"
+            }
+        },
+        "twoFactor": {
+            "screenTitle": "双重认证",
+            "title": "双重认证",
+            "description": {
+                "title": "增强安全性",
+                "text": "双重认证通过要求您手机上的验证码，为您的账户增加了一层额外的安全性。"
+            },
+            "methods": {
+                "title": "已注册方式",
+                "empty": "未注册 2FA 方式",
+                "emptyDesc": "添加电话号码以开始使用双重认证",
+                "enrolledAt": "注册于 {{date}}",
+                "remove": {
+                    "title": "移除 2FA 方式",
+                    "message": "您确定要从您的账户中移除“{{name}}”吗？",
+                    "confirm": "移除",
+                    "cancel": "取消"
+                }
+            },
+            "add": {
+                "button": "添加号码",
+                "title": "添加 2FA 号码",
+                "description": "输入电话号码以接收验证码。",
+                "label": "电话号码",
+                "placeholder": "(555) 123-4567",
+                "send": "发送验证码",
+                "sending": "正在发送...",
+                "cancel": "取消"
+            },
+            "verify": {
+                "title": "验证号码",
+                "description": "输入发送至您手机的 6 位验证码。",
+                "label": "验证码",
+                "placeholder": "123456",
+                "submit": "验证并启用",
+                "verifying": "正在验证...",
+                "cancel": "取消"
+            },
+            "success": {
+                "codeSent": "验证码已发送至您的手机",
+                "enrolled": "2FA 注册成功完成",
+                "removed": "2FA 方式已成功移除"
+            },
+            "errors": {
+                "loadFailed": "加载 2FA 设置失败",
+                "missingPhone": "请输入电话号码",
+                "invalidPhone": "请输入有效的 10 位号码",
+                "startFailed": "启动 2FA 注册失败",
+                "invalidCode": "请输入完整的 6 位验证码",
+                "completeFailed": "完成 2FA 注册失败",
+                "removeFailed": "移除 2FA 方式失败"
+            }
+        }
+    },
+    "components": {
+        "createBottomSheet": {
+            "title": "创建新项目",
+            "addExpense": "添加费用",
+            "addExpenseDesc": "手动添加费用",
+            "scanReceipt": "扫描收据",
+            "scanReceiptDesc": "扫描收据以提取项目",
+            "joinExpense": "加入费用",
+            "joinExpenseDesc": "使用链接或代码加入",
+            "scanTitle": "扫描收据",
+            "takePhoto": "拍照",
+            "takePhotoDesc": "拍摄新收据照片",
+            "chooseGallery": "从相册选择",
+            "chooseGalleryDesc": "选择现有照片",
+            "joinTitle": "加入费用",
+            "enterLink": "输入链接或代码",
+            "linkPlaceholder": "在此粘贴链接或代码...",
+            "joinButton": "加入",
+            "missingLinkError": "请输入邀请链接或代码",
+            "scanError": "扫描收据错误"
+        },
+        "changeVenmo": {
+            "title": "更改 Venmo",
+            "subtitle": "连接您的 Venmo 以更轻松地分摊费用",
+            "verified": "已验证 Venmo 账户",
+            "noProfilePic": "Venmo 账户（无头像）",
+            "changeAccount": "更改账户",
+            "usernameLabel": "Venmo 用户名",
+            "usernamePlaceholder": "your-venmo-id",
+            "removeHint": "留空以移除您的 Venmo 账户",
+            "save": "保存更改",
+            "verificationRequired": "需要验证",
+            "verificationRequiredDesc": "请等待 Venmo 验证完成或输入有效的用户名。",
+            "verificationInProgress": "验证进行中",
+            "verificationInProgressDesc": "请等待 Venmo 验证完成。",
+            "updateSuccess": "您的 Venmo 账户已成功更新。",
+            "removeSuccess": "您的 Venmo 账户已成功移除。",
+            "updateError": "更新 Venmo 账户时出错。请重试。",
+            "userNotFound": "Venmo 用户不存在。请检查名称并重试。",
+            "verifyError": "无法验证 Venmo 账户。请检查连接并重试。"
+        },
+        "changeExpenseName": {
+            "title": "更改费用名称",
+            "subtitle": "为此费用输入新名称",
+            "label": "费用名称",
+            "placeholder": "输入费用名称",
+            "save": "保存更改"
+        },
+        "expenses": {
+            "header": {
+                "edit": "编辑",
+                "add": "添加",
+                "track": "追踪",
+                "split": "分摊"
+            },
+            "footer": {
+                "settleUp": "结清",
+                "processing": "处理中..."
+            },
+            "paidBy": {
+                "label": "支付人",
+                "you": "您",
+                "noParticipants": "无参与者"
+            },
+            "participantsGrid": {
+                "addFriends": "添加好友",
+                "manage": "管理"
+            },
+            "expenseItemCard": {
+                "itemNamePlaceholder": "输入项目名称",
+                "allAllocated": "已全部分配",
+                "enterPrice": "输入价格以分摊",
+                "unallocated": "未分配：${{amount}}",
+                "totalExceeds": "总额超出账单 ${{amount}}",
+                "payers": "支付人",
+                "split": "分摊",
+                "cancel": "取消",
+                "save": "保存",
+                "settled": "付款时已结清",
+                "person": "人员 {{index}}",
+                "alerts": {
+                    "incomplete": "项目不完整",
+                    "incompleteDesc": "请检查：{{fields}}",
+                    "uneven": "分摊不均",
+                    "unevenDesc": "分摊金额与项目总额不符。调整分摊或总额。",
+                    "saveError": "保存费用错误：{{error}}"
+                },
+                "fields": {
+                    "name": "项目名称",
+                    "price": "价格",
+                    "payer": "至少一个支付人",
+                    "consumer": "分摊中至少一人"
+                }
+            },
+            "expenseViewCard": {
+                "paidByUnassigned": "由未知支付",
+                "paidByOne": "由 {{name}} 支付",
+                "paidByTwo": "由 {{name1}} 和 {{name2}} 支付",
+                "paidByMany": "由 {{name}} 和其他 {{count}} 人支付",
+                "untitledItem": "无标题项目",
+                "settled": "已结清",
+                "splitWith": "分摊人",
+                "actions": {
+                    "title": "费用操作",
+                    "message": "您想做什么？",
+                    "edit": "编辑",
+                    "delete": "删除",
+                    "cancel": "取消"
+                },
+                "locked": {
+                    "title": "项目已锁定",
+                    "message": "此项目是活动结算的一部分。取消结算以编辑此项目。"
+                }
+            },
+            "receiptBreakdown": {
+                "header": "收据项目",
+                "addItem": "添加项目",
+                "editItem": "编辑项目",
+                "itemName": "项目名称",
+                "itemNamePlaceholder": "输入项目名称",
+                "price": "价格",
+                "splitWith": "分摊人",
+                "selectPerson": "至少选择一人",
+                "cancel": "取消",
+                "save": "保存更改",
+                "lockedTitle": "项目已锁定",
+                "lockedMsg": "此项目是活动结算的一部分。取消结算以编辑此项目。",
+                "itemDefault": "项目 {{index}}",
+                "settled": "已结清",
+                "assignSomeone": "分配给某人",
+                "noOneAssigned": "未分配",
+                "extraFee": "标记为额外费用（小费、税费等）",
+                "fee": "费用",
+                "time": {
+                    "justNow": "刚刚",
+                    "minutesAgo": "{{count}} 分钟前",
+                    "hoursAgo": "{{count}} 小时前",
+                    "daysAgo": "{{count}} 天前",
+                    "weeksAgo": "{{count}} 周前"
+                }
+            },
+            "settlementInterface": {
+                "summary": {
+                    "allSettled": "全部结清！",
+                    "youOwe": "您欠",
+                    "youreOwed": "欠您",
+                    "pendingSettled": "{{pending}} 待处理 · {{settled}} 已结清",
+                    "pending": "{{count}} 待处理",
+                    "settled": "{{count}} 已结清"
+                },
+                "activity": {
+                    "title": "活动",
+                    "showMore": "显示更多 {{count}}...",
+                    "types": {
+                        "priceChange": "{{user}} 将总额从 ${{prev}} 更新为 ${{new}}",
+                        "itemAdded": "{{user}} 添加了 {{item}}",
+                        "itemAddedAmount": "{{user}} 添加了 {{item}}，金额 ${{amount}}",
+                        "itemRemoved": "{{user}} 删除了“{{item}}”",
+                        "itemRemovedAmount": "{{user}} 删除了 {{item}} (${{amount}})",
+                        "participantAdded": "{{user}} 添加了 {{participant}}",
+                        "participantRemoved": "{{user}} 删除了 {{participant}}",
+                        "default": "{{user}} 进行了更改",
+                        "itemModified": "{{user}} 将 {{item}} 编辑为 ${{amount}}",
+                        "itemModifiedComputed": "{{user}} 修改了 {{item}}：{{changes}}",
+                        "settled": "{{user}} 与 {{peer}} 结清了 ${{amount}}",
+                        "unsettled": "{{user}} 取消了与 {{peer}} 的 ${{amount}} 结算"
+                    }
+                },
+                "status": {
+                    "fullySettled": "完全结清",
+                    "partiallySettled": "部分结清",
+                    "settled": "已结清",
+                    "reminded": "已提醒",
+                    "awaitingPayment": "等待付款"
+                },
+                "items": {
+                    "title": "项目",
+                    "tapToSettle": "(点击结清)",
+                    "selectAll": "全选",
+                    "deselectAll": "取消全选"
+                },
+                "actions": {
+                    "allSettled": "全部结清",
+                    "selectToSettle": "选择项目以结清",
+                    "pay": "支付 ${{amount}}",
+                    "markSettled": "标记 ${{amount}} 已结清",
+                    "request": "请求 ${{amount}}",
+                    "reminderSent": "提醒已发送",
+                    "sendReminder": "发送提醒",
+                    "undoSettlement": "撤销结算"
+                },
+                "relationships": {
+                    "youOwe": "您欠 {{name}}",
+                    "owesYou": "{{name}} 欠您",
+                    "owes": "{{name}} 欠 {{name2}}"
+                },
+                "total": "(总计 ${{amount}})",
+                "empty": {
+                    "title": "全部结清！",
+                    "body": "每个人都已结清。无需付款。"
+                },
+                "banner": {
+                    "title": "由于更改，结算已更新。",
+                    "sub": "保留 {{new}} 个新项目，{{paid}} 个已支付项目。"
+                },
+                "alerts": {
+                    "markSettled": {
+                        "title": "标记为已结清",
+                        "message": "标记 ${{amount}} 为已结清？这将记录付款而不使用 Venmo。",
+                        "cancel": "取消",
+                        "confirm": "结清"
+                    },
+                    "unsettleAll": {
+                        "title": "撤销所有项目的结算",
+                        "message": "这将标记所有项目为未结清。您确定吗？",
+                        "confirm": "撤销结算"
+                    },
+                    "unsettle": {
+                        "title": "撤销费用结算",
+                        "message": "您确定要撤销所有项目的结算吗？",
+                        "confirm": "撤销结算"
+                    }
+                }
+            }
+        },
+        "referral": {
+            "progress": {
+                "title": "推荐进度",
+                "referrals": "{{count}} 个邀请",
+                "nextTier": "距离下一级还差 {{count}} 个"
+            },
+            "tier1": {
+                "title": "等级 1",
+                "requirement": "3 位好友",
+                "reward": "1 个月高级会员",
+                "benefits": [
+                    "无广告体验",
+                    "CSV 导出",
+                    "优先支持"
+                ]
+            },
+            "tier2": {
+                "title": "等级 2",
+                "requirement": "10 位好友",
+                "reward": "终身高级会员",
+                "benefits": [
+                    "等级 1 的所有福利",
+                    "自定义类别",
+                    "提前体验新功能"
+                ]
+            },
+            "share": {
+                "title": "邀请好友",
+                "description": "分享您的推荐链接以获得奖励",
+                "copyLink": "复制链接",
+                "shareLink": "分享链接",
+                "copied": "已复制到剪贴板！"
+            },
+            "history": {
+                "title": "推荐历史",
+                "confirmed": "已确认",
+                "pending": "待处理",
+                "empty": "暂无邀请"
+            }
+        }
     }
 }

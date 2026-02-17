@@ -90,7 +90,6 @@ export default function useSettlementActions({
       const merged = recomputeSettlementsForSave(expenseData, firestoreSettlements);
       return merged.map((s) => enrichWithUserIds(s, participantsToUse));
     } catch (error) {
-      console.error('[useSettlementActions] Error calculating settlements:', error);
       return [];
     }
   }, [expense?.settlements, expense?.participants, title, total, participants, items, selectedPayers]);
@@ -324,7 +323,6 @@ export default function useSettlementActions({
       try {
         await persistStatus(settlement, newStatus);
       } catch (err) {
-        console.error('[useSettlementActions] persist failed:', err);
         setStatus(settlement, rollbackStatus);
         Alert.alert('Error', 'Failed to save status. Please try again.');
       }
@@ -534,7 +532,6 @@ export default function useSettlementActions({
       try {
         await persistItemToggle(settlement, item.id, newSettled);
       } catch (err) {
-        console.error('[handleItemToggle] failed:', err);
         // Rollback: remove this item's override
         setItemOverrides(prev => {
           const keyOv = { ...(prev[pairKey] || {}) };
@@ -679,7 +676,6 @@ export default function useSettlementActions({
       try {
         await persistBulkItemToggle(settlement, itemIds, true);
       } catch (err) {
-        console.error('[handleBulkSettle] failed:', err);
         // Rollback
         setItemOverrides(prev => {
           const keyOv = { ...(prev[pairKey] || {}) };
@@ -878,7 +874,6 @@ export default function useSettlementActions({
           break;
 
         default:
-          console.warn('[useSettlementActions] Unknown action:', type);
       }
     },
     [participants, expense, expenseTitle, optimistic, setStatus, persistStatus, openVenmoOrFallback],

@@ -72,7 +72,6 @@ export const getUserContactPhoto = async (phoneNumber) => {
     return null;
 
   } catch (error) {
-    console.error('Error fetching user contact photo:', error);
     return null;
   }
 };
@@ -93,7 +92,6 @@ export const getContactPhotoForProfile = async (phoneNumber) => {
 
     return null;
   } catch (error) {
-    console.error('Error in getContactPhotoForProfile:', error);
     return null;
   }
 };

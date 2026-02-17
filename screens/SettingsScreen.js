@@ -7,7 +7,6 @@ import {
   Alert,
   ScrollView,
   Linking,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -101,15 +100,12 @@ const SettingsScreen = ({ navigation }) => {
     );
   };
 
-  const handleTermsOfService = () => {
-    navigation.navigate('TermsOfService');
+  const handlePrivacyPolicy = () => {
+    Linking.openURL('https://tryiou.com/privacy');
   };
 
-  const handleRateApp = () => {
-    const url = Platform.OS === 'ios' 
-      ? 'https://apps.apple.com/app/id123456789' 
-      : 'https://play.google.com/store/apps/details?id=com.yourapp.iou';
-    Linking.openURL(url);
+  const handleTermsOfService = () => {
+    navigation.navigate('TermsOfService');
   };
 
   const handleManageSubscription = async () => {
@@ -190,15 +186,15 @@ const SettingsScreen = ({ navigation }) => {
         <SectionHeader title={t('settings.support')} />
         <View style={styles.sectionContainer}>
           <SettingItem
-            icon="document-text-outline"
-            title={t('settings.terms')}
-            onPress={handleTermsOfService}
+            icon="shield-checkmark-outline"
+            title={t('settings.privacy')}
+            onPress={handlePrivacyPolicy}
           />
           <View style={styles.separator} />
           <SettingItem
-            icon="star-outline"
-            title={t('settings.rate')}
-            onPress={handleRateApp}
+            icon="document-text-outline"
+            title={t('settings.terms')}
+            onPress={handleTermsOfService}
           />
         </View>
 

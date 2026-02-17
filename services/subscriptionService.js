@@ -77,7 +77,6 @@ export const checkScanLimit = async () => {
 
     return (scanStats.count || 0) < SCAN_LIMIT_PER_WEEK;
   } catch (error) {
-    console.error('Error checking scan limit:', error);
     return false; // Fail safe
   }
 };
@@ -112,7 +111,6 @@ export const incrementScanUsage = async () => {
       });
     }
   } catch (error) {
-    console.error('Error incrementing scan usage:', error);
   }
 };
 

@@ -47,11 +47,9 @@ class NotificationService {
         try {
           await this.getFCMToken(userId);
         } catch (tokenError) {
-          console.warn('Could not get FCM token. This is normal on iOS simulator or if push notifications are not configured in Xcode');
           // Continue initialization even without token for development
         }
       } else {
-        console.warn('Notification permissions not granted - notifications will be disabled');
       }
       
       // Set up message handlers (these work even without permissions)
@@ -59,9 +57,7 @@ class NotificationService {
       
       this.isInitialized = true;
     } catch (error) {
-      console.error('Failed to initialize NotificationService:', error);
       // Don't throw - allow app to continue without notifications
-      console.warn('App will continue without push notifications');
     }
   }
 
@@ -75,7 +71,6 @@ class NotificationService {
           PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
         );
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          console.warn('Android notification permission denied');
           return false;
         }
       }
@@ -87,13 +82,11 @@ class NotificationService {
         authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
       if (!enabled) {
-        console.warn('iOS notification permission denied');
         return false;
       }
 
       return enabled;
     } catch (error) {
-      console.warn('Failed to request notification permissions:', error.message);
       return false;
     }
   }
@@ -128,7 +121,6 @@ class NotificationService {
 
       return this.fcmToken;
     } catch (error) {
-      console.error('Failed to get FCM token:', error);
       throw error;
     }
   }
@@ -149,7 +141,6 @@ class NotificationService {
       });
       
     } catch (error) {
-      console.error('Failed to update FCM token:', error);
     }
   }
 
@@ -168,7 +159,6 @@ class NotificationService {
           try {
             handler(remoteMessage);
           } catch (error) {
-            console.error('Error in message handler:', error);
           }
         });
       });
@@ -193,7 +183,6 @@ class NotificationService {
 
       return unsubscribeForeground;
     } catch (error) {
-      console.warn('Failed to setup message handlers:', error.message);
       return () => {}; // Return empty function
     }
   }
@@ -211,7 +200,6 @@ class NotificationService {
         try {
           handler({ ...remoteMessage, type: 'navigation' });
         } catch (error) {
-          console.error('Error in navigation handler:', error);
         }
       });
     }
@@ -262,7 +250,6 @@ class NotificationService {
       const result = await sendTestNotification();
       return result.data;
     } catch (error) {
-      console.error('Failed to send test notification:', error);
       throw error;
     }
   }
@@ -289,7 +276,6 @@ class NotificationService {
       
       return result.data;
     } catch (error) {
-      console.error('Failed to send notification to user:', error);
       throw error;
     }
   }
@@ -310,7 +296,6 @@ class NotificationService {
       
       return this.getDefaultPreferences();
     } catch (error) {
-      console.error('Failed to get notification preferences:', error);
       return this.getDefaultPreferences();
     }
   }
@@ -331,7 +316,6 @@ class NotificationService {
       });
       
     } catch (error) {
-      console.error('Failed to update notification preferences:', error);
       throw error;
     }
   }
@@ -392,7 +376,6 @@ class NotificationService {
       
       return true;
     } catch (error) {
-      console.error('Failed to check notification preferences:', error);
       return true; // Default to allowing notifications on error
     }
   }

@@ -39,7 +39,6 @@ export const getCurrentUserReferralLink = async (userId) => {
     const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
-      console.error('User not found');
       return null;
     }
 
@@ -65,13 +64,11 @@ export const getCurrentUserReferralLink = async (userId) => {
           }
         });
       } catch (updateError) {
-        console.error('Error updating user with referral code:', updateError);
       }
     }
 
     return getReferralLink(referralCode);
   } catch (error) {
-    console.error('Error getting referral link:', error);
     return null;
   }
 };
@@ -84,7 +81,6 @@ export const getUserReferralStats = async (userId) => {
     const db = getFirestore(getApp());
     const userDoc = await getDoc(doc(db, 'users', userId));
     if (!userDoc.exists()) {
-      console.error('User not found');
       // Return default stats instead of throwing
       return {
         referralCode: null,
@@ -132,7 +128,6 @@ export const getUserReferralStats = async (userId) => {
       totalInvitesSent: inviteStats.contactsInvited || 0
     };
   } catch (error) {
-    console.error('Error fetching referral stats:', error);
     // Return default stats instead of throwing
     return {
       referralCode: null,
@@ -176,7 +171,6 @@ export const trackReferralConversion = async (referrerId, referredUserId) => {
   try {
     // Handled by Cloud Function
   } catch (error) {
-    console.error('Error tracking referral conversion:', error);
   }
 };
 

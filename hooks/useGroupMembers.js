@@ -50,7 +50,6 @@ export const useGroupMembers = ({ visible, expenseId, onClose }) => {
       setStarredUsers(starred);
       setStarredUserIds(starred.map((user) => user.objectID || user.id));
     } catch (error) {
-      console.error('Error loading starred users:', error);
     } finally {
       setLoadingStarred(false);
     }

@@ -30,10 +30,8 @@ export const initializeRevenueCat = async (userId = null) => {
 
     return true;
   } catch (error) {
-    console.error('[RevenueCat] Initialization failed:', error);
     // In development or if needed for debugging, we might want to alert this
     if (__DEV__) {
-      console.warn('RevenueCat Init Error:', error.message);
     }
     return false;
   }
@@ -88,7 +86,6 @@ export const presentPaywall = async (options = {}) => {
     const offerings = await getOfferings();
 
     if (!offerings.current) {
-      console.error('[RevenueCat] No current offering found. Check RevenueCat dashboard.');
       throw new Error('No current offering found');
     }
 
@@ -102,7 +99,6 @@ export const presentPaywall = async (options = {}) => {
 
     return paywallResult;
   } catch (error) {
-    console.error('[RevenueCat] Error presenting paywall:', error);
     throw error;
   }
 };
