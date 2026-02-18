@@ -1,168 +1,311 @@
 <!doctype html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="icon" type="image/png" href="./logo.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IOU - Split Bills Effortlessly</title>
-  <meta name="description"
-    content="Split bills with friends the easy way. Scan receipts, split items, and settle up instantly with Venmo. The simplest bill splitting app.">
-  
+  <title>IOU — Split Bills Effortlessly</title>
+  <meta name="description" content="Scan receipts, assign items to friends, and settle up with Venmo in seconds. The fastest way to split bills.">
+  <meta name="robots" content="index, follow">
+  <meta property="og:title" content="IOU — Split Bills Effortlessly">
+  <meta property="og:description" content="Scan receipts, split items, settle with Venmo. Free.">
+  <meta property="og:image" content="https://iouapp.co/logo.png">
+  <meta property="og:url" content="https://iouapp.co/">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="canonical" href="https://iouapp.co/">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./style.css">
 </head>
-
 <body>
-  <div id="app">
-    <nav class="navbar">
-      <div class="nav-container">
-        <a href="/" class="logo">
-          <img src="./logo.png" alt="IOU - Bill Splitting App" class="logo-img">
-          <span>IOU</span>
-        </a>
-        <button type="button" class="btn-nav" id="nav-download">Download</button>
-      </div>
-    </nav>
+<div id="app">
 
-    <main class="scrolly-container">
-      
-      <!-- Sticky Phone Wrapper -->
-      <div class="sticky-wrapper">
-        <div class="iphone-mockup">
-          <img src="./iphone-frame.png" alt="iPhone Frame" class="iphone-frame-img" />
-          <div class="iphone-screen">
-            <!-- Screen 1: Hero Video -->
-            <div class="screen-content active" id="screen-hero">
-              <video class="iphone-screen-video" src="./animation.mov" autoplay loop muted playsinline></video>
-            </div>
-            
-            <!-- Screen 2: Scan Receipts -->
-            <div class="screen-content" id="screen-receipt">
-              <div class="screen-inner">
-                <div class="icon-circle receipt-bg">
-                  <i data-lucide="receipt-text" class="screen-icon"></i>
-                </div>
-                <h3>Scanning...</h3>
-                <div class="scan-line"></div>
-              </div>
-            </div>
+<!-- ===== NAV ===== -->
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="/" class="logo">
+      <img src="./logo.png" alt="IOU" class="logo-img">
+      <span>IOU</span>
+    </a>
+    <button class="btn-nav open-qr-modal" id="nav-dl">Download Free</button>
+  </div>
+</nav>
 
-            <!-- Screen 3: Split Items -->
-            <div class="screen-content" id="screen-split">
-              <div class="screen-inner">
-                <div class="split-list">
-                  <div class="split-item">
-                    <span class="avatar">A</span>
-                    <div class="bar" style="width: 60%"></div>
-                  </div>
-                  <div class="split-item">
-                    <span class="avatar" style="background:#4CAF50">B</span>
-                    <div class="bar" style="width: 40%"></div>
-                  </div>
-                </div>
-                <h3>Fair Splits</h3>
-              </div>
-            </div>
-
-            <!-- Screen 4: Venmo -->
-            <div class="screen-content" id="screen-venmo">
-               <div class="screen-inner">
-                 <img src="./venmo.png" alt="Venmo" class="venmo-logo-large">
-                 <h3>Settled!</h3>
-               </div>
-            </div>
-
-            <!-- Removed dynamic island as it is in the image -->
-            <div class="iphone-home-indicator"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Scrolling Text Sections -->
-      <div class="content-stream">
-        
-        <!-- Section 1: Hero -->
-        <section class="step" data-screen="screen-hero">
-          <div class="step-content">
-            <h1>Split Bills<br><span class="gradient-text">Effortlessly</span></h1>
-            <p>The simplest way to handle shared expenses with friends.</p>
-          </div>
-          <div class="hero-visual">
-            <div class="iphone-mockup" aria-label="iPhone mockup">
-              <div class="iphone-frame">
-                <div class="iphone-screen">
-                  <video
-                    class="iphone-screen-video"
-                    src="./animation.mp4"
-                    autoplay
-                    loop
-                    muted
-                    playsinline
-                    aria-label="IOU app profile screen animation"
-                  ></video>
-                  <div class="iphone-dynamic-island" aria-hidden="true"></div>
-                  <div class="iphone-home-indicator" aria-hidden="true"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- Section 3: Split -->
-        <section class="step" data-screen="screen-split">
-          <div class="step-content">
-            <h2>Split Items</h2>
-            <p>Assign items to friends or split shared costs instantly.</p>
-          </div>
-        </section>
-
-        <!-- Section 4: Venmo -->
-        <section class="step" data-screen="screen-venmo">
-          <div class="step-content">
-            <h2>Instant Settle</h2>
-            <p>Pay or request directly via Venmo with one tap.</p>
-          </div>
-        </section>
-
-        <!-- Section 5: Download -->
-        <section class="step last-step">
-          <div class="step-content">
-            <h2>Get Started</h2>
-            <p>Download IOU for free today.</p>
-            <button class="app-store-download-btn open-qr-modal">
-              <img src="./app-store-download.png" alt="Download on App Store" class="store-badge">
-            </button>
-          </div>
-        </section>
-
-      </div>
-
-    </main>
-
-    <footer id="footer-simple">
-      <p>&copy; 2026 IOU. <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a></p>
-    </footer>
-
-    <!-- QR Modal (Preserved) -->
-    <div class="modal-overlay" id="qr-modal" aria-hidden="true">
-      <div class="modal-backdrop" id="modal-backdrop"></div>
-      <div class="modal-content qr-modal">
-        <button type="button" class="modal-close" id="close-qr-modal" aria-label="Close">&times;</button>
-        <h3 class="modal-title">Download IOU</h3>
-        <p class="modal-subtitle">Scan to download</p>
-        <div class="modal-qr-wrapper">
-          <img id="qr-code-image" src="" alt="QR code" class="modal-qr-img">
-        </div>
-        <a href="#" id="app-store-link" class="modal-store-link" target="_blank">Open in App Store</a>
+<!-- ===== HERO ===== -->
+<section class="hero" id="hero">
+  <div class="hero-dots" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="hero-left">
+      <h1 class="hero-h1">
+        <span class="line-mask"><span class="hw">Split</span>&thinsp;<span class="hw">Expenses.</span></span>
+        <span class="line-mask"><span class="hw gw">Effortlessly.</span></span>
+      </h1>
+      <div class="hero-cta">
+        <button class="cta-btn open-qr-modal" aria-label="Download IOU on the App Store">
+          <img src="./app-store-download.png" alt="Download on the App Store" class="badge-img">
+        </button>
+        <span class="hero-sub">Free &middot; iOS &middot; No ads</span>
       </div>
     </div>
 
+    <div class="hero-right">
+      <div class="hero-phone-wrap" id="hero-phone-wrap">
+        <img src="./iphone-frame.png" alt="iPhone mockup" class="iphone-frame-img hero-iphone">
+        <div class="chip chip-a" aria-hidden="true"><span>📸</span>&nbsp;Receipt scanned!</div>
+        <div class="chip chip-b" aria-hidden="true"><span>✓</span>&nbsp;$24.50 settled</div>
+        <div class="chip chip-c" aria-hidden="true"><span>👥</span>&nbsp;3 friends added</div>
+      </div>
+    </div>
   </div>
 
-  <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
-  <script type="module" src="/src/main.js"></script>
+  <div class="scroll-hint" aria-hidden="true">
+    <span class="scroll-hint-text">Scroll to explore</span>
+    <div class="scroll-hint-bar"></div>
+  </div>
+</section>
+
+<!-- ===== STORY ===== -->
+<section class="story" id="story">
+  <!-- Step progress dots -->
+  <div class="story-dots" aria-hidden="true">
+    <div class="sdot active"></div>
+    <div class="sdot"></div>
+    <div class="sdot"></div>
+    <div class="sdot"></div>
+  </div>
+
+  <div class="story-layout">
+    <!-- Left: Sticky phone -->
+    <div class="story-phone-col">
+      <div class="story-sticky">
+        <div class="iphone story-iphone">
+          <div class="iphone-video-wrap">
+            <video
+              class="story-video"
+              src="./ScanningReceipt.mov"
+              autoplay
+              loop
+              muted
+              playsinline
+              aria-label="Scanning a receipt in IOU"
+            ></video>
+            <img src="./iphone-frame.png" alt="" class="iphone-frame-overlay" aria-hidden="true">
+          </div>
+          <!-- Annotation callouts -->
+          <div class="ann" id="ann1"><span>✨</span>&nbsp;AI reads every item</div>
+          <div class="ann" id="ann2"><span>👆</span>&nbsp;Tap to assign</div>
+          <div class="ann" id="ann3"><span>📊</span>&nbsp;Auto-calculated</div>
+          <div class="ann" id="ann4"><span>💸</span>&nbsp;One tap &rarr; Venmo</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Scrolling steps -->
+    <div class="story-steps-col">
+      <div class="story-step" data-step="0">
+        <div class="step-box">
+          <span class="step-tag">01</span>
+          <h2 class="step-h2">Snap the&nbsp;<em>receipt.</em></h2>
+          <p class="step-p">Open the camera and snap a photo. IOU's AI reads every line item, price, and tax automatically — no typing required.</p>
+          <ul class="step-list">
+            <li>Works with any receipt format</li>
+            <li>AI extracts items in seconds</li>
+            <li>Manual entry also available</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="story-step" data-step="1">
+        <div class="step-box">
+          <span class="step-tag">02</span>
+          <h2 class="step-h2">Assign each&nbsp;<em>item.</em></h2>
+          <p class="step-p">Tap any item to assign it. Shared dishes? Split equally, by percentage, or custom amounts — your call.</p>
+          <ul class="step-list">
+            <li>Per-item assignment</li>
+            <li>Custom split percentages</li>
+            <li>Add friends with one tap</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="story-step" data-step="2">
+        <div class="step-box">
+          <span class="step-tag">03</span>
+          <h2 class="step-h2">Track&nbsp;<em>balances.</em></h2>
+          <p class="step-p">IOU instantly calculates who owes what across all shared expenses. The full picture, in one glance.</p>
+          <ul class="step-list">
+            <li>Net balance per person</li>
+            <li>Full expense history</li>
+            <li>Visual balance breakdown</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="story-step" data-step="3">
+        <div class="step-box">
+          <span class="step-tag">04</span>
+          <h2 class="step-h2">Settle with&nbsp;<em>Venmo.</em></h2>
+          <p class="step-p">When it's time to pay up, one tap opens Venmo with the exact amount pre-filled. No math. No awkwardness.</p>
+          <ul class="step-list">
+            <li>Pre-filled payment amount</li>
+            <li>Works without Venmo too</li>
+            <li>Mark as settled manually</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FEATURES (dark) ===== -->
+<section class="features" id="features">
+  <div class="features-inner">
+    <div class="features-head">
+      <span class="sec-tag">Why IOU?</span>
+      <h2 class="sec-h2">Built for real <span class="gw">friendships.</span></h2>
+      <p class="sec-p">No complicated accounting. No splitting headaches. Just the simplest way to keep things fair.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat-card">
+        <div class="feat-icon">📸</div>
+        <h3>AI Receipt Scanning</h3>
+        <p>Point your camera at any receipt. IOU reads every item, price, and tax in seconds — automatically.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">⚡</div>
+        <h3>Instant Venmo</h3>
+        <p>Settle up with one tap. The exact amount is pre-filled — no math required.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">👥</div>
+        <h3>Group Expenses</h3>
+        <p>Add as many friends as you need to any expense, any time.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">✂️</div>
+        <h3>Custom Splits</h3>
+        <p>Equal, percentage, or custom amounts. Your choice, always.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">📊</div>
+        <h3>Balance Tracking</h3>
+        <p>Always know who owes who, across all your shared expenses.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">✏️</div>
+        <h3>Manual Entry</h3>
+        <p>No receipt? No problem. Create any expense from scratch.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SHOWCASE ===== -->
+<section class="showcase" id="showcase">
+  <div class="showcase-inner">
+    <div class="showcase-text">
+      <span class="sec-tag showcase-tag">See it in action</span>
+      <h2 class="sec-h2 sec-h2-light">From scan to <span class="gw">settled.</span></h2>
+      <p class="sec-p sec-p-light">Under a minute, start to finish. IOU is built for speed — so you can stop thinking about money and get back to your friends.</p>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-num"><span class="cnt" data-to="30">0</span>s</div>
+          <div class="stat-label">to scan a receipt</div>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="stat">
+          <div class="stat-num"><span class="cnt" data-to="1">0</span>&nbsp;tap</div>
+          <div class="stat-label">to settle via Venmo</div>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="stat">
+          <div class="stat-num"><span class="cnt" data-to="100">0</span>%</div>
+          <div class="stat-label">free to use</div>
+        </div>
+      </div>
+    </div>
+    <div class="showcase-phones">
+      <img src="./iphone-frame.png" alt="iPhone mockup" class="iphone-frame-img sc-phone sc-phone-1">
+      <img src="./iphone-frame.png" alt="iPhone mockup" class="iphone-frame-img sc-phone sc-phone-2">
+    </div>
+  </div>
+</section>
+
+<!-- ===== DOWNLOAD ===== -->
+<section class="download" id="download">
+  <div class="dl-glow" aria-hidden="true"></div>
+  <div class="dl-inner">
+    <span class="sec-tag sec-tag-dl">Ready to start?</span>
+    <h2 class="dl-h2">Split bills.<br><span class="gw">Not friendships.</span></h2>
+    <p class="dl-p">Free to download. No subscription. No ads. No nonsense.</p>
+    <div class="dl-actions">
+      <button class="cta-btn open-qr-modal" aria-label="Download IOU on the App Store">
+        <img src="./app-store-download.png" alt="Download on the App Store" class="badge-img">
+      </button>
+      <span class="dl-note">Free &middot; iOS &middot; No account required to get started</span>
+    </div>
+    <div class="dl-phone-wrap">
+      <img src="./iphone-frame.png" alt="iPhone mockup" class="iphone-frame-img dl-iphone">
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="/support/">Support</a>
+      <a href="/privacy.html">Privacy Policy</a>
+      <a href="/terms.html">Terms of Service</a>
+    </div>
+    <p class="footer-copy">&copy; 2026 IOU &middot; Made with ❤️ for splitting bills</p>
+  </div>
+</footer>
+
+<!-- ===== QR MODAL ===== -->
+<div class="modal-ol" id="qr-modal" aria-hidden="true">
+  <div class="modal-bd" id="modal-backdrop"></div>
+  <div class="modal-box">
+    <button class="modal-x" id="close-qr-modal" aria-label="Close">&times;</button>
+    <h3 class="modal-ttl">Download IOU</h3>
+    <p class="modal-sub">Scan the QR code to download</p>
+    <div class="modal-qr-wrap">
+      <img id="qr-code-image" src="" alt="QR code to App Store" class="modal-qr-img">
+    </div>
+    <a href="#" id="app-store-link" class="modal-link" target="_blank" rel="noopener">Open in App Store</a>
+  </div>
+</div>
+
+</div><!-- #app -->
+
+<script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
+<script type="module" src="/src/main.js"></script>
+<script>
+(function () {
+  var APP_URL = 'https://apps.apple.com/app/iou/id000000000';
+  var QR = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=';
+  var modal = document.getElementById('qr-modal');
+  var qrImg = document.getElementById('qr-code-image');
+  var link = document.getElementById('app-store-link');
+  function openM() {
+    qrImg.src = QR + encodeURIComponent(APP_URL);
+    link.href = APP_URL;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeM() {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+  document.querySelectorAll('.open-qr-modal').forEach(function (el) { el.addEventListener('click', openM); });
+  document.getElementById('close-qr-modal').addEventListener('click', closeM);
+  document.getElementById('modal-backdrop').addEventListener('click', closeM);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeM(); });
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+})();
+</script>
 </body>
 </html>
