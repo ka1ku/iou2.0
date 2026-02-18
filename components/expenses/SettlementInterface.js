@@ -63,7 +63,7 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
   const sorted = changeLog?.length ? [...changeLog]
     .filter(e => e.type !== 'priceChange')
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) : [];
-  const visible = activityExpanded ? sorted : sorted.slice(0, 3);
+  const visible = activityExpanded ? sorted : sorted.slice(0, 1);
 
   const relative = (ts) => {
     const diffMs = Date.now() - new Date(ts).getTime();
@@ -189,12 +189,12 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
           <View style={styles.activityDivider} />
           <TouchableOpacity
             style={styles.activityHeaderInline}
-            onPress={() => sorted.length > 3 && setActivityExpanded(!activityExpanded)}
-            disabled={sorted.length <= 3}
+            onPress={() => sorted.length > 1 && setActivityExpanded(!activityExpanded)}
+            disabled={sorted.length <= 1}
           >
             <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
             <Text style={styles.activityTitleInline}>{t('components.expenses.settlementInterface.activity.title')}</Text>
-            {sorted.length > 3 && (
+            {sorted.length > 1 && (
               <Ionicons name={activityExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
             )}
           </TouchableOpacity>
@@ -207,9 +207,9 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
               </View>
             </View>
           ))}
-          {!activityExpanded && sorted.length > 3 && (
+          {!activityExpanded && sorted.length > 1 && (
             <TouchableOpacity style={styles.showMore} onPress={() => setActivityExpanded(true)}>
-              <Text style={styles.showMoreText}>{t('components.expenses.settlementInterface.activity.showMore', { count: sorted.length - 3 })}</Text>
+              <Text style={styles.showMoreText}>{t('components.expenses.settlementInterface.activity.showMore', { count: sorted.length - 1 })}</Text>
             </TouchableOpacity>
           )}
         </>
@@ -269,7 +269,7 @@ const StatusPill = ({ status }) => {
 /* ─────────────────────────────────────────────────────────────────────────────
    Associated Items List
    ───────────────────────────────────────────────────────────────────────── */
-const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection, expenseType = 'expense' }) => {
+const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection, expenseType = 'expense', isCurrentUserDebtor }) => {
   const { t } = useTranslation();
   if (!items || items.length === 0) return null;
 
@@ -277,13 +277,16 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
   const unsettledItems = items.filter(i => !i.settled);
   const allUnsettledSelected = unsettledItems.length > 0 && unsettledItems.every(i => selectedItemIds?.has(i.id));
 
+  // Receipt mode: no per-item selection, only settle all at once
+  const canSelectItems = !isReceiptMode && !readOnly;
+
   return (
     <View style={styles.assocContainer}>
       <View style={styles.assocHeader}>
         <Text style={styles.assocTitle}>
-          {t('components.expenses.settlementInterface.items.title')} {!readOnly && !selectedItemIds && !isReceiptMode && t('components.expenses.settlementInterface.items.tapToSettle')}
+          {t('components.expenses.settlementInterface.items.title')} {canSelectItems && !selectedItemIds && t('components.expenses.settlementInterface.items.tapToSettle')}
         </Text>
-        {!readOnly && selectedItemIds && !isReceiptMode && unsettledItems.length > 1 && (
+        {canSelectItems && selectedItemIds && unsettledItems.length > 1 && (
           <TouchableOpacity
             onPress={() => {
               if (allUnsettledSelected) {
@@ -302,14 +305,14 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
       </View>
       {items.map((item, i) => {
         const isSettled = item.settled;
-        const isSelected = !isSettled && selectedItemIds?.has(item.id);
+        const isSelected = canSelectItems && !isSettled && selectedItemIds?.has(item.id);
 
         let iconName, iconColor;
         if (isSettled) {
           iconName = 'checkmark-circle';
           iconColor = Colors.success;
         } else if (isReceiptMode) {
-          // Receipt mode: no checkbox, just show item
+          // Receipt: no checkbox for unsettled items
           iconName = null;
           iconColor = null;
         } else if (isSelected) {
@@ -321,13 +324,20 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
         }
 
         const handlePress = () => {
-          if (readOnly || isReceiptMode) return; // No interaction in receipt mode
+          if (readOnly || isReceiptMode) return;
           if (isSettled) {
             onToggleItem?.(settlement, item);
           } else if (onToggleSelection) {
             onToggleSelection(item.id);
           }
         };
+
+        // Directionality color: red = current user owes, green = current user is owed
+        let amountDirectionColor = null;
+        if (!isSettled && isCurrentUserDebtor !== undefined) {
+          const currentUserOwes = isCurrentUserDebtor ? !item.isOffset : item.isOffset;
+          amountDirectionColor = currentUserOwes ? Colors.error : Colors.success;
+        }
 
         return (
           <TouchableOpacity
@@ -348,16 +358,17 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
             <Text style={[
               styles.assocName,
               isSettled && styles.assocNameSettled,
-              !isSettled && !isSelected && selectedItemIds && !isReceiptMode && styles.assocNameDeselected,
+              !isSettled && !isSelected && selectedItemIds && canSelectItems && styles.assocNameDeselected,
             ]} numberOfLines={1}>
               {item.name}
             </Text>
             <Text style={[
               styles.assocAmount,
               isSettled && styles.assocAmountSettled,
-              !isSettled && !isSelected && selectedItemIds && !isReceiptMode && styles.assocAmountDeselected,
+              !isSettled && !isSelected && selectedItemIds && canSelectItems && styles.assocAmountDeselected,
+              !isSettled && (amountDirectionColor ? { color: amountDirectionColor } : item.isOffset && styles.assocAmountOffset),
             ]}>
-              ${item.amount.toFixed(2)}
+              {item.amount >= 0 ? `$${item.amount.toFixed(2)}` : `−$${Math.abs(item.amount).toFixed(2)}`}
             </Text>
           </TouchableOpacity>
         );
@@ -381,6 +392,14 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
   const status = settlement.status || 'noAction';
   const isSettled = status === 'markedAsPaid' || status === 'confirmed' || status === 'complete';
 
+  // Effective amount: use remainingAmount when partial so display and buttons stay aligned
+  const effectiveAmount = status === 'partial'
+    ? (settlement.remainingAmount ?? settlement.amount)
+    : settlement.amount;
+
+  // Directionality for item coloring (undefined for spectators)
+  const isCurrentUserDebtor = isDebtor ? true : isCreditor ? false : undefined;
+
   const [busy, setBusy] = useState(false);
   const [venmoTag, setVenmoTag] = useState(null);
 
@@ -390,15 +409,14 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     [settlement.associatedItems]
   );
 
-  // For receipt flow, always select ALL items (no state needed)
-  // For expense flow, use stateful selection
+  // Receipt: always all unsettled (settle all at once). Expense: stateful selection.
   const isReceiptMode = expenseType === 'receipt';
   const [selectedItemIdsState, setSelectedItemIdsState] = useState(() => new Set(unsettledItemIds));
   const selectedItemIds = isReceiptMode ? new Set(unsettledItemIds) : selectedItemIdsState;
 
   // Sync selection when unsettled items change (e.g. after settling/unsettling)
   useEffect(() => {
-    if (isReceiptMode) return; // No state updates in receipt mode
+    if (isReceiptMode) return;
     setSelectedItemIdsState(prev => {
       const unsettledSet = new Set(unsettledItemIds);
       const next = new Set();
@@ -415,7 +433,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
   }, [unsettledItemIds.join(','), isReceiptMode]);
 
   const toggleSelection = useCallback((itemId) => {
-    if (isReceiptMode) return; // No toggling in receipt mode
+    if (isReceiptMode) return;
     setSelectedItemIdsState(prev => {
       const next = new Set(prev);
       if (next.has(itemId)) next.delete(itemId);
@@ -477,9 +495,38 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
   /* ── action button ─────────────────────────────────────────────────── */
   const hasItems = (settlement.associatedItems || []).length > 0;
   const noSelection = hasItems && selectedItemIds.size === 0;
+  const isFlipped = effectiveAmount < 0;
+  const absAmount = hasItems ? Math.abs(selectedAmount) : Math.abs(effectiveAmount);
 
   const actionBtn = () => {
     if (readOnly) return null;
+
+    // Receipt mode: single Settle/Unsettle per pair, no per-item controls
+    if (isReceiptMode) {
+      if (isSettled) {
+        return (
+          <View style={styles.actionBtnGroup}>
+            {btn(t('components.expenses.settlementInterface.actions.allSettled'), 'checkmark-circle', 'success', null)}
+            {btn(t('components.expenses.settlementInterface.actions.undoSettlement'), 'arrow-undo-outline', 'secondary', () => fire('undoMarkAsPaid'))}
+          </View>
+        );
+      }
+      if (isDebtor || isCreditor) {
+        const amt = `$${Math.abs(settlement.amount).toFixed(2)}`;
+        return btn(
+          t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }),
+          'checkmark-circle-outline',
+          'secondary',
+          () => unsettledItemIds.length > 0 ? fire('markAsSettled') : fire('markAsPaid'),
+        );
+      }
+      if (isSpectator) {
+        if (status === 'reminderSent')
+          return btn(t('components.expenses.settlementInterface.actions.reminderSent'), 'checkmark', 'disabled');
+        return btn(t('components.expenses.settlementInterface.actions.sendReminder'), 'notifications-outline', 'secondary', () => fire('sendReminder'));
+      }
+      return null;
+    }
 
     if (status === 'complete') {
       const confirmUnsettleAll = () => {
@@ -504,7 +551,7 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     }
 
     const confirmMarkSettled = () => {
-      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      const amt = `$${absAmount.toFixed(2)}`;
       Alert.alert(
         t('components.expenses.settlementInterface.alerts.markSettled.title'),
         t('components.expenses.settlementInterface.alerts.markSettled.message', { amount: amt }),
@@ -515,13 +562,16 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
       );
     };
 
+    // When flipped (negative amount), debtor is owed → shows Request; creditor owes → shows Pay
     if (isDebtor) {
       if (noSelection)
         return btn(t('components.expenses.settlementInterface.actions.selectToSettle'), 'checkbox-outline', 'disabled');
-      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      const amt = `$${absAmount.toFixed(2)}`;
       return (
         <View style={styles.actionBtnGroup}>
-          {btn(t('components.expenses.settlementInterface.actions.pay', { amount: amt }), 'logo-venmo', 'venmo', () => fire('makePayment'))}
+          {isFlipped
+            ? btn(t('components.expenses.settlementInterface.actions.request', { amount: amt }), 'logo-venmo', 'venmo', () => fire('requestPayment'))
+            : btn(t('components.expenses.settlementInterface.actions.pay', { amount: amt }), 'logo-venmo', 'venmo', () => fire('makePayment'))}
           {onBulkSettle && btn(t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }), 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
         </View>
       );
@@ -529,10 +579,12 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
     if (isCreditor) {
       if (noSelection)
         return btn(t('components.expenses.settlementInterface.actions.selectToSettle'), 'checkbox-outline', 'disabled');
-      const amt = hasItems ? `$${selectedAmount.toFixed(2)}` : `$${settlement.amount.toFixed(2)}`;
+      const amt = `$${absAmount.toFixed(2)}`;
       return (
         <View style={styles.actionBtnGroup}>
-          {btn(t('components.expenses.settlementInterface.actions.request', { amount: amt }), 'logo-venmo', 'venmo', () => fire('requestPayment'))}
+          {isFlipped
+            ? btn(t('components.expenses.settlementInterface.actions.pay', { amount: amt }), 'logo-venmo', 'venmo', () => fire('makePayment'))
+            : btn(t('components.expenses.settlementInterface.actions.request', { amount: amt }), 'logo-venmo', 'venmo', () => fire('requestPayment'))}
           {onBulkSettle && btn(t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }), 'checkmark-circle-outline', 'secondary', confirmMarkSettled)}
         </View>
       );
@@ -601,8 +653,9 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
             <View style={styles.pRow}>
               <View style={styles.pSide}>
                 {avatar(fromP, fromP?.userId === currentUserId)}
-                <Text style={styles.pName} numberOfLines={1}>{isDebtor ? 'You' : fromName?.split(' ')[0]}</Text>
-                {venmoTag && isDebtor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
+                <Text style={styles.pName} numberOfLines={1}>{fromName?.split(' ')[0]}</Text>
+                {isDebtor && <Text style={styles.youBadge}>(you)</Text>}
+                {venmoTag && isCreditor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
               </View>
               <View style={styles.connector}>
                 <View style={styles.dash} />
@@ -613,61 +666,71 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               </View>
               <View style={styles.pSide}>
                 {avatar(toP, toP?.userId === currentUserId)}
-                <Text style={styles.pName} numberOfLines={1}>{isCreditor ? 'You' : toName?.split(' ')[0]}</Text>
-                {venmoTag && isCreditor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
+                <Text style={styles.pName} numberOfLines={1}>{toName?.split(' ')[0]}</Text>
+                {isCreditor && <Text style={styles.youBadge}>(you)</Text>}
+                {venmoTag && isDebtor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
               </View>
             </View>
 
-            {/* Who owes who label */}
+            {/* Who owes who label — when effectiveAmount is negative, direction flips */}
             <View style={styles.oweLabel}>
               {isDebtor && (
                 <Text style={styles.oweLabelText}>
-                  {t('components.expenses.settlementInterface.relationships.youOwe', { name: toName?.split(' ')[0] })}
+                  {isFlipped
+                    ? t('components.expenses.settlementInterface.relationships.owesYou', { name: toName?.split(' ')[0] })
+                    : t('components.expenses.settlementInterface.relationships.youOwe', { name: toName?.split(' ')[0] })}
                 </Text>
               )}
               {isCreditor && (
                 <Text style={styles.oweLabelText}>
-                  {t('components.expenses.settlementInterface.relationships.owesYou', { name: fromName?.split(' ')[0] })}
+                  {isFlipped
+                    ? t('components.expenses.settlementInterface.relationships.youOwe', { name: fromName?.split(' ')[0] })
+                    : t('components.expenses.settlementInterface.relationships.owesYou', { name: fromName?.split(' ')[0] })}
                 </Text>
               )}
               {isSpectator && (
                 <Text style={styles.oweLabelText}>
-                  {t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
+                  {isFlipped
+                    ? t('components.expenses.settlementInterface.relationships.owes', { name: toName?.split(' ')[0], name2: fromName?.split(' ')[0] })
+                    : t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
                 </Text>
               )}
             </View>
 
-            {/* Amount */}
+            {/* Amount — use abs when negative (direction shown in label above) */}
             <View style={styles.amtRow}>
               <Text style={[styles.dollar, isSettled && styles.faded]}>$</Text>
               <View style={{ alignItems: 'center' }}>
                 <Text style={[styles.amt, isSettled && styles.amtStruck]}>
-                  {(status === 'partial' ? (settlement.remainingAmount || settlement.amount) : settlement.amount).toFixed(2)}
+                  {Math.abs(effectiveAmount).toFixed(2)}
                 </Text>
                 {status === 'partial' && (
                   <Text style={styles.totalText}>
-                    {t('components.expenses.settlementInterface.total', { amount: settlement.amount.toFixed(2) })}
+                    {t('components.expenses.settlementInterface.total', { amount: Math.abs(settlement.amount).toFixed(2) })}
                   </Text>
                 )}
               </View>
             </View>
 
-            {/* Associated Items */}
-            <AssociatedItemsList
-              items={settlement.associatedItems}
-              settlement={settlement}
-              onToggleItem={onToggleItem}
-              readOnly={readOnly}
-              selectedItemIds={!readOnly && !isReceiptMode ? selectedItemIds : undefined}
-              onToggleSelection={!readOnly && !isReceiptMode ? toggleSelection : undefined}
-              expenseType={expenseType}
-            />
+            {/* Associated Items — hidden in receipt mode (uses single settle/unsettle button instead) */}
+            {!isReceiptMode && (
+              <AssociatedItemsList
+                items={settlement.associatedItems}
+                settlement={settlement}
+                onToggleItem={onToggleItem}
+                readOnly={readOnly}
+                selectedItemIds={!readOnly ? selectedItemIds : undefined}
+                onToggleSelection={!readOnly ? toggleSelection : undefined}
+                expenseType={expenseType}
+                isCurrentUserDebtor={isCurrentUserDebtor}
+              />
+            )}
 
             {/* Actions */}
             {actionBtn()}
 
             {/* Subtle links */}
-            {!readOnly && (status === 'markedAsPaid' || status === 'confirmed') && (
+            {!readOnly && !isReceiptMode && (status === 'markedAsPaid' || status === 'confirmed') && (
               <TouchableOpacity style={styles.link} onPress={() => fire('undoMarkAsPaid')}>
                 <Text style={styles.linkText}>{t('components.expenses.settlementInterface.actions.undoSettlement')}</Text>
               </TouchableOpacity>
@@ -700,14 +763,18 @@ const SettlementInterface = ({
   const current = participants.find((p) => p.userId === currentUserId) || {};
   const name = current.name || '';
 
-  // Filter settlements to only show those involving the current user
+  // Filter settlements to only show those involving the current user.
+  // Use userId for reliable matching (works regardless of name/display); fallback to name for old data.
   const userSettlements = useMemo(() => {
     return settlements.filter(s => {
+      if (s.debtorUserId || s.creditorUserId) {
+        return s.debtorUserId === currentUserId || s.creditorUserId === currentUserId;
+      }
       const debtor = s.debtor || s.from;
       const creditor = s.creditor || s.to;
       return debtor === name || creditor === name;
     });
-  }, [settlements, name]);
+  }, [settlements, name, currentUserId]);
 
   if (!userSettlements.length && !readOnly) {
     return (
@@ -801,6 +868,7 @@ const styles = StyleSheet.create({
   avatarLetter: { fontSize: Math.floor(AVATAR_SIZE / 2.5), fontWeight: '600', color: Colors.textSecondary },
   pName: { fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textAlign: 'center', maxWidth: 70 },
   venmo: { fontSize: 10, color: Colors.venmo, fontWeight: '500', textAlign: 'center', maxWidth: 70, marginTop: 1 },
+  youBadge: { fontSize: 9, color: Colors.accent, fontWeight: '600', textAlign: 'center', maxWidth: 70, lineHeight: 11 },
 
   // Connector
   connector: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.xs },
@@ -829,6 +897,7 @@ const styles = StyleSheet.create({
   assocNameSettled: { textDecorationLine: 'line-through', color: Colors.textSecondary },
   assocAmount: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500', marginLeft: Spacing.sm },
   assocAmountSettled: { textDecorationLine: 'line-through', opacity: 0.6 },
+  assocAmountOffset: { color: Colors.success },
   assocNameDeselected: { opacity: 0.5 },
   assocAmountDeselected: { opacity: 0.5 },
 

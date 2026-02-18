@@ -73,8 +73,9 @@ const ParticipantChip = memo(({ participant, isSelected, onPress, disabled = fal
       )}
     </View>
     <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]} numberOfLines={1}>
-      {participant.name === 'Me' ? 'You' : participant.name.split(' ')[0]}
+      {participant.name.split(' ')[0]}
     </Text>
+    {participant.id === 'me-participant' && <Text style={styles.chipYouBadge}>(you)</Text>}
   </TouchableOpacity>
 ), (prevProps, nextProps) => {
   return (
@@ -359,8 +360,7 @@ const ItemRow = memo(({
                 <View style={styles.viewModeChipContainer}>
                   {participants.map((participant, pIndex) => {
                     const isSelected = item.selectedConsumers?.includes(pIndex);
-                    const isToggling = togglingState?.itemId === item.id &&
-                      togglingState?.participantIndex === pIndex;
+                    // const isToggling = togglingState?.itemId === item.id && togglingState?.participantIndex === pIndex; // REMOVED
 
                     return (
                       <View key={participant.id} style={styles.chipWrapper}>
@@ -368,13 +368,9 @@ const ItemRow = memo(({
                           participant={participant}
                           isSelected={isSelected}
                           onPress={() => handleViewModeParticipantToggle(pIndex)}
-                          disabled={isLocked || isToggling}
+                          disabled={isLocked} // REMOVED isToggling check
                         />
-                        {isToggling && (
-                          <View style={styles.chipLoadingOverlay}>
-                            <ActivityIndicator size="small" color={Colors.accent} />
-                          </View>
-                        )}
+                        {/* REMOVED Loading Overlay */}
                       </View>
                     );
                   })}
@@ -444,7 +440,7 @@ const ReceiptBreakdown = ({
 }) => {
   const { t } = useTranslation();
   const [editingItemId, setEditingItemId] = useState(null);
-  const [togglingState, setTogglingState] = useState(null); // { itemId, participantIndex }
+  // const [togglingState, setTogglingState] = useState(null); // REMOVED for instant feel
   const prevItemsLengthRef = useRef(items.length);
   const itemLayoutMapRef = useRef({});
   const userManualAddRef = useRef(false);
@@ -562,14 +558,14 @@ const ReceiptBreakdown = ({
     const item = items[itemIndex];
     if (!item) return;
 
-    setTogglingState({ itemId: item.id, participantIndex });
+    // setTogglingState({ itemId: item.id, participantIndex }); // REMOVED
 
     try {
       await onToggleParticipant(itemIndex, participantIndex);
     } catch (error) {
       // Error already handled by parent
     } finally {
-      setTogglingState(null);
+      // setTogglingState(null); // REMOVED
     }
   }, [items, onToggleParticipant]);
 
@@ -597,8 +593,8 @@ const ReceiptBreakdown = ({
               item={item}
               index={index}
               isEditing={editingItemId === item.id}
-              isLocked={lockedItemIds?.has(item.id) || isSettled}
-              isLockedBySettlement={isSettled && !lockedItemIds?.has(item.id)}
+              isLocked={lockedItemIds?.has(item.id)}
+              isLockedBySettlement={false}
               isSaving={isSavingItemId === item.id}
               participants={participants}
               onToggleEdit={toggleEditMode}
@@ -609,7 +605,7 @@ const ReceiptBreakdown = ({
               validationErrors={validationErrors}
               onClearValidationError={onClearValidationError}
               onToggleParticipant={handleToggleParticipantWithState}
-              togglingState={togglingState}
+              // togglingState={togglingState} // REMOVED
               isLast={index === items.length - 1} // Pass isLast
             />
           </View>
@@ -917,6 +913,14 @@ const styles = StyleSheet.create({
   chipLabelSelected: {
     color: Colors.textPrimary,
     fontWeight: '600',
+  },
+  chipYouBadge: {
+    fontSize: 8,
+    color: Colors.accent,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 10,
+    marginLeft: 4,
   },
 
   // Action Buttons

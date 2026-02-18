@@ -4,18 +4,837 @@
         "account": "アカウント",
         "profile": "プロフィール設定",
         "venmo": "Venmo連携",
-        "preferences": "基本設定",
+        "preferences": "設定",
         "language": "言語",
         "region": "地域",
         "currency": "通貨",
         "support": "サポート",
         "terms": "利用規約",
-        "rate": "アプリを評価",
+        "privacy": "プライバシーポリシー",
         "signOut": "サインアウト",
-        "deleteAccount": "アカウントを削除"
+        "deleteAccount": "アカウント削除",
+        "manageSubscription": "サブスクリプション管理",
+        "restorePurchases": "購入の復元",
+        "restoreSuccess": "購入が正常に復元されました",
+        "noSubscriptions": "アクティブなサブスクリプションが見つかりません",
+        "restoreError": "復元中にエラーが発生しました。もう一度お試しください",
+        "growth": "成長",
+        "buildYourSquad": {
+            "title": "チームを作る",
+            "subtitle": "友達を招待して報酬を獲得"
+        },
+        "connectedAccounts": {
+            "title": "連携アカウント",
+            "sectionTitle": "支払いアカウント",
+            "aboutTitle": "連携アカウントについて",
+            "connected": "連携済み",
+            "notConnected": "未連携",
+            "connect": "連携する",
+            "disconnect": "解除する",
+            "loading": "アカウントを読み込み中...",
+            "venmo": {
+                "name": "Venmo",
+                "description": "支払いと精算用",
+                "connectTitle": "Venmoを連携",
+                "connectMessage": "Venmoアカウントを連携するには、Venmo情報でログインまたは登録してください。",
+                "goToSignUp": "登録へ移動",
+                "reconnectionSoon": "Venmoの再連携はまもなく利用可能になります。"
+            },
+            "paypal": {
+                "name": "PayPal",
+                "description": "近日公開"
+            },
+            "zelle": {
+                "name": "Zelle",
+                "description": "近日公開"
+            },
+            "disconnectAlert": {
+                "title": "アカウント解除",
+                "message": "このアカウントの連携を解除してもよろしいですか？一部の機能にアクセスできなくなる可能性があります。",
+                "confirm": "解除する",
+                "cancel": "キャンセル",
+                "success": "アカウントの連携を解除しました",
+                "soon": "アカウント解除はまもなく利用可能になります。"
+            },
+            "info": {
+                "secureTitle": "安全でプライベート",
+                "secureDesc": "支払い情報は安全に保管され、他のユーザーと共有されることはありません。",
+                "easyTitle": "簡単な精算",
+                "easyDesc": "連携アカウントを使用すると、割り勘の支払いや受け取りが簡単になります。"
+            },
+            "soon": "近日公開",
+            "integrationSoon": "{{name}}連携はまもなく利用可能になります。"
+        },
+        "profileSettings": {
+            "title": "プロフィール編集",
+            "loading": "プロフィールを読み込み中...",
+            "changePhoto": "プロフィール写真を変更",
+            "firstName": "名",
+            "lastName": "姓",
+            "username": "ユーザー名",
+            "paymentMethods": "支払い方法",
+            "venmo": "Venmoアカウント",
+            "notConnected": "未連携",
+            "visibilityInfo": "この情報はIOU上の友達に公開されます。",
+            "save": "変更を保存",
+            "success": "成功",
+            "error": "エラー",
+            "selectImageError": "画像選択エラー",
+            "updateSuccess": "プロフィールを更新しました！",
+            "updateError": "プロフィールの更新に失敗しました"
+        },
+        "currencies": {
+            "usd": "米ドル (USD)",
+            "eur": "ユーロ (EUR)",
+            "gbp": "英ポンド (GBP)",
+            "mxn": "メキシコペソ (MXN)",
+            "cad": "カナダドル (CAD)",
+            "cny": "中国人民元 (CNY)",
+            "jpy": "日本円 (JPY)",
+            "krw": "韓国ウォン (KRW)",
+            "vnd": "ベトナムドン (VND)"
+        },
+        "termsOfService": {
+            "lastUpdated": "最終更新日: 2024年12月",
+            "sections": {
+                "1": {
+                    "title": "1. 規約への同意",
+                    "content": "IOUモバイルアプリケーション（以下「アプリ」）にアクセスして使用することにより、お客様は本契約の条件および規定に拘束されることに同意するものとします。これに同意されない場合は、本サービスを使用しないでください。"
+                },
+                "2": {
+                    "title": "2. 使用許諾",
+                    "content": "個人的かつ非営利的な一時的な閲覧のみを目的として、IOUアプリのコピーを一時的にダウンロードする許可が付与されます。これはライセンスの付与であり、所有権の譲渡ではありません。このライセンスに基づき、以下の行為は禁止されています。",
+                    "bullets": {
+                        "1": "資料の変更またはコピー",
+                        "2": "商業目的または公共の展示（商業的かどうかにかかわらず）での使用",
+                        "3": "アプリに含まれるソフトウェアのリバースエンジニアリングの試み",
+                        "4": "資料からの著作権またはその他の所有権表示の削除"
+                    }
+                },
+                "3": {
+                    "title": "3. ユーザーアカウント",
+                    "content": "アプリの特定の機能を使用するには、アカウントを作成する必要があります。お客様は以下の責任を負います。",
+                    "bullets": {
+                        "1": "正確かつ完全な情報の提供",
+                        "2": "アカウント認証情報のセキュリティ維持",
+                        "3": "アカウント下で行われるすべての活動",
+                        "4": "不正使用の即時通知"
+                    }
+                },
+                "4": {
+                    "title": "4. 支払い処理",
+                    "content": "アプリは経費の追跡とユーザー間の精算を容易にします。サードパーティの決済サービスと統合する場合があります。これらの機能を使用することにより、お客様は以下に同意するものとします。",
+                    "bullets": {
+                        "1": "サードパーティ決済プロバイダーの利用規約の遵守",
+                        "2": "当社が支払い処理の責任を負わないことの理解",
+                        "3": "決済処理業者によって請求される手数料の負担"
+                    }
+                },
+                "5": {
+                    "title": "5. プライバシーポリシー",
+                    "content": "お客様のプライバシーは当社にとって重要です。当社の慣行を理解するために、アプリの使用にも適用されるプライバシーポリシーをご確認ください。"
+                },
+                "6": {
+                    "title": "6. 禁止事項",
+                    "content": "以下の目的でアプリを使用することはできません。",
+                    "bullets": {
+                        "1": "違法な目的、または違法行為への参加を他者に勧誘するため",
+                        "2": "国際、連邦、州、または地方の規制、規則、法律、条例に違反するため",
+                        "3": "当社の知的財産権または他者の知的財産権を侵害するため",
+                        "4": "嫌がらせ、虐待、侮辱、危害、名誉毀損、中傷、脅迫、差別を行うため",
+                        "5": "虚偽または誤解を招く情報を送信するため"
+                    },
+                    "content2": "当社は不快なコンテンツや虐待的なユーザーに対してゼロトレランスポリシーを持っています。これらの規約に違反するコンテンツは削除され、そのような行動をとるユーザーはブロックされ、サービスから追放されます。"
+                },
+                "7": {
+                    "title": "7. 免責事項",
+                    "content": "本アプリの情報は「現状有姿」で提供されます。法律で許容される最大限の範囲で、当社は：",
+                    "bullets": {
+                        "1": "本アプリおよびそのコンテンツに関するすべての表明および保証を除外します",
+                        "2": "情報の正確性、完全性、または適時性を保証しません",
+                        "3": "本アプリの使用に起因または関連する損害に対する一切の責任を除外します"
+                    }
+                },
+                "8": {
+                    "title": "8. 責任の制限",
+                    "content": "いかなる場合においても、IOUまたはそのサプライヤーは、アプリの使用または使用不能から生じる損害（データまたは利益の損失、または業務中断による損害を含むがこれに限定されない）について責任を負いません。たとえIOUまたは正当な権限のある代表者がそのような損害の可能性について口頭または書面で通知されていたとしても同様です。"
+                },
+                "9": {
+                    "title": "9. 改訂",
+                    "content": "アプリに表示される資料には、技術的、誤字、または写真の誤りが含まれる場合があります。IOUは、アプリ上の資料がいずれも正確、完全、または最新であることを保証しません。IOUは、予告なしにいつでもアプリに含まれる資料を変更することがあります。"
+                },
+                "10": {
+                    "title": "10. 準拠法",
+                    "content": "これらの利用規約は米国法に準拠し、同法に従って解釈されるものとし、お客様はその州または場所の裁判所の専属管轄権に取消不能の形で服従するものとします。"
+                },
+                "11": {
+                    "title": "11. 連絡先",
+                    "content": "これらの利用規約についてご質問がある場合は、以下までお問い合わせください。",
+                    "email": "メール: legal@iou-app.com",
+                    "support": "サポート: support@iou-app.com"
+                }
+            },
+            "footer": "IOUを使用することにより、お客様はこれらの利用規約を読み、理解し、拘束されることに同意したものとみなされます。"
+        }
     },
     "common": {
         "cancel": "キャンセル",
-        "save": "保存"
+        "save": "保存",
+        "loading": "読み込み中...",
+        "error": "エラー",
+        "success": "成功"
+    },
+    "home": {
+        "title": "ホーム",
+        "headerTitle": "経費",
+        "searchPlaceholder": "経費やメンバーを検索...",
+        "noExpensesTitle": "経費はまだありません",
+        "noExpensesDesc": "作成をタップして最初の経費を追加してください",
+        "noSearchResultsTitle": "経費が見つかりません",
+        "noSearchResultsDesc": "別の検索用語を試してください",
+        "settledUp": "精算済み",
+        "youOwe": "あなたの借金",
+        "youAreOwed": "あなたの貸金",
+        "confirmPayment": "支払いを確認",
+        "awaitingConfirmation": "確認待ち",
+        "needsSettlement": "精算が必要",
+        "receipt": "レシート",
+        "expense": "経費",
+        "otherMembers": "他のメンバー"
+    },
+    "profile": {
+        "title": "プロフィール",
+        "balanceSummary": "残高サマリー",
+        "recentExpenses": "最近の経費",
+        "editProfile": "プロフィール編集",
+        "loading": "プロフィールを読み込み中...",
+        "noUsername": "ユーザー名なし",
+        "totalOwedToYou": "貸金合計",
+        "totalYouOwe": "借金合計",
+        "participants": "参加者",
+        "createFirstExpense": "最初の経費を作成",
+        "startTracking": "共有経費の追跡を開始",
+        "loadMore": "さらに読み込む",
+        "remaining": "残り"
+    },
+    "navigation": {
+        "home": "ホーム",
+        "profile": "プロフィール"
+    },
+    "addExpense": {
+        "addExpenseTitle": "経費を追加",
+        "editExpenseTitle": "経費を編集",
+        "item": "項目",
+        "items": "項目",
+        "date": "日付",
+        "amount": "金額",
+        "paidBy": "支払い者",
+        "split": "割り勘",
+        "saveSuccess": "経費を保存しました",
+        "saveError": "経費の保存中にエラーが発生しました",
+        "validationError": "すべての必須項目を入力してください",
+        "deleteItemParams": {
+            "title": "項目を削除",
+            "message": "この項目を削除してもよろしいですか？この操作は取り消せません。",
+            "confirm": "削除"
+        },
+        "validation": {
+            "feeNames": "手数料名を入力してください",
+            "unevenSplitTitle": "割り勘が不均等です",
+            "unevenSplitMessage": "1つ以上の項目の割り勘金額が合計と一致しません。項目を確認してください。",
+            "unauthenticated": "認証されていません",
+            "deleteError": "項目の削除エラー: {{error}}"
+        },
+        "addFirstItem": "最初の項目を追加",
+        "addAnotherItem": "別の項目を追加",
+        "noItemsTitle": "項目はまだありません",
+        "noItemsDesc": "最初の項目を追加して開始してください"
+    },
+    "addReceipt": {
+        "addReceiptTitle": "レシートを追加",
+        "editReceiptTitle": "レシートを編集",
+        "paidBy": "支払い者",
+        "extraCharges": "追加料金",
+        "totals": "合計",
+        "addFee": "{{type}}を追加",
+        "feeTypes": {
+            "tip": "チップ",
+            "tax": "税金",
+            "service": "サービス料",
+            "custom": "カスタム"
+        },
+        "placeholders": {
+            "feeName": "料金名（例：持ち込み料）"
+        },
+        "subtotal": "小計",
+        "feesAndTip": "手数料とチップ",
+        "total": "合計",
+        "incompleteItems": "不完全な項目",
+        "incompleteItemsDesc": "すべての項目の価格が0より大きく、少なくとも1人が割り当てられていることを確認してください。",
+        "feeNameMissing": "すべての手数料名を入力してください"
+    },
+    "expenseSettings": {
+        "title": "経費設定",
+        "expenseName": "経費名",
+        "changeName": "名前を変更",
+        "untitledExpense": "無題の経費",
+        "shareExpense": "経費を共有",
+        "allowJoin": "他の人の参加を許可",
+        "shareLink": "リンクを共有",
+        "copyLink": "リンクをコピー",
+        "dangerZone": "危険ゾーン",
+        "leaveExpense": "経費から退出",
+        "leaveExpenseSubtitle": "この経費から自分を削除",
+        "errors": {
+            "emptyName": "経費名は空にできません",
+            "updateNameError": "経費名の更新エラー",
+            "leaveError": "経費からの退出エラー",
+            "cannotLeave": "退出できません",
+            "cannotLeaveDesc": "どの項目にも含まれていない場合のみ、この経費から退出できます。まずすべての項目から自分を削除してください。"
+        },
+        "success": {
+            "nameUpdated": "経費名を更新しました",
+            "leftExpense": "経費から退出しました",
+            "copied": "コピーしました！",
+            "linkCopied": "招待リンクをクリップボードにコピーしました"
+        },
+        "confirmLeave": {
+            "title": "経費から退出",
+            "message": "この経費から退出してもよろしいですか？すべての割り勘から削除され、アクセスできなくなります。"
+        },
+        "shareMessage": "IOUで私の経費「{{title}}」に参加してください。\n\nタップして参加:\n{{link}}"
+    },
+    "friendProfile": {
+        "title": "友達のプロフィール",
+        "options": "オプション",
+        "report": "ユーザーを報告",
+        "block": "ユーザーをブロック",
+        "loading": "友達のプロフィールを読み込み中...",
+        "balanceSummary": "残高サマリー",
+        "netBalance": "純残高",
+        "theyOweYouOverall": "彼らの借金総額",
+        "youOweThemOverall": "あなたの借金総額",
+        "theyOweYou": "彼らの借金",
+        "youOweThem": "あなたの借金",
+        "paymentMethods": "支払い方法",
+        "noPaymentMethod": "利用可能な支払い方法がありません",
+        "sharedExpenses": "共有経費",
+        "noSharedExpenses": "共有経費はまだありません",
+        "addFirstExpense": "最初の経費を追加",
+        "owesYou": "貸金",
+        "youOwe": "借金",
+        "reportPrompt": {
+            "title": "ユーザーを報告",
+            "message": "このユーザーを報告する理由を教えてください。",
+            "submit": "報告"
+        },
+        "blockPrompt": {
+            "title": "ユーザーをブロック",
+            "message": "このユーザーをブロックしてもよろしいですか？彼らのコンテンツは表示されなくなり、やり取りできなくなります。",
+            "confirm": "ブロック"
+        },
+        "reportSuccess": "報告送信済み",
+        "reportSuccessDesc": "ご報告ありがとうございます。まもなく確認いたします。",
+        "blockSuccess": "ユーザーをブロックしました",
+        "blockSuccessDesc": "このユーザーをブロックしました。"
+    },
+    "setupExpense": {
+        "title": "この{{type}}の名前は何にしますか？",
+        "titlePlaceholder": "{{type}}名を入力...",
+        "whoSplitting": "誰と割り勘しますか？",
+        "addPeople": "人を追加",
+        "creating": "作成中...",
+        "continue": "続行",
+        "errors": {
+            "titleRequired": "この{{type}}のタイトルを入力してください",
+            "participantsRequired": "すべての参加者の名前を入力してください",
+            "noUser": "ユーザーがログインしていません",
+            "profileError": "ユーザープロファイルの取得に失敗しました",
+            "createError": "{{type}}の作成エラー: {{message}}"
+        }
+    },
+    "auth": {
+        "common": {
+            "usCountryCode": "🇺🇸 +1"
+        },
+        "welcome": {
+            "title": "IOUへようこそ！",
+            "split": "グループで割り勘",
+            "autoCalculate": "自動計算",
+            "realTime": "リアルタイム同期",
+            "createAccount": "アカウント作成",
+            "signIn": "サインイン"
+        },
+        "signIn": {
+            "title": "サインイン",
+            "stepTitle": "電話番号",
+            "stepSubtitle": "番号確認のために認証コードを送信します",
+            "inputLabel": "電話番号",
+            "placeholder": "(555) 123-4567",
+            "button": "コードを送信",
+            "sending": "送信中...",
+            "noAccount": "アカウントをお持ちでないですか？",
+            "createAccount": "アカウント作成",
+            "infoSms": "SMSで認証コードを送信します",
+            "infoSecure": "あなたの電話番号は安全に保管されます",
+            "errors": {
+                "missingPhone": "電話番号を入力してください",
+                "invalidPhone": "有効な10桁の電話番号を入力してください"
+            }
+        },
+        "signUp": {
+            "stepIndicator": "ステップ {{current}} / {{total}}",
+            "title": "アカウント作成",
+            "step1": {
+                "title": "お名前は？",
+                "subtitle": "友達にあなたを識別するために使用します",
+                "firstName": "名",
+                "lastName": "姓",
+                "firstNamePlaceholder": "名を入力",
+                "lastNamePlaceholder": "姓を入力"
+            },
+            "step2": {
+                "title": "ユーザー名を選択",
+                "subtitle": "これはアプリ内でのあなた固有のIDになります",
+                "username": "ユーザー名",
+                "placeholder": "ユーザー名を入力",
+                "hint": "3-20文字、文字、数字、アンダースコアのみ"
+            },
+            "step3": {
+                "title": "Venmoを連携",
+                "subtitle": "Venmoを接続して割り勘を簡単に（オプション）",
+                "label": "Venmo ID",
+                "placeholder": "your-venmo-id",
+                "verified": "確認済みVenmoアカウント",
+                "noProfilePic": "Venmoアカウント（プロフィール写真なし）",
+                "change": "アカウント変更",
+                "skip": "スキップ"
+            },
+            "continue": "続行",
+            "alreadyHaveAccount": "すでにアカウントをお持ちですか？",
+            "errors": {
+                "required": "必須項目",
+                "firstNameReq": "名を入力してください",
+                "lastNameReq": "姓を入力してください",
+                "invalidFirst": "名は文字、スペース、ハイフン、アポストロフィのみ使用できます",
+                "invalidLast": "姓は文字、スペース、ハイフン、アポストロフィのみ使用できます",
+                "minFirst": "名は2文字以上である必要があります",
+                "minLast": "姓は2文字以上である必要があります",
+                "usernameReq": "ユーザー名を入力してください",
+                "invalidUsername": "ユーザー名は3-20文字で、文字、数字、アンダースコアのみ使用できます",
+                "usernameTaken": "ユーザー名は使用されています",
+                "usernameTakenDesc": "このユーザー名は既に使用されています。別のユーザー名を選択してください。",
+                "checkError": "ユーザー名の利用可能性を確認できませんでした",
+                "saveError": "情報の保存中にエラーが発生しました。もう一度お試しください。",
+                "accountExists": "アカウントは既に存在します",
+                "accountExistsDesc": "この電話番号は既に登録されています。サインインするか、別の番号を使用してください。",
+                "signInInstead": "代わりにサインイン",
+                "useDiffNumber": "別の番号を使用",
+                "verificationError": "無効な認証応答を受信しました"
+            }
+        },
+        "verifyOTP": {
+            "title": "電話番号の確認",
+            "title2FA": "2要素認証",
+            "subtitle": "{{phone}}に送信された\n6桁のコードを入力してください",
+            "subtitle2FA": "デバイスに送信された6桁のコードを入力してください",
+            "button": "コードを確認",
+            "verifying": "確認中...",
+            "resend": "コードを再送信",
+            "sending": "送信中...",
+            "resendTimer": "{{timer}}秒後に再送信",
+            "info": "コードが届きませんか？信号を確認して再試行してください。",
+            "success": {
+                "resend": "認証コードを再送信しました"
+            },
+            "errors": {
+                "invalidCodeLength": "完全な6桁のコードを入力してください",
+                "noSession": "認証セッションが見つかりません。新しいコードをリクエストしてください。",
+                "signupMissing": "登録データがありません",
+                "signupMissingDesc": "プロフィールを作成できませんでした。もう一度登録をお試しください。",
+                "profileFailed": "プロフィールの作成に失敗しました",
+                "profileFailedDesc": "電話番号は確認されましたが、プロフィールを作成できませんでした: {{message}}",
+                "verificationFailed": "確認に失敗しました",
+                "noResend2FA": "2FAコードは再送信できません。コードを再入力するか、再度サインインしてください。",
+                "resendFailed": "認証コードの再送信に失敗しました。もう一度お試しください。"
+            },
+            "loading": {
+                "uploading": "プロフィール写真をアップロード中...",
+                "creating": "プロフィールを作成中...",
+                "finalizing": "アカウントを仕上げ中...",
+                "securing": "データを保護中..."
+            }
+        },
+        "contactInvite": {
+            "title": "チームを作る",
+            "subtitle": "IOUは友達と一緒ならもっと楽しいです。連絡先を接続して知り合いを見つけ、機能を解除しましょう。",
+            "findFriends": "友達を探す",
+            "skip": "今はスキップ",
+            "skipLink": "スキップ",
+            "done": "完了",
+            "tiers": {
+                "solo": {
+                    "name": "ソロモード",
+                    "description": "基本機能",
+                    "features": {
+                        "manual": "手動での経費入力",
+                        "ratios": "単純な割り勘比率"
+                    }
+                },
+                "squadStarted": {
+                    "name": "チーム始動",
+                    "description": "スマート機能解除",
+                    "features": {
+                        "suggestions": "スマートな連絡先提案",
+                        "friends": "アプリ内で友達を見る",
+                        "templates": "経費テンプレート"
+                    }
+                },
+                "fullSquad": {
+                    "name": "フルチーム",
+                    "description": "プレミアムステータス",
+                    "features": {
+                        "premium": "プレミアム1ヶ月無料",
+                        "categories": "カスタムカテゴリ",
+                        "support": "優先サポート"
+                    }
+                }
+            },
+            "alerts": {
+                "contactsRequired": {
+                    "title": "連絡先が必要です",
+                    "message": "友達を見つけるには連絡先へのアクセスが必要です。設定で有効にしてください。",
+                    "ok": "OK"
+                },
+                "premiumUnlocked": {
+                    "title": "プレミアム解除！ 🌟",
+                    "message": "プレミアム1ヶ月分が自動的に解除されました！"
+                },
+                "featuresUnlocked": {
+                    "title": "新機能解除！ 🚀",
+                    "message": "スマート提案とテンプレートが解除されました！"
+                },
+                "error": "問題が発生しました。もう一度お試しください。"
+            }
+        },
+        "twoFactor": {
+            "screenTitle": "2要素認証",
+            "title": "2要素認証",
+            "description": {
+                "title": "セキュリティ強化",
+                "text": "2要素認証は、電話からの確認コードを要求することで、アカウントに追加のセキュリティレイヤーを追加します。"
+            },
+            "methods": {
+                "title": "登録済みメソッド",
+                "empty": "登録済みの2FAメソッドはありません",
+                "emptyDesc": "2要素認証を開始するには電話番号を追加してください",
+                "enrolledAt": "登録日: {{date}}",
+                "remove": {
+                    "title": "2FAメソッドを削除",
+                    "message": "アカウントから「{{name}}」を削除してもよろしいですか？",
+                    "confirm": "削除",
+                    "cancel": "キャンセル"
+                }
+            },
+            "add": {
+                "button": "番号を追加",
+                "title": "2FA用番号を追加",
+                "description": "確認コードを受け取るための電話番号を入力してください。",
+                "label": "電話番号",
+                "placeholder": "(555) 123-4567",
+                "send": "コードを送信",
+                "sending": "送信中...",
+                "cancel": "キャンセル"
+            },
+            "verify": {
+                "title": "番号を確認",
+                "description": "携帯電話に送信された6桁のコードを入力してください。",
+                "label": "確認コード",
+                "placeholder": "123456",
+                "submit": "確認して有効化",
+                "verifying": "確認中...",
+                "cancel": "キャンセル"
+            },
+            "success": {
+                "codeSent": "確認コードを送信しました",
+                "enrolled": "2FA登録が完了しました",
+                "removed": "2FAメソッドを削除しました"
+            },
+            "errors": {
+                "loadFailed": "2FA設定の読み込みに失敗しました",
+                "missingPhone": "電話番号を入力してください",
+                "invalidPhone": "有効な10桁の電話番号を入力してください",
+                "startFailed": "2FA登録の開始に失敗しました",
+                "invalidCode": "完全な6桁のコードを入力してください",
+                "completeFailed": "2FA登録の完了に失敗しました",
+                "removeFailed": "2FAメソッドの削除に失敗しました"
+            }
+        }
+    },
+    "components": {
+        "createBottomSheet": {
+            "title": "新規作成",
+            "addExpense": "経費を追加",
+            "addExpenseDesc": "手動で経費を追加",
+            "scanReceipt": "レシートをスキャン",
+            "scanReceiptDesc": "レシートをスキャンして項目を抽出",
+            "joinExpense": "経費に参加",
+            "joinExpenseDesc": "リンクまたはコードを使用して参加",
+            "scanTitle": "レシートをスキャン",
+            "takePhoto": "写真を撮る",
+            "takePhotoDesc": "新しいレシート写真を撮影",
+            "chooseGallery": "ギャラリーから選択",
+            "chooseGalleryDesc": "既存の写真を選択",
+            "joinTitle": "経費に参加",
+            "enterLink": "リンクまたはコードを入力",
+            "linkPlaceholder": "リンクまたはコードを貼り付け...",
+            "joinButton": "参加",
+            "missingLinkError": "招待リンクまたはコードを入力してください",
+            "scanError": "レシートスキャンエラー"
+        },
+        "changeVenmo": {
+            "title": "Venmoを変更",
+            "subtitle": "Venmoを接続して割り勘を簡単に",
+            "verified": "確認済みVenmoアカウント",
+            "noProfilePic": "Venmoアカウント（プロフィール写真なし）",
+            "changeAccount": "アカウント変更",
+            "usernameLabel": "Venmo ID",
+            "usernamePlaceholder": "your-venmo-id",
+            "removeHint": "Venmoアカウントを削除するには空白のままにしてください",
+            "save": "変更を保存",
+            "verificationRequired": "確認が必要です",
+            "verificationRequiredDesc": "Venmoの確認が完了するのを待つか、有効なユーザー名を入力してください。",
+            "verificationInProgress": "確認中",
+            "verificationInProgressDesc": "Venmoの確認が完了するのをお待ちください。",
+            "updateSuccess": "Venmoアカウントが正常に更新されました。",
+            "removeSuccess": "Venmoアカウントが正常に削除されました。",
+            "updateError": "Venmoアカウントの更新エラー。もう一度お試しください。",
+            "userNotFound": "Venmoユーザーが存在しません。名前を確認してもう一度お試しください。",
+            "verifyError": "Venmoアカウントを確認できませんでした。接続を確認してもう一度お試しください。"
+        },
+        "changeExpenseName": {
+            "title": "経費名を変更",
+            "subtitle": "この経費の新しい名前を入力してください",
+            "label": "経費名",
+            "placeholder": "経費名を入力",
+            "save": "変更を保存"
+        },
+        "expenses": {
+            "header": {
+                "edit": "編集",
+                "add": "追加",
+                "track": "追跡",
+                "split": "割り勘"
+            },
+            "footer": {
+                "settleUp": "精算",
+                "processing": "処理中..."
+            },
+            "paidBy": {
+                "label": "支払い者",
+                "you": "あなた",
+                "noParticipants": "参加者なし"
+            },
+            "participantsGrid": {
+                "addFriends": "友達を追加",
+                "manage": "管理"
+            },
+            "expenseItemCard": {
+                "itemNamePlaceholder": "項目名を入力",
+                "allAllocated": "すべて割り当て済み",
+                "enterPrice": "割り勘する価格を入力",
+                "unallocated": "未割り当て: ${{amount}}",
+                "totalExceeds": "合計が請求額を${{amount}}超過しています",
+                "payers": "支払い者",
+                "split": "割り勘",
+                "cancel": "キャンセル",
+                "save": "変更を保存",
+                "settled": "支払いで精算済み",
+                "person": "人 {{index}}",
+                "alerts": {
+                    "incomplete": "不完全な項目",
+                    "incompleteDesc": "以下を確認してください: {{fields}}",
+                    "uneven": "不均等な割り勘",
+                    "unevenDesc": "割り勘金額が項目の合計と一致しません。割り勘または合計金額を調整してください。",
+                    "saveError": "経費の保存エラー: {{error}}"
+                },
+                "fields": {
+                    "name": "項目名",
+                    "price": "価格",
+                    "payer": "少なくとも1人の支払い者",
+                    "consumer": "割り勘に少なくとも1人"
+                }
+            },
+            "expenseViewCard": {
+                "paidByUnassigned": "不明な支払い者",
+                "paidByOne": "{{name}}が支払い",
+                "paidByTwo": "{{name1}}と{{name2}}が支払い",
+                "paidByMany": "{{name}}と他{{count}}人が支払い",
+                "untitledItem": "無題の項目",
+                "settled": "精算済み",
+                "splitWith": "割り勘相手",
+                "actions": {
+                    "title": "経費アクション",
+                    "message": "何をしますか？",
+                    "edit": "編集",
+                    "delete": "削除",
+                    "cancel": "キャンセル"
+                },
+                "locked": {
+                    "title": "項目ロック中",
+                    "message": "この項目はアクティブな精算の一部です。この項目を編集するには精算を解除してください。"
+                }
+            },
+            "receiptBreakdown": {
+                "header": "レシート項目",
+                "addItem": "項目を追加",
+                "editItem": "項目を編集",
+                "itemName": "項目名",
+                "itemNamePlaceholder": "項目名を入力",
+                "price": "価格",
+                "splitWith": "割り勘相手",
+                "selectPerson": "少なくとも1人を選択",
+                "cancel": "キャンセル",
+                "save": "変更を保存",
+                "lockedTitle": "項目ロック中",
+                "lockedMsg": "この項目はアクティブな精算の一部です。この項目を編集するには精算を解除してください。",
+                "itemDefault": "項目 {{index}}",
+                "settled": "精算済み",
+                "assignSomeone": "誰かを割り当て",
+                "noOneAssigned": "割り当てなし",
+                "extraFee": "追加費用としてマーク（チップ、税金など）",
+                "fee": "手数料",
+                "time": {
+                    "justNow": "たった今",
+                    "minutesAgo": "{{count}}分前",
+                    "hoursAgo": "{{count}}時間前",
+                    "daysAgo": "{{count}}日前",
+                    "weeksAgo": "{{count}}週間前"
+                }
+            },
+            "settlementInterface": {
+                "summary": {
+                    "allSettled": "すべて精算済み！",
+                    "youOwe": "あなたの借金",
+                    "youreOwed": "あなたの貸金",
+                    "pendingSettled": "{{pending}} 保留中 · {{settled}} 精算済み",
+                    "pending": "{{count}} 保留中",
+                    "settled": "{{count}} 精算済み"
+                },
+                "activity": {
+                    "title": "アクティビティ",
+                    "showMore": "他{{count}}件を表示...",
+                    "types": {
+                        "priceChange": "{{user}}が合計を${{prev}}から${{new}}に更新しました",
+                        "itemAdded": "{{user}}が{{item}}を追加しました",
+                        "itemAddedAmount": "{{user}}が{{item}}を${{amount}}で追加しました",
+                        "itemRemoved": "{{user}}が「{{item}}」を削除しました",
+                        "itemRemovedAmount": "{{user}}が{{item}}（${{amount}}）を削除しました",
+                        "participantAdded": "{{user}}が{{participant}}を追加しました",
+                        "participantRemoved": "{{user}}が{{participant}}を削除しました",
+                        "default": "{{user}}が変更を加えました",
+                        "itemModified": "{{user}}が{{item}}を${{amount}}に編集しました",
+                        "itemModifiedComputed": "{{user}}が{{item}}を編集しました: {{changes}}",
+                        "settled": "{{user}}が{{peer}}と${{amount}}精算しました",
+                        "unsettled": "{{user}}が{{peer}}との${{amount}}の精算を解除しました"
+                    }
+                },
+                "status": {
+                    "fullySettled": "完全に精算済み",
+                    "partiallySettled": "一部精算済み",
+                    "settled": "精算済み",
+                    "reminded": "通知済み",
+                    "awaitingPayment": "支払い待ち"
+                },
+                "items": {
+                    "title": "項目",
+                    "tapToSettle": "（タップして精算）",
+                    "selectAll": "すべて選択",
+                    "deselectAll": "すべて選択解除"
+                },
+                "actions": {
+                    "allSettled": "すべて精算済み",
+                    "selectToSettle": "精算する項目を選択",
+                    "pay": "${{amount}}支払う",
+                    "markSettled": "${{amount}}を精算済みにする",
+                    "request": "${{amount}}請求する",
+                    "reminderSent": "リマインダー送信済み",
+                    "sendReminder": "リマインダーを送信",
+                    "undoSettlement": "精算を解除"
+                },
+                "relationships": {
+                    "youOwe": "あなたは{{name}}に借りがあります",
+                    "owesYou": "{{name}}はあなたに借りがあります",
+                    "owes": "{{name}}は{{name2}}に借りがあります"
+                },
+                "total": "（合計 ${{amount}}）",
+                "empty": {
+                    "title": "すべて精算済み！",
+                    "body": "全員の貸し借りが解消されました。支払いは不要です。"
+                },
+                "banner": {
+                    "title": "変更により精算が更新されました。",
+                    "sub": "{{new}}件の新規、{{paid}}件の支払いは保持されます。"
+                },
+                "alerts": {
+                    "markSettled": {
+                        "title": "精算済みにする",
+                        "message": "${{amount}}を精算済みにしますか？これにより、Venmoを使用せずに支払いが記録されます。",
+                        "cancel": "キャンセル",
+                        "confirm": "精算"
+                    },
+                    "unsettleAll": {
+                        "title": "すべての項目を精算解除",
+                        "message": "これにより、すべての項目が未精算としてマークされます。よろしいですか？",
+                        "confirm": "精算解除"
+                    },
+                    "unsettle": {
+                        "title": "経費の精算解除",
+                        "message": "すべての項目の精算を解除してもよろしいですか？",
+                        "confirm": "精算解除"
+                    }
+                }
+            }
+        },
+        "referral": {
+            "progress": {
+                "title": "紹介状況",
+                "referrals": "{{count}}件の紹介",
+                "nextTier": "次のティアまであと{{count}}人"
+            },
+            "tier1": {
+                "title": "ティア 1",
+                "requirement": "友達3人",
+                "reward": "プレミアム1ヶ月分",
+                "benefits": [
+                    "広告なし",
+                    "CSVエクスポート",
+                    "優先サポート"
+                ]
+            },
+            "tier2": {
+                "title": "ティア 2",
+                "requirement": "友達10人",
+                "reward": "永久プレミアム",
+                "benefits": [
+                    "ティア1のすべての特典",
+                    "カスタムカテゴリ",
+                    "新機能への早期アクセス"
+                ]
+            },
+            "share": {
+                "title": "友達を招待",
+                "description": "紹介リンクを共有して報酬を獲得しましょう",
+                "copyLink": "リンクをコピー",
+                "shareLink": "リンクを共有",
+                "copied": "クリップボードにコピーしました！"
+            },
+            "history": {
+                "title": "紹介履歴",
+                "confirmed": "確認済み",
+                "pending": "保留中",
+                "empty": "紹介はまだありません"
+            }
+        }
     }
 }

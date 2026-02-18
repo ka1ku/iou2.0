@@ -111,7 +111,6 @@ const FriendProfileScreen = ({ route, navigation }) => {
           const result = calculateSettlement(expense);
           settlements = result.settlements || [];
         } catch (error) {
-          console.error('[FriendProfileScreen] Settlement calculation error:', error);
           return;
         }
       }

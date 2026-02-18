@@ -9,7 +9,7 @@ import {
   getExpenseById,
   createPaymentRequest,
 } from '../services/expenseService';
-import { calculateSettlement, calculateSettlementWithItemStates, migrateOldSettlement } from '../utils/settlementCalculator';
+import { recomputeSettlementsForSave, migrateOldSettlement } from '../utils/settlementCalculator';
 
 // Build the canonical key for a settlement (with amount - for status overrides)
 const makeKey = (settlement) => {
@@ -24,6 +24,19 @@ const makePairKey = (settlement) => {
   const from = settlement.debtor || settlement.from;
   const to = settlement.creditor || settlement.to;
   return `${from}|||${to}`;
+};
+
+// Enrich settlement with userIds from participants (for reliable cross-user matching)
+const enrichWithUserIds = (settlement, participants) => {
+  const debtor = settlement.debtor || settlement.from;
+  const creditor = settlement.creditor || settlement.to;
+  const debtorParticipant = participants.find(p => (p.name || '').trim() === (debtor || '').trim());
+  const creditorParticipant = participants.find(p => (p.name || '').trim() === (creditor || '').trim());
+  return {
+    ...settlement,
+    debtorUserId: debtorParticipant?.userId || settlement.debtorUserId,
+    creditorUserId: creditorParticipant?.userId || settlement.creditorUserId,
+  };
 };
 
 /**
@@ -59,62 +72,34 @@ export default function useSettlementActions({
   const [venmoActionType, setVenmoActionType] = useState(null); // 'pay' or 'charge'
   const [recalculationInfo, setRecalculationInfo] = useState(null);
 
-  // ─── settlement calculation ───────────────────────────────────────────
+  // ─── settlement source: compute, merge Firestore settled state, and persist old settlements ──
+  // Use recomputeSettlementsForSave so settlements with settled items persist even when greedy netting drops them
   const calculatedSettlements = useMemo(() => {
     try {
-      // Build expense data for calculation
+      // Use expense data when available for consistent order across all devices.
+      const participantsToUse = expense?.participants?.length ? expense.participants : participants;
+      const payersToUse = expense?.selectedPayers?.length ? expense.selectedPayers : selectedPayers;
       const expenseData = {
         title: title || 'Expense',
         total,
-        participants,
-        items, // Items now include fees with isExtraFee flag
-        selectedPayers: selectedPayers || [0],
+        participants: participantsToUse,
+        items,
+        selectedPayers: payersToUse || [0],
       };
-
-      // Migrate old settlements if needed
-      const migratedSettlements = (expense?.settlements || []).map(migrateOldSettlement);
-
-      // Use new calculator that preserves item-level settlement states
-      const result = calculateSettlementWithItemStates(expenseData, migratedSettlements);
-
-      // Map to consistent format with both debtor/creditor and from/to fields
-      return (result.settlements || []).map(s => ({
-        from: s.from,
-        to: s.to,
-        amount: s.amount,
-        status: s.status || 'noAction',
-        debtor: s.from,
-        creditor: s.to,
-        associatedItems: s.associatedItems || [],
-        settledAmount: s.settledAmount || 0,
-        remainingAmount: s.remainingAmount || s.amount,
-      }));
+      const firestoreSettlements = (expense?.settlements || []).map(migrateOldSettlement);
+      const merged = recomputeSettlementsForSave(expenseData, firestoreSettlements);
+      return merged.map((s) => enrichWithUserIds(s, participantsToUse));
     } catch (error) {
-      console.error('[useSettlementActions] Error calculating settlements:', error);
       return [];
     }
-  }, [expense?.settlements, title, total, participants, items, selectedPayers]);
+  }, [expense?.settlements, expense?.participants, title, total, participants, items, selectedPayers]);
 
-  // Sync overrides from Firestore whenever settlements change
+  // Clear optimistic overrides when Firestore settlements update (e.g. from another user)
   useEffect(() => {
-    if (!expense?.settlements) return;
-    console.log('[SYNC] expense.settlements changed, resetting overrides. Settlements:', expense.settlements.map(s => ({
-      pairKey: makePairKey(s),
-      status: s.status,
-      items: (s.associatedItems || []).map(i => ({ id: i.id, settled: i.settled })),
-    })));
-    const PAYMENT_FLOW_STATUSES = ['markedAsPaid', 'reminderSent', 'confirmed'];
-    const initial = {};
-    expense.settlements.forEach((s) => {
-      const key = makeKey(s);
-      const status = s.status || 'noAction';
-      if (PAYMENT_FLOW_STATUSES.includes(status)) {
-        initial[key] = status;
-      }
-    });
-    console.log('[SYNC] New statusOverrides:', initial);
-    setStatusOverrides(initial);
-    setItemOverrides({});
+    if (expense?.settlements) {
+      setStatusOverrides({});
+      setItemOverrides({});
+    }
   }, [expense?.settlements]);
 
   // ─── derived settlements with overrides applied ───────────────────────
@@ -155,18 +140,18 @@ export default function useSettlementActions({
   }, [calculatedSettlements, statusOverrides, itemOverrides]);
 
   // ─── locked item IDs ──────────────────────────────────────────────────
-  // Items are locked if they have been settled in ANY settlement (item.settled === true)
+  // Lock only items explicitly marked settled (item.settled === true) in Firestore settlements.
+  // New items enter Firestore with settled: false, so they are never locked even if the
+  // parent settlement has status 'partial' or 'markedAsPaid'.
   const lockedItemIds = useMemo(() => {
     const locked = new Set();
-    settlements.forEach(s => {
+    (expense?.settlements || []).forEach(s => {
       (s.associatedItems || []).forEach(item => {
-        if (item.id && item.settled === true) {
-          locked.add(item.id);
-        }
+        if (item.id && item.settled === true) locked.add(item.id);
       });
     });
     return locked;
-  }, [settlements]);
+  }, [expense?.settlements]);
 
   // ─── helpers ──────────────────────────────────────────────────────────
   const setStatus = useCallback((settlement, status) => {
@@ -186,15 +171,21 @@ export default function useSettlementActions({
       const previousStatus = rows.find(s => makePairKey(s) === makePairKey(settlement))?.status || 'noAction';
 
       // Bootstrap: if Firestore has no settlements yet, seed from local calc
+      const latestParticipants = latest.participants || participants;
       if (rows.length === 0 && calculatedSettlements.length > 0) {
-        rows = calculatedSettlements.map((s) => ({
-          debtor: s.debtor || s.from,
-          creditor: s.creditor || s.to,
-          amount: s.amount,
-          status: s.status || 'noAction',
-          updatedAt: new Date().toISOString(),
-          associatedItems: s.associatedItems || [],
-        }));
+        rows = calculatedSettlements.map((s) => {
+          const enriched = enrichWithUserIds(s, latestParticipants);
+          return {
+            debtor: s.debtor || s.from,
+            creditor: s.creditor || s.to,
+            debtorUserId: enriched.debtorUserId,
+            creditorUserId: enriched.creditorUserId,
+            amount: s.amount,
+            status: s.status || 'noAction',
+            updatedAt: new Date().toISOString(),
+            associatedItems: s.associatedItems || [],
+          };
+        });
       }
 
       let found = false;
@@ -206,8 +197,11 @@ export default function useSettlementActions({
           found = true;
 
           // If unsettling, mark all associatedItems as unsettled
+          // If settling, mark all associatedItems as settled
           const SETTLED_STATES = ['markedAsPaid', 'confirmed', 'complete', 'partial'];
+          const MANUAL_SETTLE = ['markedAsPaid', 'confirmed'];
           const isUnsettling = SETTLED_STATES.includes(previousStatus) && newStatus === 'noAction';
+          const isSettling = previousStatus === 'noAction' && MANUAL_SETTLE.includes(newStatus);
 
           let updatedAssociatedItems = settlement.associatedItems || s.associatedItems || [];
           if (isUnsettling) {
@@ -216,32 +210,67 @@ export default function useSettlementActions({
               settled: false,
               settledAt: null,
             }));
+          } else if (isSettling) {
+            // When marking the whole settlement as paid, mark all items as settled
+            const now = new Date().toISOString();
+            updatedAssociatedItems = updatedAssociatedItems.map(item => ({
+              ...item,
+              settled: true,
+              settledAt: now,
+            }));
           }
 
+          // Calculate settled amounts based on the action
+          let settledAmount = s.settledAmount || 0;
+          let remainingAmount = s.remainingAmount || settlement.amount;
+
+          if (isUnsettling) {
+            settledAmount = 0;
+            remainingAmount = settlement.amount;
+          } else if (isSettling) {
+            settledAmount = settlement.amount;
+            remainingAmount = 0;
+          }
+
+          const enriched = enrichWithUserIds(settlement, latest.participants || participants);
           return {
             ...s,
+            debtorUserId: enriched.debtorUserId || s.debtorUserId,
+            creditorUserId: enriched.creditorUserId || s.creditorUserId,
             status: newStatus,
             updatedAt: new Date().toISOString(),
-            // Use updated associatedItems if unsettling, otherwise keep current
             associatedItems: updatedAssociatedItems,
-            // Update amount to match current proposed amount
             amount: settlement.amount,
-            // Reset settled amounts when unsettling
-            settledAmount: isUnsettling ? 0 : s.settledAmount,
-            remainingAmount: isUnsettling ? settlement.amount : s.remainingAmount,
+            settledAmount,
+            remainingAmount,
           };
         }
         return s;
       });
 
       if (!found) {
+        // For new settlements, mark items as settled if the status is a settling status
+        const MANUAL_SETTLE = ['markedAsPaid', 'confirmed'];
+        const now = new Date().toISOString();
+        const items = (settlement.associatedItems || []).map(item => {
+          if (MANUAL_SETTLE.includes(newStatus)) {
+            return { ...item, settled: true, settledAt: now };
+          }
+          return item;
+        });
+
+        const enriched = enrichWithUserIds(settlement, latest.participants || participants);
         updated.push({
           debtor: settlement.debtor || settlement.from,
           creditor: settlement.creditor || settlement.to,
+          debtorUserId: enriched.debtorUserId,
+          creditorUserId: enriched.creditorUserId,
           amount: settlement.amount,
           status: newStatus,
-          updatedAt: new Date().toISOString(),
-          associatedItems: settlement.associatedItems || [],
+          updatedAt: now,
+          associatedItems: items,
+          settledAmount: MANUAL_SETTLE.includes(newStatus) ? settlement.amount : 0,
+          remainingAmount: MANUAL_SETTLE.includes(newStatus) ? 0 : settlement.amount,
         });
       }
 
@@ -283,7 +312,7 @@ export default function useSettlementActions({
         items: updatedItems,
       }, uid);
     },
-    [expense?.id, calculatedSettlements],
+    [expense?.id, calculatedSettlements, participants],
   );
 
   // Optimistic update + persist, with automatic rollback on failure
@@ -294,7 +323,6 @@ export default function useSettlementActions({
       try {
         await persistStatus(settlement, newStatus);
       } catch (err) {
-        console.error('[useSettlementActions] persist failed:', err);
         setStatus(settlement, rollbackStatus);
         Alert.alert('Error', 'Failed to save status. Please try again.');
       }
@@ -400,41 +428,50 @@ export default function useSettlementActions({
 
       let existingSettlements = latest.settlements || [];
 
-      // Bootstrap: if Firestore has no settlements yet, seed from local calc
+      // Bootstrap: if Firestore has no settlements yet, seed from local calc (include userIds for cross-user sync)
       if (existingSettlements.length === 0 && calculatedSettlements.length > 0) {
-        existingSettlements = calculatedSettlements.map((s) => ({
+        const bootParticipants = latest.participants || participants;
+        existingSettlements = calculatedSettlements.map((s) => enrichWithUserIds({
           debtor: s.debtor || s.from,
           creditor: s.creditor || s.to,
           amount: s.amount,
           status: s.status || 'noAction',
           updatedAt: new Date().toISOString(),
           associatedItems: s.associatedItems || [],
-        }));
+        }, bootParticipants));
       }
 
       const pairKey = makePairKey(settlement);
       let found = false;
 
+      // Use CLIENT's settlement.associatedItems as source of truth — Firestore may have
+      // stale/incomplete data (e.g. missing bidirectional items from old format)
+      const clientItems = settlement.associatedItems || [];
+
       const updated = existingSettlements.map(s => {
         if (makePairKey(s) === pairKey) {
           found = true;
-          const updatedItems = (s.associatedItems || []).map(item =>
+          const fsItemMap = new Map((s.associatedItems || []).map(i => [i.id, i]));
+          const updatedItems = clientItems.map(item =>
             item.id === itemId
               ? { ...item, settled, settledAt: settled ? new Date().toISOString() : null }
-              : item
+              : { ...item, settled: fsItemMap.get(item.id)?.settled ?? item.settled, settledAt: (fsItemMap.get(item.id)?.settled ? fsItemMap.get(item.id)?.settledAt : null) ?? item.settledAt }
           );
 
           const settledAmount = updatedItems.filter(i => i.settled).reduce((sum, i) => sum + i.amount, 0);
           const totalAmount = updatedItems.reduce((sum, i) => sum + i.amount, 0);
 
           let status = 'noAction';
-          if (settledAmount > 0.01) {
+          if (Math.abs(settledAmount) > 0.01) {
             status = Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial';
           }
 
           return {
             ...s,
+            debtorUserId: settlement.debtorUserId ?? s.debtorUserId,
+            creditorUserId: settlement.creditorUserId ?? s.creditorUserId,
             associatedItems: updatedItems,
+            amount: Math.round(totalAmount * 100) / 100,
             status,
             settledAmount: Math.round(settledAmount * 100) / 100,
             remainingAmount: Math.round((totalAmount - settledAmount) * 100) / 100,
@@ -444,21 +481,26 @@ export default function useSettlementActions({
         return s;
       });
 
-      // If settlement not found (edge case), add it
+      // If settlement not found (edge case), add it using client data
       if (!found) {
+        const updatedItems = clientItems.map(item =>
+          item.id === itemId
+            ? { ...item, settled, settledAt: settled ? new Date().toISOString() : null }
+            : item
+        );
+        const settledAmount = updatedItems.filter(i => i.settled).reduce((sum, i) => sum + i.amount, 0);
+        const totalAmount = updatedItems.reduce((sum, i) => sum + i.amount, 0);
         updated.push({
           debtor: settlement.debtor || settlement.from,
           creditor: settlement.creditor || settlement.to,
-          amount: settlement.amount,
-          status: settled ? 'partial' : 'noAction',
+          debtorUserId: settlement.debtorUserId,
+          creditorUserId: settlement.creditorUserId,
+          amount: Math.round(totalAmount * 100) / 100,
+          status: Math.abs(settledAmount) > 0.01 ? (Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial') : 'noAction',
           updatedAt: new Date().toISOString(),
-          associatedItems: (settlement.associatedItems || []).map(item =>
-            item.id === itemId
-              ? { ...item, settled, settledAt: settled ? new Date().toISOString() : null }
-              : item
-          ),
-          settledAmount: settled ? settlement.associatedItems.find(i => i.id === itemId)?.amount || 0 : 0,
-          remainingAmount: settlement.amount - (settled ? settlement.associatedItems.find(i => i.id === itemId)?.amount || 0 : 0),
+          associatedItems: updatedItems,
+          settledAmount: Math.round(settledAmount * 100) / 100,
+          remainingAmount: Math.round((totalAmount - settledAmount) * 100) / 100,
         });
       }
 
@@ -490,7 +532,6 @@ export default function useSettlementActions({
       try {
         await persistItemToggle(settlement, item.id, newSettled);
       } catch (err) {
-        console.error('[handleItemToggle] failed:', err);
         // Rollback: remove this item's override
         setItemOverrides(prev => {
           const keyOv = { ...(prev[pairKey] || {}) };
@@ -534,40 +575,49 @@ export default function useSettlementActions({
       let existingSettlements = latest.settlements || [];
 
       if (existingSettlements.length === 0 && calculatedSettlements.length > 0) {
-        existingSettlements = calculatedSettlements.map((s) => ({
+        const bootParticipants = latest.participants || participants;
+        existingSettlements = calculatedSettlements.map((s) => enrichWithUserIds({
           debtor: s.debtor || s.from,
           creditor: s.creditor || s.to,
           amount: s.amount,
           status: s.status || 'noAction',
           updatedAt: new Date().toISOString(),
           associatedItems: s.associatedItems || [],
-        }));
+        }, bootParticipants));
       }
 
       const pairKey = makePairKey(settlement);
       const itemIdSet = new Set(itemIds);
       let found = false;
 
+      // Use CLIENT's settlement.associatedItems as source of truth — Firestore may have
+      // stale/incomplete data (e.g. missing bidirectional items from old format)
+      const clientItems = settlement.associatedItems || [];
+
       const updated = existingSettlements.map(s => {
         if (makePairKey(s) === pairKey) {
           found = true;
-          const updatedItems = (s.associatedItems || []).map(item =>
+          const fsItemMap = new Map((s.associatedItems || []).map(i => [i.id, i]));
+          const updatedItems = clientItems.map(item =>
             itemIdSet.has(item.id)
               ? { ...item, settled, settledAt: settled ? new Date().toISOString() : null }
-              : item
+              : { ...item, settled: fsItemMap.get(item.id)?.settled ?? item.settled, settledAt: (fsItemMap.get(item.id)?.settled ? fsItemMap.get(item.id)?.settledAt : null) ?? item.settledAt }
           );
 
           const settledAmount = updatedItems.filter(i => i.settled).reduce((sum, i) => sum + i.amount, 0);
           const totalAmount = updatedItems.reduce((sum, i) => sum + i.amount, 0);
 
           let status = 'noAction';
-          if (settledAmount > 0.01) {
+          if (Math.abs(settledAmount) > 0.01) {
             status = Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial';
           }
 
           return {
             ...s,
+            debtorUserId: settlement.debtorUserId ?? s.debtorUserId,
+            creditorUserId: settlement.creditorUserId ?? s.creditorUserId,
             associatedItems: updatedItems,
+            amount: Math.round(totalAmount * 100) / 100,
             status,
             settledAmount: Math.round(settledAmount * 100) / 100,
             remainingAmount: Math.round((totalAmount - settledAmount) * 100) / 100,
@@ -578,7 +628,7 @@ export default function useSettlementActions({
       });
 
       if (!found) {
-        const updatedItems = (settlement.associatedItems || []).map(item =>
+        const updatedItems = clientItems.map(item =>
           itemIdSet.has(item.id)
             ? { ...item, settled, settledAt: settled ? new Date().toISOString() : null }
             : item
@@ -588,8 +638,10 @@ export default function useSettlementActions({
         updated.push({
           debtor: settlement.debtor || settlement.from,
           creditor: settlement.creditor || settlement.to,
-          amount: settlement.amount,
-          status: settledAmount > 0.01 ? (Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial') : 'noAction',
+          debtorUserId: settlement.debtorUserId,
+          creditorUserId: settlement.creditorUserId,
+          amount: Math.round(totalAmount * 100) / 100,
+          status: Math.abs(settledAmount) > 0.01 ? (Math.abs(settledAmount - totalAmount) < 0.01 ? 'complete' : 'partial') : 'noAction',
           updatedAt: new Date().toISOString(),
           associatedItems: updatedItems,
           settledAmount: Math.round(settledAmount * 100) / 100,
@@ -624,7 +676,6 @@ export default function useSettlementActions({
       try {
         await persistBulkItemToggle(settlement, itemIds, true);
       } catch (err) {
-        console.error('[handleBulkSettle] failed:', err);
         // Rollback
         setItemOverrides(prev => {
           const keyOv = { ...(prev[pairKey] || {}) };
@@ -688,38 +739,26 @@ export default function useSettlementActions({
 
           const pairKey = makePairKey(settlement);
 
-          console.log('[UNSETTLE] pairKey:', pairKey);
-          console.log('[UNSETTLE] Firestore settlements:', (latest.settlements || []).map(s => ({
-            pairKey: makePairKey(s),
-            status: s.status,
-            items: (s.associatedItems || []).map(i => ({ id: i.id, settled: i.settled })),
-          })));
-
           // Reset this settlement in Firestore: status → noAction, all items → unsettled
-          let matched = false;
+          // Use client's settlement.associatedItems (full list) so we don't lose bidirectional items
+          const clientItems = settlement.associatedItems || [];
           const updatedSettlements = (latest.settlements || []).map(s => {
             if (makePairKey(s) !== pairKey) return s;
-            matched = true;
+            const totalAmount = clientItems.reduce((sum, i) => sum + i.amount, 0);
             return {
               ...s,
               status: 'noAction',
               settledAmount: 0,
-              remainingAmount: s.amount,
+              remainingAmount: Math.round(totalAmount * 100) / 100,
+              amount: Math.round(totalAmount * 100) / 100,
               updatedAt: new Date().toISOString(),
-              associatedItems: (s.associatedItems || []).map(item => ({
+              associatedItems: clientItems.map(item => ({
                 ...item,
                 settled: false,
                 settledAt: null,
               })),
             };
           });
-
-          console.log('[UNSETTLE] Matched settlement?', matched);
-          console.log('[UNSETTLE] Updated settlements:', updatedSettlements.map(s => ({
-            pairKey: makePairKey(s),
-            status: s.status,
-            items: (s.associatedItems || []).map(i => ({ id: i.id, settled: i.settled })),
-          })));
 
           // Clear settledAt/settledBy from the items array too
           const assocIds = new Set((settlement.associatedItems || []).map(i => i.id));
@@ -735,7 +774,6 @@ export default function useSettlementActions({
             items: updatedItems,
           }, uid);
 
-          console.log('[UNSETTLE] Firestore write complete');
           break;
         }
 
@@ -836,7 +874,6 @@ export default function useSettlementActions({
           break;
 
         default:
-          console.warn('[useSettlementActions] Unknown action:', type);
       }
     },
     [participants, expense, expenseTitle, optimistic, setStatus, persistStatus, openVenmoOrFallback],

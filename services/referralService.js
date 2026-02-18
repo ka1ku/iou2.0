@@ -39,7 +39,6 @@ export const getCurrentUserReferralLink = async (userId) => {
     const userDoc = await getDoc(userDocRef);
 
     if (!userDoc.exists()) {
-      console.error('User not found');
       return null;
     }
 
@@ -64,15 +63,12 @@ export const getCurrentUserReferralLink = async (userId) => {
             tier2: { unlocked: false, unlockedAt: null }
           }
         });
-        console.log('Generated referral code for legacy user:', referralCode);
       } catch (updateError) {
-        console.error('Error updating user with referral code:', updateError);
       }
     }
 
     return getReferralLink(referralCode);
   } catch (error) {
-    console.error('Error getting referral link:', error);
     return null;
   }
 };
@@ -85,7 +81,6 @@ export const getUserReferralStats = async (userId) => {
     const db = getFirestore(getApp());
     const userDoc = await getDoc(doc(db, 'users', userId));
     if (!userDoc.exists()) {
-      console.error('User not found');
       // Return default stats instead of throwing
       return {
         referralCode: null,
@@ -133,7 +128,6 @@ export const getUserReferralStats = async (userId) => {
       totalInvitesSent: inviteStats.contactsInvited || 0
     };
   } catch (error) {
-    console.error('Error fetching referral stats:', error);
     // Return default stats instead of throwing
     return {
       referralCode: null,
@@ -175,13 +169,8 @@ export const parseReferralCode = (url) => {
  */
 export const trackReferralConversion = async (referrerId, referredUserId) => {
   try {
-    // This will be handled by Cloud Function, but we can add client-side logging
-    console.log('Referral conversion tracked:', {
-      referrer: referrerId,
-      referred: referredUserId
-    });
+    // Handled by Cloud Function
   } catch (error) {
-    console.error('Error tracking referral conversion:', error);
   }
 };
 

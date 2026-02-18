@@ -75,7 +75,6 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
       // Default to Home
       return 'Home';
     } catch (error) {
-      console.warn('Error determining target tab:', error);
       return 'Home';
     }
   }, [navigation, getLastActiveTab]);

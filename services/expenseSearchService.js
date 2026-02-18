@@ -70,7 +70,6 @@ export const searchExpenses = async (query, hitsPerPage = 3) => {
     
     return filteredHits;
   } catch (error) {
-    console.error('Error searching expenses:', error);
     return [];
   }
 };
@@ -125,7 +124,6 @@ export const searchExpensesWithDetails = async (query, hitsPerPage = 3) => {
     // Filter out any null results (expenses that were deleted but still in Algolia)
     return expenses.filter(expense => expense !== null);
   } catch (error) {
-    console.error('Error searching expenses with details:', error);
     return [];
   }
 };

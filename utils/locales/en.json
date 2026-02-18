@@ -10,7 +10,7 @@
         "currency": "Currency",
         "support": "Support",
         "terms": "Terms of Service",
-        "rate": "Rate the App",
+        "privacy": "Privacy Policy",
         "signOut": "Sign Out",
         "deleteAccount": "Delete Account",
         "manageSubscription": "Manage Subscription",
@@ -789,6 +789,11 @@
                     "unsettle": {
                         "title": "Unsettle Expense",
                         "message": "Are you sure you want to unsettle all items?",
+                        "confirm": "Unsettle"
+                    },
+                    "unsettleAll": {
+                        "title": "Unsettle All Items",
+                        "message": "This will mark all items as unsettled. Are you sure?",
                         "confirm": "Unsettle"
                     }
                 }

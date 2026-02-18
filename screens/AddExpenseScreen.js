@@ -31,6 +31,7 @@ import GroupMembersModal from "../components/expenses/GroupMembersModal";
 import SplitTab from "../components/expenses/SplitTab";
 import useSettlementActions from "../hooks/useSettlementActions";
 import useExpenseSnapshot from "../hooks/useExpenseSnapshot";
+import useExpenseInitSync from "../hooks/useExpenseInitSync";
 import { useTranslation } from '../contexts/LanguageContext';
 
 const SPLIT_TOLERANCE = 0.01;
@@ -60,6 +61,8 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
   const itemLayoutMapRef = useRef({});
   const prevItemsLengthRef = useRef(state.items.length);
   const manualAddRef = useRef(false);
+  const hasAutoExpandedFirstRef = useRef(false);
+  const prevExpenseIdRef = useRef(null);
 
   const currentUserId = getCurrentUser()?.uid;
 
@@ -77,19 +80,20 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     expense,
     participants: state.participants,
     items: state.items,
-    fees: state.fees,
     total,
     title: expense?.title || state.title,
     currentUserId,
     selectedPayers: expense?.selectedPayers || state.selectedPayers,
   });
 
-  useEffect(() => {
-    // Tab bar hiding is handled centrally in App.js via getTabBarStyle
-    if (expense && (isEditing || isNewExpense)) {
-      actions.initializeFromExpense(expense, isEditing, isNewExpense);
-    }
-  }, [expense, isEditing, isNewExpense, navigation, actions]);
+  useExpenseInitSync({
+    expense,
+    isEditing,
+    isNewExpense,
+    state,
+    actions,
+    skipSync: false,
+  });
 
   useEffect(() => {
     const itemsAdded = state.items.length - prevItemsLengthRef.current;
@@ -103,47 +107,22 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
     prevItemsLengthRef.current = state.items.length;
   }, [state.items.length]);
 
+  // Reset auto-expand when we switch to a different expense
   useEffect(() => {
-    if (!isEditing && state.items.length > 0) {
-      setEditingItems(prev => {
-        if (prev.size === 0) {
-          return new Set([0]);
-        }
-        return prev;
-      });
+    if (expense?.id && prevExpenseIdRef.current !== expense.id) {
+      prevExpenseIdRef.current = expense.id;
+      hasAutoExpandedFirstRef.current = false;
+    }
+  }, [expense?.id]);
+
+  // Only auto-expand first item once when we first get items (new expense flow).
+  // Don't revert to edit mode when user has intentionally collapsed items.
+  useEffect(() => {
+    if (!isEditing && state.items.length > 0 && !hasAutoExpandedFirstRef.current) {
+      hasAutoExpandedFirstRef.current = true;
+      setEditingItems(prev => (prev.size === 0 ? new Set([0]) : prev));
     }
   }, [isEditing, state.items.length]);
-
-  useEffect(() => {
-    const currentUserId = getCurrentUser()?.uid;
-    const meParticipant = state.participants.find((p) => p.userId === currentUserId);
-    const allParticipants = [
-      meParticipant || {
-        name: getCurrentUser()?.fullName || getCurrentUser()?.firstName || "Unknown User",
-        id: "me-participant",
-        userId: currentUserId,
-        placeholder: false,
-        phoneNumber: null,
-        username: getCurrentUser()?.username || null,
-        profilePhoto: getCurrentUser()?.profilePhoto || null,
-      },
-      ...state.selectedFriends.map((friend, index) => ({
-        name: friend.name || "",
-        id: `friend-${friend.id || index}`,
-        userId: friend.id || null,
-        phoneNumber: friend.phoneNumber || null,
-        username: friend.username || null,
-        profilePhoto: friend.profilePhoto || null,
-        placeholder: false,
-      })),
-    ];
-
-    const participantsChanged =
-      JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
-    if (participantsChanged) {
-      actions.setParticipants(allParticipants);
-    }
-  }, [state.selectedFriends, state.participants, actions]);
 
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
@@ -186,13 +165,7 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         selectedPayers: item.selectedPayers || [0],
         splits: item.splits || [],
       })),
-      fees: state.fees.map((fee) => ({
-        id: fee.id,
-        name: fee.name.trim(),
-        amount: parseFloat(fee.amount) || 0,
-        type: fee.type || "fixed",
-        splits: fee.splits || [],
-      })),
+      fees: [], // Manual expenses: use items only (add fee-type items with isExtraFee if needed)
       selectedPayers: state.selectedPayers || [0],
       join: { enabled: state.joinEnabled },
     };
@@ -216,10 +189,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
         t('common.error'),
         t('addExpense.validationError')
       );
-      return false;
-    }
-    if (state.fees.some((fee) => !fee.name.trim())) {
-      Alert.alert(t('common.error'), t('addExpense.validation.feeNames'));
       return false;
     }
     if (!state.selectedPayers?.length) {
@@ -421,7 +390,6 @@ const AddExpenseScreenContent = ({ route, navigation }) => {
               title: state.title,
               participants: state.participants,
               items: state.items,
-              fees: state.fees,
               createdBy: currentUserId,
               join: { enabled: state.joinEnabled },
             },
@@ -565,9 +533,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   content: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
@@ -578,13 +543,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.lg,
   },
   memberCountContainer: {
     flexDirection: 'row',
@@ -711,12 +669,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
   },
   sectionSubtitle: {
     ...Typography.body2,

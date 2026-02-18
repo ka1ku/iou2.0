@@ -46,7 +46,6 @@ export const ExpenseDataProvider = ({ children }) => {
     totalOwed: 0,
     totalOwes: 0,
     netBalance: 0,
-    debtBreakdown: {}
   });
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -65,7 +64,7 @@ export const ExpenseDataProvider = ({ children }) => {
       setCurrentUser(user);
       if (!user) {
         setExpenses([]);
-        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
+        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0 });
         setUserProfile(null);
         setIsProfileLoading(false); // No user, so profile loading is done (it's null)
         setLoading(false);
@@ -81,7 +80,7 @@ export const ExpenseDataProvider = ({ children }) => {
   useEffect(() => {
     if (!currentUser) {
       setExpenses([]);
-      setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
+      setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0 });
       setLoading(false);
       setHasMore(true);
       lastDocRef.current = null;
@@ -167,9 +166,8 @@ export const ExpenseDataProvider = ({ children }) => {
       expensesQuery,
       handleSnapshot,
       (error) => {
-        console.error('Expenses query failed:', error);
         setExpenses([]);
-        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
+        setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0 });
         setLoading(false);
         setHasMore(false);
         hasReceivedInitialSnapshot.current = true;
@@ -229,7 +227,6 @@ export const ExpenseDataProvider = ({ children }) => {
       });
 
     } catch (error) {
-      console.error('Error loading more expenses:', error);
       setHasMore(false);
     } finally {
       setLoadingMore(false);
@@ -239,7 +236,7 @@ export const ExpenseDataProvider = ({ children }) => {
   // Calculate balances only when expenses or user changes
   useEffect(() => {
     if (!currentUser || expenses.length === 0) {
-      setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0, debtBreakdown: {} });
+      setBalances({ totalOwed: 0, totalOwes: 0, netBalance: 0 });
       return;
     }
 
@@ -272,7 +269,6 @@ export const ExpenseDataProvider = ({ children }) => {
         setIsProfileLoading(false); // Profile load attempt complete (found or not found)
       },
       (error) => {
-        console.error('Error fetching user profile:', error);
         setUserProfile(null);
         setIsProfileLoading(false); // Profile load attempt complete (failed)
       }

@@ -145,7 +145,6 @@ export const fetchAndClassifyContacts = async () => {
     };
 
   } catch (error) {
-    console.error('Error fetching contacts:', error);
     return { onApp: [], suggestions: [], others: [] };
   }
 };
@@ -216,7 +215,6 @@ export const trackInvite = async (phoneNumber, name) => {
     return { unlockedPremium: false, count: stats.contactsInvited };
     
   } catch (error) {
-    console.error('Error tracking invite:', error);
     return null;
   }
 };

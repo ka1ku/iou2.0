@@ -340,13 +340,12 @@ export const createUserProfile = async (userData, phoneNumber) => {
         try {
           cleanUserData.profilePhoto = await downloadAndUploadImage(contactPhotoUri, user.uid);
           profilePhotoSet = true;
-          console.log('Using Apple contact photo as profile picture');
         } catch (uploadError) {
-          console.log('Failed to upload contact photo, falling back to Venmo or avatar');
+          // Fall back to Venmo or avatar
         }
       }
     } catch (contactError) {
-      console.log('Could not get contact photo, falling back to Venmo or avatar');
+      // Fall back to Venmo or avatar
     }
 
     // 2. If no contact photo, try Venmo profile pic
@@ -360,7 +359,6 @@ export const createUserProfile = async (userData, phoneNumber) => {
           try {
             cleanUserData.profilePhoto = await downloadAndUploadImage(userData.venmoProfilePic.trim(), user.uid);
             profilePhotoSet = true;
-            console.log('Using Venmo profile photo');
           } catch (uploadError) {
             // If upload fails, fallback to the original Venmo URL
             cleanUserData.profilePhoto = userData.venmoProfilePic.trim();
@@ -368,14 +366,13 @@ export const createUserProfile = async (userData, phoneNumber) => {
           }
         }
       } catch (urlError) {
-        console.log('Failed to process Venmo photo');
+        // Failed to process Venmo photo
       }
     }
 
     // 3. If neither contact photo nor Venmo photo, use generated avatar
     if (!profilePhotoSet) {
       cleanUserData.profilePhoto = generateFallbackAvatar(cleanUserData.firstName, cleanUserData.lastName, 'User');
-      console.log('Using generated avatar');
     }
 
     // Generate referral code for new user
@@ -410,7 +407,6 @@ export const createUserProfile = async (userData, phoneNumber) => {
         await AsyncStorage.removeItem('pendingReferralCode');
       }
     } catch (error) {
-      console.error('Error processing referral:', error);
     }
 
     // Create user document with auth UID as document ID
@@ -547,7 +543,6 @@ export const updateUserProfile = async (profileData) => {
         // Upload the new image to Firebase Storage
         updateData.profilePhoto = await downloadAndUploadImage(profileData.profilePhoto, user.uid);
       } catch (uploadError) {
-        console.error('Failed to upload profile photo:', uploadError);
         // Continue without updating photo if upload fails
       }
     } else if (profileData.profilePhoto) {
@@ -658,7 +653,6 @@ export const deleteUserAccount = async () => {
     
     return true;
   } catch (error) {
-    console.error('Error deleting account:', error);
     throw error;
   }
 };
@@ -677,7 +671,6 @@ export const reportUser = async (reportedUserId, reason, description = '') => {
     
     return true;
   } catch (error) {
-    console.error('Error reporting user:', error);
     throw error;
   }
 };
@@ -694,7 +687,6 @@ export const blockUser = async (blockedUserId) => {
     
     return true;
   } catch (error) {
-    console.error('Error blocking user:', error);
     throw error;
   }
 };
@@ -727,7 +719,6 @@ export const updateUserPreferences = async (preferences) => {
     
     return true;
   } catch (error) {
-    console.error('Error updating user preferences:', error);
     return false;
   }
 };
@@ -748,7 +739,6 @@ export const getUserPreferences = async () => {
     }
     return null;
   } catch (error) {
-    console.error('Error getting user preferences:', error);
     return null;
   }
 };

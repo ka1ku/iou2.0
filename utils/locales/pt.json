@@ -2,7 +2,7 @@
     "settings": {
         "title": "Configurações",
         "account": "Conta",
-        "profile": "Configurações de Perfil",
+        "profile": "Configurações do Perfil",
         "venmo": "Integração Venmo",
         "preferences": "Preferências",
         "language": "Idioma",
@@ -10,12 +10,831 @@
         "currency": "Moeda",
         "support": "Suporte",
         "terms": "Termos de Serviço",
-        "rate": "Avaliar o App",
+        "privacy": "Política de Privacidade",
         "signOut": "Sair",
-        "deleteAccount": "Excluir Conta"
+        "deleteAccount": "Excluir Conta",
+        "manageSubscription": "Gerenciar Assinatura",
+        "restorePurchases": "Restaurar Compras",
+        "restoreSuccess": "Compras restauradas com sucesso",
+        "noSubscriptions": "Nenhuma assinatura ativa encontrada",
+        "restoreError": "Erro ao restaurar. Tente novamente",
+        "growth": "Crescimento",
+        "buildYourSquad": {
+            "title": "Monte seu Esquadrão",
+            "subtitle": "Ganhe recompensas convidando amigos"
+        },
+        "connectedAccounts": {
+            "title": "Contas Conectadas",
+            "sectionTitle": "Contas de Pagamento",
+            "aboutTitle": "Sobre Contas Conectadas",
+            "connected": "Conectado",
+            "notConnected": "Não Conectado",
+            "connect": "Conectar",
+            "disconnect": "Desconectar",
+            "loading": "Carregando contas...",
+            "venmo": {
+                "name": "Venmo",
+                "description": "Para pagamentos e reembolsos",
+                "connectTitle": "Conectar Venmo",
+                "connectMessage": "Para conectar sua conta Venmo, faça login ou inscreva-se com suas informações do Venmo.",
+                "goToSignUp": "Ir para Inscrição",
+                "reconnectionSoon": "A reconexão com o Venmo estará disponível em breve."
+            },
+            "paypal": {
+                "name": "PayPal",
+                "description": "Em breve"
+            },
+            "zelle": {
+                "name": "Zelle",
+                "description": "Em breve"
+            },
+            "disconnectAlert": {
+                "title": "Desconectar Conta",
+                "message": "Tem certeza que deseja desconectar esta conta? Você pode perder o acesso a alguns recursos.",
+                "confirm": "Desconectar",
+                "cancel": "Cancelar",
+                "success": "Conta desconectada com sucesso",
+                "soon": "A desconexão da conta estará disponível em breve."
+            },
+            "info": {
+                "secureTitle": "Seguro e Privado",
+                "secureDesc": "Suas informações de pagamento são armazenadas com segurança e nunca compartilhadas com outros usuários.",
+                "easyTitle": "Acertos Fáceis",
+                "easyDesc": "Contas conectadas facilitam o envio e recebimento de pagamentos para despesas compartilhadas."
+            },
+            "soon": "Em breve",
+            "integrationSoon": "A integração com {{name}} estará disponível em breve."
+        },
+        "profileSettings": {
+            "title": "Editar Perfil",
+            "loading": "Carregando perfil...",
+            "changePhoto": "Alterar Foto do Perfil",
+            "firstName": "Nome",
+            "lastName": "Sobrenome",
+            "username": "Nome de Usuário",
+            "paymentMethods": "Métodos de Pagamento",
+            "venmo": "Conta Venmo",
+            "notConnected": "Não Conectado",
+            "visibilityInfo": "Esta informação será visível para seus amigos no IOU.",
+            "save": "Salvar Alterações",
+            "success": "Sucesso",
+            "error": "Erro",
+            "selectImageError": "Erro ao selecionar imagem",
+            "updateSuccess": "Perfil atualizado com sucesso!",
+            "updateError": "Erro ao atualizar perfil"
+        },
+        "currencies": {
+            "usd": "Dólar Americano (USD)",
+            "eur": "Euro (EUR)",
+            "gbp": "Libra Esterlina (GBP)",
+            "mxn": "Peso Mexicano (MXN)",
+            "cad": "Dólar Canadense (CAD)",
+            "cny": "Yuan Chinês (CNY)",
+            "jpy": "Iene Japonês (JPY)",
+            "krw": "Won Sul-Coreano (KRW)",
+            "vnd": "Dong Vietnamita (VND)"
+        },
+        "termsOfService": {
+            "lastUpdated": "Última atualização: Dezembro de 2024",
+            "sections": {
+                "1": {
+                    "title": "1. Aceitação dos Termos",
+                    "content": "Ao acessar e usar o aplicativo móvel IOU (\"App\"), você aceita e concorda em ficar vinculado aos termos e disposições deste contrato. Se você não concordar com o acima exposto, não use este serviço."
+                },
+                "2": {
+                    "title": "2. Licença de Uso",
+                    "content": "É concedida permissão para baixar temporariamente uma cópia do aplicativo IOU apenas para visualização transitória pessoal e não comercial. Esta é a concessão de uma licença, não uma transferência de título, e sob esta licença você não pode:",
+                    "bullets": {
+                        "1": "modificar ou copiar os materiais",
+                        "2": "usar os materiais para qualquer finalidade comercial ou para qualquer exibição pública",
+                        "3": "tentar descompilar ou fazer engenharia reversa de qualquer software contido no aplicativo",
+                        "4": "remover quaisquer direitos autorais ou outras notações de propriedade dos materiais"
+                    }
+                },
+                "3": {
+                    "title": "3. Contas de Usuário",
+                    "content": "Para usar certos recursos do App, você deve criar uma conta. Você é responsável por:",
+                    "bullets": {
+                        "1": "Fornecer informações precisas e completas",
+                        "2": "Manter a segurança das credenciais da sua conta",
+                        "3": "Todas as atividades que ocorrem sob sua conta",
+                        "4": "Nos notificar imediatamente sobre qualquer uso não autorizado"
+                    }
+                },
+                "4": {
+                    "title": "4. Processamento de Pagamentos",
+                    "content": "O App facilita o rastreamento de despesas e o acerto entre usuários. Podemos integrar com processadores de pagamento de terceiros. Ao usar esses recursos, você concorda em:",
+                    "bullets": {
+                        "1": "Cumprir os termos de serviço dos provedores de pagamento terceirizados",
+                        "2": "Entender que não somos responsáveis pelo processamento de pagamentos",
+                        "3": "Arcar com quaisquer taxas cobradas pelos processadores de pagamento"
+                    }
+                },
+                "5": {
+                    "title": "5. Política de Privacidade",
+                    "content": "Sua privacidade é importante para nós. Por favor, revise nossa Política de Privacidade, que também rege o uso do App, para entender nossas práticas."
+                },
+                "6": {
+                    "title": "6. Usos Proibidos",
+                    "content": "Você não pode usar nosso App:",
+                    "bullets": {
+                        "1": "Para qualquer finalidade ilegal ou para solicitar a outros que realizem ou participem de atos ilegais",
+                        "2": "Para violar quaisquer regulamentos, regras, leis ou decretos internacionais, federais, provinciais ou estaduais",
+                        "3": "Para infringir ou violar nossos direitos de propriedade intelectual ou os direitos de propriedade intelectual de terceiros",
+                        "4": "Para assediar, abusar, insultar, prejudicar, difamar, caluniar, depreciar, intimidar ou discriminar",
+                        "5": "Para enviar informações falsas ou enganosas"
+                    },
+                    "content2": "Temos uma política de tolerância zero para conteúdo censurável e usuários abusivos. O conteúdo que violar esses termos será removido e os usuários que se envolverem em tal comportamento serão bloqueados e banidos do Serviço."
+                },
+                "7": {
+                    "title": "7. Isenção de Responsabilidade",
+                    "content": "As informações neste App são fornecidas \"como estão\". Na extensão máxima permitida por lei, esta Empresa:",
+                    "bullets": {
+                        "1": "Exclui todas as representações e garantias relacionadas a este aplicativo e seu conteúdo",
+                        "2": "Não garante a precisão, integridade ou atualidade das informações",
+                        "3": "Exclui qualquer responsabilidade por danos decorrentes ou relacionados ao uso deste aplicativo"
+                    }
+                },
+                "8": {
+                    "title": "8. Limitação de Responsabilidade",
+                    "content": "Em nenhum caso a IOU ou seus fornecedores serão responsáveis por quaisquer danos (incluindo, sem limitação, danos por perda de dados ou lucro, ou devido à interrupção dos negócios) decorrentes do uso ou da incapacidade de usar o App, mesmo que a IOU ou um representante autorizado tenha sido notificado oralmente ou por escrito da possibilidade de tal dano."
+                },
+                "9": {
+                    "title": "9. Revisões",
+                    "content": "Os materiais que aparecem no App podem incluir erros técnicos, tipográficos ou fotográficos. A IOU não garante que qualquer um dos materiais em seu App seja preciso, completo ou atual. A IOU pode fazer alterações nos materiais contidos em seu App a qualquer momento sem aviso prévio."
+                },
+                "10": {
+                    "title": "10. Lei Aplicável",
+                    "content": "Estes termos e condições são regidos e interpretados de acordo com as leis dos Estados Unidos e você se submete irrevogavelmente à jurisdição exclusiva dos tribunais nesse Estado ou local."
+                },
+                "11": {
+                    "title": "11. Informações de Contato",
+                    "content": "Se tiver alguma dúvida sobre estes Termos de Serviço, entre em contato conosco em:",
+                    "email": "E-mail: legal@iou-app.com",
+                    "support": "Suporte: support@iou-app.com"
+                }
+            },
+            "footer": "Ao usar o IOU, você reconhece que leu e entendeu estes Termos de Serviço e concorda em ficar vinculado a eles."
+        }
     },
     "common": {
         "cancel": "Cancelar",
-        "save": "Salvar"
+        "save": "Salvar",
+        "loading": "Carregando...",
+        "error": "Erro",
+        "success": "Sucesso"
+    },
+    "home": {
+        "title": "Início",
+        "headerTitle": "Despesas",
+        "searchPlaceholder": "Buscar despesas ou membros...",
+        "noExpensesTitle": "Nenhuma despesa ainda",
+        "noExpensesDesc": "Toque em Criar para adicionar sua primeira despesa",
+        "noSearchResultsTitle": "Nenhuma despesa encontrada",
+        "noSearchResultsDesc": "Tente um termo de busca diferente",
+        "settledUp": "Quitado",
+        "youOwe": "Você deve",
+        "youAreOwed": "Devem a você",
+        "confirmPayment": "Confirmar Pagamento",
+        "awaitingConfirmation": "Aguardando confirmação",
+        "needsSettlement": "Precisa de acerto",
+        "receipt": "Recibo",
+        "expense": "Despesa",
+        "otherMembers": "Outros Membros"
+    },
+    "profile": {
+        "title": "Perfil",
+        "balanceSummary": "Resumo do Saldo",
+        "recentExpenses": "Despesas Recentes",
+        "editProfile": "Editar Perfil",
+        "loading": "Carregando perfil...",
+        "noUsername": "Sem nome de usuário",
+        "totalOwedToYou": "Total que devem a você",
+        "totalYouOwe": "Total que você deve",
+        "participants": "participantes",
+        "createFirstExpense": "Crie sua primeira despesa",
+        "startTracking": "Comece a monitorar despesas compartilhadas",
+        "loadMore": "Carregar Mais",
+        "remaining": "restante"
+    },
+    "navigation": {
+        "home": "Início",
+        "profile": "Perfil"
+    },
+    "addExpense": {
+        "addExpenseTitle": "Adicionar Despesa",
+        "editExpenseTitle": "Editar Despesa",
+        "item": "Item",
+        "items": "Itens",
+        "date": "Data",
+        "amount": "Valor",
+        "paidBy": "Pago por",
+        "split": "Dividir",
+        "saveSuccess": "Despesa salva com sucesso",
+        "saveError": "Erro ao salvar despesa",
+        "validationError": "Preencha todos os campos obrigatórios",
+        "deleteItemParams": {
+            "title": "Excluir Item",
+            "message": "Tem certeza de que deseja excluir este item? Esta ação não pode ser desfeita.",
+            "confirm": "Excluir"
+        },
+        "validation": {
+            "feeNames": "Por favor, preencha todos os nomes de taxas",
+            "unevenSplitTitle": "Divisão Desigual",
+            "unevenSplitMessage": "Um ou mais itens têm valores divididos que não correspondem aos totais. Por favor, verifique seus itens.",
+            "unauthenticated": "Usuário não autenticado",
+            "deleteError": "Erro ao excluir item: {{error}}"
+        },
+        "addFirstItem": "Adicione seu Primeiro Item",
+        "addAnotherItem": "Adicionar Outro Item",
+        "noItemsTitle": "Nenhum item ainda",
+        "noItemsDesc": "Comece adicionando seu primeiro item a esta despesa"
+    },
+    "addReceipt": {
+        "addReceiptTitle": "Adicionar Recibo",
+        "editReceiptTitle": "Editar Recibo",
+        "paidBy": "PAGO POR",
+        "extraCharges": "TAXAS EXTRAS",
+        "totals": "TOTAIS",
+        "addFee": "Adicionar {{type}}",
+        "feeTypes": {
+            "tip": "Gorjeta",
+            "tax": "Imposto",
+            "service": "Serviço",
+            "custom": "Personalizado"
+        },
+        "placeholders": {
+            "feeName": "Nome da taxa (ex: Rolha)"
+        },
+        "subtotal": "Subtotal",
+        "feesAndTip": "Taxas e Gorjeta",
+        "total": "Total",
+        "incompleteItems": "Itens Incompletos",
+        "incompleteItemsDesc": "Certifique-se de que todos os itens tenham preço maior que zero e pelo menos uma pessoa atribuída.",
+        "feeNameMissing": "Por favor, preencha todos os nomes de taxas"
+    },
+    "expenseSettings": {
+        "title": "Configurações da Despesa",
+        "expenseName": "Nome da Despesa",
+        "changeName": "Alterar Nome",
+        "untitledExpense": "Despesa Sem Título",
+        "shareExpense": "Compartilhar Despesa",
+        "allowJoin": "Permitir que outros participem",
+        "shareLink": "Compartilhar Link",
+        "copyLink": "Copiar Link",
+        "dangerZone": "Zona de Perigo",
+        "leaveExpense": "Sair da Despesa",
+        "leaveExpenseSubtitle": "Remover-se desta despesa",
+        "errors": {
+            "emptyName": "O nome da despesa não pode estar vazio",
+            "updateNameError": "Erro ao atualizar nome da despesa",
+            "leaveError": "Erro ao sair da despesa",
+            "cannotLeave": "Não é possível sair",
+            "cannotLeaveDesc": "Você só pode sair desta despesa se não fizer parte de nenhum item. Remova-se de todos os itens primeiro."
+        },
+        "success": {
+            "nameUpdated": "Nome da despesa atualizado com sucesso",
+            "leftExpense": "Você saiu da despesa com sucesso",
+            "copied": "Copiado!",
+            "linkCopied": "Link de convite copiado para a área de transferência"
+        },
+        "confirmLeave": {
+            "title": "Sair da Despesa",
+            "message": "Tem certeza que deseja sair desta despesa? Você será removido de todas as divisões e não poderá mais acessá-la."
+        },
+        "shareMessage": "Junte-se à minha despesa \"{{title}}\" no IOU.\n\nToque para participar:\n{{link}}"
+    },
+    "friendProfile": {
+        "title": "Perfil de Amigo",
+        "options": "Opções",
+        "report": "Denunciar Usuário",
+        "block": "Bloquear Usuário",
+        "loading": "Carregando perfil do amigo...",
+        "balanceSummary": "Resumo do Saldo",
+        "netBalance": "Saldo Líquido",
+        "theyOweYouOverall": "Eles te devem no total",
+        "youOweThemOverall": "Você deve a eles no total",
+        "theyOweYou": "Te Devem",
+        "youOweThem": "Você Deve",
+        "paymentMethods": "Métodos de Pagamento",
+        "noPaymentMethod": "Nenhum método de pagamento disponível",
+        "sharedExpenses": "Despesas Compartilhadas",
+        "noSharedExpenses": "Nenhuma despesa compartilhada ainda",
+        "addFirstExpense": "Adicionar Primeira Despesa",
+        "owesYou": "Te deve",
+        "youOwe": "Você deve",
+        "reportPrompt": {
+            "title": "Denunciar Usuário",
+            "message": "Por favor, diga-nos por que você está denunciando este usuário.",
+            "submit": "Denunciar"
+        },
+        "blockPrompt": {
+            "title": "Bloquear Usuário",
+            "message": "Tem certeza que deseja bloquear este usuário? Você não verá mais o conteúdo dele e não poderá interagir com ele.",
+            "confirm": "Bloquear"
+        },
+        "reportSuccess": "Denúncia Enviada",
+        "reportSuccessDesc": "Obrigado pela sua denúncia. Iremos analisá-la em breve.",
+        "blockSuccess": "Usuário Bloqueado",
+        "blockSuccessDesc": "Você bloqueou este usuário."
+    },
+    "setupExpense": {
+        "title": "Como você quer chamar este {{type}}?",
+        "titlePlaceholder": "Digite o nome do {{type}}...",
+        "whoSplitting": "Quem está dividindo?",
+        "addPeople": "Adicionar Pessoas",
+        "creating": "Criando...",
+        "continue": "Continuar",
+        "errors": {
+            "titleRequired": "Por favor, digite um título para este {{type}}",
+            "participantsRequired": "Por favor, insira nomes para todos os participantes",
+            "noUser": "Nenhum usuário logado",
+            "profileError": "Falha ao obter perfil do usuário",
+            "createError": "Erro ao criar {{type}}: {{message}}"
+        }
+    },
+    "auth": {
+        "common": {
+            "usCountryCode": "🇺🇸 +1"
+        },
+        "welcome": {
+            "title": "Bem-vindo ao IOU!",
+            "split": "Dividir com Grupos",
+            "autoCalculate": "Cálculo Automático",
+            "realTime": "Sincronização em Tempo Real",
+            "createAccount": "Criar Conta",
+            "signIn": "Entrar"
+        },
+        "signIn": {
+            "title": "Entrar",
+            "stepTitle": "Número de Telefone",
+            "stepSubtitle": "Enviaremos um código de verificação para confirmar seu número",
+            "inputLabel": "Número de Telefone",
+            "placeholder": "(555) 123-4567",
+            "button": "Enviar Código",
+            "sending": "Enviando...",
+            "noAccount": "Não tem uma conta?",
+            "createAccount": "Criar Conta",
+            "infoSms": "Enviaremos um código de verificação via SMS",
+            "infoSecure": "Seu número de telefone é mantido seguro e privado",
+            "errors": {
+                "missingPhone": "Por favor, digite seu número de telefone",
+                "invalidPhone": "Por favor, digite um número válido de 10 dígitos"
+            }
+        },
+        "signUp": {
+            "stepIndicator": "Etapa {{current}} de {{total}}",
+            "title": "Criar Conta",
+            "step1": {
+                "title": "Qual é o seu nome?",
+                "subtitle": "Usaremos isso para identificar você com seus amigos",
+                "firstName": "Nome",
+                "lastName": "Sobrenome",
+                "firstNamePlaceholder": "Digite seu nome",
+                "lastNamePlaceholder": "Digite seu sobrenome"
+            },
+            "step2": {
+                "title": "Escolha um nome de usuário",
+                "subtitle": "Este será seu identificador exclusivo no aplicativo",
+                "username": "Nome de Usuário",
+                "placeholder": "Digite um nome de usuário",
+                "hint": "3-20 caracteres, apenas letras, números e sublinhados"
+            },
+            "step3": {
+                "title": "Vincule seu Venmo",
+                "subtitle": "Conecte seu Venmo para dividir despesas mais facilmente (opcional)",
+                "label": "Nome de usuário Venmo",
+                "placeholder": "seu-usuario-venmo",
+                "verified": "Conta Venmo Verificada",
+                "noProfilePic": "Conta Venmo (Sem Foto de Perfil)",
+                "change": "Alterar Conta",
+                "skip": "Pular"
+            },
+            "continue": "Continuar",
+            "alreadyHaveAccount": "Já tem uma conta?",
+            "errors": {
+                "required": "Campo Obrigatório",
+                "firstNameReq": "Por favor, digite seu nome",
+                "lastNameReq": "Por favor, digite seu sobrenome",
+                "invalidFirst": "O nome só pode conter letras, espaços, hífens e apóstrofos",
+                "invalidLast": "O sobrenome só pode conter letras, espaços, hífens e apóstrofos",
+                "minFirst": "O nome deve ter pelo menos 2 caracteres",
+                "minLast": "O sobrenome deve ter pelo menos 2 caracteres",
+                "usernameReq": "Por favor, digite um nome de usuário",
+                "invalidUsername": "O nome de usuário deve ter 3-20 caracteres e conter apenas letras, números e sublinhados",
+                "usernameTaken": "Nome de usuário em uso",
+                "usernameTakenDesc": "Este nome de usuário já está sendo usado. Por favor, escolha outro.",
+                "checkError": "Não foi possível verificar a disponibilidade do nome de usuário",
+                "saveError": "Erro ao salvar suas informações. Tente novamente.",
+                "accountExists": "Conta já existe",
+                "accountExistsDesc": "Este número de telefone já está registrado. Você pode entrar ou usar outro número.",
+                "signInInstead": "Entrar em vez disso",
+                "useDiffNumber": "Usar outro número",
+                "verificationError": "Resposta de verificação inválida recebida"
+            }
+        },
+        "verifyOTP": {
+            "title": "Verificar Telefone",
+            "title2FA": "Autenticação de Dois Fatores",
+            "subtitle": "Digite o código de 6 dígitos enviado para\n{{phone}}",
+            "subtitle2FA": "Digite o código de 6 dígitos enviado para o seu dispositivo",
+            "button": "Verificar Código",
+            "verifying": "Verificando...",
+            "resend": "Reenviar Código",
+            "sending": "Enviando...",
+            "resendTimer": "Reenviar código em {{timer}}s",
+            "info": "Não recebeu o código? Verifique seu sinal e tente novamente.",
+            "success": {
+                "resend": "Código de verificação reenviado com sucesso"
+            },
+            "errors": {
+                "invalidCodeLength": "Por favor, digite o código completo de 6 dígitos",
+                "noSession": "Nenhuma sessão de verificação encontrada. Por favor, solicite um novo código.",
+                "signupMissing": "Dados de inscrição ausentes",
+                "signupMissingDesc": "Não foi possível criar seu perfil. Por favor, tente se inscrever novamente.",
+                "profileFailed": "Falha na Criação do Perfil",
+                "profileFailedDesc": "Seu telefone foi verificado, mas não conseguimos criar seu perfil: {{message}}",
+                "verificationFailed": "Verificação Falhou",
+                "noResend2FA": "Não é possível reenviar códigos 2FA. Tente inserir o código novamente ou faça login novamente.",
+                "resendFailed": "Erro ao reenviar código de verificação. Tente novamente."
+            },
+            "loading": {
+                "uploading": "Carregando sua foto de perfil...",
+                "creating": "Criando seu perfil...",
+                "finalizing": "Finalizando sua conta...",
+                "securing": "Protegendo seus dados..."
+            }
+        },
+        "contactInvite": {
+            "title": "Monte seu Esquadrão",
+            "subtitle": "O IOU é mais divertido com amigos. Conecte seus contatos para encontrar pessoas que você conhece e desbloquear recursos.",
+            "findFriends": "Encontrar Amigos",
+            "skip": "Pular por enquanto",
+            "skipLink": "Pular",
+            "done": "Concluído",
+            "tiers": {
+                "solo": {
+                    "name": "Modo Solo",
+                    "description": "Recursos Básicos",
+                    "features": {
+                        "manual": "Entrada manual de despesas",
+                        "ratios": "Proporções de divisão simples"
+                    }
+                },
+                "squadStarted": {
+                    "name": "Esquadrão Iniciado",
+                    "description": "Recursos Inteligentes Desbloqueados",
+                    "features": {
+                        "suggestions": "Sugestões inteligentes de contatos",
+                        "friends": "Ver amigos no app",
+                        "templates": "Modelos de despesas"
+                    }
+                },
+                "fullSquad": {
+                    "name": "Esquadrão Completo",
+                    "description": "Status Premium",
+                    "features": {
+                        "premium": "1 Mês Premium Grátis",
+                        "categories": "Categorias personalizadas",
+                        "support": "Suporte prioritário"
+                    }
+                }
+            },
+            "alerts": {
+                "contactsRequired": {
+                    "title": "Contatos Necessários",
+                    "message": "Para encontrar seus amigos, precisamos de acesso aos seus contatos. Por favor, ative nas configurações.",
+                    "ok": "OK"
+                },
+                "premiumUnlocked": {
+                    "title": "Premium Desbloqueado! 🌟",
+                    "message": "Você desbloqueou 1 Mês de Premium automaticamente!"
+                },
+                "featuresUnlocked": {
+                    "title": "Novos Recursos Desbloqueados! 🚀",
+                    "message": "Você desbloqueou Sugestões Inteligentes e Modelos!"
+                },
+                "error": "Algo deu errado. Tente novamente."
+            }
+        },
+        "twoFactor": {
+            "screenTitle": "Autenticação de Dois Fatores",
+            "title": "Autenticação de Dois Fatores",
+            "description": {
+                "title": "Segurança Aprimorada",
+                "text": "A autenticação de dois fatores adiciona uma camada extra de segurança à sua conta, exigindo um código de verificação do seu telefone."
+            },
+            "methods": {
+                "title": "Métodos Cadastrados",
+                "empty": "Nenhum método 2FA cadastrado",
+                "emptyDesc": "Adicione um número de telefone para começar com a autenticação de dois fatores",
+                "enrolledAt": "Cadastrado em {{date}}",
+                "remove": {
+                    "title": "Remover Método 2FA",
+                    "message": "Tem certeza que deseja remover \"{{name}}\" da sua conta?",
+                    "confirm": "Remover",
+                    "cancel": "Cancelar"
+                }
+            },
+            "add": {
+                "button": "Adicionar Número",
+                "title": "Adicionar Número para 2FA",
+                "description": "Digite um número de telefone para receber códigos de verificação.",
+                "label": "Número de Telefone",
+                "placeholder": "(555) 123-4567",
+                "send": "Enviar Código",
+                "sending": "Enviando...",
+                "cancel": "Cancelar"
+            },
+            "verify": {
+                "title": "Verificar Número",
+                "description": "Digite o código de 6 dígitos enviado para o seu telefone.",
+                "label": "Código de Verificação",
+                "placeholder": "123456",
+                "submit": "Verificar e Ativar",
+                "verifying": "Verificando...",
+                "cancel": "Cancelar"
+            },
+            "success": {
+                "codeSent": "Código de verificação enviado para o seu telefone",
+                "enrolled": "Inscrição 2FA concluída com sucesso",
+                "removed": "Método 2FA removido com sucesso"
+            },
+            "errors": {
+                "loadFailed": "Falha ao carregar configurações 2FA",
+                "missingPhone": "Por favor, digite um número de telefone",
+                "invalidPhone": "Por favor, digite um número válido de 10 dígitos",
+                "startFailed": "Falha ao iniciar inscrição 2FA",
+                "invalidCode": "Por favor, digite o código completo de 6 dígitos",
+                "completeFailed": "Falha ao concluir inscrição 2FA",
+                "removeFailed": "Falha ao remover método 2FA"
+            }
+        }
+    },
+    "components": {
+        "createBottomSheet": {
+            "title": "Criar Novo",
+            "addExpense": "Adicionar Despesa",
+            "addExpenseDesc": "Adicionar uma despesa manualmente",
+            "scanReceipt": "Escanear Recibo",
+            "scanReceiptDesc": "Escanear um recibo para extrair itens",
+            "joinExpense": "Entrar em Despesa",
+            "joinExpenseDesc": "Usar um link ou código para entrar",
+            "scanTitle": "Escanear Recibo",
+            "takePhoto": "Tirar Foto",
+            "takePhotoDesc": "Capturar uma nova foto de recibo",
+            "chooseGallery": "Escolher da Galeria",
+            "chooseGalleryDesc": "Selecionar uma foto existente",
+            "joinTitle": "Entrar em Despesa",
+            "enterLink": "Inserir Link ou Código",
+            "linkPlaceholder": "Cole o link ou código aqui...",
+            "joinButton": "Entrar",
+            "missingLinkError": "Por favor, insira um link ou código de convite",
+            "scanError": "Erro ao Escanear Recibo"
+        },
+        "changeVenmo": {
+            "title": "Alterar Venmo",
+            "subtitle": "Conecte seu Venmo para dividir despesas mais facilmente",
+            "verified": "Conta Venmo Verificada",
+            "noProfilePic": "Conta Venmo (Sem Foto de Perfil)",
+            "changeAccount": "Alterar Conta",
+            "usernameLabel": "Nome de usuário Venmo",
+            "usernamePlaceholder": "seu-usuario-venmo",
+            "removeHint": "Deixe em branco para remover sua conta Venmo",
+            "save": "Salvar Alterações",
+            "verificationRequired": "Verificação Necessária",
+            "verificationRequiredDesc": "Por favor, aguarde a verificação do Venmo ser concluída ou insira um nome de usuário válido.",
+            "verificationInProgress": "Verificação em Andamento",
+            "verificationInProgressDesc": "Por favor, aguarde a conclusão da verificação do Venmo.",
+            "updateSuccess": "Sua conta Venmo foi atualizada com sucesso.",
+            "removeSuccess": "Sua conta Venmo foi removida com sucesso.",
+            "updateError": "Erro ao atualizar conta Venmo. Tente novamente.",
+            "userNotFound": "Usuário Venmo não existe. Verifique o nome e tente novamente.",
+            "verifyError": "Não foi possível verificar a conta Venmo. Verifique sua conexão e tente novamente."
+        },
+        "changeExpenseName": {
+            "title": "Alterar Nome da Despesa",
+            "subtitle": "Digite um novo nome para esta despesa",
+            "label": "Nome da Despesa",
+            "placeholder": "Digite o nome da despesa",
+            "save": "Salvar Alterações"
+        },
+        "expenses": {
+            "header": {
+                "edit": "Editar",
+                "add": "Adic.",
+                "track": "Rastrear",
+                "split": "Div."
+            },
+            "footer": {
+                "settleUp": "Quitar",
+                "processing": "Processando..."
+            },
+            "paidBy": {
+                "label": "Pago por",
+                "you": "Você",
+                "noParticipants": "Sem participantes"
+            },
+            "participantsGrid": {
+                "addFriends": "Adic. amigos",
+                "manage": "Gerenciar"
+            },
+            "expenseItemCard": {
+                "itemNamePlaceholder": "Digite nome do item",
+                "allAllocated": "Tudo alocado",
+                "enterPrice": "Digite preço p/ dividir",
+                "unallocated": "Não alocado: ${{amount}}",
+                "totalExceeds": "Total excede conta em ${{amount}}",
+                "payers": "Pagadores",
+                "split": "Dividir",
+                "cancel": "Cancelar",
+                "save": "Salvar",
+                "settled": "Quitado no pagamento",
+                "person": "Pessoa {{index}}",
+                "alerts": {
+                    "incomplete": "Item Incompleto",
+                    "incompleteDesc": "Verifique: {{fields}}",
+                    "uneven": "Divisão Desigual",
+                    "unevenDesc": "Valores da divisão não correspondem ao total do item. Ajuste as divisões ou o valor total.",
+                    "saveError": "Erro ao salvar despesa: {{error}}"
+                },
+                "fields": {
+                    "name": "nome do item",
+                    "price": "preço",
+                    "payer": "pelo menos um pagador",
+                    "consumer": "pelo menos uma pessoa na divisão"
+                }
+            },
+            "expenseViewCard": {
+                "paidByUnassigned": "Pago por Desconhecido",
+                "paidByOne": "Pago por {{name}}",
+                "paidByTwo": "Pago por {{name1}} e {{name2}}",
+                "paidByMany": "Pago por {{name}} e outros {{count}}",
+                "untitledItem": "Item Sem Título",
+                "settled": "Quitado",
+                "splitWith": "Dividido com",
+                "actions": {
+                    "title": "Ações da Despesa",
+                    "message": "O que você gostaria de fazer?",
+                    "edit": "Editar",
+                    "delete": "Excluir",
+                    "cancel": "Cancelar"
+                },
+                "locked": {
+                    "title": "Item Bloqueado",
+                    "message": "Este item faz parte de um acerto ativo. Cancele o acerto para editar este item."
+                }
+            },
+            "receiptBreakdown": {
+                "header": "Itens do Recibo",
+                "addItem": "Adic. Item",
+                "editItem": "Editar Item",
+                "itemName": "Nome do Item",
+                "itemNamePlaceholder": "Digite nome do item",
+                "price": "Preço",
+                "splitWith": "Dividido com",
+                "selectPerson": "Selecione pelo menos uma pessoa",
+                "cancel": "Cancelar",
+                "save": "Salvar",
+                "lockedTitle": "Item Bloqueado",
+                "lockedMsg": "Este item faz parte de um acerto ativo. Cancele o acerto para editar este item.",
+                "itemDefault": "Item {{index}}",
+                "settled": "Quitado",
+                "assignSomeone": "Atribuir a alguém",
+                "noOneAssigned": "Ninguém atribuído",
+                "extraFee": "Marcar como taxa extra (gorjeta, imposto, etc)",
+                "fee": "Taxa",
+                "time": {
+                    "justNow": "agora mesmo",
+                    "minutesAgo": "há {{count}}m",
+                    "hoursAgo": "há {{count}}h",
+                    "daysAgo": "há {{count}}d",
+                    "weeksAgo": "há {{count}}sem"
+                }
+            },
+            "settlementInterface": {
+                "summary": {
+                    "allSettled": "Tudo quitado!",
+                    "youOwe": "Você deve",
+                    "youreOwed": "Devem a você",
+                    "pendingSettled": "{{pending}} pendente · {{settled}} quitado",
+                    "pending": "{{count}} pendente",
+                    "settled": "{{count}} quitado"
+                },
+                "activity": {
+                    "title": "Atividade",
+                    "showMore": "Mostrar mais {{count}}...",
+                    "types": {
+                        "priceChange": "{{user}} atualizou o total de ${{prev}} para ${{new}}",
+                        "itemAdded": "{{user}} adicionou {{item}}",
+                        "itemAddedAmount": "{{user}} adicionou {{item}} por ${{amount}}",
+                        "itemRemoved": "{{user}} removeu \"{{item}}\"",
+                        "itemRemovedAmount": "{{user}} removeu {{item}} (${{amount}})",
+                        "participantAdded": "{{user}} adicionou {{participant}}",
+                        "participantRemoved": "{{user}} removeu {{participant}}",
+                        "default": "{{user}} fez uma alteração",
+                        "itemModified": "{{user}} editou {{item}} por ${{amount}}",
+                        "itemModifiedComputed": "{{user}} modificou {{item}}: {{changes}}",
+                        "settled": "{{user}} quitou com {{peer}} por ${{amount}}",
+                        "unsettled": "{{user}} cancelou o acerto de ${{amount}} com {{peer}}"
+                    }
+                },
+                "status": {
+                    "fullySettled": "Totalmente Quitado",
+                    "partiallySettled": "Parcialmente Quitado",
+                    "settled": "Quitado",
+                    "reminded": "Lembrado",
+                    "awaitingPayment": "Aguardando Pagamento"
+                },
+                "items": {
+                    "title": "Itens",
+                    "tapToSettle": "(toque para quitar)",
+                    "selectAll": "Selecionar Tudo",
+                    "deselectAll": "Desmarcar Tudo"
+                },
+                "actions": {
+                    "allSettled": "Tudo Quitado",
+                    "selectToSettle": "Selecione itens para quitar",
+                    "pay": "Pagar {{amount}}",
+                    "markSettled": "Marcar {{amount}} Quitado",
+                    "request": "Solicitar {{amount}}",
+                    "reminderSent": "Lembrete Enviado",
+                    "sendReminder": "Enviar Lembrete",
+                    "undoSettlement": "Desfazer Acerto"
+                },
+                "relationships": {
+                    "youOwe": "Você deve a {{name}}",
+                    "owesYou": "{{name}} te deve",
+                    "owes": "{{name}} deve a {{name2}}"
+                },
+                "total": "(${{amount}} total)",
+                "empty": {
+                    "title": "Tudo Quitado!",
+                    "body": "Todo mundo está em dia. Nenhum pagamento necessário."
+                },
+                "banner": {
+                    "title": "Acertos atualizados devido a alterações.",
+                    "sub": "{{new}} novos, {{paid}} pagos mantidos."
+                },
+                "alerts": {
+                    "markSettled": {
+                        "title": "Marcar como Quitado",
+                        "message": "Marcar {{amount}} como quitado? Isso registra o pagamento sem usar o Venmo.",
+                        "cancel": "Cancelar",
+                        "confirm": "Quitar"
+                    },
+                    "unsettleAll": {
+                        "title": "Desfazer Acerto de Todos os Itens",
+                        "message": "Isso marcará todos os itens como não quitados. Tem certeza?",
+                        "confirm": "Desfazer Acerto"
+                    },
+                    "unsettle": {
+                        "title": "Desfazer Acerto da Despesa",
+                        "message": "Tem certeza que deseja desfazer o acerto de todos os itens?",
+                        "confirm": "Desfazer Acerto"
+                    }
+                }
+            }
+        },
+        "referral": {
+            "progress": {
+                "title": "Progresso de Indicações",
+                "referrals": "{{count}} Indicações",
+                "nextTier": "Faltam {{count}} para o próximo nível"
+            },
+            "tier1": {
+                "title": "Nível 1",
+                "requirement": "3 Amigos",
+                "reward": "1 Mês Premium",
+                "benefits": [
+                    "Experiência sem anúncios",
+                    "Exportação CSV",
+                    "Suporte Prioritário"
+                ]
+            },
+            "tier2": {
+                "title": "Nível 2",
+                "requirement": "10 Amigos",
+                "reward": "Premium Vitalício",
+                "benefits": [
+                    "Todos os benefícios do Nível 1",
+                    "Categorias Personalizadas",
+                    "Acesso antecipado a novos recursos"
+                ]
+            },
+            "share": {
+                "title": "Convidar Amigos",
+                "description": "Compartilhe seu link de indicação para ganhar recompensas",
+                "copyLink": "Copiar Link",
+                "shareLink": "Compartilhar Link",
+                "copied": "Copiado para a área de transferência!"
+            },
+            "history": {
+                "title": "Histórico de Indicações",
+                "confirmed": "Confirmado",
+                "pending": "Pendente",
+                "empty": "Nenhuma indicação ainda"
+            }
+        }
     }
 }

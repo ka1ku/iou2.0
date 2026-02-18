@@ -26,6 +26,7 @@ import Card from "../Card";
 import DeleteButton from "../DeleteButton";
 import PriceInput from "./PriceInput";
 import LoadingSpinner from "../LoadingSpinner";
+import ProfilePicture from "../VenmoProfilePicture";
 
 const smartRoundSplit = (total, count) => {
   if (count <= 0 || total <= 0) return new Array(count).fill(0);
@@ -61,7 +62,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
   const [saving, setSaving] = useState(false);
 
   const [activeInput, setActiveInput] = useState(null);
-  
+
   const [validationErrors, setValidationErrors] = useState({
     name: false,
     amount: false,
@@ -195,11 +196,10 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
   };
 
   const togglePayer = (participantIndex) => {
-    const newPayers = item.selectedPayers.includes(participantIndex)
-      ? item.selectedPayers.filter((i) => i !== participantIndex)
-      : [...item.selectedPayers, participantIndex];
+    // Single payer only — selecting a payer replaces the current one
+    const newPayers = [participantIndex];
     actions.updateItem(index, { selectedPayers: newPayers });
-    if (validationErrors.payers && newPayers.length > 0) {
+    if (validationErrors.payers) {
       setValidationErrors(prev => ({ ...prev, payers: false }));
     }
   };
@@ -291,7 +291,7 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       const expenseData = {
         title: state.title,
         items: state.items,
-        fees: state.fees,
+        fees: [],
         selectedPayers: state.selectedPayers,
         participants: state.participants,
         joinEnabled: state.joinEnabled,
@@ -343,26 +343,26 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
       style={{ marginBottom: 16, backgroundColor: Colors.surfaceLight }}
     >
       <View style={styles.itemHeader}>
-          <View style={styles.itemNameSection}>
-            <TextInput
-              style={[
-                styles.itemNameInput,
-                validationErrors.name && styles.inputError
-              ]}
-              placeholder={t('components.expenses.expenseItemCard.itemNamePlaceholder')}
-              placeholderTextColor={Colors.textSecondary}
-              value={item.name}
-              onChangeText={(text) => {
-                actions.updateItem(index, { name: text });
-                if (validationErrors.name) {
-                  setValidationErrors(prev => ({ ...prev, name: false }));
-                }
-              }}
-              keyboardType="default"
-              autoCorrect={false}
-            />
-          </View>
+        <View style={styles.itemNameSection}>
+          <TextInput
+            style={[
+              styles.itemNameInput,
+              validationErrors.name && styles.inputError
+            ]}
+            placeholder={t('components.expenses.expenseItemCard.itemNamePlaceholder')}
+            placeholderTextColor={Colors.textSecondary}
+            value={item.name}
+            onChangeText={(text) => {
+              actions.updateItem(index, { name: text });
+              if (validationErrors.name) {
+                setValidationErrors(prev => ({ ...prev, name: false }));
+              }
+            }}
+            keyboardType="default"
+            autoCorrect={false}
+          />
         </View>
+      </View>
 
       <View style={styles.priceSection}>
         <PriceInput
@@ -390,39 +390,38 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
             styles.payerChips,
             validationErrors.payers && styles.sectionError
           ]}>
-            {participants.map((participant, pIndex) => (
-              <TouchableOpacity
-                key={pIndex}
-                style={[
-                  styles.payerChip,
-                  item.selectedPayers.includes(pIndex) &&
-                    styles.payerChipActive,
-                ]}
-                onPress={() => togglePayer(pIndex)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.payerChipContent}>
-                  {item.selectedPayers.includes(pIndex) && (
-                    <View style={styles.checkmarkContainer}>
-                      <Ionicons
-                        name="checkmark"
-                        size={12}
-                        color={Colors.accent}
-                      />
-                    </View>
-                  )}
-                  <Text
+            {[...participants.map((p, i) => ({ participant: p, originalIndex: i }))]
+              .sort((a, b) => (a.participant.id === 'me-participant' ? -1 : b.participant.id === 'me-participant' ? 1 : 0))
+              .map(({ participant, originalIndex: pIndex }) => {
+                const isSelected = item.selectedPayers.includes(pIndex);
+                const isMe = participant.id === 'me-participant';
+                return (
+                  <TouchableOpacity
+                    key={pIndex}
                     style={[
-                      styles.payerChipText,
-                      item.selectedPayers.includes(pIndex) &&
-                        styles.payerChipTextActive,
+                      styles.payerChip,
+                      isSelected && styles.payerChipActive,
                     ]}
+                    onPress={() => togglePayer(pIndex)}
+                    activeOpacity={0.7}
                   >
-                    {participant.name || t('components.expenses.expenseItemCard.person', { index: pIndex + 1 })}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                    <View style={styles.payerChipContent}>
+
+                      <ProfilePicture
+                        source={participant.profilePhoto}
+                        size={20}
+                        username={participant.name}
+                      />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Text style={[styles.payerChipText, isSelected && styles.payerChipTextActive]}>
+                          {participant.name?.split(' ')[0] || t('components.expenses.expenseItemCard.person', { index: pIndex + 1 })}
+                        </Text>
+                        {isMe && <Text style={[styles.payerChipYouBadge, isSelected && styles.payerChipYouBadgeActive]}>(you)</Text>}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
           </View>
         </View>
       </View>
@@ -459,61 +458,65 @@ const ExpenseItemCard = ({ item, index, onCancelEdit, onDelete, expenseId, isEdi
               </Text>
             )}
           </View>
-          {participants.map((participant, pIndex) => {
-            const consumerPosition = item.selectedConsumers.indexOf(pIndex);
-            const splitAmount = consumerPosition >= 0 ? derivedSplits[consumerPosition] : 0;
-            const isSelected = item.selectedConsumers.includes(pIndex);
-            const isAuto = isSelected && manualSplits[pIndex] === undefined;
-            return (
-              <View key={pIndex} style={styles.splitRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.checkbox,
-                    isSelected && styles.checkboxSelected,
-                  ]}
-                  onPress={() => toggleConsumer(pIndex)}
-                >
-                  {isSelected && (
-                    <Ionicons name="checkmark" size={16} color="white" />
-                  )}
-                </TouchableOpacity>
-                <View style={styles.participantInfo}>
-                  <Text
+          {[...participants.map((p, i) => ({ participant: p, originalIndex: i }))]
+            .sort((a, b) => (a.participant.id === 'me-participant' ? -1 : b.participant.id === 'me-participant' ? 1 : 0))
+            .map(({ participant, originalIndex: pIndex }) => {
+              const consumerPosition = item.selectedConsumers.indexOf(pIndex);
+              const splitAmount = consumerPosition >= 0 ? derivedSplits[consumerPosition] : 0;
+              const isSelected = item.selectedConsumers.includes(pIndex);
+              const isAuto = isSelected && manualSplits[pIndex] === undefined;
+              const isMe = participant.id === 'me-participant';
+              return (
+                <View key={pIndex} style={styles.splitRow}>
+                  <TouchableOpacity
                     style={[
-                      styles.participantName,
-                      !isSelected && styles.participantNameDisabled,
+                      styles.checkbox,
+                      isSelected && styles.checkboxSelected,
                     ]}
-                    numberOfLines={1}
+                    onPress={() => toggleConsumer(pIndex)}
                   >
-                    {participant.name || t('components.expenses.expenseItemCard.person', { index: pIndex + 1 })}
-                  </Text>
-                </View>
-                <View style={styles.inputContainer}>
-                  <PriceInput
-                    value={
-                      activeInput && activeInput.index === pIndex
-                        ? activeInput.value
-                        : splitAmount
-                    }
-                    onChangeText={(text) => handleLiveTextChange(pIndex, text)}
-                    onFocus={() => handleFocus(pIndex)}
-                    onBlur={handleBlur}
-                    placeholder="0.00"
-                    style={[
-                      styles.amountInput,
-                      !isSelected && styles.disabledAmountInput,
-                      isAuto &&
+                    {isSelected && (
+                      <Ionicons name="checkmark" size={16} color="white" />
+                    )}
+                  </TouchableOpacity>
+                  <View style={styles.participantInfo}>
+                    <Text
+                      style={[
+                        styles.participantName,
+                        !isSelected && styles.participantNameDisabled,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {participant.name?.split(' ')[0] || t('components.expenses.expenseItemCard.person', { index: pIndex + 1 })}
+                    </Text>
+                    {isMe && <Text style={[styles.splitYouBadge, !isSelected && styles.splitYouBadgeDisabled]}>(you)</Text>}
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <PriceInput
+                      value={
+                        activeInput && activeInput.index === pIndex
+                          ? activeInput.value
+                          : splitAmount
+                      }
+                      onChangeText={(text) => handleLiveTextChange(pIndex, text)}
+                      onFocus={() => handleFocus(pIndex)}
+                      onBlur={handleBlur}
+                      placeholder="0.00"
+                      style={[
+                        styles.amountInput,
+                        !isSelected && styles.disabledAmountInput,
+                        isAuto &&
                         !(activeInput && activeInput.index === pIndex) &&
                         styles.autoAmountInput,
-                    ]}
-                    editable={isSelected}
-                    showCurrency={true}
-                    selected={isSelected}
-                  />
+                      ]}
+                      editable={isSelected}
+                      showCurrency={true}
+                      selected={isSelected}
+                    />
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              );
+            })}
         </View>
       </View>
 
@@ -664,14 +667,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   payerChipTextActive: { color: Colors.surface, fontWeight: "600" },
-  checkmarkContainer: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: Colors.white,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  payerChipYouBadge: { fontSize: 10, color: Colors.accent, fontWeight: '600' },
+  payerChipYouBadgeActive: { color: Colors.surface },
+
+
   splitContainer: { marginTop: Spacing.md },
   splitLabel: {
     ...Typography.label,
@@ -716,6 +715,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   participantNameDisabled: { color: Colors.textSecondary, opacity: 0.6 },
+  splitYouBadge: { fontSize: 9, color: Colors.accent, fontWeight: '600', lineHeight: 11 },
+  splitYouBadgeDisabled: { opacity: 0.5 },
   inputContainer: { width: 100 },
   disabledAmountInput: {
     backgroundColor: "transparent",

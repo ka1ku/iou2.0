@@ -364,6 +364,28 @@ exports.sendNotificationToUser = functions.https.onCall(async (data, context) =>
   }
 });
 
+// Get userIds of participants who are assigned to at least one item (payer or consumer).
+// Only these users should be notified about expense changes that affect them.
+function getAffectedUserIds(expense) {
+  const participants = expense.participants || [];
+  const items = expense.items || [];
+  const affected = new Set();
+
+  items.forEach(item => {
+    const payers = (item.selectedPayers && item.selectedPayers.length > 0)
+      ? item.selectedPayers
+      : (expense.selectedPayers || [0]);
+    const consumers = item.selectedConsumers || [];
+
+    [...payers, ...consumers].forEach(idx => {
+      const p = participants[idx];
+      if (p && p.userId) affected.add(p.userId);
+    });
+  });
+
+  return [...affected];
+}
+
 // Helper function to send notifications to multiple users
 async function sendNotificationsToUsers(userIds, title, body, notificationData = {}) {
   const notifications = [];
@@ -508,8 +530,9 @@ exports.onExpenseCreated = functions.firestore
       // Identify the actor (user who triggered the function)
       const actorId = context.auth ? context.auth.uid : expense.createdBy;
 
-      // Get all participant user IDs (excluding creator and actor)
-      const participantIds = (expense.participantIds || []).filter(id => id !== expense.createdBy && id !== actorId);
+      // Only notify participants who are assigned to at least one item (the change affects them)
+      const affectedIds = getAffectedUserIds(expense);
+      const participantIds = affectedIds.filter(id => id !== expense.createdBy && id !== actorId);
 
       if (participantIds.length > 0) {
         const title = 'New Expense Added';
@@ -537,16 +560,23 @@ exports.onExpenseUpdated = functions.firestore
     const expenseId = context.params.expenseId;
 
     try {
-      // Only notify if significant changes occurred
-      const significantChanges = [
-        'title', 'totalAmount', 'items', 'participantIds'
-      ];
+      // Only notify for add/remove of items, not for edits. Title/participant changes still notify.
+      const beforeItems = before.items || [];
+      const afterItems = after.items || [];
+      const oldIds = new Set(beforeItems.map(i => i.id).filter(Boolean));
+      const newIds = new Set(afterItems.map(i => i.id).filter(Boolean));
+      const hasItemsAdded = afterItems.some(i => i.id && !oldIds.has(i.id));
+      const hasItemsRemoved = beforeItems.some(i => i.id && !newIds.has(i.id));
+      const hasItemsAddedOrRemoved = hasItemsAdded || hasItemsRemoved;
 
-      const hasSignificantChange = significantChanges.some(field => {
-        return JSON.stringify(before[field]) !== JSON.stringify(after[field]);
-      });
+      const titleChanged = before.title !== after.title;
+      const participantsChanged = JSON.stringify(before.participantIds) !== JSON.stringify(after.participantIds);
 
-      if (!hasSignificantChange) return;
+      // Skip notification if items changed but only edits (no add/remove)
+      const itemsChanged = JSON.stringify(before.items) !== JSON.stringify(after.items);
+      if (itemsChanged && !hasItemsAddedOrRemoved) return; // edits only - no notification
+
+      if (!titleChanged && !participantsChanged && !hasItemsAddedOrRemoved) return;
 
       // Get updater info
       const updaterId = after.updatedBy || after.createdBy;
@@ -557,8 +587,9 @@ exports.onExpenseUpdated = functions.firestore
       // Identify the actor
       const actorId = context.auth ? context.auth.uid : updaterId;
 
-      // Get all participant user IDs (excluding updater and actor)
-      const participantIds = (after.participantIds || []).filter(id =>
+      // Only notify participants who are assigned to at least one item (the change affects them)
+      const affectedIds = getAffectedUserIds(after);
+      const participantIds = affectedIds.filter(id =>
         id !== updaterId && id !== actorId
       );
 
@@ -574,8 +605,8 @@ exports.onExpenseUpdated = functions.firestore
         return status !== 'noAction';
       });
 
-      if (totalChanged && hasPaidSettlements && participantIds.length > 0) {
-        // Find participants affected by paid settlements
+      if (totalChanged && hasPaidSettlements && hasItemsAddedOrRemoved && participantIds.length > 0) {
+        // Find participants affected by paid settlements (only when items add/remove, not edits)
         const paidSettlements = (after.settlements || []).filter(s => (s.status || 'noAction') !== 'noAction');
         const affectedUserIds = new Set();
         paidSettlements.forEach(s => {
@@ -631,11 +662,22 @@ exports.onExpenseSettled = functions.firestore
     try {
       // Check if expense was just settled
       if (!before.settled && after.settled) {
-        // Get all participant user IDs (excluding the person who settled it)
+        // Only notify users who are in settlements (debtor or creditor) - the change affected them
         const settledBy = after.settledBy || after.updatedBy || after.createdBy;
         const actorId = context.auth ? context.auth.uid : settledBy;
 
-        const participantIds = (after.participantIds || []).filter(id => id !== settledBy && id !== actorId);
+        const affectedUserIds = new Set();
+        const participants = after.participants || [];
+        (after.settlements || []).forEach(s => {
+          const debtorName = s.debtor || s.from;
+          const creditorName = s.creditor || s.to;
+          participants.forEach(p => {
+            if ((p.name === debtorName || p.name === creditorName) && p.userId) {
+              affectedUserIds.add(p.userId);
+            }
+          });
+        });
+        const participantIds = [...affectedUserIds].filter(id => id !== settledBy && id !== actorId);
 
         if (participantIds.length > 0) {
           const title = 'Expense Settled';
@@ -719,9 +761,12 @@ exports.onExpenseJoin = functions.firestore
         const joinerData = joinerDoc.data();
         const joinerName = `${joinerData.firstName} ${joinerData.lastName}`.trim();
 
-        // Notify all existing participants (excluding the joiner)
+        // Only notify existing participants who are assigned to items (the change could affect them)
         const actorId = context.auth ? context.auth.uid : joinerId;
-        const existingParticipants = beforeParticipants.filter(id => id !== joinerId && id !== actorId);
+        const affectedIds = new Set(getAffectedUserIds(after));
+        const existingParticipants = beforeParticipants.filter(id =>
+          id !== joinerId && id !== actorId && affectedIds.has(id)
+        );
 
         if (existingParticipants.length > 0) {
           const title = 'Someone Joined Your Expense';
@@ -1235,7 +1280,6 @@ exports.onNewUserSignup = functions.firestore
     try {
       // Check if user was referred
       if (!newUser.referredBy || !newUser.referredBy.userId) {
-        console.log('User was not referred, skipping referral tracking');
         return null;
       }
 
@@ -1279,7 +1323,6 @@ exports.onNewUserSignup = functions.firestore
       // Check and grant tier rewards
       await checkAndGrantRewards(referrerRef, referrerData, friendsJoined);
 
-      console.log(`Referral conversion tracked: ${newUserId} referred by ${referrerId}`);
       return null;
     } catch (error) {
       console.error('Error tracking referral conversion:', error);
@@ -1319,8 +1362,6 @@ async function checkAndGrantRewards(referrerRef, referrerData, friendsJoined) {
     updates['inviteStats.premiumUnlocked'] = true;
 
     currentPremiumUntil = newPremiumUntil;
-
-    console.log(`Tier 1 reward granted to ${referrerRef.id}: 1 month premium`);
   }
 
   // Tier 2: 5 referrals = additional 2 months (total 3 months)
@@ -1336,8 +1377,6 @@ async function checkAndGrantRewards(referrerRef, referrerData, friendsJoined) {
 
     updates['inviteStats.premiumUntil'] = admin.firestore.Timestamp.fromDate(newPremiumUntil);
     updates['inviteStats.premiumUnlocked'] = true;
-
-    console.log(`Tier 2 reward granted to ${referrerRef.id}: additional 2 months premium`);
   }
 
   // Apply updates if any rewards were granted

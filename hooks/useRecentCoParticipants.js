@@ -96,7 +96,6 @@ export const useRecentCoParticipants = (enabled = true) => {
         JSON.stringify({ data: sorted, timestamp: Date.now() })
       ).catch(() => {});
     } catch (error) {
-      console.error('Error fetching recent co-participants:', error);
     } finally {
       setLoading(false);
     }

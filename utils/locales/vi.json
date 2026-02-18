@@ -10,12 +10,831 @@
         "currency": "Tiền tệ",
         "support": "Hỗ trợ",
         "terms": "Điều khoản dịch vụ",
-        "rate": "Đánh giá ứng dụng",
+        "privacy": "Chính sách bảo mật",
         "signOut": "Đăng xuất",
-        "deleteAccount": "Xóa tài khoản"
+        "deleteAccount": "Xóa tài khoản",
+        "manageSubscription": "Quản lý đăng ký",
+        "restorePurchases": "Khôi phục mua hàng",
+        "restoreSuccess": "Khôi phục mua hàng thành công",
+        "noSubscriptions": "Không tìm thấy đăng ký nào đang hoạt động",
+        "restoreError": "Lỗi khi khôi phục. Vui lòng thử lại",
+        "growth": "Tăng trưởng",
+        "buildYourSquad": {
+            "title": "Xây dựng đội của bạn",
+            "subtitle": "Kiếm phần thưởng bằng cách mời bạn bè"
+        },
+        "connectedAccounts": {
+            "title": "Tài khoản đã kết nối",
+            "sectionTitle": "Tài khoản thanh toán",
+            "aboutTitle": "Giới thiệu về tài khoản đã kết nối",
+            "connected": "Đã kết nối",
+            "notConnected": "Chưa kết nối",
+            "connect": "Kết nối",
+            "disconnect": "Ngắt kết nối",
+            "loading": "Đang tải tài khoản...",
+            "venmo": {
+                "name": "Venmo",
+                "description": "Để thanh toán và hoàn tiền",
+                "connectTitle": "Kết nối Venmo",
+                "connectMessage": "Để kết nối tài khoản Venmo của bạn, vui lòng đăng nhập hoặc đăng ký bằng thông tin Venmo của bạn.",
+                "goToSignUp": "Đi đến Đăng ký",
+                "reconnectionSoon": "Tính năng kết nối lại Venmo sẽ sớm ra mắt."
+            },
+            "paypal": {
+                "name": "PayPal",
+                "description": "Sắp ra mắt"
+            },
+            "zelle": {
+                "name": "Zelle",
+                "description": "Sắp ra mắt"
+            },
+            "disconnectAlert": {
+                "title": "Ngắt kết nối tài khoản",
+                "message": "Bạn có chắc chắn muốn ngắt kết nối tài khoản này không? Bạn có thể mất quyền truy cập vào một số tính năng.",
+                "confirm": "Ngắt kết nối",
+                "cancel": "Hủy",
+                "success": "Đã ngắt kết nối tài khoản thành công",
+                "soon": "Tính năng ngắt kết nối tài khoản sẽ sớm ra mắt."
+            },
+            "info": {
+                "secureTitle": "An toàn và riêng tư",
+                "secureDesc": "Thông tin thanh toán của bạn được lưu trữ an toàn và không bao giờ được chia sẻ với người dùng khác.",
+                "easyTitle": "Thanh toán dễ dàng",
+                "easyDesc": "Các tài khoản được kết nối giúp việc gửi và nhận thanh toán cho các chi phí chung trở nên dễ dàng."
+            },
+            "soon": "Sắp ra mắt",
+            "integrationSoon": "Tích hợp {{name}} sẽ sớm ra mắt."
+        },
+        "profileSettings": {
+            "title": "Chỉnh sửa hồ sơ",
+            "loading": "Đang tải hồ sơ...",
+            "changePhoto": "Thay đổi ảnh hồ sơ",
+            "firstName": "Tên",
+            "lastName": "Họ",
+            "username": "Tên người dùng",
+            "paymentMethods": "Phương thức thanh toán",
+            "venmo": "Tài khoản Venmo",
+            "notConnected": "Chưa kết nối",
+            "visibilityInfo": "Thông tin này sẽ hiển thị với bạn bè của bạn trên IOU.",
+            "save": "Lưu thay đổi",
+            "success": "Thành công",
+            "error": "Lỗi",
+            "selectImageError": "Lỗi khi chọn ảnh",
+            "updateSuccess": "Đã cập nhật hồ sơ thành công!",
+            "updateError": "Lỗi khi cập nhật hồ sơ"
+        },
+        "currencies": {
+            "usd": "Đô la Mỹ (USD)",
+            "eur": "Euro (EUR)",
+            "gbp": "Bảng Anh (GBP)",
+            "mxn": "Peso Mexico (MXN)",
+            "cad": "Đô la Canada (CAD)",
+            "cny": "Nhân dân tệ (CNY)",
+            "jpy": "Yên Nhật (JPY)",
+            "krw": "Won Hàn Quốc (KRW)",
+            "vnd": "Đồng Việt Nam (VND)"
+        },
+        "termsOfService": {
+            "lastUpdated": "Cập nhật lần cuối: Tháng 12 năm 2024",
+            "sections": {
+                "1": {
+                    "title": "1. Chấp nhận các điều khoản",
+                    "content": "Bằng cách truy cập và sử dụng ứng dụng di động IOU (\"Ứng dụng\"), bạn chấp nhận và đồng ý bị ràng buộc bởi các điều khoản và quy định của thỏa thuận này. Nếu bạn không đồng ý với các điều khoản trên, vui lòng không sử dụng dịch vụ này."
+                },
+                "2": {
+                    "title": "2. Giấy phép sử dụng",
+                    "content": "Cho phép tạm thời tải xuống một bản sao của ứng dụng IOU chỉ để xem tạm thời cho mục đích cá nhân, phi thương mại. Đây là việc cấp giấy phép, không phải chuyển nhượng quyền sở hữu, và theo giấy phép này, bạn không được:",
+                    "bullets": {
+                        "1": "sửa đổi hoặc sao chép tài liệu",
+                        "2": "sử dụng tài liệu cho bất kỳ mục đích thương mại nào hoặc cho bất kỳ hình thức hiển thị công cộng nào",
+                        "3": "cố gắng dịch ngược hoặc thiết kế ngược bất kỳ phần mềm nào có trong ứng dụng",
+                        "4": "xóa bất kỳ bản quyền hoặc các ký hiệu độc quyền khác khỏi tài liệu"
+                    }
+                },
+                "3": {
+                    "title": "3. Tài khoản người dùng",
+                    "content": "Để sử dụng một số tính năng nhất định của Ứng dụng, bạn phải tạo một tài khoản. Bạn chịu trách nhiệm về:",
+                    "bullets": {
+                        "1": "Cung cấp thông tin chính xác và đầy đủ",
+                        "2": "Duy trì bảo mật thông tin đăng nhập tài khoản của bạn",
+                        "3": "Mọi hoạt động diễn ra dưới tài khoản của bạn",
+                        "4": "Thông báo ngay cho chúng tôi về mọi hành vi sử dụng trái phép"
+                    }
+                },
+                "4": {
+                    "title": "4. Xử lý thanh toán",
+                    "content": "Ứng dụng tạo điều kiện thuận lợi cho việc theo dõi chi phí và thanh toán giữa những người dùng. Chúng tôi có thể tích hợp với các bộ xử lý thanh toán của bên thứ ba. Bằng cách sử dụng các tính năng này, bạn đồng ý:",
+                    "bullets": {
+                        "1": "Tuân thủ các điều khoản dịch vụ của nhà cung cấp dịch vụ thanh toán bên thứ ba",
+                        "2": "Hiểu rằng chúng tôi không chịu trách nhiệm xử lý thanh toán",
+                        "3": "Chịu mọi khoản phí do bên xử lý thanh toán tính"
+                    }
+                },
+                "5": {
+                    "title": "5. Chính sách bảo mật",
+                    "content": "Quyền riêng tư của bạn rất quan trọng đối với chúng tôi. Vui lòng xem Chính sách bảo mật của chúng tôi, chính sách này cũng điều chỉnh việc bạn sử dụng Ứng dụng, để hiểu các hoạt động của chúng tôi."
+                },
+                "6": {
+                    "title": "6. Các hành vi bị cấm",
+                    "content": "Bạn không được sử dụng Ứng dụng của chúng tôi:",
+                    "bullets": {
+                        "1": "Cho bất kỳ mục đích bất hợp pháp nào hoặc để lôi kéo người khác thực hiện hoặc tham gia vào bất kỳ hành vi bất hợp pháp nào",
+                        "2": "Để vi phạm bất kỳ quy định, quy tắc, luật lệ hoặc pháp lệnh quốc tế, liên bang, tỉnh hoặc tiểu bang nào",
+                        "3": "Để xâm phạm hoặc vi phạm quyền sở hữu trí tuệ của chúng tôi hoặc quyền sở hữu trí tuệ của người khác",
+                        "4": "Để quấy rối, lạm dụng, lăng mạ, làm hại, phỉ báng, vu khống, chê bai, đe dọa hoặc phân biệt đối xử",
+                        "5": "Để gửi thông tin sai lệch hoặc gây hiểu lầm"
+                    },
+                    "content2": "Chúng tôi có chính sách không khoan nhượng đối với nội dung phản cảm và người dùng lạm dụng. Nội dung vi phạm các điều khoản này sẽ bị xóa và người dùng có hành vi như vậy sẽ bị chặn và cấm sử dụng Dịch vụ."
+                },
+                "7": {
+                    "title": "7. Tuyên bố từ chối trách nhiệm",
+                    "content": "Thông tin trên Ứng dụng này được cung cấp \"nguyên trạng\". Trong phạm vi tối đa được pháp luật cho phép, Công ty này:",
+                    "bullets": {
+                        "1": "Loại trừ mọi tuyên bố và bảo đảm liên quan đến ứng dụng này và nội dung của nó",
+                        "2": "Không đảm bảo tính chính xác, đầy đủ hoặc kịp thời của thông tin",
+                        "3": "Loại trừ mọi trách nhiệm pháp lý đối với các thiệt hại phát sinh từ hoặc liên quan đến việc bạn sử dụng ứng dụng này"
+                    }
+                },
+                "8": {
+                    "title": "8. Giới hạn trách nhiệm",
+                    "content": "Trong mọi trường hợp, IOU hoặc các nhà cung cấp của IOU sẽ không chịu trách nhiệm pháp lý đối với bất kỳ thiệt hại nào (bao gồm, nhưng không giới hạn ở thiệt hại do mất dữ liệu hoặc lợi nhuận, hoặc do gián đoạn kinh doanh) phát sinh từ việc sử dụng hoặc không thể sử dụng Ứng dụng, ngay cả khi IOU hoặc đại diện được ủy quyền đã được thông báo bằng miệng hoặc bằng văn bản về khả năng xảy ra thiệt hại đó."
+                },
+                "9": {
+                    "title": "9. Sửa đổi",
+                    "content": "Các tài liệu xuất hiện trên Ứng dụng có thể bao gồm các lỗi kỹ thuật, đánh máy hoặc chụp ảnh. IOU không đảm bảo rằng bất kỳ tài liệu nào trên Ứng dụng của mình là chính xác, đầy đủ hoặc cập nhật. IOU có thể thay đổi các tài liệu có trên Ứng dụng của mình bất cứ lúc nào mà không cần thông báo."
+                },
+                "10": {
+                    "title": "10. Luật điều chỉnh",
+                    "content": "Các điều khoản và điều kiện này được điều chỉnh và hiểu theo luật pháp của Hoa Kỳ và bạn phải tuân theo thẩm quyền xét xử độc quyền của các tòa án tại Tiểu bang hoặc địa điểm đó."
+                },
+                "11": {
+                    "title": "11. Thông tin liên hệ",
+                    "content": "Nếu bạn có bất kỳ câu hỏi nào về các Điều khoản dịch vụ này, vui lòng liên hệ với chúng tôi theo địa chỉ:",
+                    "email": "Email: legal@iou-app.com",
+                    "support": "Hỗ trợ: support@iou-app.com"
+                }
+            },
+            "footer": "Bằng cách sử dụng IOU, bạn xác nhận rằng bạn đã đọc và hiểu các Điều khoản dịch vụ này và đồng ý bị ràng buộc bởi chúng."
+        }
     },
     "common": {
         "cancel": "Hủy",
-        "save": "Lưu"
+        "save": "Lưu",
+        "loading": "Đang tải...",
+        "error": "Lỗi",
+        "success": "Thành công"
+    },
+    "home": {
+        "title": "Trang chủ",
+        "headerTitle": "Chi phí",
+        "searchPlaceholder": "Tìm kiếm chi phí hoặc thành viên...",
+        "noExpensesTitle": "Chưa có chi phí nào",
+        "noExpensesDesc": "Nhấn Tạo để thêm chi phí đầu tiên của bạn",
+        "noSearchResultsTitle": "Không tìm thấy chi phí",
+        "noSearchResultsDesc": "Hãy thử một từ khóa tìm kiếm khác",
+        "settledUp": "Đã thanh toán",
+        "youOwe": "Bạn nợ",
+        "youAreOwed": "Bạn được nợ",
+        "confirmPayment": "Xác nhận thanh toán",
+        "awaitingConfirmation": "Đang chờ xác nhận",
+        "needsSettlement": "Cần thanh toán",
+        "receipt": "Biên lai",
+        "expense": "Chi phí",
+        "otherMembers": "Thành viên khác"
+    },
+    "profile": {
+        "title": "Hồ sơ",
+        "balanceSummary": "Tóm tắt số dư",
+        "recentExpenses": "Chi phí gần đây",
+        "editProfile": "Chỉnh sửa hồ sơ",
+        "loading": "Đang tải hồ sơ...",
+        "noUsername": "Không có tên người dùng",
+        "totalOwedToYou": "Tổng số tiền bạn được nợ",
+        "totalYouOwe": "Tổng số tiền bạn nợ",
+        "participants": "người tham gia",
+        "createFirstExpense": "Tạo chi phí đầu tiên của bạn",
+        "startTracking": "Bắt đầu theo dõi chi phí chung",
+        "loadMore": "Tải thêm",
+        "remaining": "còn lại"
+    },
+    "navigation": {
+        "home": "Trang chủ",
+        "profile": "Hồ sơ"
+    },
+    "addExpense": {
+        "addExpenseTitle": "Thêm chi phí",
+        "editExpenseTitle": "Chỉnh sửa chi phí",
+        "item": "Mục",
+        "items": "Các mục",
+        "date": "Ngày",
+        "amount": "Số tiền",
+        "paidBy": "Được trả bởi",
+        "split": "Chia",
+        "saveSuccess": "Đã lưu chi phí thành công",
+        "saveError": "Lỗi khi lưu chi phí",
+        "validationError": "Vui lòng điền vào tất cả các trường bắt buộc",
+        "deleteItemParams": {
+            "title": "Xóa mục",
+            "message": "Bạn có chắc chắn muốn xóa mục này không? Hành động này không thể hoàn tác.",
+            "confirm": "Xóa"
+        },
+        "validation": {
+            "feeNames": "Vui lòng điền tất cả tên phí",
+            "unevenSplitTitle": "Chia không đều",
+            "unevenSplitMessage": "Một hoặc nhiều mục có số tiền chia không khớp với tổng số. Vui lòng kiểm tra lại các mục của bạn.",
+            "unauthenticated": "Người dùng chưa được xác thực",
+            "deleteError": "Lỗi khi xóa mục: {{error}}"
+        },
+        "addFirstItem": "Thêm mục đầu tiên của bạn",
+        "addAnotherItem": "Thêm mục khác",
+        "noItemsTitle": "Chưa có mục nào",
+        "noItemsDesc": "Bắt đầu bằng cách thêm mục đầu tiên vào chi phí này"
+    },
+    "addReceipt": {
+        "addReceiptTitle": "Thêm biên lai",
+        "editReceiptTitle": "Chỉnh sửa biên lai",
+        "paidBy": "ĐƯỢC TRẢ BỞI",
+        "extraCharges": "PHÍ PHỤ THÊM",
+        "totals": "TỔNG CỘNG",
+        "addFee": "Thêm {{type}}",
+        "feeTypes": {
+            "tip": "Tiền boa",
+            "tax": "Thuế",
+            "service": "Dịch vụ",
+            "custom": "Tùy chỉnh"
+        },
+        "placeholders": {
+            "feeName": "Tên phí (ví dụ: Phí mở nút chai)"
+        },
+        "subtotal": "Tổng phụ",
+        "feesAndTip": "Phí và tiền boa",
+        "total": "Tổng cộng",
+        "incompleteItems": "Mục không đầy đủ",
+        "incompleteItemsDesc": "Vui lòng đảm bảo tất cả các mục có giá lớn hơn 0 và có ít nhất một người được chỉ định.",
+        "feeNameMissing": "Vui lòng điền tất cả tên phí"
+    },
+    "expenseSettings": {
+        "title": "Cài đặt chi phí",
+        "expenseName": "Tên chi phí",
+        "changeName": "Đổi tên",
+        "untitledExpense": "Chi phí không có tiêu đề",
+        "shareExpense": "Chia sẻ chi phí",
+        "allowJoin": "Cho phép người khác tham gia",
+        "shareLink": "Chia sẻ liên kết",
+        "copyLink": "Sao chép liên kết",
+        "dangerZone": "Vùng nguy hiểm",
+        "leaveExpense": "Rời khỏi chi phí",
+        "leaveExpenseSubtitle": "Xóa bản thân khỏi chi phí này",
+        "errors": {
+            "emptyName": "Tên chi phí không được để trống",
+            "updateNameError": "Lỗi khi cập nhật tên chi phí",
+            "leaveError": "Lỗi khi rời khỏi chi phí",
+            "cannotLeave": "Không thể rời khỏi",
+            "cannotLeaveDesc": "Bạn chỉ có thể rời khỏi chi phí này nếu bạn không tham gia vào bất kỳ mục nào. Hãy xóa bản thân khỏi tất cả các mục trước."
+        },
+        "success": {
+            "nameUpdated": "Đã cập nhật tên chi phí thành công",
+            "leftExpense": "Bạn đã rời khỏi chi phí thành công",
+            "copied": "Đã sao chép!",
+            "linkCopied": "Đã sao chép liên kết mời vào khay nhớ tạm"
+        },
+        "confirmLeave": {
+            "title": "Rời khỏi chi phí",
+            "message": "Bạn có chắc chắn muốn rời khỏi chi phí này không? Bạn sẽ bị xóa khỏi tất cả các khoản chia và không thể truy cập lại nữa."
+        },
+        "shareMessage": "Tham gia chi phí \"{{title}}\" của tôi trên IOU.\n\nNhấn để tham gia:\n{{link}}"
+    },
+    "friendProfile": {
+        "title": "Hồ sơ bạn bè",
+        "options": "Tùy chọn",
+        "report": "Báo cáo người dùng",
+        "block": "Chặn người dùng",
+        "loading": "Đang tải hồ sơ bạn bè...",
+        "balanceSummary": "Tóm tắt số dư",
+        "netBalance": "Số dư ròng",
+        "theyOweYouOverall": "Họ nợ bạn tổng cộng",
+        "youOweThemOverall": "Bạn nợ họ tổng cộng",
+        "theyOweYou": "Họ nợ bạn",
+        "youOweThem": "Bạn nợ họ",
+        "paymentMethods": "Phương thức thanh toán",
+        "noPaymentMethod": "Không có phương thức thanh toán nào",
+        "sharedExpenses": "Chi phí chung",
+        "noSharedExpenses": "Chưa có chi phí chung nào",
+        "addFirstExpense": "Thêm chi phí đầu tiên",
+        "owesYou": "Nợ bạn",
+        "youOwe": "Bạn nợ",
+        "reportPrompt": {
+            "title": "Báo cáo người dùng",
+            "message": "Vui lòng cho chúng tôi biết lý do bạn báo cáo người dùng này.",
+            "submit": "Báo cáo"
+        },
+        "blockPrompt": {
+            "title": "Chặn người dùng",
+            "message": "Bạn có chắc chắn muốn chặn người dùng này không? Bạn sẽ không còn nhìn thấy nội dung của họ và không thể tương tác với họ nữa.",
+            "confirm": "Chặn"
+        },
+        "reportSuccess": "Đã gửi báo cáo",
+        "reportSuccessDesc": "Cảm ơn bạn đã báo cáo. Chúng tôi sẽ xem xét sớm.",
+        "blockSuccess": "Đã chặn người dùng",
+        "blockSuccessDesc": "Bạn đã chặn người dùng này."
+    },
+    "setupExpense": {
+        "title": "Bạn muốn gọi {{type}} này là gì?",
+        "titlePlaceholder": "Nhập tên {{type}}...",
+        "whoSplitting": "Ai đang chia tiền?",
+        "addPeople": "Thêm người",
+        "creating": "Đang tạo...",
+        "continue": "Tiếp tục",
+        "errors": {
+            "titleRequired": "Vui lòng nhập tên cho {{type}} này",
+            "participantsRequired": "Vui lòng nhập tên cho tất cả người tham gia",
+            "noUser": "Không có người dùng đăng nhập",
+            "profileError": "Không thể lấy hồ sơ người dùng",
+            "createError": "Lỗi khi tạo {{type}}: {{message}}"
+        }
+    },
+    "auth": {
+        "common": {
+            "usCountryCode": "🇺🇸 +1"
+        },
+        "welcome": {
+            "title": "Chào mừng đến với IOU!",
+            "split": "Chia tiền với nhóm",
+            "autoCalculate": "Tự động tính toán",
+            "realTime": "Đồng bộ hóa thời gian thực",
+            "createAccount": "Tạo tài khoản",
+            "signIn": "Đăng nhập"
+        },
+        "signIn": {
+            "title": "Đăng nhập",
+            "stepTitle": "Số điện thoại",
+            "stepSubtitle": "Chúng tôi sẽ gửi mã xác minh để xác nhận số của bạn",
+            "inputLabel": "Số điện thoại",
+            "placeholder": "(555) 123-4567",
+            "button": "Gửi mã",
+            "sending": "Đang gửi...",
+            "noAccount": "Chưa có tài khoản?",
+            "createAccount": "Tạo tài khoản",
+            "infoSms": "Chúng tôi sẽ gửi mã xác minh qua SMS",
+            "infoSecure": "Số điện thoại của bạn được giữ an toàn và riêng tư",
+            "errors": {
+                "missingPhone": "Vui lòng nhập số điện thoại của bạn",
+                "invalidPhone": "Vui lòng nhập số điện thoại hợp lệ gồm 10 chữ số"
+            }
+        },
+        "signUp": {
+            "stepIndicator": "Bước {{current}} trên {{total}}",
+            "title": "Tạo tài khoản",
+            "step1": {
+                "title": "Tên bạn là gì?",
+                "subtitle": "Chúng tôi sẽ sử dụng tên này để xác định bạn với bạn bè",
+                "firstName": "Tên",
+                "lastName": "Họ",
+                "firstNamePlaceholder": "Nhập tên của bạn",
+                "lastNamePlaceholder": "Nhập họ của bạn"
+            },
+            "step2": {
+                "title": "Chọn tên người dùng",
+                "subtitle": "Đây sẽ là ID duy nhất của bạn trong ứng dụng",
+                "username": "Tên người dùng",
+                "placeholder": "Nhập tên người dùng",
+                "hint": "3-20 ký tự, chỉ gồm chữ cái, số và dấu gạch dưới"
+            },
+            "step3": {
+                "title": "Liên kết Venmo của bạn",
+                "subtitle": "Kết nối Venmo của bạn để chia chi phí dễ dàng hơn (tùy chọn)",
+                "label": "Tên người dùng Venmo",
+                "placeholder": "ten-venmo-cua-ban",
+                "verified": "Tài khoản Venmo đã xác minh",
+                "noProfilePic": "Tài khoản Venmo (Không có ảnh hồ sơ)",
+                "change": "Thay đổi tài khoản",
+                "skip": "Bỏ qua"
+            },
+            "continue": "Tiếp tục",
+            "alreadyHaveAccount": "Đã có tài khoản?",
+            "errors": {
+                "required": "Trường bắt buộc",
+                "firstNameReq": "Vui lòng nhập tên của bạn",
+                "lastNameReq": "Vui lòng nhập họ của bạn",
+                "invalidFirst": "Tên chỉ được chứa các chữ cái, khoảng trắng, dấu gạch ngang và dấu ngoặc đơn",
+                "invalidLast": "Họ chỉ được chứa các chữ cái, khoảng trắng, dấu gạch ngang và dấu ngoặc đơn",
+                "minFirst": "Tên phải có ít nhất 2 ký tự",
+                "minLast": "Họ phải có ít nhất 2 ký tự",
+                "usernameReq": "Vui lòng nhập tên người dùng",
+                "invalidUsername": "Tên người dùng phải có 3-20 ký tự và chỉ chứa chữ cái, số và dấu gạch dưới",
+                "usernameTaken": "Tên người dùng đã được sử dụng",
+                "usernameTakenDesc": "Tên người dùng này đã được sử dụng. Vui lòng chọn tên khác.",
+                "checkError": "Không thể kiểm tra tính khả dụng của tên người dùng",
+                "saveError": "Lỗi khi lưu thông tin của bạn. Vui lòng thử lại.",
+                "accountExists": "Tài khoản đã tồn tại",
+                "accountExistsDesc": "Số điện thoại này đã được đăng ký. Bạn có thể đăng nhập hoặc sử dụng số khác.",
+                "signInInstead": "Đăng nhập thay thế",
+                "useDiffNumber": "Sử dụng số khác",
+                "verificationError": "Đã nhận được phản hồi xác minh không hợp lệ"
+            }
+        },
+        "verifyOTP": {
+            "title": "Xác minh số điện thoại",
+            "title2FA": "Xác thực hai yếu tố",
+            "subtitle": "Nhập mã 6 chữ số gửi đến\n{{phone}}",
+            "subtitle2FA": "Nhập mã 6 chữ số gửi đến thiết bị của bạn",
+            "button": "Xác minh mã",
+            "verifying": "Đang xác minh...",
+            "resend": "Gửi lại mã",
+            "sending": "Đang gửi...",
+            "resendTimer": "Gửi lại mã sau {{timer}}s",
+            "info": "Không nhận được mã? Kiểm tra tín hiệu và thử lại.",
+            "success": {
+                "resend": "Mã xác minh đã được gửi lại thành công"
+            },
+            "errors": {
+                "invalidCodeLength": "Vui lòng nhập mã đầy đủ 6 chữ số",
+                "noSession": "Không tìm thấy phiên xác minh. Vui lòng yêu cầu mã mới.",
+                "signupMissing": "Thiếu dữ liệu đăng ký",
+                "signupMissingDesc": "Không thể tạo hồ sơ của bạn. Vui lòng thử đăng ký lại.",
+                "profileFailed": "Tạo hồ sơ thất bại",
+                "profileFailedDesc": "Điện thoại của bạn đã được xác minh nhưng chúng tôi không thể tạo hồ sơ của bạn: {{message}}",
+                "verificationFailed": "Xác minh thất bại",
+                "noResend2FA": "Không thể gửi lại mã 2FA. Vui lòng thử nhập lại mã hoặc đăng nhập lại.",
+                "resendFailed": "Lỗi khi gửi lại mã xác minh. Vui lòng thử lại."
+            },
+            "loading": {
+                "uploading": "Đang tải ảnh hồ sơ của bạn lên...",
+                "creating": "Đang tạo hồ sơ của bạn...",
+                "finalizing": "Đang hoàn tất tài khoản của bạn...",
+                "securing": "Đang bảo mật dữ liệu của bạn..."
+            }
+        },
+        "contactInvite": {
+            "title": "Xây dựng đội của bạn",
+            "subtitle": "IOU vui hơn khi có bạn bè. Kết nối danh bạ để tìm những người bạn biết và mở khóa các tính năng.",
+            "findFriends": "Tìm bạn bè",
+            "skip": "Bỏ qua lúc này",
+            "skipLink": "Bỏ qua",
+            "done": "Xong",
+            "tiers": {
+                "solo": {
+                    "name": "Chế độ Solo",
+                    "description": "Tính năng cơ bản",
+                    "features": {
+                        "manual": "Nhập chi phí thủ công",
+                        "ratios": "Tỷ lệ chia đơn giản"
+                    }
+                },
+                "squadStarted": {
+                    "name": "Đội đã bắt đầu",
+                    "description": "Mở khóa tính năng thông minh",
+                    "features": {
+                        "suggestions": "Gợi ý liên hệ thông minh",
+                        "friends": "Xem bạn bè trong ứng dụng",
+                        "templates": "Mẫu chi phí"
+                    }
+                },
+                "fullSquad": {
+                    "name": "Đội đầy đủ",
+                    "description": "Trạng thái Premium",
+                    "features": {
+                        "premium": "1 tháng Premium miễn phí",
+                        "categories": "Danh mục tùy chỉnh",
+                        "support": "Hỗ trợ ưu tiên"
+                    }
+                }
+            },
+            "alerts": {
+                "contactsRequired": {
+                    "title": "Cần danh bạ",
+                    "message": "Để tìm bạn bè của bạn, chúng tôi cần quyền truy cập vào danh bạ của bạn. Vui lòng bật trong cài đặt.",
+                    "ok": "OK"
+                },
+                "premiumUnlocked": {
+                    "title": "Đã mở khóa Premium! 🌟",
+                    "message": "Bạn đã tự động mở khóa 1 tháng Premium!"
+                },
+                "featuresUnlocked": {
+                    "title": "Đã mở khóa tính năng mới! 🚀",
+                    "message": "Bạn đã mở khóa Gợi ý thông minh và Mẫu!"
+                },
+                "error": "Đã xảy ra lỗi. Vui lòng thử lại."
+            }
+        },
+        "twoFactor": {
+            "screenTitle": "Xác thực hai yếu tố",
+            "title": "Xác thực hai yếu tố",
+            "description": {
+                "title": "Bảo mật nâng cao",
+                "text": "Xác thực hai yếu tố thêm một lớp bảo mật bổ sung vào tài khoản của bạn bằng cách yêu cầu mã xác minh từ điện thoại của bạn."
+            },
+            "methods": {
+                "title": "Phương thức đã đăng ký",
+                "empty": "Không có phương thức 2FA nào được đăng ký",
+                "emptyDesc": "Thêm số điện thoại để bắt đầu xác thực hai yếu tố",
+                "enrolledAt": "Đăng ký ngày {{date}}",
+                "remove": {
+                    "title": "Xóa phương thức 2FA",
+                    "message": "Bạn có chắc chắn muốn xóa \"{{name}}\" khỏi tài khoản của mình không?",
+                    "confirm": "Xóa",
+                    "cancel": "Hủy"
+                }
+            },
+            "add": {
+                "button": "Thêm số",
+                "title": "Thêm số cho 2FA",
+                "description": "Nhập số điện thoại để nhận mã xác minh.",
+                "label": "Số điện thoại",
+                "placeholder": "(555) 123-4567",
+                "send": "Gửi mã",
+                "sending": "Đang gửi...",
+                "cancel": "Hủy"
+            },
+            "verify": {
+                "title": "Xác minh số",
+                "description": "Nhập mã 6 chữ số được gửi đến điện thoại của bạn.",
+                "label": "Mã xác minh",
+                "placeholder": "123456",
+                "submit": "Xác minh và Bật",
+                "verifying": "Đang xác minh...",
+                "cancel": "Hủy"
+            },
+            "success": {
+                "codeSent": "Mã xác minh đã được gửi đến điện thoại của bạn",
+                "enrolled": "Đăng ký 2FA hoàn tất thành công",
+                "removed": "Đã xóa phương thức 2FA thành công"
+            },
+            "errors": {
+                "loadFailed": "Không tải được cài đặt 2FA",
+                "missingPhone": "Vui lòng nhập số điện thoại",
+                "invalidPhone": "Vui lòng nhập số điện thoại hợp lệ gồm 10 chữ số",
+                "startFailed": "Không bắt đầu được đăng ký 2FA",
+                "invalidCode": "Vui lòng nhập mã đầy đủ 6 chữ số",
+                "completeFailed": "Không hoàn tất được đăng ký 2FA",
+                "removeFailed": "Không xóa được phương thức 2FA"
+            }
+        }
+    },
+    "components": {
+        "createBottomSheet": {
+            "title": "Tạo mới",
+            "addExpense": "Thêm chi phí",
+            "addExpenseDesc": "Thêm chi phí theo cách thủ công",
+            "scanReceipt": "Quét biên lai",
+            "scanReceiptDesc": "Quét biên lai để trích xuất các mục",
+            "joinExpense": "Tham gia chi phí",
+            "joinExpenseDesc": "Sử dụng liên kết hoặc mã để tham gia",
+            "scanTitle": "Quét biên lai",
+            "takePhoto": "Chụp ảnh",
+            "takePhotoDesc": "Chụp ảnh biên lai mới",
+            "chooseGallery": "Chọn từ thư viện",
+            "chooseGalleryDesc": "Chọn ảnh hiện có",
+            "joinTitle": "Tham gia chi phí",
+            "enterLink": "Nhập liên kết hoặc mã",
+            "linkPlaceholder": "Dán liên kết hoặc mã vào đây...",
+            "joinButton": "Tham gia",
+            "missingLinkError": "Vui lòng nhập liên kết mời hoặc mã",
+            "scanError": "Lỗi quét biên lai"
+        },
+        "changeVenmo": {
+            "title": "Thay đổi Venmo",
+            "subtitle": "Kết nối Venmo của bạn để chia chi phí dễ dàng hơn",
+            "verified": "Tài khoản Venmo đã xác minh",
+            "noProfilePic": "Tài khoản Venmo (Không có ảnh hồ sơ)",
+            "changeAccount": "Thay đổi tài khoản",
+            "usernameLabel": "Tên người dùng Venmo",
+            "usernamePlaceholder": "ten-venmo-cua-ban",
+            "removeHint": "Để trống để xóa tài khoản Venmo của bạn",
+            "save": "Lưu thay đổi",
+            "verificationRequired": "Cần xác minh",
+            "verificationRequiredDesc": "Vui lòng đợi quá trình xác minh Venmo hoàn tất hoặc nhập tên người dùng hợp lệ.",
+            "verificationInProgress": "Đang xác minh",
+            "verificationInProgressDesc": "Vui lòng đợi quá trình xác minh Venmo hoàn tất.",
+            "updateSuccess": "Tài khoản Venmo của bạn đã được cập nhật thành công.",
+            "removeSuccess": "Tài khoản Venmo của bạn đã được xóa thành công.",
+            "updateError": "Lỗi khi cập nhật tài khoản Venmo. Vui lòng thử lại.",
+            "userNotFound": "Người dùng Venmo không tồn tại. Vui lòng kiểm tra tên và thử lại.",
+            "verifyError": "Không thể xác minh tài khoản Venmo. Vui lòng kiểm tra kết nối và thử lại."
+        },
+        "changeExpenseName": {
+            "title": "Thay đổi tên chi phí",
+            "subtitle": "Nhập tên mới cho chi phí này",
+            "label": "Tên chi phí",
+            "placeholder": "Nhập tên chi phí",
+            "save": "Lưu thay đổi"
+        },
+        "expenses": {
+            "header": {
+                "edit": "Sửa",
+                "add": "Thêm",
+                "track": "T.dõi",
+                "split": "Chia"
+            },
+            "footer": {
+                "settleUp": "T.toán",
+                "processing": "Đang xử lý..."
+            },
+            "paidBy": {
+                "label": "Được trả bởi",
+                "you": "Bạn",
+                "noParticipants": "Không có người tham gia"
+            },
+            "participantsGrid": {
+                "addFriends": "Thêm bạn",
+                "manage": "Quản lý"
+            },
+            "expenseItemCard": {
+                "itemNamePlaceholder": "Nhập tên mục",
+                "allAllocated": "Đã phân bổ tất cả",
+                "enterPrice": "Nhập giá để chia",
+                "unallocated": "Chưa phân bổ: ${{amount}}",
+                "totalExceeds": "Tổng vượt quá hóa đơn ${{amount}}",
+                "payers": "Người trả tiền",
+                "split": "Chia",
+                "cancel": "Hủy",
+                "save": "Lưu thay đổi",
+                "settled": "Đã thanh toán khi trả tiền",
+                "person": "Người {{index}}",
+                "alerts": {
+                    "incomplete": "Mục không đầy đủ",
+                    "incompleteDesc": "Vui lòng kiểm tra: {{fields}}",
+                    "uneven": "Chia không đều",
+                    "unevenDesc": "Số tiền chia không khớp với tổng mục. Hãy điều chỉnh chia hoặc tổng số tiền.",
+                    "saveError": "Lỗi khi lưu chi phí: {{error}}"
+                },
+                "fields": {
+                    "name": "tên mục",
+                    "price": "giá",
+                    "payer": "ít nhất một người trả tiền",
+                    "consumer": "ít nhất một người trong phần chia"
+                }
+            },
+            "expenseViewCard": {
+                "paidByUnassigned": "Được trả bởi Ẩn danh",
+                "paidByOne": "Được trả bởi {{name}}",
+                "paidByTwo": "Được trả bởi {{name1}} và {{name2}}",
+                "paidByMany": "Được trả bởi {{name}} và {{count}} người khác",
+                "untitledItem": "Mục không tiêu đề",
+                "settled": "Đã thanh toán",
+                "splitWith": "Chia với",
+                "actions": {
+                    "title": "Hành động chi phí",
+                    "message": "Bạn muốn làm gì?",
+                    "edit": "Chỉnh sửa",
+                    "delete": "Xóa",
+                    "cancel": "Hủy"
+                },
+                "locked": {
+                    "title": "Mục đã khóa",
+                    "message": "Mục này là một phần của khoản thanh toán đang hoạt động. Hủy thanh toán để chỉnh sửa mục này."
+                }
+            },
+            "receiptBreakdown": {
+                "header": "Các mục biên lai",
+                "addItem": "Thêm mục",
+                "editItem": "Chỉnh sửa mục",
+                "itemName": "Tên mục",
+                "itemNamePlaceholder": "Nhập tên mục",
+                "price": "Giá",
+                "splitWith": "Chia với",
+                "selectPerson": "Chọn ít nhất một người",
+                "cancel": "Hủy",
+                "save": "Lưu thay đổi",
+                "lockedTitle": "Mục đã khóa",
+                "lockedMsg": "Mục này là một phần của khoản thanh toán đang hoạt động. Hủy thanh toán để chỉnh sửa mục này.",
+                "itemDefault": "Mục {{index}}",
+                "settled": "Đã thanh toán",
+                "assignSomeone": "Gán cho ai đó",
+                "noOneAssigned": "Chưa gán ai",
+                "extraFee": "Đánh dấu là phí phụ (tiền boa, thuế, v.v.)",
+                "fee": "Phí",
+                "time": {
+                    "justNow": "vừa xong",
+                    "minutesAgo": "{{count}} phút trước",
+                    "hoursAgo": "{{count}} giờ trước",
+                    "daysAgo": "{{count}} ngày trước",
+                    "weeksAgo": "{{count}} tuần trước"
+                }
+            },
+            "settlementInterface": {
+                "summary": {
+                    "allSettled": "Đã thanh toán tất cả!",
+                    "youOwe": "Bạn nợ",
+                    "youreOwed": "Bạn được nợ",
+                    "pendingSettled": "{{pending}} chờ xử lý · {{settled}} đã thanh toán",
+                    "pending": "{{count}} chờ xử lý",
+                    "settled": "{{count}} đã thanh toán"
+                },
+                "activity": {
+                    "title": "Hoạt động",
+                    "showMore": "Hiển thị thêm {{count}}...",
+                    "types": {
+                        "priceChange": "{{user}} đã cập nhật tổng số tiền từ ${{prev}} thành ${{new}}",
+                        "itemAdded": "{{user}} đã thêm {{item}}",
+                        "itemAddedAmount": "{{user}} đã thêm {{item}} với giá ${{amount}}",
+                        "itemRemoved": "{{user}} đã xóa \"{{item}}\"",
+                        "itemRemovedAmount": "{{user}} đã xóa {{item}} (${{amount}})",
+                        "participantAdded": "{{user}} đã thêm {{participant}}",
+                        "participantRemoved": "{{user}} đã xóa {{participant}}",
+                        "default": "{{user}} đã thay đổi",
+                        "itemModified": "{{user}} đã chỉnh sửa {{item}} thành ${{amount}}",
+                        "itemModifiedComputed": "{{user}} đã sửa đổi {{item}}: {{changes}}",
+                        "settled": "{{user}} đã thanh toán với {{peer}} số tiền ${{amount}}",
+                        "unsettled": "{{user}} đã hủy thanh toán ${{amount}} với {{peer}}"
+                    }
+                },
+                "status": {
+                    "fullySettled": "Đã thanh toán đầy đủ",
+                    "partiallySettled": "Đã thanh toán một phần",
+                    "settled": "Đã thanh toán",
+                    "reminded": "Đã nhắc nhở",
+                    "awaitingPayment": "Đang chờ thanh toán"
+                },
+                "items": {
+                    "title": "Các mục",
+                    "tapToSettle": "(nhấn để thanh toán)",
+                    "selectAll": "Chọn tất cả",
+                    "deselectAll": "Bỏ chọn tất cả"
+                },
+                "actions": {
+                    "allSettled": "Đã thanh toán tất cả",
+                    "selectToSettle": "Chọn mục để thanh toán",
+                    "pay": "Trả ${{amount}}",
+                    "markSettled": "Đánh dấu ${{amount}} đã thanh toán",
+                    "request": "Yêu cầu ${{amount}}",
+                    "reminderSent": "Đã gửi lời nhắc",
+                    "sendReminder": "Gửi lời nhắc",
+                    "undoSettlement": "Hủy thanh toán"
+                },
+                "relationships": {
+                    "youOwe": "Bạn nợ {{name}}",
+                    "owesYou": "{{name}} nợ bạn",
+                    "owes": "{{name}} nợ {{name2}}"
+                },
+                "total": "(tổng ${{amount}})",
+                "empty": {
+                    "title": "Đã thanh toán tất cả!",
+                    "body": "Mọi người đều đã thanh toán xong. Không cần thanh toán thêm."
+                },
+                "banner": {
+                    "title": "Các khoản thanh toán đã cập nhật do thay đổi.",
+                    "sub": "{{new}} mới, {{paid}} đã trả được giữ lại."
+                },
+                "alerts": {
+                    "markSettled": {
+                        "title": "Đánh dấu là đã thanh toán",
+                        "message": "Đánh dấu ${{amount}} là đã thanh toán? Điều này ghi lại khoản thanh toán mà không sử dụng Venmo.",
+                        "cancel": "Hủy",
+                        "confirm": "Thanh toán"
+                    },
+                    "unsettleAll": {
+                        "title": "Hủy thanh toán tất cả các mục",
+                        "message": "Điều này sẽ đánh dấu tất cả các mục là chưa thanh toán. Bạn có chắc chắn không?",
+                        "confirm": "Hủy thanh toán"
+                    },
+                    "unsettle": {
+                        "title": "Hủy thanh toán chi phí",
+                        "message": "Bạn có chắc chắn muốn hủy thanh toán tất cả các mục không?",
+                        "confirm": "Hủy thanh toán"
+                    }
+                }
+            }
+        },
+        "referral": {
+            "progress": {
+                "title": "Tiến độ giới thiệu",
+                "referrals": "{{count}} Lời mời",
+                "nextTier": "{{count}} người nữa để lên cấp tiếp theo"
+            },
+            "tier1": {
+                "title": "Cấp 1",
+                "requirement": "3 Bạn bè",
+                "reward": "1 tháng Premium",
+                "benefits": [
+                    "Trải nghiệm không quảng cáo",
+                    "Xuất CSV",
+                    "Hỗ trợ ưu tiên"
+                ]
+            },
+            "tier2": {
+                "title": "Cấp 2",
+                "requirement": "10 Bạn bè",
+                "reward": "Premium trọn đời",
+                "benefits": [
+                    "Tất cả quyền lợi Cấp 1",
+                    "Danh mục tùy chỉnh",
+                    "Truy cập sớm tính năng mới"
+                ]
+            },
+            "share": {
+                "title": "Mời bạn bè",
+                "description": "Chia sẻ liên kết giới thiệu để nhận thưởng",
+                "copyLink": "Sao chép liên kết",
+                "shareLink": "Chia sẻ liên kết",
+                "copied": "Đã sao chép vào khay nhớ tạm!"
+            },
+            "history": {
+                "title": "Lịch sử giới thiệu",
+                "confirmed": "Đã xác nhận",
+                "pending": "Đang chờ xử lý",
+                "empty": "Chưa có lời mời nào"
+            }
+        }
     }
 }

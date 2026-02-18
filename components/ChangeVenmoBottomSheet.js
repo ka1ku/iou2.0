@@ -214,7 +214,6 @@ const ChangeVenmoBottomSheet = forwardRef((props, ref) => {
         ]
       );
     } catch (error) {
-      console.error('Error updating Venmo profile:', error);
       Alert.alert(
         t('common.error'),
         error.message || t('components.changeVenmo.updateError')

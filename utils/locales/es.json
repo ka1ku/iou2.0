@@ -10,7 +10,7 @@
         "currency": "Moneda",
         "support": "Soporte",
         "terms": "Términos de Servicio",
-        "rate": "Calificar la App",
+        "privacy": "Política de Privacidad",
         "signOut": "Cerrar Sesión",
         "deleteAccount": "Eliminar Cuenta",
         "manageSubscription": "Administrar Suscripción",
@@ -732,7 +732,11 @@
                         "itemRemovedAmount": "{{user}} eliminó {{item}} (${{amount}})",
                         "participantAdded": "{{user}} añadió a {{participant}}",
                         "participantRemoved": "{{user}} eliminó a {{participant}}",
-                        "default": "{{user}} hizo un cambio"
+                        "default": "{{user}} hizo un cambio",
+                        "itemModified": "{{user}} editó {{item}} por ${{amount}}",
+                        "itemModifiedComputed": "{{user}} editó {{item}}: {{changes}}",
+                        "settled": "{{user}} liquidó con {{peer}} por ${{amount}}",
+                        "unsettled": "{{user}} deshizo liquidación de ${{amount}} con {{peer}}"
                     }
                 },
                 "status": {
@@ -778,48 +782,58 @@
                         "message": "¿Marcar {{amount}} como liquidado? Esto registra el pago sin usar Venmo.",
                         "cancel": "Cancelar",
                         "confirm": "Liquidar"
+                    },
+                    "unsettleAll": {
+                        "title": "Deshacer Liquidación de Todos los Ítems",
+                        "message": "Esto marcará todos los ítems como no liquidados. ¿Estás seguro?",
+                        "confirm": "Deshacer"
+                    },
+                    "unsettle": {
+                        "title": "Deshacer Liquidación de Gasto",
+                        "message": "¿Estás seguro de que quieres deshacer la liquidación de todos los ítems?",
+                        "confirm": "Deshacer"
                     }
                 }
             }
         },
         "referral": {
             "progress": {
-                "title": "Tu Progreso",
-                "referrals": "{{count}} referencias confirmadas",
-                "nextTier": "{{count}} más para la próxima recompensa"
+                "title": "Progreso de Referidos",
+                "referrals": "{{count}} Referidos",
+                "nextTier": "{{count}} más para el siguiente nivel"
             },
             "tier1": {
-                "title": "Nivel 1: Iniciador de Escuadrón",
-                "requirement": "3 referencias exitosas",
-                "reward": "1 mes de IOU Pro",
+                "title": "Nivel 1",
+                "requirement": "3 Amigos",
+                "reward": "1 Mes de Premium",
                 "benefits": [
-                    "Escaneo de recibos",
-                    "Gastos ilimitados",
-                    "Categorías personalizadas"
+                    "Experiencia sin anuncios",
+                    "Exportar a CSV",
+                    "Soporte Prioritario"
                 ]
             },
             "tier2": {
-                "title": "Nivel 2: Líder de Escuadrón",
-                "requirement": "5 referencias exitosas",
-                "reward": "3 meses de IOU Pro",
+                "title": "Nivel 2",
+                "requirement": "10 Amigos",
+                "reward": "Premium de Por Vida",
                 "benefits": [
-                    "Todo en Nivel 1",
-                    "Soporte prioritario",
-                    "Acceso anticipado a funciones"
+                    "Todos los beneficios de Nivel 1",
+                    "Categorías personalizadas",
+                    "Acceso anticipado a nuevas funciones"
                 ]
             },
             "share": {
-                "title": "Comparte Tu Enlace",
-                "description": "Invita amigos para ganar recompensas",
+                "title": "Invita Amigos",
+                "description": "Comparte tu enlace de referido para ganar recompensas",
                 "copyLink": "Copiar Enlace",
                 "shareLink": "Compartir Enlace",
-                "copied": "¡Enlace copiado!"
+                "copied": "¡Copiado al portapapeles!"
             },
             "history": {
-                "title": "Historial de Referencias",
+                "title": "Historial de Referidos",
                 "confirmed": "Confirmado",
                 "pending": "Pendiente",
-                "empty": "Aún no hay referencias. ¡Empieza a invitar amigos!"
+                "empty": "No hay referidos aún"
             }
         }
     }

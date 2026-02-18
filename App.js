@@ -152,7 +152,6 @@ const NotificationNavigationSetup = () => {
             break;
         }
       } catch (error) {
-        console.error('Failed to navigate from notification:', error);
       }
     };
 
@@ -387,10 +386,8 @@ export default function App() {
       try {
         const success = await initializeRevenueCat(null); // Initial anonymous setup
         if (!success) {
-          console.error('RevenueCat failed to initialize');
         }
       } catch (error) {
-        console.error('Error during RevenueCat initialization:', error);
       }
 
       try {
@@ -421,7 +418,6 @@ export default function App() {
           linkingListener.remove();
         };
       } catch (error) {
-        console.error('Error handling referral deep link:', error);
       }
     };
 
@@ -445,7 +441,6 @@ export default function App() {
             if (currency) store.setCurrency(currency);
           }
         } catch (error) {
-          console.error('Failed to sync preferences:', error);
         }
 
       }

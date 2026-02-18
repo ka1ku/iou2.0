@@ -54,7 +54,6 @@ class ExpoNotificationService {
       const permissionsGranted = await this.requestPermissions();
       
       if (!permissionsGranted) {
-        console.warn('Notification permissions not granted');
         return;
       }
 
@@ -89,10 +88,8 @@ class ExpoNotificationService {
 
         this.isInitialized = true;
       } else {
-        console.warn('Must use physical device for push notifications');
       }
     } catch (error) {
-      console.error('Failed to initialize ExpoNotificationService:', error);
       throw error;
     }
   }
@@ -112,7 +109,6 @@ class ExpoNotificationService {
 
       return finalStatus === 'granted';
     } catch (error) {
-      console.error('Failed to request notification permissions:', error);
       return false;
     }
   }
@@ -133,7 +129,6 @@ class ExpoNotificationService {
       });
       
     } catch (error) {
-      console.error('Failed to update Expo push token:', error);
       throw error;
     }
   }
@@ -153,7 +148,6 @@ class ExpoNotificationService {
       const { status } = await Notifications.getPermissionsAsync();
       return status === 'granted';
     } catch (error) {
-      console.error('Failed to check notification permissions:', error);
       return false;
     }
   }
@@ -240,7 +234,6 @@ class ExpoNotificationService {
       
       return this.getDefaultPreferences();
     } catch (error) {
-      console.error('Failed to get notification preferences:', error);
       return this.getDefaultPreferences();
     }
   }
@@ -261,7 +254,6 @@ class ExpoNotificationService {
       });
       
     } catch (error) {
-      console.error('Failed to update notification preferences:', error);
       throw error;
     }
   }
@@ -322,7 +314,6 @@ class ExpoNotificationService {
       
       return true;
     } catch (error) {
-      console.error('Failed to check notification preferences:', error);
       return true; // Default to allowing notifications on error
     }
   }
@@ -340,7 +331,6 @@ class ExpoNotificationService {
       const result = await sendTestNotification();
       return result.data;
     } catch (error) {
-      console.error('Failed to send test notification:', error);
       throw error;
     }
   }

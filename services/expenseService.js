@@ -15,7 +15,7 @@ import {
 import { getFunctions, httpsCallable } from '@react-native-firebase/functions';
 import { getApp } from '@react-native-firebase/app';
 import { Linking, Platform } from 'react-native';
-import { calculateSettlementWithPartialSettlements, calculateSettlement } from '../utils/settlementCalculator';
+import { recomputeSettlementsForSave } from '../utils/settlementCalculator';
 import { getUserProfile } from './friendService';
 import { arrayUnion } from '@react-native-firebase/firestore';
 
@@ -29,26 +29,80 @@ const generateJoinCode = () => {
   return result;
 };
 
+/** Sort participants by userId and remap item indices for consistent order across devices */
+const sortParticipantsAndRemapItems = (participants, items, expenseSelectedPayers) => {
+  const parts = participants || [];
+  const its = items || [];
+  const remap = (idx) => {
+    if (!oldIdxToNewIdx) return idx;
+    return oldIdxToNewIdx[idx] ?? idx;
+  };
+  let oldIdxToNewIdx = null;
+  if (!parts.length) return { participants: [], items: its, selectedPayers: expenseSelectedPayers };
+  if (!its.length) {
+    const withOrigIdx = parts.map((p, i) => ({ ...p, _origIdx: i }));
+    const sorted = withOrigIdx.sort((a, b) => {
+      const keyA = a.userId ?? `z-${a._origIdx}`;
+      const keyB = b.userId ?? `z-${b._origIdx}`;
+      return keyA.localeCompare(keyB);
+    });
+    oldIdxToNewIdx = [];
+    sorted.forEach((p, newIdx) => { oldIdxToNewIdx[p._origIdx] = newIdx; });
+    return {
+      participants: sorted.map(({ _origIdx, ...p }) => p),
+      items: its,
+      selectedPayers: (expenseSelectedPayers || [0]).map(remap),
+    };
+  }
+  const withOrigIdx = parts.map((p, i) => ({ ...p, _origIdx: i }));
+  const sorted = withOrigIdx.sort((a, b) => {
+    const keyA = a.userId ?? `z-${a._origIdx}`;
+    const keyB = b.userId ?? `z-${b._origIdx}`;
+    return keyA.localeCompare(keyB);
+  });
+  oldIdxToNewIdx = [];
+  sorted.forEach((p, newIdx) => { oldIdxToNewIdx[p._origIdx] = newIdx; });
+  const participantsOut = sorted.map(({ _origIdx, ...p }) => p);
+  const itemsOut = its.map((item) => ({
+    ...item,
+    selectedPayers: (item.selectedPayers || [0]).map(remap),
+    selectedConsumers: (item.selectedConsumers || [0]).map(remap),
+  }));
+  return {
+    participants: participantsOut,
+    items: itemsOut,
+    selectedPayers: (expenseSelectedPayers || [0]).map(remap),
+  };
+};
 
 export const createExpense = async (expenseData, userId) => {
   try {
+    let participants = expenseData.participants || [];
+    let items = expenseData.items || [];
+    let selectedPayers = expenseData.selectedPayers || [0];
+    if (participants.length) {
+      const sorted = sortParticipantsAndRemapItems(participants, items, selectedPayers);
+      participants = sorted.participants;
+      items = sorted.items;
+      selectedPayers = sorted.selectedPayers;
+    }
 
     // Create participantIds array for efficient array-contains queries
     const participantIds = [];
-    if (expenseData.participants) {
-      expenseData.participants.forEach((participant) => {
-        if (participant.userId && !participantIds.includes(participant.userId)) {
-          participantIds.push(participant.userId);
-        }
-      });
-    }
+    participants.forEach((participant) => {
+      if (participant.userId && !participantIds.includes(participant.userId)) {
+        participantIds.push(participant.userId);
+      }
+    });
 
     const expense = {
       ...expenseData,
+      participants,
+      items,
+      selectedPayers,
       createdBy: userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      items: expenseData.items || [],
       participantIds,
       join: {
         enabled: true,
@@ -76,10 +130,27 @@ export const updateExpense = async (expenseId, updateData, userId) => {
 
     let finalUpdateData = { ...updateData };
 
-    // Create participantIds array for efficient array-contains queries
+    // Sort participants and remap item indices for consistent order across devices
     if (updateData.participants) {
+      const itemsToUse = updateData.items ?? (await (async () => {
+        const expenseRef = doc(getFirestore(getApp()), 'expenses', expenseId);
+        const snap = await getDoc(expenseRef);
+        return snap.exists() ? (snap.data().items || []) : [];
+      })());
+      const { participants: sortedParticipants, items: remappedItems, selectedPayers: remappedSelectedPayers } = sortParticipantsAndRemapItems(
+        updateData.participants,
+        itemsToUse,
+        updateData.selectedPayers
+      );
+      finalUpdateData.participants = sortedParticipants;
+      if (itemsToUse.length > 0) finalUpdateData.items = remappedItems;
+      if (updateData.selectedPayers) finalUpdateData.selectedPayers = remappedSelectedPayers;
+    }
+
+    // Create participantIds array for efficient array-contains queries
+    if (finalUpdateData.participants) {
       const participantIds = [];
-      updateData.participants.forEach((participant) => {
+      finalUpdateData.participants.forEach((participant) => {
         if (participant.userId && !participantIds.includes(participant.userId)) {
           participantIds.push(participant.userId);
         }
@@ -118,8 +189,8 @@ export const updateExpense = async (expenseId, updateData, userId) => {
           const currentExpense = { id: expenseSnap.id, ...expenseSnap.data() };
           const existingSettlements = currentExpense.settlements || [];
 
-          // Only recalculate if settlements already exist AND we're not explicitly setting them
-          if (shouldRecalculateSettlements && existingSettlements.length > 0) {
+          // Recalculate whenever items/participants/fees change (handles direction flips, new items, etc.)
+          if (shouldRecalculateSettlements) {
             // Merge the update data with current expense data to get the complete expense
             const updatedExpense = {
               ...currentExpense,
@@ -130,75 +201,31 @@ export const updateExpense = async (expenseId, updateData, userId) => {
               fees: updateData.fees !== undefined ? updateData.fees : currentExpense.fees,
             };
 
-            // Recalculate settlements preserving paid ones
-            const settlementResult = calculateSettlementWithPartialSettlements(
+            // Recompute settlements from items, preserving Firestore settled state (handles direction flips)
+            const recalculatedSettlements = recomputeSettlementsForSave(
               updatedExpense,
               existingSettlements
-            );
-
-            // Format settlements for Firestore (use debtor/creditor format)
-            // The calculateSettlementWithPartialSettlements function preserves settlements where
-            // money has been transferred (status !== 'noAction') and marks them with preserved: true
-            const recalculatedSettlements = settlementResult.settlements.map(s => {
-              // If this settlement was preserved (money already transferred), keep it fixed
-              // Preserved settlements maintain their original amount and status because money was already transferred
-              if (s.preserved === true) {
-                // Find the original settlement to preserve all its metadata exactly
-                const originalSettlement = existingSettlements.find(existing => {
-                  const existingFrom = existing.debtor || existing.from;
-                  const existingTo = existing.creditor || existing.to;
-                  const existingAmount = existing.amount;
-                  const settlementFrom = s.from || s.debtor;
-                  const settlementTo = s.to || s.creditor;
-                  const settlementAmount = s.amount;
-
-                  // Round amounts for comparison
-                  const roundedExisting = Math.round(existingAmount * 100) / 100;
-                  const roundedSettlement = Math.round(settlementAmount * 100) / 100;
-
-                  return existingFrom === settlementFrom &&
-                    existingTo === settlementTo &&
-                    roundedExisting === roundedSettlement;
-                });
-
-                // Use original settlement data exactly as it was (money already transferred)
-                // This preserves the original amount, status (markedAsPaid, paymentMade, paymentRequested), and metadata
-                if (originalSettlement) {
-                  return {
-                    debtor: originalSettlement.debtor || originalSettlement.from,
-                    creditor: originalSettlement.creditor || originalSettlement.to,
-                    amount: originalSettlement.amount, // Keep original amount - money already transferred
-                    status: originalSettlement.status, // Preserve status (markedAsPaid, paymentMade, paymentRequested, etc.)
-                    updatedAt: originalSettlement.updatedAt || new Date().toISOString(),
-                    associatedItems: originalSettlement.associatedItems || [],
-                  };
-                } else {
-                  // Fallback if original not found (shouldn't happen, but safety net)
-                  // Use the preserved settlement data from the calculator
-                  return {
-                    debtor: s.from,
-                    creditor: s.to,
-                    amount: s.amount, // Preserved amount from calculator
-                    status: s.status, // Should be markedAsPaid, paymentMade, paymentRequested, etc.
-                    updatedAt: new Date().toISOString(),
-                    associatedItems: [],
-                  };
-                }
-              } else {
-                // This is a new settlement (no money transferred yet)
-                // Generated based on adjusted balances after accounting for transferred settlements
-                return {
-                  debtor: s.from,
-                  creditor: s.to,
-                  amount: s.amount,
-                  status: 'noAction', // New settlements start with noAction
-                  updatedAt: new Date().toISOString(),
-                  associatedItems: s.associatedItems || [],
-                };
-              }
+            ).map((s) => {
+              const pairKey = (a, b) => `${a}|||${b}`;
+              const original = existingSettlements.find(
+                (ex) =>
+                  pairKey(ex.debtor || ex.from, ex.creditor || ex.to) === pairKey(s.debtor || s.from, s.creditor || s.to) ||
+                  pairKey(ex.debtor || ex.from, ex.creditor || ex.to) === pairKey(s.creditor || s.to, s.debtor || s.from)
+              );
+              return {
+                debtor: s.debtor || s.from,
+                creditor: s.creditor || s.to,
+                debtorUserId: s.debtorUserId,
+                creditorUserId: s.creditorUserId,
+                amount: s.amount,
+                status: s.status,
+                updatedAt: original?.updatedAt || new Date().toISOString(),
+                associatedItems: s.associatedItems || [],
+                settledAmount: s.settledAmount,
+                remainingAmount: s.remainingAmount,
+              };
             });
 
-            // Add recalculated settlements to update data
             finalUpdateData.settlements = recalculatedSettlements;
           }
 
@@ -439,54 +466,19 @@ export const updateExpense = async (expenseId, updateData, userId) => {
                 });
               }
 
-              // Detect participant changes
-              if (updateData.participants !== undefined) {
-                const oldParticipants = currentExpense.participants || [];
-                const newParticipants = updateData.participants;
-                const oldUserIds = new Set(oldParticipants.map(p => p.userId).filter(Boolean));
-                const newUserIds = new Set(newParticipants.map(p => p.userId).filter(Boolean));
-                const addedParticipants = newParticipants.filter(p => p.userId && !oldUserIds.has(p.userId));
-                const removedParticipants = oldParticipants.filter(p => p.userId && !newUserIds.has(p.userId));
-
-                let userName = null;
-                // Reuse actorName if possible, but keep local logic if strictly needed. 
-                // Actually we can just use actorName.
-                userName = actorName;
-
-                addedParticipants.forEach(p => {
-                  changeLogEntries.push({
-                    type: 'participantAdded',
-                    userId: userId || null,
-                    userName: userName || 'Someone',
-                    timestamp: new Date().toISOString(),
-                    details: { participantName: p.name || 'Unknown' },
-                  });
-                });
-
-                removedParticipants.forEach(p => {
-                  changeLogEntries.push({
-                    type: 'participantRemoved',
-                    userId: userId || null,
-                    userName: userName || 'Someone',
-                    timestamp: new Date().toISOString(),
-                    details: { participantName: p.name || 'Unknown' },
-                  });
-                });
-              }
+              // Participant add/remove does not add to activity (per product requirement)
 
               // Append change log entries using arrayUnion
               if (changeLogEntries.length > 0) {
                 finalUpdateData.changeLog = arrayUnion(...changeLogEntries);
               }
             } catch (logError) {
-              console.error('[updateExpense] Failed to generate change log:', logError);
               // Don't block the update if logging fails
             }
           }
         }
       } catch (recalcError) {
         // If recalculation/logging fails, log but don't block the update
-        console.error('[updateExpense] Failed to recalculate settlements:', recalcError);
       }
     }
 
@@ -811,7 +803,6 @@ export const createPaymentRequest = async ({ fromUserId, toUserId, amount, expen
       requestId: result.data.requestId || 'req_' + Date.now() // Fallback ID since we don't store it
     };
   } catch (error) {
-    console.error('Error creating payment request:', error);
     throw error;
   }
 };

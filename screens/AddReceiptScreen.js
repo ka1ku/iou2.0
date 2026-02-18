@@ -23,6 +23,7 @@ import { createExpense, updateExpense, updateExpenseParticipants, deleteItemFrom
 import { ExpenseProvider, useExpense } from '../contexts/ExpenseContext';
 import useSettlementActions from '../hooks/useSettlementActions';
 import useExpenseSnapshot from '../hooks/useExpenseSnapshot';
+import useExpenseInitSync from '../hooks/useExpenseInitSync';
 import ExpenseHeader from '../components/expenses/ExpenseHeader';
 import GroupMembersModal from '../components/expenses/GroupMembersModal';
 import PaidBySection from '../components/expenses/PaidBySection';
@@ -43,21 +44,13 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   // Use live expense if available, otherwise fall back to initial expense
   const expense = liveExpense || initialExpense;
 
-  // Debug logging
-  useEffect(() => {
-    console.log('[AddReceiptScreen] Expense updated:', {
-      hasExpense: !!expense,
-      expenseId: expense?.id,
-      feesCount: expense?.fees?.length || 0,
-      fees: expense?.fees?.map(f => ({ id: f.id, name: f.name, amount: f.amount })) || [],
-    });
-  }, [expense]);
 
   const isEditing = !!expense && !isNewExpense;
   const insets = useSafeAreaInsets();
   const currentUserId = getCurrentUser()?.uid || null;
   const scrollRef = useRef(null);
   const isFocused = useIsFocused();
+  const lastPayerToggleAtRef = useRef(0);
 
   const { state, actions, total } = useExpense();
 
@@ -90,20 +83,19 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     selectedPayers: expense?.selectedPayers || state.selectedPayers,
   });
 
-  // Wrap settlement actions with validation
+  // Wrap settlement actions with validation (all items must be assigned before settling)
   const handleSettlementActionWithValidation = useCallback(async (type, settlement, customAmount) => {
-    // Only validate for settlement actions (markAsPaid, etc.), not for undo actions
     const SETTLEMENT_ACTIONS = ['markAsPaid', 'makePayment', 'requestPayment'];
-
-    if (SETTLEMENT_ACTIONS.includes(type)) {
-      if (!validateForSettlement()) {
-        return; // Validation failed, don't proceed
-      }
-    }
-
-    // Validation passed or it's an undo action, proceed with the action
+    if (SETTLEMENT_ACTIONS.includes(type) && !validateForSettlement()) return;
     return handleSettlementAction(type, settlement, customAmount);
   }, [handleSettlementAction, validateForSettlement]);
+
+  // Wrap bulk action with validation (markAsSettled, makePayment, requestPayment)
+  const handleBulkActionWithValidation = useCallback(async (type, settlement, selectedItemIds) => {
+    const SETTLEMENT_ACTIONS = ['markAsSettled', 'makePayment', 'requestPayment'];
+    if (SETTLEMENT_ACTIONS.includes(type) && !validateForSettlement()) return;
+    return handleBulkAction(type, settlement, selectedItemIds);
+  }, [handleBulkAction, validateForSettlement]);
 
   // Calculate totals
   const { itemsSubtotal, fees, calculatedTotal } = useMemo(() => {
@@ -196,7 +188,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
       // Success haptic feedback is handled in ReceiptBreakdown
     } catch (error) {
-      console.error('Failed to toggle participant:', error);
 
       // Rollback optimistic update on error
       actions.updateItem(itemIndex, { selectedConsumers: originalConsumers });
@@ -213,21 +204,19 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       const currentUser = getCurrentUser();
       if (!currentUser) throw new Error('Not authenticated');
 
-      // Single selection only - always set to the clicked participant
-      const newPayers = [participantIndex];
+      // Participant order is consistent across devices (expense.participants), so index is correct.
+      actions.setSelectedPayers([participantIndex]);
+      lastPayerToggleAtRef.current = Date.now();
 
-      // Update Firestore directly - snapshot listener will update UI
       await updateExpense(expense.id, {
-        selectedPayers: newPayers,
+        selectedPayers: [participantIndex],
       }, currentUser.uid);
 
-      // Success haptic
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (error) {
-      console.error('Failed to toggle payer:', error);
       Alert.alert('Error', 'Failed to update payer. Please try again.');
     }
-  }, [expense?.id]);
+  }, [expense?.id, actions]);
 
   const prepareExpenseData = async () => {
     const currentUser = getCurrentUser();
@@ -271,6 +260,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
         splits: item.splits || [],
         isExtraFee: item.isExtraFee || false, // Preserve isExtraFee flag
       })),
+      fees: [], // Receipts: fees are items with isExtraFee, not a separate array
       selectedPayers: state.selectedPayers || [0],
       join: { enabled: state.joinEnabled },
     };
@@ -383,89 +373,15 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     return true;
   };
 
-  // Ref to track which expense ID we've already initialized
-  const initializedIdRef = useRef(null);
-  const hasInitialized = useRef(false);
-
-  useEffect(() => {
-    // Tab bar hiding is handled centrally in App.js via getTabBarStyle
-    if (expense && (isEditing || isNewExpense)) {
-      // Only initialize if we haven't initialized this expense ID yet
-      if (initializedIdRef.current !== expense.id) {
-        console.log('[AddReceiptScreen] Initializing from expense:', {
-          expenseId: expense.id,
-          itemsCount: expense.items?.length || 0,
-        });
-        actions.initializeFromExpense(expense, isEditing, isNewExpense);
-        initializedIdRef.current = expense.id;
-        hasInitialized.current = true; // Mark as initialized
-      }
-    }
-  }, [expense?.id, isEditing, isNewExpense, actions]);
-
-  // Sync items, participants from Firestore when they change (prevents stale data from overwriting DB)
-  useEffect(() => {
-    if (!expense || !isEditing) return;
-
-    // Sync items
-    if (expense.items) {
-      const firestoreItemIds = new Set(expense.items.map(i => `${i.id}:${i.amount}:${i.name}`));
-      const stateItemIds = new Set(state.items.map(i => `${i.id}:${i.amount}:${i.name}`));
-      const itemsChanged =
-        firestoreItemIds.size !== stateItemIds.size ||
-        ![...firestoreItemIds].every(id => stateItemIds.has(id));
-
-      if (itemsChanged) {
-        const itemsWithPayers = expense.items.map(item => ({
-          ...item,
-          selectedPayers: item.selectedPayers || [0],
-          selectedConsumers: item.selectedConsumers || [0],
-        }));
-        actions.setItems(itemsWithPayers);
-      }
-    }
-
-    // Sync selectedPayers
-    if (expense.selectedPayers && JSON.stringify(expense.selectedPayers) !== JSON.stringify(state.selectedPayers)) {
-      actions.setSelectedPayers(expense.selectedPayers);
-    }
-
-    // Sync title
-    if (expense.title && expense.title !== state.title) {
-      actions.setTitle(expense.title);
-    }
-  }, [expense, isEditing, state.items, state.selectedPayers, state.title, actions]);
-
-  useEffect(() => {
-    const currentUserId = getCurrentUser()?.uid;
-    const meParticipant = state.participants.find((p) => p.userId === currentUserId);
-    const allParticipants = [
-      meParticipant || {
-        name: getCurrentUser()?.fullName || getCurrentUser()?.firstName || "Unknown User",
-        id: "me-participant",
-        userId: currentUserId,
-        placeholder: false,
-        phoneNumber: null,
-        username: getCurrentUser()?.username || null,
-        profilePhoto: getCurrentUser()?.profilePhoto || null,
-      },
-      ...state.selectedFriends.map((friend, index) => ({
-        name: friend.name || "",
-        id: `friend-${friend.id || index}`,
-        userId: friend.id || null,
-        phoneNumber: friend.phoneNumber || null,
-        username: friend.username || null,
-        profilePhoto: friend.profilePhoto || null,
-        placeholder: false,
-      })),
-    ];
-
-    const participantsChanged =
-      JSON.stringify(allParticipants) !== JSON.stringify(state.participants);
-    if (participantsChanged) {
-      actions.setParticipants(allParticipants);
-    }
-  }, [state.selectedFriends, state.participants, actions]);
+  useExpenseInitSync({
+    expense,
+    isEditing,
+    isNewExpense,
+    state,
+    actions,
+    skipSync: !!savingItemId,
+    lastPayerToggleAtRef,
+  });
 
   useEffect(() => {
     const updatedItems = state.items.map(item => ({
@@ -514,7 +430,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
               hasUpdatedScannedItems.current = true;
             }
           } catch (error) {
-            console.error('Failed to update scanned items in Firestore:', error);
           }
         }
       }
@@ -527,25 +442,10 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   // Check if ANYTHING is settled - if so, lock EVERYTHING
   const isSettled = useMemo(() => {
-    const hasSettled = settlements.some(s =>
+    return settlements.some(s =>
       ['markedAsPaid', 'confirmed', 'complete', 'partial'].includes(s.status) ||
       (s.settledAmount && s.settledAmount > 0)
     );
-
-    // Enhanced debug logging
-    console.log('[AddReceiptScreen] isSettled check:', {
-      settlementsCount: settlements.length,
-      settlements: settlements.map(s => ({
-        from: s.from,
-        to: s.to,
-        status: s.status,
-        settledAmount: s.settledAmount,
-        amount: s.amount,
-      })),
-      hasSettled,
-    });
-
-    return hasSettled;
   }, [settlements]);
 
   return (
@@ -715,7 +615,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                 handleAction={handleSettlementActionWithValidation}
                 handleItemToggle={handleItemToggle}
                 handleBulkSettle={handleBulkSettle}
-                handleBulkAction={handleBulkAction}
+                handleBulkAction={handleBulkActionWithValidation}
                 changeLog={expense?.changeLog}
                 recalculationInfo={recalculationInfo}
                 onDismissRecalculation={() => setRecalculationInfo(null)}

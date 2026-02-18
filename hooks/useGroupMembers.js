@@ -50,7 +50,6 @@ export const useGroupMembers = ({ visible, expenseId, onClose }) => {
       setStarredUsers(starred);
       setStarredUserIds(starred.map((user) => user.objectID || user.id));
     } catch (error) {
-      console.error('Error loading starred users:', error);
     } finally {
       setLoadingStarred(false);
     }
@@ -230,79 +229,46 @@ export const useGroupMembers = ({ visible, expenseId, onClose }) => {
     });
   }, [invitedContacts, debouncedQuery]);
 
-  // --- Current user + all members ---
-  const currentUserData = useMemo(() => {
-    const currentUser = getCurrentUser();
-    const currentUserId = currentUser?.uid;
-
-    // Try to find "Me" in the existing participants list from context
-    // This ensures we use the most up-to-date profile data (name, photo) 
-    // rather than potentially stale auth data
-    const meParticipant = state.participants?.find(
-      (p) => p.id === 'me-participant' || p.userId === currentUserId
-    );
-
-    if (meParticipant) {
-      return {
-        ...meParticipant,
-        isCurrentUser: true,
-        // Ensure name isn't empty
-        name: meParticipant.name || currentUser?.displayName || 'Me',
-      };
-    }
-
-    return {
-      id: currentUserId || 'current-user',
-      name: currentUser?.fullName || currentUser?.firstName || 'Unknown User',
-      username: currentUser?.username,
-      profilePhoto: currentUser?.profilePhoto,
-      isCurrentUser: true,
-    };
-  }, [state.participants]);
-
-  const allMembers = useMemo(() => [currentUserData, ...selectedFriends], [currentUserData, selectedFriends]);
+  const { participants } = state;
+  const allMembers = useMemo(
+    () =>
+      (participants || []).map((p) => ({
+        ...p,
+        id: p.userId || p.id,
+        isCurrentUser: p.userId === getCurrentUser()?.uid,
+      })),
+    [participants]
+  );
 
   // --- Friends referenced by items (non-removable) ---
   const friendsOnItems = useMemo(() => {
     const items = state.items || [];
-    // Collect all participant indices used across items
+    const participants = state.participants || [];
+    const currentUserId = getCurrentUser()?.uid;
     const usedIndices = new Set();
     items.forEach((item) => {
       (item.selectedConsumers || []).forEach((idx) => usedIndices.add(idx));
       (item.selectedPayers || []).forEach((idx) => usedIndices.add(idx));
     });
-    // Map participant indices > 0 back to friend IDs
-    // participants = [currentUser, ...selectedFriends], so friend i = participant i+1
     const ids = new Set();
-    selectedFriends.forEach((friend, i) => {
-      if (usedIndices.has(i + 1)) {
-        ids.add(friend.id);
-      }
+    usedIndices.forEach((idx) => {
+      const p = participants[idx];
+      if (p?.userId && p.userId !== currentUserId) ids.add(p.userId);
     });
     return ids;
-  }, [state.items, selectedFriends]);
+  }, [state.items, state.participants]);
 
   // --- Done handler ---
   const handleDone = useCallback(async () => {
     try {
       const authUser = getCurrentUser();
-      if (expenseId && authUser?.uid) {
-        const participantsToSave = allMembers.map((member) => {
-          if (member.isCurrentUser) {
-            return {
-              name: member.name,
-              userId: authUser.uid,
-              profilePhoto: member.profilePhoto || authUser.profilePhoto || null,
-              username: member.username || authUser.username || null,
-            };
-          }
-          return {
-            name: member.name,
-            userId: member.id,
-            profilePhoto: member.profilePhoto || null,
-            username: member.username || null,
-          };
-        });
+      if (expenseId && authUser?.uid && state.participants?.length) {
+        const participantsToSave = state.participants.map((p) => ({
+          name: p.name,
+          userId: p.userId,
+          profilePhoto: p.profilePhoto || null,
+          username: p.username || null,
+        }));
         await updateExpenseParticipants(expenseId, participantsToSave, authUser.uid);
       }
     } catch (e) {
@@ -310,7 +276,7 @@ export const useGroupMembers = ({ visible, expenseId, onClose }) => {
     } finally {
       onClose();
     }
-  }, [expenseId, allMembers, onClose]);
+  }, [expenseId, state.participants, onClose]);
 
   return {
     // State

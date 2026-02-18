@@ -12,7 +12,6 @@ export const useContactSearch = (enabled = true) => {
       const result = await fetchAndClassifyContacts();
       setAllContacts(result);
     } catch (error) {
-      console.error('Error fetching contacts:', error);
     } finally {
       setLoading(false);
     }
