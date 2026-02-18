@@ -8,45 +8,7 @@
   <title>IOU - Split Bills Effortlessly</title>
   <meta name="description"
     content="Split bills with friends the easy way. Scan receipts, split items, and settle up instantly with Venmo. The simplest bill splitting app.">
-  <meta name="robots" content="index, follow">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://iouapp.co/">
-  <meta property="og:title" content="IOU - Split Bills Effortlessly">
-  <meta property="og:description"
-    content="Split bills with friends the easy way. Scan receipts, split items, and settle up instantly with Venmo.">
-  <meta property="og:image" content="https://iouapp.co/logo.png">
-
-  <!-- Twitter -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:url" content="https://iouapp.co/">
-  <meta name="twitter:title" content="IOU - Split Bills Effortlessly">
-  <meta name="twitter:description"
-    content="Split bills with friends the easy way. Scan receipts, split items, and settle up instantly with Venmo.">
-  <meta name="twitter:image" content="https://iouapp.co/logo.png">
-
-  <!-- Canonical -->
-  <link rel="canonical" href="https://iouapp.co/">
-
-  <!-- Schema.org Structured Data -->
-  <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "MobileApplication",
-      "name": "IOU",
-      "operatingSystem": "iOS, Android",
-      "applicationCategory": "FinanceApplication",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      },
-      "description": "Split bills with friends the easy way. Scan receipts, split items, and settle up instantly with Venmo.",
-      "image": "https://iouapp.co/logo.png"
-    }
-  </script>
-
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -58,266 +20,138 @@
     <nav class="navbar">
       <div class="nav-container">
         <a href="/" class="logo">
-          <img src="/logo.png" alt="IOU - Bill Splitting App" class="logo-img">
+          <img src="./logo.png" alt="IOU - Bill Splitting App" class="logo-img">
           <span>IOU</span>
         </a>
         <button type="button" class="btn-nav" id="nav-download">Download</button>
       </div>
     </nav>
 
-    <main>
-      <!-- Hero Section -->
-      <section class="hero">
-        <div class="hero-container">
-          <div class="hero-content">
+    <main class="scrolly-container">
+      
+      <!-- Sticky Phone Wrapper -->
+      <div class="sticky-wrapper">
+        <div class="iphone-mockup">
+          <img src="./iphone-frame.png" alt="iPhone Frame" class="iphone-frame-img" />
+          <div class="iphone-screen">
+            <!-- Screen 1: Hero Video -->
+            <div class="screen-content active" id="screen-hero">
+              <video class="iphone-screen-video" src="./animation.mov" autoplay loop muted playsinline></video>
+            </div>
+            
+            <!-- Screen 2: Scan Receipts -->
+            <div class="screen-content" id="screen-receipt">
+              <div class="screen-inner">
+                <div class="icon-circle receipt-bg">
+                  <i data-lucide="receipt-text" class="screen-icon"></i>
+                </div>
+                <h3>Scanning...</h3>
+                <div class="scan-line"></div>
+              </div>
+            </div>
+
+            <!-- Screen 3: Split Items -->
+            <div class="screen-content" id="screen-split">
+              <div class="screen-inner">
+                <div class="split-list">
+                  <div class="split-item">
+                    <span class="avatar">A</span>
+                    <div class="bar" style="width: 60%"></div>
+                  </div>
+                  <div class="split-item">
+                    <span class="avatar" style="background:#4CAF50">B</span>
+                    <div class="bar" style="width: 40%"></div>
+                  </div>
+                </div>
+                <h3>Fair Splits</h3>
+              </div>
+            </div>
+
+            <!-- Screen 4: Venmo -->
+            <div class="screen-content" id="screen-venmo">
+               <div class="screen-inner">
+                 <img src="./venmo.png" alt="Venmo" class="venmo-logo-large">
+                 <h3>Settled!</h3>
+               </div>
+            </div>
+
+            <!-- Removed dynamic island as it is in the image -->
+            <div class="iphone-home-indicator"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrolling Text Sections -->
+      <div class="content-stream">
+        
+        <!-- Section 1: Hero -->
+        <section class="step" data-screen="screen-hero">
+          <div class="step-content">
             <h1>Split Bills<br><span class="gradient-text">Effortlessly</span></h1>
-            <p class="hero-subtitle">
-              Scan receipts, assign items to friends, and settle up instantly with Venmo. 
-              No more awkward math or chasing people down for money.
-            </p>
-            <div class="cta-buttons">
-              <button type="button" class="app-store-download-btn open-qr-modal" aria-label="Download on the App Store">
-                <img src="/app-store-download.png" alt="Download on the App Store" class="app-store-download-img">
-              </button>
-            </div>
+            <p>The simplest way to handle shared expenses with friends.</p>
           </div>
-          <div class="hero-visual">
-            <div class="iphone-mockup" aria-label="iPhone mockup">
-              <div class="iphone-frame">
-                <div class="iphone-screen">
-                  <video
-                    class="iphone-screen-video"
-                    src="./animation.mov"
-                    autoplay
-                    loop
-                    muted
-                    playsinline
-                    aria-label="IOU app profile screen animation"
-                  ></video>
-                  <div class="iphone-dynamic-island" aria-hidden="true"></div>
-                  <div class="iphone-home-indicator" aria-hidden="true"></div>
-                </div>
-              </div>
-            </div>
+        </section>
+
+        <!-- Section 2: Scan -->
+        <section class="step" data-screen="screen-receipt">
+          <div class="step-content">
+            <h2>Scan Receipts</h2>
+            <p>Just snap a photo. We automatically extract items and prices for you.</p>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- Features Section - Bento Grid -->
-      <section id="features" class="features">
-        <div class="container">
-          <div class="section-header">
-            <h2>Everything You Need to<br>Split Bills Fairly</h2>
-            <p>Powerful features that make splitting bills a breeze</p>
+        <!-- Section 3: Split -->
+        <section class="step" data-screen="screen-split">
+          <div class="step-content">
+            <h2>Split Items</h2>
+            <p>Assign items to friends or split shared costs instantly.</p>
           </div>
+        </section>
 
-          <div class="bento-grid">
-            <!-- Split Items -->
-            <article class="bento-card bento-split">
-              <div class="bento-content">
-                <div class="bento-icon split">
-                  <i data-lucide="percent" aria-hidden="true"></i>
-                </div>
-                <h3>Split Items</h3>
-              </div>
-              <div class="bento-description">
-                <p>Split expenses and receipts item by item. Use custom splits for shared items.</p>
-              </div>
-              <div class="bento-overlay"></div>
-            </article>
-
-            <!-- Scan Receipts (span 2 rows) -->
-            <article class="bento-card bento-receipt bento-featured">
-              <div class="bento-content">
-                <div class="bento-icon receipt">
-                  <i data-lucide="receipt-text" aria-hidden="true"></i>
-                </div>
-                <h3>Scan Receipts</h3>
-              </div>
-              <div class="bento-description">
-                <p>Just snap a photo of your receipt and let IOU automatically extract all the items and prices.</p>
-              </div>
-              <div class="bento-overlay"></div>
-            </article>
-
-            <!-- Instant Venmo -->
-            <article class="bento-card bento-venmo">
-              <div class="bento-content">
-                <div class="bento-icon venmo">
-                  <img src="/venmo.png" alt="Venmo" class="venmo-icon">
-                </div>
-                <h3>Instant Venmo</h3>
-              </div>
-              <div class="bento-description">
-                <p>Settle up with just a tap. IOU links to your Venmo account with the exact amount to be paid or requested.</p>
-              </div>
-              <div class="bento-overlay"></div>
-            </article>
-
-            <!-- Manual Expenses -->
-            <article class="bento-card bento-manual">
-              <div class="bento-content">
-                <div class="bento-icon manual">
-                  <i data-lucide="pen-line" aria-hidden="true"></i>
-                </div>
-                <h3>Manual Expenses</h3>
-              </div>
-              <div class="bento-description">
-                <p>Create custom expenses for anything.</p>
-              </div>
-              <div class="bento-overlay"></div>
-            </article>
-
-            <!-- Track Balances -->
-            <article class="bento-card bento-track">
-              <div class="bento-content">
-                <div class="bento-icon track">
-                  <i data-lucide="bar-chart-3" aria-hidden="true"></i>
-                </div>
-                <h3>Track Balances</h3>
-              </div>
-              <div class="bento-description">
-                <p>See who owes who and for how much in an instant. Keep track of all your shared expenses.</p>
-              </div>
-              <div class="bento-overlay"></div>
-            </article>
-
-            <!-- Group Expenses (full width) -->
-            <article class="bento-card bento-group bento-wide">
-              <div class="bento-content">
-                <div class="bento-icon group">
-                  <i data-lucide="users" aria-hidden="true"></i>
-                </div>
-                <h3>Group Expenses</h3>
-              </div>
-              <div class="bento-description">
-                <p>Add multiple friends to an expense. Perfect for nights out with friends, spring break trips, and forgetful roommates.</p>
-              </div>
-              <div class="bento-overlay"></div>
-            </article>
+        <!-- Section 4: Venmo -->
+        <section class="step" data-screen="screen-venmo">
+          <div class="step-content">
+            <h2>Instant Settle</h2>
+            <p>Pay or request directly via Venmo with one tap.</p>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- How It Works Section -->
-      <section id="how-it-works" class="how-it-works">
-        <div class="how-it-works-inner">
-          <div class="how-it-works-header">
-            <h2>Split an Expense in <span class="gradient-text">3 Simple Steps</span></h2>
-            <p>Scan or enter an expense, assign items to friends, and settle up with Venmo in seconds. If you don't have Venmo, that's okay too ;)</p>
+        <!-- Section 5: Download -->
+        <section class="step last-step">
+          <div class="step-content">
+            <h2>Get Started</h2>
+            <p>Download IOU for free today.</p>
+            <button class="app-store-download-btn open-qr-modal">
+              <img src="./app-store-download.png" alt="Download on App Store" class="store-badge">
+            </button>
           </div>
+        </section>
 
-          <!-- Step indicators with connecting line -->
-          <div class="how-it-works-steps-line" aria-hidden="true">
-            <div class="how-it-works-line"></div>
-            <div class="how-it-works-numbers">
-              <span class="how-it-works-num">1</span>
-              <span class="how-it-works-num">2</span>
-              <span class="how-it-works-num">3</span>
-            </div>
-          </div>
-
-          <div class="how-it-works-grid">
-            <article class="how-it-works-card">
-              <div class="how-it-works-icon">
-                <i data-lucide="camera" aria-hidden="true"></i>
-              </div>
-              <h3>Scan or Create</h3>
-              <p>Take a photo of your receipt or manually create an expense.</p>
-              <ul class="how-it-works-benefits">
-                <li>Scan receipts directly from your camera roll</li>
-              </ul>
-            </article>
-
-            <article class="how-it-works-card">
-              <div class="how-it-works-icon">
-                <i data-lucide="list-checks" aria-hidden="true"></i>
-              </div>
-              <h3>Assign Items</h3>
-              <p>Tap each item to assign the payer(s) and the consumer(s).</p>
-              <ul class="how-it-works-benefits">
-                <li>Apply custom splits to individual items</li>
-                <li>Split shared items across multiple people</li>
-              </ul>
-            </article>
-
-            <article class="how-it-works-card">
-              <div class="how-it-works-icon">
-                <i data-lucide="handshake" aria-hidden="true"></i>
-              </div>
-              <h3>Settle Up</h3>
-              <p>Tap the Venmo button to open Venmo with the exact amount to be paid or requested. </p>
-              <ul class="how-it-works-benefits">
-                <li>One-tap Venmo payment</li>
-                <li>Works with settlement outside of Venmo</li>
-              </ul>
-            </article>
-          </div>
-        </div>
-      </section>
+      </div>
 
     </main>
 
-    <!-- QR Code Modal -->
+    <footer id="footer-simple">
+      <p>&copy; 2026 IOU. <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a></p>
+    </footer>
+
+    <!-- QR Modal (Preserved) -->
     <div class="modal-overlay" id="qr-modal" aria-hidden="true">
       <div class="modal-backdrop" id="modal-backdrop"></div>
       <div class="modal-content qr-modal">
         <button type="button" class="modal-close" id="close-qr-modal" aria-label="Close">&times;</button>
-        <h3 class="modal-title">Download the IOU app</h3>
-        <p class="modal-subtitle">Scan the QR code below to continue to the app store.</p>
+        <h3 class="modal-title">Download IOU</h3>
+        <p class="modal-subtitle">Scan to download</p>
         <div class="modal-qr-wrapper">
-          <img id="qr-code-image" src="" alt="QR code to App Store" class="modal-qr-img">
+          <img id="qr-code-image" src="" alt="QR code" class="modal-qr-img">
         </div>
-        <a href="#" id="app-store-link" class="modal-store-link" target="_blank" rel="noopener">Open in App Store</a>
+        <a href="#" id="app-store-link" class="modal-store-link" target="_blank">Open in App Store</a>
       </div>
     </div>
 
-    <footer id="download">
-      <div class="footer-container">
-        <div class="footer-links">
-          <a href="/privacy.html">Privacy Policy</a>
-          <a href="/terms.html">Terms of Service</a>
-        </div>
-        <p class="footer-copyright">&copy; 2026 IOU. Made with ❤️ for splitting bills.</p>
-      </div>
-    </footer>
   </div>
 
   <script src="https://unpkg.com/lucide@0.563.0/dist/umd/lucide.min.js"></script>
-  <script>
-    (function () {
-      var APP_STORE_URL = 'https://apps.apple.com/app/iou/id000000000'; // Replace id000000000 with your app's ID
-      var QR_API = 'https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=';
-      var modal = document.getElementById('qr-modal');
-      var qrImg = document.getElementById('qr-code-image');
-      var appStoreLink = document.getElementById('app-store-link');
-
-      function openModal() {
-        qrImg.src = QR_API + encodeURIComponent(APP_STORE_URL);
-        appStoreLink.href = APP_STORE_URL;
-        modal.classList.add('modal-open');
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
-      }
-
-      function closeModal() {
-        modal.classList.remove('modal-open');
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
-      }
-
-      document.querySelectorAll('.open-qr-modal, #nav-download').forEach(function (el) {
-        el.addEventListener('click', openModal);
-      });
-      document.getElementById('close-qr-modal').addEventListener('click', closeModal);
-      document.getElementById('modal-backdrop').addEventListener('click', closeModal);
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && modal.classList.contains('modal-open')) closeModal();
-      });
-
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-    })();
-  </script>
+  <script type="module" src="/src/main.js"></script>
 </body>
-
 </html>

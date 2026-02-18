@@ -14,8 +14,10 @@ export const useSettingsStore = create(
     (set) => ({
       language: deviceLanguage,
       currency: deviceCurrency,
+      demoMode: false,
       setLanguage: (language) => set({ language }),
       setCurrency: (currency) => set({ currency }),
+      setDemoMode: (demoMode) => set({ demoMode }),
     }),
     {
       name: 'settings-storage',

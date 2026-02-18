@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, memo } from 'react';
+import React, { useMemo, useCallback, memo, useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { calculateUserBalanceForExpense, getFormattedBalanceString, getBalanceCo
 import LoadingSpinner from '../LoadingSpinner';
 import { getCurrentUser } from '../../services/authService';
 import { useTranslation } from '../../contexts/LanguageContext';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 
 const RecentExpenses = ({ 
   expenses, 
@@ -21,9 +22,138 @@ const RecentExpenses = ({
   userProfile 
 }) => {
   const { t } = useTranslation();
+  const { demoMode } = useSettingsStore();
+  const [demoExpenses, setDemoExpenses] = useState([]);
+  const demoIntervalRef = useRef(null);
+  const demoIndexRef = useRef(0);
+
+  // Demo expense data that syncs with balance animations
+  const demoExpenseList = useMemo(() => [
+    {
+      id: 'demo-1',
+      title: 'Dinner at Olive Garden',
+      expenseType: 'receipt',
+      participants: [{ name: 'You' }, { name: 'Sarah' }, { name: 'Mike' }],
+      total: 45.50,
+      userBalance: -15.17,
+      status: 'youOwe',
+    },
+    {
+      id: 'demo-2',
+      title: 'Coffee & Pastries',
+      expenseType: 'receipt',
+      participants: [{ name: 'You' }, { name: 'Alex' }],
+      total: 32.20,
+      userBalance: 16.10,
+      status: 'youAreOwed',
+    },
+    {
+      id: 'demo-3',
+      title: 'Movie Tickets',
+      expenseType: 'expense',
+      participants: [{ name: 'You' }, { name: 'Emma' }, { name: 'Jake' }],
+      total: 18.75,
+      userBalance: -6.25,
+      status: 'youOwe',
+    },
+    {
+      id: 'demo-4',
+      title: 'Lunch at Chipotle',
+      expenseType: 'receipt',
+      participants: [{ name: 'You' }, { name: 'Chris' }, { name: 'Jordan' }],
+      total: 67.30,
+      userBalance: 22.43,
+      status: 'youAreOwed',
+    },
+    {
+      id: 'demo-5',
+      title: 'Uber to Airport',
+      expenseType: 'expense',
+      participants: [{ name: 'You' }, { name: 'Taylor' }],
+      total: 25.00,
+      userBalance: -12.50,
+      status: 'youOwe',
+    },
+    {
+      id: 'demo-6',
+      title: 'Grocery Shopping',
+      expenseType: 'receipt',
+      participants: [{ name: 'You' }, { name: 'Sam' }, { name: 'Riley' }],
+      total: 41.80,
+      userBalance: 13.93,
+      status: 'youAreOwed',
+    },
+    {
+      id: 'demo-7',
+      title: 'Concert Tickets',
+      expenseType: 'expense',
+      participants: [{ name: 'You' }, { name: 'Morgan' }, { name: 'Casey' }, { name: 'Drew' }],
+      total: 55.60,
+      userBalance: -13.90,
+      status: 'youOwe',
+    },
+    {
+      id: 'demo-8',
+      title: 'Brunch at The Griddle',
+      expenseType: 'receipt',
+      participants: [{ name: 'You' }, { name: 'Quinn' }, { name: 'Avery' }],
+      total: 89.90,
+      userBalance: 29.97,
+      status: 'youAreOwed',
+    },
+  ], []);
+
+  // Demo mode animation effect
+  useEffect(() => {
+    if (demoMode) {
+      // Clear any existing interval
+      if (demoIntervalRef.current) {
+        clearInterval(demoIntervalRef.current);
+      }
+
+      // Start from the beginning
+      demoIndexRef.current = 0;
+      setDemoExpenses([]);
+      
+      // Add expenses one by one
+      const addNextExpense = () => {
+        const nextIndex = demoIndexRef.current;
+        if (nextIndex < demoExpenseList.length) {
+          setDemoExpenses(prev => [demoExpenseList[nextIndex], ...prev.slice(0, 7)]);
+          demoIndexRef.current = nextIndex + 1;
+        } else {
+          // Reset and start over
+          demoIndexRef.current = 0;
+          setDemoExpenses([]);
+        }
+      };
+
+      // Add first expense immediately
+      addNextExpense();
+
+      // Then continue every 2.5 seconds (matching balance animation)
+      demoIntervalRef.current = setInterval(addNextExpense, 2500);
+
+      return () => {
+        if (demoIntervalRef.current) {
+          clearInterval(demoIntervalRef.current);
+        }
+      };
+    } else {
+      // Clear interval and expenses when demo mode is disabled
+      if (demoIntervalRef.current) {
+        clearInterval(demoIntervalRef.current);
+      }
+      setDemoExpenses([]);
+    }
+  }, [demoMode, demoExpenseList]);
+
   const recentExpenses = useMemo(() => {
+    if (demoMode) {
+      return demoExpenses;
+    }
     return expenses.slice(0, displayedExpensesCount);
-  }, [expenses, displayedExpensesCount]);
+  }, [demoMode, demoExpenses, expenses, displayedExpensesCount]);
 
   const SkeletonLoader = memo(() => (
     <View style={styles.skeletonLoader}>
@@ -132,6 +262,64 @@ const RecentExpenses = ({
   }, [userProfile, getUserBalanceForExpense]);
 
   const renderExpenseSummary = useCallback((expense) => {
+    // Handle demo expenses differently
+    if (demoMode && expense.id?.startsWith('demo-')) {
+      const isReceipt = expense.expenseType === 'receipt';
+      const iconName = isReceipt ? 'receipt-outline' : 'card-outline';
+      const isOwed = expense.status === 'youAreOwed';
+      const balanceColor = isOwed ? Colors.success : Colors.danger;
+
+      return (
+        <TouchableOpacity
+          key={expense.id}
+          style={styles.expenseSummaryCard}
+          onPress={() => {}}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.statusIndicator, { backgroundColor: balanceColor }]} />
+          
+          <View style={styles.cardContent}>
+            <View style={styles.expenseSummaryHeader}>
+              <View style={styles.expenseSummaryLeft}>
+                <View style={[styles.iconContainer, { backgroundColor: `${Colors.accent}15` }]}>
+                  <Ionicons name={iconName} size={18} color={Colors.accent} />
+                </View>
+                <View style={styles.titleContainer}>
+                  <Text style={styles.expenseSummaryTitle} numberOfLines={1}>
+                    {expense.title}
+                  </Text>
+                  <View style={styles.participantsRow}>
+                    <Ionicons name="people-outline" size={12} color={Colors.textSecondary} />
+                    <Text style={styles.participantCount}>
+                      {expense.participants?.length || 0} {t('profile.participants')}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.amountContainer}>
+                <Text style={styles.expenseSummaryTotal}>
+                  ${expense.total.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.expenseSummaryDetails}>
+              <View style={styles.statusBadge}>
+                <Ionicons 
+                  name={isOwed ? "arrow-down-circle" : "arrow-up-circle"} 
+                  size={14} 
+                  color={balanceColor} 
+                />
+                <Text style={[styles.statusText, { color: balanceColor }]}>
+                  {isOwed ? t('home.youAreOwed') : t('home.youOwe')} ${Math.abs(expense.userBalance).toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     // Calculate user's balance for this expense
     const userBalance = getUserBalanceForExpense(expense);
     const settlementStatus = getSettlementStatus(expense);
@@ -243,7 +431,7 @@ const RecentExpenses = ({
         </View>
       </TouchableOpacity>
     );
-  }, [getUserBalanceForExpense, getSettlementStatus, onExpensePress]);
+  }, [demoMode, getUserBalanceForExpense, getSettlementStatus, onExpensePress, t]);
 
   if (loading) {
     return (
@@ -263,13 +451,13 @@ const RecentExpenses = ({
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderLeft}>
           <Text style={styles.sectionTitle}>{t('profile.recentExpenses')}</Text>
-          {!loading && expenses.length > 0 && (
+          {!loading && (demoMode ? demoExpenses : expenses).length > 0 && (
             <View style={styles.expenseTypeCounts}>
               <View style={styles.typeCount}>
                 <View style={styles.typeCountBadge}>
                   <Ionicons name="card-outline" size={14} color={Colors.accent} />
                   <Text style={styles.typeCountText}>
-                    {expenses.filter(exp => exp.expenseType !== 'receipt').length}
+                    {(demoMode ? demoExpenses : expenses).filter(exp => exp.expenseType !== 'receipt').length}
                   </Text>
                 </View>
               </View>
@@ -277,7 +465,7 @@ const RecentExpenses = ({
                 <View style={styles.typeCountBadge}>
                   <Ionicons name="receipt-outline" size={14} color={Colors.accent} />
                   <Text style={styles.typeCountText}>
-                    {expenses.filter(exp => exp.expenseType === 'receipt').length}
+                    {(demoMode ? demoExpenses : expenses).filter(exp => exp.expenseType === 'receipt').length}
                   </Text>
                 </View>
               </View>
@@ -286,7 +474,7 @@ const RecentExpenses = ({
         </View>
       </View>
 
-      {expenses.length === 0 ? (
+      {(demoMode ? demoExpenses : expenses).length === 0 ? (
         <View style={styles.emptyState}>
           <View style={styles.emptyStateIconContainer}>
             <Ionicons name="receipt-outline" size={48} color={Colors.accent} />
@@ -306,7 +494,7 @@ const RecentExpenses = ({
           <View style={styles.expensesList}>
             {recentExpenses.map(renderExpenseSummary)}
           </View>
-          {displayedExpensesCount < expenses.length && (
+          {!demoMode && displayedExpensesCount < expenses.length && (
             <TouchableOpacity onPress={onLoadMore} style={styles.loadMoreButton}>
               <Text style={styles.loadMoreText}>
                 {t('profile.loadMore')} ({expenses.length - displayedExpensesCount} {t('profile.remaining')})
