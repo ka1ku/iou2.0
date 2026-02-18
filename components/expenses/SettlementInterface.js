@@ -63,7 +63,7 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
   const sorted = changeLog?.length ? [...changeLog]
     .filter(e => e.type !== 'priceChange')
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) : [];
-  const visible = activityExpanded ? sorted : sorted.slice(0, 3);
+  const visible = activityExpanded ? sorted : sorted.slice(0, 1);
 
   const relative = (ts) => {
     const diffMs = Date.now() - new Date(ts).getTime();
@@ -189,12 +189,12 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
           <View style={styles.activityDivider} />
           <TouchableOpacity
             style={styles.activityHeaderInline}
-            onPress={() => sorted.length > 3 && setActivityExpanded(!activityExpanded)}
-            disabled={sorted.length <= 3}
+            onPress={() => sorted.length > 1 && setActivityExpanded(!activityExpanded)}
+            disabled={sorted.length <= 1}
           >
             <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
             <Text style={styles.activityTitleInline}>{t('components.expenses.settlementInterface.activity.title')}</Text>
-            {sorted.length > 3 && (
+            {sorted.length > 1 && (
               <Ionicons name={activityExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={Colors.textSecondary} />
             )}
           </TouchableOpacity>
@@ -207,9 +207,9 @@ const SettlementSummary = ({ settlements, currentUserName, changeLog }) => {
               </View>
             </View>
           ))}
-          {!activityExpanded && sorted.length > 3 && (
+          {!activityExpanded && sorted.length > 1 && (
             <TouchableOpacity style={styles.showMore} onPress={() => setActivityExpanded(true)}>
-              <Text style={styles.showMoreText}>{t('components.expenses.settlementInterface.activity.showMore', { count: sorted.length - 3 })}</Text>
+              <Text style={styles.showMoreText}>{t('components.expenses.settlementInterface.activity.showMore', { count: sorted.length - 1 })}</Text>
             </TouchableOpacity>
           )}
         </>
