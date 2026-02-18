@@ -43,13 +43,11 @@ export const calculateUserTotalBalance = (expenses, userId) => {
       totalOwed: 0,
       totalOwes: 0,
       netBalance: 0,
-      debtBreakdown: {}
     };
   }
 
   let totalOwedToUser = 0;
   let totalUserOwes = 0;
-  const debtBreakdown = {};
 
 
   expenses.forEach(expense => {
@@ -70,7 +68,6 @@ export const calculateUserTotalBalance = (expenses, userId) => {
     totalOwed: Math.round(totalOwedToUser * 100) / 100,
     totalOwes: Math.round(totalUserOwes * 100) / 100,
     netBalance: Math.round(netBalance * 100) / 100,
-    debtBreakdown
   };
 };
 

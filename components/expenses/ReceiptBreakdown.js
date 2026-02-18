@@ -73,8 +73,9 @@ const ParticipantChip = memo(({ participant, isSelected, onPress, disabled = fal
       )}
     </View>
     <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]} numberOfLines={1}>
-      {participant.name === 'Me' ? 'You' : participant.name.split(' ')[0]}
+      {participant.name.split(' ')[0]}
     </Text>
+    {participant.id === 'me-participant' && <Text style={styles.chipYouBadge}>(you)</Text>}
   </TouchableOpacity>
 ), (prevProps, nextProps) => {
   return (
@@ -593,7 +594,7 @@ const ReceiptBreakdown = ({
               index={index}
               isEditing={editingItemId === item.id}
               isLocked={lockedItemIds?.has(item.id)}
-              isLockedBySettlement={isSettled && !lockedItemIds?.has(item.id)}
+              isLockedBySettlement={false}
               isSaving={isSavingItemId === item.id}
               participants={participants}
               onToggleEdit={toggleEditMode}
@@ -912,6 +913,14 @@ const styles = StyleSheet.create({
   chipLabelSelected: {
     color: Colors.textPrimary,
     fontWeight: '600',
+  },
+  chipYouBadge: {
+    fontSize: 8,
+    color: Colors.accent,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 10,
+    marginLeft: 4,
   },
 
   // Action Buttons

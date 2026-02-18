@@ -533,9 +533,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
   content: {
     flex: 1,
     paddingHorizontal: Spacing.lg,
@@ -546,13 +543,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: Spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.textPrimary,
-    marginBottom: Spacing.sm,
-    marginTop: Spacing.lg,
   },
   memberCountContainer: {
     flexDirection: 'row',
@@ -679,12 +669,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     textAlign: 'center',
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
   },
   sectionSubtitle: {
     ...Typography.body2,

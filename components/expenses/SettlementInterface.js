@@ -269,7 +269,7 @@ const StatusPill = ({ status }) => {
 /* ─────────────────────────────────────────────────────────────────────────────
    Associated Items List
    ───────────────────────────────────────────────────────────────────────── */
-const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection, expenseType = 'expense' }) => {
+const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, selectedItemIds, onToggleSelection, expenseType = 'expense', isCurrentUserDebtor }) => {
   const { t } = useTranslation();
   if (!items || items.length === 0) return null;
 
@@ -332,6 +332,13 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
           }
         };
 
+        // Directionality color: red = current user owes, green = current user is owed
+        let amountDirectionColor = null;
+        if (!isSettled && isCurrentUserDebtor !== undefined) {
+          const currentUserOwes = isCurrentUserDebtor ? !item.isOffset : item.isOffset;
+          amountDirectionColor = currentUserOwes ? Colors.error : Colors.success;
+        }
+
         return (
           <TouchableOpacity
             key={item.id || i}
@@ -359,7 +366,7 @@ const AssociatedItemsList = ({ items, settlement, onToggleItem, readOnly, select
               styles.assocAmount,
               isSettled && styles.assocAmountSettled,
               !isSettled && !isSelected && selectedItemIds && canSelectItems && styles.assocAmountDeselected,
-              item.isOffset && styles.assocAmountOffset,
+              !isSettled && (amountDirectionColor ? { color: amountDirectionColor } : item.isOffset && styles.assocAmountOffset),
             ]}>
               {item.amount >= 0 ? `$${item.amount.toFixed(2)}` : `−$${Math.abs(item.amount).toFixed(2)}`}
             </Text>
@@ -384,6 +391,14 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
   const isSpectator = !isDebtor && !isCreditor;
   const status = settlement.status || 'noAction';
   const isSettled = status === 'markedAsPaid' || status === 'confirmed' || status === 'complete';
+
+  // Effective amount: use remainingAmount when partial so display and buttons stay aligned
+  const effectiveAmount = status === 'partial'
+    ? (settlement.remainingAmount ?? settlement.amount)
+    : settlement.amount;
+
+  // Directionality for item coloring (undefined for spectators)
+  const isCurrentUserDebtor = isDebtor ? true : isCreditor ? false : undefined;
 
   const [busy, setBusy] = useState(false);
   const [venmoTag, setVenmoTag] = useState(null);
@@ -480,12 +495,38 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
   /* ── action button ─────────────────────────────────────────────────── */
   const hasItems = (settlement.associatedItems || []).length > 0;
   const noSelection = hasItems && selectedItemIds.size === 0;
-  const displayAmount = status === 'partial' ? (settlement.remainingAmount ?? settlement.amount) : settlement.amount;
-  const isFlipped = displayAmount < 0;
-  const absAmount = hasItems ? Math.abs(selectedAmount) : Math.abs(settlement.amount);
+  const isFlipped = effectiveAmount < 0;
+  const absAmount = hasItems ? Math.abs(selectedAmount) : Math.abs(effectiveAmount);
 
   const actionBtn = () => {
     if (readOnly) return null;
+
+    // Receipt mode: single Settle/Unsettle per pair, no per-item controls
+    if (isReceiptMode) {
+      if (isSettled) {
+        return (
+          <View style={styles.actionBtnGroup}>
+            {btn(t('components.expenses.settlementInterface.actions.allSettled'), 'checkmark-circle', 'success', null)}
+            {btn(t('components.expenses.settlementInterface.actions.undoSettlement'), 'arrow-undo-outline', 'secondary', () => fire('undoMarkAsPaid'))}
+          </View>
+        );
+      }
+      if (isDebtor || isCreditor) {
+        const amt = `$${Math.abs(settlement.amount).toFixed(2)}`;
+        return btn(
+          t('components.expenses.settlementInterface.actions.markSettled', { amount: amt }),
+          'checkmark-circle-outline',
+          'secondary',
+          () => unsettledItemIds.length > 0 ? fire('markAsSettled') : fire('markAsPaid'),
+        );
+      }
+      if (isSpectator) {
+        if (status === 'reminderSent')
+          return btn(t('components.expenses.settlementInterface.actions.reminderSent'), 'checkmark', 'disabled');
+        return btn(t('components.expenses.settlementInterface.actions.sendReminder'), 'notifications-outline', 'secondary', () => fire('sendReminder'));
+      }
+      return null;
+    }
 
     if (status === 'complete') {
       const confirmUnsettleAll = () => {
@@ -612,8 +653,9 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
             <View style={styles.pRow}>
               <View style={styles.pSide}>
                 {avatar(fromP, fromP?.userId === currentUserId)}
-                <Text style={styles.pName} numberOfLines={1}>{isDebtor ? 'You' : fromName?.split(' ')[0]}</Text>
-                {venmoTag && isDebtor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
+                <Text style={styles.pName} numberOfLines={1}>{fromName?.split(' ')[0]}</Text>
+                {isDebtor && <Text style={styles.youBadge}>(you)</Text>}
+                {venmoTag && isCreditor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
               </View>
               <View style={styles.connector}>
                 <View style={styles.dash} />
@@ -624,48 +666,43 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               </View>
               <View style={styles.pSide}>
                 {avatar(toP, toP?.userId === currentUserId)}
-                <Text style={styles.pName} numberOfLines={1}>{isCreditor ? 'You' : toName?.split(' ')[0]}</Text>
-                {venmoTag && isCreditor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
+                <Text style={styles.pName} numberOfLines={1}>{toName?.split(' ')[0]}</Text>
+                {isCreditor && <Text style={styles.youBadge}>(you)</Text>}
+                {venmoTag && isDebtor && <Text style={styles.venmo} numberOfLines={1}>@{venmoTag}</Text>}
               </View>
             </View>
 
-            {/* Who owes who label — when remainingAmount is negative, direction flips (you're owed / you owe) */}
-            {(() => {
-              const displayAmount = status === 'partial' ? (settlement.remainingAmount ?? settlement.amount) : settlement.amount;
-              const isFlipped = displayAmount < 0;
-              return (
-                <View style={styles.oweLabel}>
-                  {isDebtor && (
-                    <Text style={styles.oweLabelText}>
-                      {isFlipped
-                        ? t('components.expenses.settlementInterface.relationships.owesYou', { name: toName?.split(' ')[0] })
-                        : t('components.expenses.settlementInterface.relationships.youOwe', { name: toName?.split(' ')[0] })}
-                    </Text>
-                  )}
-                  {isCreditor && (
-                    <Text style={styles.oweLabelText}>
-                      {isFlipped
-                        ? t('components.expenses.settlementInterface.relationships.youOwe', { name: fromName?.split(' ')[0] })
-                        : t('components.expenses.settlementInterface.relationships.owesYou', { name: fromName?.split(' ')[0] })}
-                    </Text>
-                  )}
-                  {isSpectator && (
-                    <Text style={styles.oweLabelText}>
-                      {isFlipped
-                        ? t('components.expenses.settlementInterface.relationships.owes', { name: toName?.split(' ')[0], name2: fromName?.split(' ')[0] })
-                        : t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
-                    </Text>
-                  )}
-                </View>
-              );
-            })()}
+            {/* Who owes who label — when effectiveAmount is negative, direction flips */}
+            <View style={styles.oweLabel}>
+              {isDebtor && (
+                <Text style={styles.oweLabelText}>
+                  {isFlipped
+                    ? t('components.expenses.settlementInterface.relationships.owesYou', { name: toName?.split(' ')[0] })
+                    : t('components.expenses.settlementInterface.relationships.youOwe', { name: toName?.split(' ')[0] })}
+                </Text>
+              )}
+              {isCreditor && (
+                <Text style={styles.oweLabelText}>
+                  {isFlipped
+                    ? t('components.expenses.settlementInterface.relationships.youOwe', { name: fromName?.split(' ')[0] })
+                    : t('components.expenses.settlementInterface.relationships.owesYou', { name: fromName?.split(' ')[0] })}
+                </Text>
+              )}
+              {isSpectator && (
+                <Text style={styles.oweLabelText}>
+                  {isFlipped
+                    ? t('components.expenses.settlementInterface.relationships.owes', { name: toName?.split(' ')[0], name2: fromName?.split(' ')[0] })
+                    : t('components.expenses.settlementInterface.relationships.owes', { name: fromName?.split(' ')[0], name2: toName?.split(' ')[0] })}
+                </Text>
+              )}
+            </View>
 
             {/* Amount — use abs when negative (direction shown in label above) */}
             <View style={styles.amtRow}>
               <Text style={[styles.dollar, isSettled && styles.faded]}>$</Text>
               <View style={{ alignItems: 'center' }}>
                 <Text style={[styles.amt, isSettled && styles.amtStruck]}>
-                  {Math.abs(status === 'partial' ? (settlement.remainingAmount ?? settlement.amount) : settlement.amount).toFixed(2)}
+                  {Math.abs(effectiveAmount).toFixed(2)}
                 </Text>
                 {status === 'partial' && (
                   <Text style={styles.totalText}>
@@ -675,22 +712,25 @@ const SettlementCard = ({ settlement, index, participants, currentUserId, curren
               </View>
             </View>
 
-            {/* Associated Items */}
-            <AssociatedItemsList
-              items={settlement.associatedItems}
-              settlement={settlement}
-              onToggleItem={isReceiptMode ? undefined : onToggleItem}
-              readOnly={readOnly}
-              selectedItemIds={!readOnly && !isReceiptMode ? selectedItemIds : undefined}
-              onToggleSelection={!readOnly && !isReceiptMode ? toggleSelection : undefined}
-              expenseType={expenseType}
-            />
+            {/* Associated Items — hidden in receipt mode (uses single settle/unsettle button instead) */}
+            {!isReceiptMode && (
+              <AssociatedItemsList
+                items={settlement.associatedItems}
+                settlement={settlement}
+                onToggleItem={onToggleItem}
+                readOnly={readOnly}
+                selectedItemIds={!readOnly ? selectedItemIds : undefined}
+                onToggleSelection={!readOnly ? toggleSelection : undefined}
+                expenseType={expenseType}
+                isCurrentUserDebtor={isCurrentUserDebtor}
+              />
+            )}
 
             {/* Actions */}
             {actionBtn()}
 
             {/* Subtle links */}
-            {!readOnly && (status === 'markedAsPaid' || status === 'confirmed') && (
+            {!readOnly && !isReceiptMode && (status === 'markedAsPaid' || status === 'confirmed') && (
               <TouchableOpacity style={styles.link} onPress={() => fire('undoMarkAsPaid')}>
                 <Text style={styles.linkText}>{t('components.expenses.settlementInterface.actions.undoSettlement')}</Text>
               </TouchableOpacity>
@@ -828,6 +868,7 @@ const styles = StyleSheet.create({
   avatarLetter: { fontSize: Math.floor(AVATAR_SIZE / 2.5), fontWeight: '600', color: Colors.textSecondary },
   pName: { fontSize: 12, fontWeight: '600', color: Colors.textPrimary, textAlign: 'center', maxWidth: 70 },
   venmo: { fontSize: 10, color: Colors.venmo, fontWeight: '500', textAlign: 'center', maxWidth: 70, marginTop: 1 },
+  youBadge: { fontSize: 9, color: Colors.accent, fontWeight: '600', textAlign: 'center', maxWidth: 70, lineHeight: 11 },
 
   // Connector
   connector: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.xs },

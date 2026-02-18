@@ -55,13 +55,14 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
     const payerDetails = payers.map((index) => participants[index]).filter(Boolean);
     if (payerDetails.length === 0) return t('components.expenses.expenseViewCard.paidByUnassigned');
 
+    const displayName = (p) => p.name?.split(' ')[0] || p.name;
     if (payerDetails.length === 1) {
-      return t('components.expenses.expenseViewCard.paidByOne', { name: payerDetails[0].name });
+      return t('components.expenses.expenseViewCard.paidByOne', { name: displayName(payerDetails[0]) });
     }
     if (payerDetails.length === 2) {
-      return t('components.expenses.expenseViewCard.paidByTwo', { name1: payerDetails[0].name, name2: payerDetails[1].name });
+      return t('components.expenses.expenseViewCard.paidByTwo', { name1: displayName(payerDetails[0]), name2: displayName(payerDetails[1]) });
     }
-    return t('components.expenses.expenseViewCard.paidByMany', { name: payerDetails[0].name, count: payerDetails.length - 1 });
+    return t('components.expenses.expenseViewCard.paidByMany', { name: displayName(payerDetails[0]), count: payerDetails.length - 1 });
   }, [item.selectedPayers, participants, t]);
 
   const splitInfo = useMemo(() => {
@@ -72,8 +73,7 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
     return consumers
       .map((consumerIndex, i) => {
         const consumer = participants[consumerIndex];
-        // Skip current user
-        if (consumer?.name === 'Me') return null;
+        const isMe = consumer?.id === 'me-participant';
 
         // Validate split amount exists and is a number
         const splitValue = splits[i];
@@ -82,12 +82,14 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
           : 0;
 
         return {
-          name: consumer?.name || `Person ${consumerIndex + 1}`,
+          name: consumer?.name?.split(' ')[0] || `Person ${consumerIndex + 1}`,
           profilePhoto: consumer?.profilePhoto,
           amount: splitAmount,
+          isMe,
         };
       })
-      .filter(Boolean); // Remove null entries
+      .filter(Boolean)
+      .sort((a, b) => (a.isMe ? -1 : b.isMe ? 1 : 0)); // current user first
   }, [item.selectedConsumers, item.splits, participants]);
 
   const handleMenuPress = () => {
@@ -114,9 +116,9 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
   };
 
   return (
-    <Card 
-      variant="flat" 
-      padding="large" 
+    <Card
+      variant="flat"
+      padding="large"
       margin="none"
       style={[styles.cardContainer, styles.noBorder]}
     >
@@ -155,8 +157,8 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
 
       <View style={styles.splitSection}>
         <View style={styles.sectionDivider} />
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={styles.splitHeader}
           onPress={() => setIsExpanded(!isExpanded)}
           activeOpacity={0.7}
@@ -166,10 +168,10 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
             {!isExpanded && (
               <View style={styles.previewContainer}>
                 {splitInfo.slice(0, 3).map((split, index) => (
-                  <View 
-                    key={index} 
+                  <View
+                    key={index}
                     style={[
-                      styles.previewAvatarContainer, 
+                      styles.previewAvatarContainer,
                       { zIndex: index, marginLeft: index > 0 ? -8 : 0 }
                     ]}
                   >
@@ -181,26 +183,26 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
                   </View>
                 ))}
                 {splitInfo.length > 3 && (
-                   <View style={[styles.previewAvatarContainer, styles.moreAvatar, { zIndex: 10, marginLeft: -8 }]}>
-                      <Text style={styles.moreAvatarText}>+{splitInfo.length - 3}</Text>
-                   </View>
+                  <View style={[styles.previewAvatarContainer, styles.moreAvatar, { zIndex: 10, marginLeft: -8 }]}>
+                    <Text style={styles.moreAvatarText}>+{splitInfo.length - 3}</Text>
+                  </View>
                 )}
               </View>
             )}
           </View>
-          
-          <Ionicons 
-            name={isExpanded ? "chevron-down" : "chevron-forward"} 
-            size={16} 
-            color={Colors.textSecondary} 
+
+          <Ionicons
+            name={isExpanded ? "chevron-down" : "chevron-forward"}
+            size={16}
+            color={Colors.textSecondary}
           />
         </TouchableOpacity>
-        
+
         {isExpanded && (
           <View style={styles.splitList}>
             {splitInfo.map((split, index) => (
-              <View 
-                key={index} 
+              <View
+                key={index}
                 style={styles.splitItem}
               >
                 <View style={styles.participantInfo}>
@@ -209,7 +211,10 @@ const ExpenseViewCard = ({ item, onEdit, onDelete, isLocked = false }) => {
                     size={28}
                     username={split.name}
                   />
-                  <Text style={styles.participantName}>{split.name}</Text>
+                  <View style={styles.participantNameCol}>
+                    <Text style={styles.participantName}>{split.name}</Text>
+                    {split.isMe && <Text style={styles.youBadge}>(you)</Text>}
+                  </View>
                 </View>
                 <Text style={styles.splitAmount}>${split.amount.toFixed(2)}</Text>
               </View>
@@ -310,7 +315,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -4, 
+    marginTop: -4,
     marginRight: -4,
   },
 
@@ -387,12 +392,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
   },
+  participantNameCol: {
+    marginLeft: Spacing.md,
+  },
   participantName: {
     ...Typography.body,
     color: Colors.textPrimary,
-    marginLeft: Spacing.md,
     fontWeight: "500",
     fontSize: 15,
+  },
+  youBadge: {
+    fontSize: 9,
+    color: Colors.accent,
+    fontWeight: '600',
+    lineHeight: 11,
   },
   splitAmount: {
     ...Typography.body,

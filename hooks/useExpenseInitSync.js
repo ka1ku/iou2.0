@@ -80,5 +80,4 @@ export default function useExpenseInitSync({
     lastSyncedExpenseRef.current = expense;
   }, [expense, isEditing, skipSync, state.items, state.selectedPayers, state.title, actions, lastPayerToggleAtRef]);
 
-  return { initializedIdRef };
 }

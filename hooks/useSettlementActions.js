@@ -140,18 +140,18 @@ export default function useSettlementActions({
   }, [calculatedSettlements, statusOverrides, itemOverrides]);
 
   // ─── locked item IDs ──────────────────────────────────────────────────
-  // Items are locked if they have been settled in ANY settlement (item.settled === true)
+  // Lock only items explicitly marked settled (item.settled === true) in Firestore settlements.
+  // New items enter Firestore with settled: false, so they are never locked even if the
+  // parent settlement has status 'partial' or 'markedAsPaid'.
   const lockedItemIds = useMemo(() => {
     const locked = new Set();
-    settlements.forEach(s => {
+    (expense?.settlements || []).forEach(s => {
       (s.associatedItems || []).forEach(item => {
-        if (item.id && item.settled === true) {
-          locked.add(item.id);
-        }
+        if (item.id && item.settled === true) locked.add(item.id);
       });
     });
     return locked;
-  }, [settlements]);
+  }, [expense?.settlements]);
 
   // ─── helpers ──────────────────────────────────────────────────────────
   const setStatus = useCallback((settlement, status) => {

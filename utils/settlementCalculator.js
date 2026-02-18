@@ -126,27 +126,32 @@ const getAssociatedItemsBidirectional = (debtorName, creditorName, assocMap, ite
   return result;
 };
 
-// ─── Net settlement generation ──────────────────────────────────────────
-const generateNetSettlements = (balances) => {
-  const copy = balances.map((b) => ({ ...b }));
-  const debtors = copy.filter((b) => b.balance > 0.01).sort((a, b) => b.balance - a.balance);
-  const creditors = copy.filter((b) => b.balance < -0.01).sort((a, b) => a.balance - b.balance);
-
+// ─── Net settlement generation (pair-wise) ───────────────────────────────
+// For each pair (i, j), compute the net amount i owes j directly.
+// Preserves real relationships — no settlements between people who never transacted.
+const generateNetSettlements = (participants, items, assocMap, expense) => {
   const out = [];
-  let di = 0;
-  let ci = 0;
+  for (let i = 0; i < participants.length; i++) {
+    for (let j = i + 1; j < participants.length; j++) {
+      const nameI = participants[i].name;
+      const nameJ = participants[j].name;
 
-  while (di < debtors.length && ci < creditors.length) {
-    const d = debtors[di];
-    const c = creditors[ci];
-    const amt = Math.min(d.balance, Math.abs(c.balance));
-    if (amt > 0.01) {
-      out.push({ from: d.name, to: c.name, amount: Math.round(amt * 100) / 100 });
+      // Get all items for pair (nameI=debtor, nameJ=creditor)
+      const assocItems = getAssociatedItemsBidirectional(nameI, nameJ, assocMap, items, participants, expense);
+      if (assocItems.length === 0) continue;
+
+      // Net: positive = nameI owes nameJ, negative = nameJ owes nameI
+      const netAmount = Math.round(assocItems.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
+      if (Math.abs(netAmount) < 0.01) continue;
+
+      if (netAmount > 0) {
+        out.push({ from: nameI, to: nameJ, amount: netAmount, associatedItems: assocItems });
+      } else {
+        // Direction flips: nameJ is debtor, nameI is creditor — recompute with correct orientation
+        const flippedItems = getAssociatedItemsBidirectional(nameJ, nameI, assocMap, items, participants, expense);
+        out.push({ from: nameJ, to: nameI, amount: Math.abs(netAmount), associatedItems: flippedItems });
+      }
     }
-    d.balance -= amt;
-    c.balance += amt;
-    if (Math.abs(d.balance) < 0.01) di++;
-    if (Math.abs(c.balance) < 0.01) ci++;
   }
   return out;
 };
@@ -163,23 +168,20 @@ export const computeSettlements = (expense) => {
 
   const total = items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0);
   const balances = calculateParticipantBalances(expense, participants, items, total);
-  const raw = generateNetSettlements(balances);
   const assocMap = buildAssocMap(expense, participants, items);
+  const raw = generateNetSettlements(participants, items, assocMap, expense);
 
-  const settlements = raw.map((s) => {
-    const associatedItems = getAssociatedItemsBidirectional(s.from, s.to, assocMap, items, participants, expense);
-    return {
-      debtor: s.from,
-      creditor: s.to,
-      from: s.from,
-      to: s.to,
-      amount: s.amount,
-      status: 'noAction',
-      associatedItems,
-      settledAmount: 0,
-      remainingAmount: s.amount,
-    };
-  });
+  const settlements = raw.map((s) => ({
+    debtor: s.from,
+    creditor: s.to,
+    from: s.from,
+    to: s.to,
+    amount: s.amount,
+    status: 'noAction',
+    associatedItems: s.associatedItems,
+    settledAmount: 0,
+    remainingAmount: s.amount,
+  }));
 
   return { settlements, balances };
 };

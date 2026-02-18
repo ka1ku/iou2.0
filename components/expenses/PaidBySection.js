@@ -15,7 +15,7 @@ import { useTranslation } from '../../contexts/LanguageContext';
 const PaidBySection = ({ disabled = false, onTogglePayer }) => {
   const { t } = useTranslation();
   const { state, actions } = useExpense();
-  const { participants, selectedPayers, items } = state;
+  const { participants, selectedPayers } = state;
 
   const togglePayer = async (participantIndex) => {
     if (disabled) return;
@@ -37,61 +37,68 @@ const PaidBySection = ({ disabled = false, onTogglePayer }) => {
         style={styles.scrollView}
       >
         <View style={styles.paidByGrid}>
-            {participants && participants.length > 0 ? participants.map((participant, pIndex) => {
-            const isSelected = selectedPayers.includes(pIndex);
-            return (
-                <TouchableOpacity
-                key={pIndex}
-                style={[
-                    styles.paidByItem,
-                    isSelected && styles.paidByItemSelected
-                ]}
-                onPress={async () => {
-                    await togglePayer(pIndex);
-                }}
-                activeOpacity={0.7}
-                disabled={disabled}
-                >
-                <View style={styles.paidByItemContent}>
-                    <View style={styles.paidByAvatar}>
-                    {participant?.profilePhoto ? (
-                        <Image
-                        source={{ uri: participant.profilePhoto }}
-                        style={styles.paidByAvatarImage}
-                        contentFit="cover"
-                        transition={200}
-                        />
-                    ) : (
-                        <View style={[
-                        styles.paidByAvatarPlaceholder,
-                        participant?.name === 'Me' && styles.currentUserAvatar
-                        ]}>
+          {participants && participants.length > 0 ? (
+            [...participants.map((p, i) => ({ participant: p, originalIndex: i }))]
+              .sort((a, b) => (a.participant?.id === 'me-participant' ? -1 : b.participant?.id === 'me-participant' ? 1 : 0))
+              .map(({ participant, originalIndex: pIndex }) => {
+                const isSelected = selectedPayers.includes(pIndex);
+                const isMe = participant?.id === 'me-participant';
+                return (
+                  <TouchableOpacity
+                    key={pIndex}
+                    style={[
+                      styles.paidByItem,
+                      isSelected && styles.paidByItemSelected
+                    ]}
+                    onPress={async () => {
+                      await togglePayer(pIndex);
+                    }}
+                    activeOpacity={0.7}
+                    disabled={disabled}
+                  >
+                    <View style={styles.paidByItemContent}>
+                      <View style={styles.paidByAvatar}>
+                        {participant?.profilePhoto ? (
+                          <Image
+                            source={{ uri: participant.profilePhoto }}
+                            style={styles.paidByAvatarImage}
+                            contentFit="cover"
+                            transition={200}
+                          />
+                        ) : (
+                          <View style={[
+                            styles.paidByAvatarPlaceholder,
+                            isMe && styles.currentUserAvatar
+                          ]}>
+                            <Text style={[
+                              styles.paidByAvatarText,
+                              isMe && styles.currentUserInitials
+                            ]}>
+                              {(participant?.name?.[0] || 'U').toUpperCase()}
+                            </Text>
+                          </View>
+                        )}
+                        {isSelected && (
+                          <View style={styles.paidByCheckmark}>
+                            <Ionicons name="checkmark" size={12} color={Colors.surface} />
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.nameContainer}>
                         <Text style={[
-                            styles.paidByAvatarText,
-                            participant?.name === 'Me' && styles.currentUserInitials
-                        ]}>
-                            {(participant?.name?.[0] || 'U').toUpperCase()}
+                          styles.paidByName,
+                          isSelected && styles.paidByNameSelected
+                        ]} numberOfLines={1}>
+                          {participant.name.split(' ')[0]}
                         </Text>
-                        </View>
-                    )}
-                    {isSelected && (
-                        <View style={styles.paidByCheckmark}>
-                        <Ionicons name="checkmark" size={12} color={Colors.surface} />
-                        </View>
-                    )}
+                        {isMe && <Text style={[styles.youText, isSelected && styles.youTextSelected]}>(you)</Text>}
+                      </View>
                     </View>
-                    <Text style={[
-                    styles.paidByName,
-                    isSelected && styles.paidByNameSelected
-                    ]} numberOfLines={1}>
-                    {participant.name === 'Me' ? t('components.expenses.paidBy.you') : participant.name.split(' ')[0]}
-                    </Text>
-                </View>
-                </TouchableOpacity>
-            );
-            }) : (
+                  </TouchableOpacity>
+                );
+              })) : (
             <Text style={styles.noParticipantsText}>{t('components.expenses.paidBy.noParticipants')}</Text>
-            )}
+          )}
         </View>
       </ScrollView>
     </View>
@@ -199,6 +206,21 @@ const styles = StyleSheet.create({
   },
   currentUserInitials: {
     color: Colors.brand, // Brand color for text
+  },
+  nameContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 0,
+    width: '100%',
+  },
+  youText: {
+    fontSize: 10,
+    color: Colors.accent,
+    fontWeight: '600',
+  },
+  youTextSelected: {
+    color: Colors.brand,
   },
 });
 
