@@ -258,7 +258,7 @@ body {
 }
 
 /* ============================================================
-   iPHONE MOCKUP - iphone-frame.png
+   iPHONE MOCKUP - iphone17-frame.png
    ============================================================ */
 .iphone { position: relative; display: inline-block; }
 
@@ -275,19 +275,56 @@ body {
 .sc-phone-2      { --pw: 230px; }
 .dl-iphone       { --pw: 260px; }
 
+/* Hero phone: video behind, frame overlay on top (scoped to hero only) */
+.hero-video-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  width: 280px;
+  aspect-ratio: 9 / 19.5;
+  overflow: hidden;
+  border-radius: 44px;
+}
+.hero-video-wrap .hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 44px;
+  transform: scale(0.93);
+  transform-origin: center center;
+}
+.hero-video-wrap .hero-frame-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
 /* Story phone: video behind, frame overlay on top */
 .iphone-video-wrap {
   position: relative;
   display: inline-block;
   line-height: 0;
   width: 256px;
+  aspect-ratio: 9 / 19.5;
+  overflow: hidden;
+  border-radius: 44px;
 }
 .story-video {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   border-radius: 44px;
-  transform: scale(0.92);
+  transform: scale(0.93);
   transform-origin: center center;
 }
 .iphone-frame-overlay {
@@ -296,7 +333,8 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: fill;
+  object-fit: contain;
+  object-position: center;
   pointer-events: none;
   z-index: 2;
 }
@@ -636,15 +674,47 @@ body {
   flex-shrink: 0;
 }
 
-/* Dual phones */
+/* Dual phones - welcome screen + frame overlay */
 .showcase-phones {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   gap: 1.5rem;
+  position: relative;
+  z-index: 1;
 }
-.sc-phone-1 { transform: rotate(-4deg) translateY(18px); }
-.sc-phone-2 { transform: rotate(3deg) translateY(-14px); }
+.showcase-phone-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  width: var(--pw);
+  aspect-ratio: 9 / 19.5;
+  overflow: hidden;
+  border-radius: 44px;
+}
+.showcase-phone-wrap .showcase-phone-screen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 44px;
+  transform: scale(0.93);
+  transform-origin: center center;
+}
+.showcase-phone-wrap .showcase-phone-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  pointer-events: none;
+  z-index: 2;
+}
+.sc-phone-1 { transform: rotate(-4deg) translateY(18px); --pw: 230px; }
+.sc-phone-2 { transform: rotate(3deg) translateY(-14px); --pw: 230px; }
 
 /* ============================================================
    DOWNLOAD
@@ -705,6 +775,14 @@ body {
   margin-top: 4rem;
   display: flex;
   justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+.dl-phone-wrap .iphone-frame-img {
+  display: block;
+  width: 260px;
+  height: auto;
+  object-fit: contain;
 }
 /* Glowing frame for download phone */
 .dl-iphone.iphone-frame-img {

@@ -61,9 +61,21 @@ gsap.to('.hero-dots', {
    STORY — screen switching + annotation pop-ins + step text
    ============================================================ */
 const storyScreens = Array.from(document.querySelectorAll('.story-scr'));
+const storyVideos = Array.from(document.querySelectorAll('.story-video'));
 const anns = Array.from(document.querySelectorAll('.ann'));
 const dots = Array.from(document.querySelectorAll('.sdot'));
 const storyDots = document.querySelector('.story-dots');
+
+// Step index -> video index: 0=Scanning, 1=FindFriends, 2=AssignItems, 3=Balances
+const stepToVideoIndex = [0, 1, 2, 3];
+
+// Initialise story videos: only video 0 visible and playing
+if (storyVideos.length > 0) {
+  gsap.set(storyVideos[0], { opacity: 1 });
+  gsap.set(storyVideos.slice(1), { opacity: 0 });
+  storyVideos[0].play().catch(() => {});
+  storyVideos.slice(1).forEach(v => v.pause());
+}
 
 // Initialise screen opacities (only if story screens exist)
 if (storyScreens.length > 0) {
@@ -71,14 +83,35 @@ if (storyScreens.length > 0) {
   gsap.set(storyScreens[0], { opacity: 1, y: 0 });
 }
 
-let currentStep = 0;
+let currentStep = -1;
 
 function goToStep(idx) {
   if (idx === currentStep) return;
 
+  // Story videos: crossfade to the video for this step
+  if (storyVideos.length > 0 && stepToVideoIndex[idx] !== undefined) {
+    const prevVideoIdx = currentStep >= 0 ? stepToVideoIndex[currentStep] : -1;
+    const nextVideoIdx = stepToVideoIndex[idx];
+    
+    // Only transition if the video index actually changes
+    if (prevVideoIdx !== nextVideoIdx) {
+      const prevVideo = prevVideoIdx >= 0 ? storyVideos[prevVideoIdx] : null;
+      const nextVideo = storyVideos[nextVideoIdx];
+      
+      if (prevVideo) {
+        gsap.to(prevVideo, { opacity: 0, duration: 0.35, ease: 'power2.in', onComplete: () => prevVideo.pause() });
+      }
+      if (nextVideo) {
+        gsap.fromTo(nextVideo, { opacity: 0 }, { opacity: 1, duration: 0.4, ease: 'power2.out', delay: 0.1, onStart: () => nextVideo.play().catch(() => {}) });
+      }
+    }
+  }
+
   // Screens (only if story screens exist)
   if (storyScreens.length > 0) {
-    gsap.to(storyScreens[currentStep], { opacity: 0, y: -8, duration: 0.3, ease: 'power2.in' });
+    if (currentStep >= 0) {
+      gsap.to(storyScreens[currentStep], { opacity: 0, y: -8, duration: 0.3, ease: 'power2.in' });
+    }
     gsap.fromTo(
       storyScreens[idx],
       { opacity: 0, y: 14 },
@@ -86,14 +119,21 @@ function goToStep(idx) {
     );
   }
 
-  // Annotations
+  // Annotations: Ensure ONLY the current index is shown, hide all others
   if (anns.length > 0) {
-    gsap.to(anns[currentStep], { opacity: 0, scale: 0.65, duration: 0.22, ease: 'power2.in' });
-    gsap.fromTo(
-      anns[idx],
-      { opacity: 0, scale: 0.65, y: 8 },
-      { opacity: 1, scale: 1, y: 0, duration: 0.48, ease: 'back.out(2)', delay: 0.28 }
-    );
+    anns.forEach((ann, i) => {
+      if (i === idx) {
+        // Show current
+        gsap.killTweensOf(ann);
+        gsap.fromTo(ann, 
+          { opacity: 0, scale: 0.65, y: 8 }, 
+          { opacity: 1, scale: 1, y: 0, duration: 0.48, ease: 'back.out(2)', delay: 0.28 }
+        );
+      } else {
+        // Hide others (forcefully if needed)
+        gsap.to(ann, { opacity: 0, scale: 0.65, duration: 0.22, ease: 'power2.in', overwrite: true });
+      }
+    });
   }
 
   // Progress dots
@@ -116,42 +156,11 @@ if (storyDots) {
 }
 
 // Animate first annotation in when story appears
-if (anns.length > 0) {
-  ScrollTrigger.create({
-    trigger: '#story',
-    start: 'top 60%',
-    once: true,
-    onEnter: () => gsap.fromTo(anns[0],
-    { opacity: 0, scale: 0.65, y: 8 },
-    { opacity: 1, scale: 1, y: 0, duration: 0.55, ease: 'back.out(2)' }
-  ),
-  });
-}
+// (Removed redundant one-time trigger; goToStep(0) handles this now)
 
-// Step text + screen/annotation trigger per step
+// Step text is static; only switch phone/annotations when step reaches mid-viewport
 const steps = document.querySelectorAll('.story-step');
 steps.forEach((step, i) => {
-  const tag  = step.querySelector('.step-tag');
-  const h2   = step.querySelector('.step-h2');
-  const p    = step.querySelector('.step-p');
-  const lis  = step.querySelectorAll('.step-list li');
-
-  // Slide-in text on enter, reverse on leave
-  const tl = gsap.timeline({
-    scrollTrigger: {
-      trigger: step,
-      start: 'top 72%',
-      end: 'bottom 28%',
-      toggleActions: 'play reverse play reverse',
-    },
-  });
-  tl
-    .from(tag, { x: -22, opacity: 0, duration: 0.38 })
-    .from(h2,  { x: -34, opacity: 0, duration: 0.5  }, '-=0.18')
-    .from(p,   { x: -24, opacity: 0, duration: 0.42 }, '-=0.2')
-    .from(lis, { x: -16, opacity: 0, duration: 0.36, stagger: 0.08 }, '-=0.18');
-
-  // Switch phone screen when step reaches mid-viewport
   ScrollTrigger.create({
     trigger: step,
     start: 'top 56%',
