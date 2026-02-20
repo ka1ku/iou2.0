@@ -86,7 +86,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "Allow $(PRODUCT_NAME) to access your contacts and use your contact photo as your profile picture."
+          "contactsPermission": "The app accesses your contacts to help find people you know who are already on the app, invite others to join the app, and to optionally use your contact photo as your default profile picture."
         }
       ]
     ],
