@@ -45,7 +45,7 @@
           "venmo",
           "venmo"
         ],
-        "NSContactsUsageDescription": "This app needs access to your contacts to help you find and connect with people you know, and to use your contact photo as your default profile picture.",
+        "NSContactsUsageDescription": "IOU uses your contacts to show which of your contacts are already on IOU, to let you invite friends by text, and to optionally use a contact's photo as your profile picture. For example, when you invite a friend, we use only that contact's name and phone number to send the invite; we do not upload your full contact list.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -86,7 +86,7 @@
       [
         "expo-contacts",
         {
-          "contactsPermission": "The app accesses your contacts to help find people you know who are already on the app, invite others to join the app, and to optionally use your contact photo as your default profile picture."
+          "contactsPermission": "IOU uses your contacts to show which of your contacts are already on IOU, to let you invite friends by text, and to optionally use a contact's photo as your profile picture. For example, when you invite a friend, we use only that contact's name and phone number to send the invite; we do not upload your full contact list."
         }
       ]
     ],

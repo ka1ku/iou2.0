@@ -8,7 +8,6 @@ import {
   ScrollView,
   Linking,
   Platform,
-  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -52,7 +51,7 @@ const SettingItem = ({
 
 const SettingsScreen = ({ navigation }) => {
   const changeVenmoBottomSheetRef = useRef(null);
-  const { language, currency, demoMode, setDemoMode } = useSettingsStore();
+  const { language, currency } = useSettingsStore();
   const { t } = useTranslation();
 
   const handleSignOut = () => {
@@ -183,30 +182,6 @@ const SettingsScreen = ({ navigation }) => {
             rightElement={<Text style={styles.rightValueText}>{language.toUpperCase()} • {currency}</Text>}
             onPress={() => navigation.navigate('LanguageRegion')}
           />
-        </View>
-
-        <SectionHeader title={t('settings.advertising')} />
-        <View style={styles.sectionContainer}>
-          <TouchableOpacity 
-            style={styles.settingItem}
-            onPress={() => setDemoMode(!demoMode)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.iconContainer}>
-              <Ionicons name="film-outline" size={20} color={Colors.textPrimary === '#FFFFFF' ? Colors.textPrimary : '#555'} />
-            </View>
-            <View style={styles.settingTextContainer}>
-              <Text style={styles.settingText}>{t('settings.demoMode')}</Text>
-              <Text style={styles.settingSubtext}>{t('settings.demoModeDescription')}</Text>
-            </View>
-            <Switch
-              value={demoMode}
-              onValueChange={setDemoMode}
-              trackColor={{ false: Colors.divider, true: Colors.accent }}
-              thumbColor={Colors.surface}
-              ios_backgroundColor={Colors.divider}
-            />
-          </TouchableOpacity>
         </View>
 
         <SectionHeader title={t('settings.support')} />

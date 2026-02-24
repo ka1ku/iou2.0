@@ -18,9 +18,6 @@
         "restoreSuccess": "Purchases restored successfully",
         "noSubscriptions": "No active subscriptions found to restore",
         "restoreError": "Failed to restore purchases. Please try again",
-        "demoMode": "Demo Mode",
-        "demoModeDescription": "Animate balance changes for screen recording",
-        "advertising": "Advertising",
         "growth": "Growth",
         "buildYourSquad": {
             "title": "Build Your Squad",
