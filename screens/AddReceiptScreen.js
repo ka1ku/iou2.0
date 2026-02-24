@@ -29,6 +29,7 @@ import GroupMembersModal from '../components/expenses/GroupMembersModal';
 import PaidBySection from '../components/expenses/PaidBySection';
 import ReceiptBreakdown from '../components/expenses/ReceiptBreakdown';
 import SplitTab from '../components/expenses/SplitTab';
+import { calculateReceiptTotals, materializeReceiptItems } from '../utils/receiptItemAmounts';
 
 import { useTranslation } from '../contexts/LanguageContext';
 
@@ -62,7 +63,23 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   const [itemValidationErrors, setItemValidationErrors] = useState({});
   const [savingItemId, setSavingItemId] = useState(null);
 
-  // Tips & Fees state
+  const materializedItems = useMemo(
+    () => materializeReceiptItems(state.items || []),
+    [state.items]
+  );
+
+  const { subtotal: itemsSubtotal, total: calculatedTotal } = useMemo(
+    () => calculateReceiptTotals(state.items || []),
+    [state.items]
+  );
+
+  const feeItems = useMemo(
+    () => materializedItems.filter((item) => item.isExtraFee),
+    [materializedItems]
+  );
+
+  const selectedPayersForCalc = expense?.selectedPayers || state.selectedPayers || [0];
+
   // Settlement hook (lifted to screen level for lockedItemIds)
   const {
     settlements,
@@ -76,11 +93,11 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   } = useSettlementActions({
     expense,
     participants: state.participants,
-    items: state.items, // Items now include fees
-    total,
+    items: materializedItems,
+    total: calculatedTotal || total,
     title: expense?.title || state.title,
     currentUserId,
-    selectedPayers: expense?.selectedPayers || state.selectedPayers,
+    selectedPayers: selectedPayersForCalc,
   });
 
   // Wrap settlement actions with validation (all items must be assigned before settling)
@@ -97,21 +114,6 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     return handleBulkAction(type, settlement, selectedItemIds);
   }, [handleBulkAction, validateForSettlement]);
 
-  // Calculate totals
-  const { itemsSubtotal, fees, calculatedTotal } = useMemo(() => {
-    const regularItems = state.items.filter(item => !item.isExtraFee);
-    const feeItems = state.items.filter(item => item.isExtraFee);
-
-    const subtotal = regularItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-    const feesTotal = feeItems.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-
-    return {
-      itemsSubtotal: subtotal,
-      fees: feeItems,
-      calculatedTotal: subtotal + feesTotal
-    };
-  }, [state.items]);
-
   const handleAddItem = useCallback(() => {
     // Only add item to local state - don't persist to Firestore
     // Item will be persisted when user clicks "Save Changes"
@@ -119,8 +121,29 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   }, [actions]);
 
   const handleUpdateItem = useCallback((index, field, value) => {
+    if (field === 'amount' || field === 'unitAmount') {
+      actions.updateItem(index, { amount: value, unitAmount: value });
+      return;
+    }
+
+    if (field === 'quantity') {
+      const currentItem = materializedItems[index];
+      const unitAmount = currentItem?.unitAmount ?? currentItem?.amount ?? 0;
+      actions.updateItem(index, { quantity: value, unitAmount });
+      return;
+    }
+
+    if (field === 'isExtraFee') {
+      actions.updateItem(index, {
+        isExtraFee: value,
+        feeCalcType: 'fixed',
+        feePercentage: null,
+      });
+      return;
+    }
+
     actions.updateItem(index, { [field]: value });
-  }, [actions]);
+  }, [actions, materializedItems]);
 
   const handleRemoveItem = useCallback((index) => {
     Alert.alert(
@@ -248,17 +271,21 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
     return {
       title: finalTitle,
-      total: total,
+      total: calculatedTotal,
       expenseType: "receipt",
       participants: mappedParticipants,
-      items: state.items.map((item) => ({
+      items: materializedItems.map((item) => ({
         id: item.id,
         name: item.name.trim(),
         amount: parseFloat(item.amount) || 0,
+        unitAmount: parseFloat(item.unitAmount) || parseFloat(item.amount) || 0,
+        quantity: parseFloat(item.quantity) > 0 ? parseFloat(item.quantity) : 1,
         selectedConsumers: item.selectedConsumers || [0],
         selectedPayers: item.selectedPayers || [0],
         splits: item.splits || [],
         isExtraFee: item.isExtraFee || false, // Preserve isExtraFee flag
+        feeCalcType: item.feeCalcType || 'fixed',
+        feePercentage: item.feeCalcType === 'percentage' ? (parseFloat(item.feePercentage) || null) : null,
       })),
       fees: [], // Receipts: fees are items with isExtraFee, not a separate array
       selectedPayers: state.selectedPayers || [0],
@@ -267,7 +294,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
   };
 
   // Validate that everything is ready for settlement
-  const validateForSettlement = () => {
+  function validateForSettlement() {
     // Check if there's a payer
     if (!state.selectedPayers?.length) {
       Alert.alert(
@@ -278,7 +305,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     }
 
     // Check if all items are assigned
-    const unassignedItems = state.items.filter(
+    const unassignedItems = materializedItems.filter(
       item => !item.selectedConsumers || item.selectedConsumers.length === 0
     );
 
@@ -291,9 +318,21 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     }
 
     // Check if all items have valid amounts
-    const invalidItems = state.items.filter(
+    const invalidItems = materializedItems.filter(
       item => !item.amount || parseFloat(item.amount) <= 0
     );
+
+    const invalidFeePercentageItems = materializedItems.filter(
+      item => item.isExtraFee && item.feeCalcType === 'percentage' && (!item.feePercentage || parseFloat(item.feePercentage) <= 0 || parseFloat(item.feePercentage) > 100)
+    );
+
+    if (invalidFeePercentageItems.length > 0) {
+      Alert.alert(
+        'Cannot Settle',
+        'Percentage fees must be greater than 0% and no more than 100%.'
+      );
+      return false;
+    }
 
     if (invalidItems.length > 0) {
       Alert.alert(
@@ -304,9 +343,9 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     }
 
     return true;
-  };
+  }
 
-  const validateExpense = () => {
+  function validateExpense() {
     if (state.participants.some((p) => !p.name.trim())) {
       Alert.alert(t('common.error'), t('addExpense.validationError'));
       return false;
@@ -315,11 +354,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       Alert.alert(t('common.error'), t('addExpense.validationError'));
       return false;
     }
-    if (
-      state.items.some(
-        (item) => !item.name.trim() || parseFloat(item.amount) < 0
-      )
-    ) {
+    if (materializedItems.some((item) => !item.name.trim() || parseFloat(item.amount) < 0)) {
       Alert.alert(
         t('common.error'),
         t('addExpense.validationError')
@@ -338,7 +373,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     const errors = {};
     let hasErrors = false;
 
-    state.items.forEach((item, index) => {
+    materializedItems.forEach((item, index) => {
       const itemErrors = {};
 
       // Check if item has zero or negative price
@@ -346,6 +381,20 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
       if (!amount || amount <= 0 || isNaN(amount)) {
         itemErrors.amount = true;
         hasErrors = true;
+      }
+
+      const quantity = parseFloat(item.quantity);
+      if (!quantity || quantity <= 0 || isNaN(quantity)) {
+        itemErrors.quantity = true;
+        hasErrors = true;
+      }
+
+      if (item.isExtraFee && item.feeCalcType === 'percentage') {
+        const pct = parseFloat(item.feePercentage);
+        if (!pct || pct <= 0 || pct > 100 || isNaN(pct)) {
+          itemErrors.feePercentage = true;
+          hasErrors = true;
+        }
       }
 
       // Check if item has no assigned consumers
@@ -371,7 +420,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
     // Clear any previous validation errors
     setItemValidationErrors({});
     return true;
-  };
+  }
 
   useExpenseInitSync({
     expense,
@@ -399,22 +448,36 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
 
   useEffect(() => {
     const updateScannedItems = async () => {
-      if (scannedReceipt && fromReceiptScan && !hasUpdatedScannedItems.current) {
-        actions.setTitle(scannedReceipt.title || '');
+        if (scannedReceipt && fromReceiptScan && !hasUpdatedScannedItems.current) {
+          actions.setTitle(scannedReceipt.title || '');
 
         // All items including fees (fees have isExtraFee: true)
         let formattedItems = [];
         if (scannedReceipt.items && scannedReceipt.items.length > 0) {
-          formattedItems = scannedReceipt.items.map((item, index) => ({
-            id: Date.now().toString() + index,
-            name: item.name || '',
-            amount: parseFloat(item.amount) || 0,
-            selectedConsumers: [],
-            selectedPayers: [0],
-            splits: [],
-            isExtraFee: item.isExtraFee || false // Preserve the isExtraFee flag from scanner
-          }));
-          actions.setItems(formattedItems);
+          formattedItems = scannedReceipt.items.map((item, index) => {
+            const rawQty = parseFloat(item.quantity);
+            const quantity = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 1;
+            const amount = Math.max(0, parseFloat(item.amount) || 0);
+            const unitAmount = Number.isFinite(item.unitAmount)
+              ? Math.max(0, parseFloat(item.unitAmount))
+              : (quantity > 0 ? Math.round((amount / quantity + Number.EPSILON) * 100) / 100 : amount);
+            return {
+              id: Date.now().toString() + index,
+              name: (item.name != null && String(item.name).trim()) ? String(item.name).trim() : '',
+              amount,
+              unitAmount,
+              quantity,
+              selectedConsumers: [],
+              selectedPayers: [0],
+              splits: [],
+              isExtraFee: item.isExtraFee === true,
+              feeCalcType: 'fixed',
+              feePercentage: null,
+            };
+          });
+          const materializedScannedItems = materializeReceiptItems(formattedItems);
+          actions.setItems(materializedScannedItems);
+          formattedItems = materializedScannedItems;
         }
 
         actions.setSelectedPayers([0]);
@@ -458,7 +521,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
             id: expense?.id,
             title: state.title,
             participants: state.participants,
-            items: state.items, // Items now include fees with isExtraFee flag
+            items: materializedItems,
             createdBy: getCurrentUser()?.uid,
             join: { enabled: state.joinEnabled }
           }
@@ -522,7 +585,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                 }
               }}>
                 <ReceiptBreakdown
-                  items={state.items}
+                  items={materializedItems}
                   participants={state.participants}
                   lockedItemIds={lockedItemIds}
                   isSettled={isSettled}
@@ -585,7 +648,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                   </View>
 
                   {/* Fees */}
-                  {fees.map((fee, index) => (
+                  {feeItems.map((fee, index) => (
                     <View key={fee.id || index} style={styles.totalRow}>
                       <Text style={styles.totalLabel}>{fee.name}</Text>
                       <Text style={styles.totalValue}>${(parseFloat(fee.amount) || 0).toFixed(2)}</Text>
@@ -593,7 +656,7 @@ const AddReceiptScreenContent = ({ route, navigation }) => {
                   ))}
 
                   {/* Separator before total if there are fees */}
-                  {fees.length > 0 && <View style={styles.separator} />}
+                  {feeItems.length > 0 && <View style={styles.separator} />}
 
                   {/* Grand Total */}
                   <View style={styles.totalRow}>

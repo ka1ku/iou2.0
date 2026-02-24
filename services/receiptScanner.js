@@ -2,6 +2,35 @@ import { getApp } from '@react-native-firebase/app';
 import { getAI, getGenerativeModel } from '@react-native-firebase/ai';
 import { imageToBase64 } from './imageHandler';
 
+/** Parse a numeric value from AI output (may be string or number); default if invalid. */
+const parseNum = (value, fallback) => {
+  if (value == null) return fallback;
+  const n = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : fallback;
+};
+
+/** Parse quantity: must be > 0; default 1. */
+const parseQuantity = (value) => {
+  const q = parseNum(value, 1);
+  return q > 0 ? q : 1;
+};
+
+/** Parse amount (currency); default 0. */
+const parseAmount = (value) => Math.max(0, parseNum(value, 0));
+
+const roundCurrency = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
+/** If the string is all caps, convert to title case (first letter of each word only). */
+const fixAllCaps = (str) => {
+  if (str == null || typeof str !== 'string') return str;
+  const trimmed = str.trim();
+  const letters = trimmed.replace(/\W/g, '');
+  if (!letters || letters !== letters.toUpperCase()) return trimmed;
+  return trimmed
+    .split(/\s+/)
+    .map((word) => word.slice(0, 1).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
 
 export const processReceiptImage = async (imageUri, onStart, onStop, onSuccess, onError) => {
   if (onStart) onStart();
@@ -43,14 +72,20 @@ export const scanReceiptWithAI = async (base64Image) => {
 {
   "title": "Business name",
   "date": "YYYY-MM-DD",
-  "subtotal": "number",
-  "total": "number",
-  "items": [{"name": "item", "amount": "number", "quantity": "number"}],
-  "fees": [{"name": "fee (e.g., Tax, Tip, Service Charge)", "amount": "number"}],
+  "subtotal": number,
+  "total": number,
+  "items": [{"name": "item name", "amount": number, "quantity": number}],
+  "fees": [{"name": "fee name (e.g. Tax, Tip, Service Charge)", "amount": number}],
   "participants": [{"name": "You", "paidBy": true}]
 }
 
-Important: Extract any tips, taxes, service charges, or fees into the "fees" array.
+Rules:
+- Line with a price → output as a new item (name, amount, quantity).
+- Line with no price AND indented (or subordinate) → do NOT create a new item; append its text to the previous item's name (e.g. "Adult" then indented "Section B" → one item named "Adult - Section B" with the previous line's amount and quantity).
+- "name" = product/description only. Do NOT include the price or quantity in the name.
+- "amount" = line total (quantity × unit price). "quantity" = number of that item.
+- Put tips, taxes, service charges, delivery fees, etc. in "fees" with "name" and "amount".
+- Use numeric values (not quoted) for amounts and quantities.
 Respond with ONLY valid JSON.`;
 
     const response = await model.generateContent([
@@ -69,32 +104,50 @@ Respond with ONLY valid JSON.`;
       throw new Error('This image does not appear to be a receipt. Please try with a clear receipt image.');
     }
 
-    // Convert regular items
-    const regularItems = (receiptData.items || []).map(item => ({
-      name: item.name || 'Item',
-      amount: Number(item.amount) || 0,
-      quantity: Number(item.quantity) || 1,
-      isExtraFee: false
-    }));
+    // Convert regular items with robust parsing
+    const regularItems = (receiptData.items || []).map((item) => {
+      const quantity = parseQuantity(item.quantity);
+      const amount = parseAmount(item.amount);
+      const unitAmount = quantity > 0 ? Math.round((amount / quantity + Number.EPSILON) * 100) / 100 : amount;
+      return {
+        name: (item.name != null && String(item.name).trim()) ? String(item.name).trim() : 'Item',
+        amount,
+        unitAmount,
+        quantity,
+        isExtraFee: false,
+      };
+    });
 
-    // Convert fees to items with isExtraFee flag
-    const feeItems = (receiptData.fees || []).map(fee => ({
-      name: fee.name || 'Fee',
-      amount: Number(fee.amount) || 0,
+    // Convert fees to items with isExtraFee flag; robust parsing for amount and name
+    const feeItems = (receiptData.fees || []).map((fee) => ({
+      name: (fee.name != null && String(fee.name).trim()) ? String(fee.name).trim() : 'Fee',
+      amount: parseAmount(fee.amount),
       quantity: 1,
-      isExtraFee: true // Mark as extra fee
+      isExtraFee: true,
     }));
 
     // Combine items and fees into single array (fees at the end)
     const allItems = [...regularItems, ...feeItems];
 
+    const computedSubtotal = roundCurrency(
+      regularItems.reduce((sum, item) => sum + item.amount, 0)
+    );
+    const computedTotal = roundCurrency(
+      allItems.reduce((sum, item) => sum + item.amount, 0)
+    );
+    const statedTotal = parseAmount(receiptData.total);
+    const mismatchCents = Math.abs(computedTotal - statedTotal);
+    const totalMismatch = mismatchCents > 0.1;
+
+    const rawTitle = (receiptData.title != null && String(receiptData.title).trim()) ? String(receiptData.title).trim() : 'Receipt';
     return {
-      title: receiptData.title || 'Receipt',
+      title: fixAllCaps(rawTitle) || rawTitle,
       date: receiptData.date || new Date().toISOString().split('T')[0],
-      subtotal: Number(receiptData.subtotal) || 0,
-      total: Number(receiptData.total) || 0,
-      items: allItems, // All items including fees
-      participants: receiptData.participants || [{ name: 'You', paidBy: true }]
+      subtotal: computedSubtotal,
+      total: computedTotal,
+      items: allItems,
+      participants: receiptData.participants || [{ name: 'You', paidBy: true }],
+      ...(totalMismatch && { totalMismatch: true, statedTotal }),
     };
     
   } catch (error) {

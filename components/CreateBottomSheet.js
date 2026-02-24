@@ -131,15 +131,16 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
           startScanningAnimation,
           stopScanningAnimation,
           (receiptData) => {
-            // Increment usage count on success
             incrementScanUsage();
-            
-            // Navigate to SetupExpense directly as it's in the RootStack
-            navigation.navigate('SetupExpense', { 
-              expenseType: 'receipt',
-              scannedReceipt: receiptData,
-              fromReceiptScan: true 
-            });
+            if (receiptData.totalMismatch) {
+              Alert.alert(
+                'Total mismatch',
+                `Receipt total was $${(receiptData.statedTotal ?? 0).toFixed(2)} but extracted items sum to $${(receiptData.total ?? 0).toFixed(2)}. Using the sum of extracted items.`,
+                [{ text: 'OK', onPress: () => navigation.navigate('SetupExpense', { expenseType: 'receipt', scannedReceipt: receiptData, fromReceiptScan: true }) }]
+              );
+            } else {
+              navigation.navigate('SetupExpense', { expenseType: 'receipt', scannedReceipt: receiptData, fromReceiptScan: true });
+            }
           },
           (errorMessage) => {
             Alert.alert('Receipt Scanning Error', errorMessage);
@@ -202,15 +203,16 @@ const CreateBottomSheet = forwardRef(({ navigation, getLastActiveTab }, ref) => 
           startScanningAnimation,
           stopScanningAnimation,
           (receiptData) => {
-            // Increment usage count on success
             incrementScanUsage();
-
-            // Navigate to SetupExpense directly as it's in the RootStack
-            navigation.navigate('SetupExpense', { 
-              expenseType: 'receipt',
-              scannedReceipt: receiptData,
-              fromReceiptScan: true 
-            });
+            if (receiptData.totalMismatch) {
+              Alert.alert(
+                'Total mismatch',
+                `Receipt total was $${(receiptData.statedTotal ?? 0).toFixed(2)} but extracted items sum to $${(receiptData.total ?? 0).toFixed(2)}. Using the sum of extracted items.`,
+                [{ text: 'OK', onPress: () => navigation.navigate('SetupExpense', { expenseType: 'receipt', scannedReceipt: receiptData, fromReceiptScan: true }) }]
+              );
+            } else {
+              navigation.navigate('SetupExpense', { expenseType: 'receipt', scannedReceipt: receiptData, fromReceiptScan: true });
+            }
           },
           (errorMessage) => {
             Alert.alert('Receipt Scanning Error', errorMessage);

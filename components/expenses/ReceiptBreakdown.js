@@ -110,10 +110,15 @@ const ItemRow = memo(({
   const { t } = useTranslation();
   const itemErrors = validationErrors?.[item.id] || {};
   const [localValidationErrors, setLocalValidationErrors] = useState({});
+  const [localQtyText, setLocalQtyText] = useState(() => String(item.quantity ?? 1));
+  const isPercentageFee = item.isExtraFee && item.feeCalcType === 'percentage';
+  const feePercentageValue = parseFloat(item.feePercentage);
+  const quantityValue = parseFloat(item.quantity) || 1;
 
   useEffect(() => {
     if (!isEditing) {
       setLocalValidationErrors({});
+      setLocalQtyText(String(item.quantity ?? 1));
     }
   }, [isEditing]);
 
@@ -130,8 +135,17 @@ const ItemRow = memo(({
 
   const handleSaveClick = useCallback(() => {
     const errors = {};
-    const amount = parseFloat(item.amount);
-    if (!amount || amount <= 0 || isNaN(amount)) {
+    const amount = parseFloat(item.unitAmount ?? item.amount);
+    const quantity = parseFloat(item.quantity);
+    if (!quantity || quantity <= 0 || isNaN(quantity)) {
+      errors.quantity = true;
+    }
+
+    if (isPercentageFee) {
+      if (!feePercentageValue || feePercentageValue <= 0 || feePercentageValue > 100 || isNaN(feePercentageValue)) {
+        errors.feePercentage = true;
+      }
+    } else if (!amount || amount <= 0 || isNaN(amount)) {
       errors.amount = true;
     }
 
@@ -142,7 +156,7 @@ const ItemRow = memo(({
 
     setLocalValidationErrors({});
     onSave(index);
-  }, [item.amount, index, onSave]);
+  }, [item.amount, item.unitAmount, item.quantity, index, onSave, isPercentageFee, feePercentageValue]);
 
   const handleViewModeParticipantToggle = useCallback(async (pIndex) => {
     // Block if locked
@@ -192,6 +206,78 @@ const ItemRow = memo(({
               </TouchableOpacity>
             </View>
 
+            {/* Extra Fee Toggle */}
+            <TouchableOpacity
+              style={styles.extraFeeToggle}
+              onPress={() => onUpdate('item', index, 'isExtraFee', !item.isExtraFee)}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={item.isExtraFee ? 'checkbox' : 'square-outline'}
+                size={20}
+                color={item.isExtraFee ? Colors.accent : Colors.textSecondary}
+              />
+              <Text style={styles.extraFeeLabel}>
+                {t('components.expenses.receiptBreakdown.extraFee') || 'Mark as extra fee (tip, tax, etc.)'}
+              </Text>
+            </TouchableOpacity>
+
+            {item.isExtraFee && (
+              <>
+                <View style={styles.feeModeToggleRow}>
+                  <TouchableOpacity
+                    style={[styles.feeModeOption, item.feeCalcType !== 'percentage' && styles.feeModeOptionSelected]}
+                    onPress={() => onUpdate('item', index, 'feeCalcType', 'fixed')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.feeModeText, item.feeCalcType !== 'percentage' && styles.feeModeTextSelected]}>
+                      Fixed
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.feeModeOption, item.feeCalcType === 'percentage' && styles.feeModeOptionSelected]}
+                    onPress={() => onUpdate('item', index, 'feeCalcType', 'percentage')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.feeModeText, item.feeCalcType === 'percentage' && styles.feeModeTextSelected]}>
+                      Percentage
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {item.feeCalcType === 'percentage' && (
+                  <View style={styles.feePercentageRow}>
+                    <View style={styles.feePercentageInputWrap}>
+                      <Text style={[styles.editLabel, (itemErrors.feePercentage || localValidationErrors.feePercentage) && styles.errorLabel]}>
+                        Fee %
+                      </Text>
+                      <View style={styles.percentInputContainer}>
+                        <TextInput
+                          style={[styles.editInput, styles.percentInput, (itemErrors.feePercentage || localValidationErrors.feePercentage) && styles.errorInput]}
+                          value={item.feePercentage == null ? '' : String(item.feePercentage)}
+                          onChangeText={(value) => {
+                            const sanitized = value.replace(/[^0-9.]/g, '');
+                            onUpdate('item', index, 'feePercentage', sanitized === '' ? null : Number(sanitized));
+                            const pct = parseFloat(sanitized);
+                            if (pct > 0 && pct <= 100) {
+                              setLocalValidationErrors(prev => ({ ...prev, feePercentage: false }));
+                            }
+                          }}
+                          keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                          placeholder="10"
+                        />
+                        <Text style={styles.percentSuffix}>%</Text>
+                      </View>
+                    </View>
+                    <View style={styles.feePreviewWrap}>
+                      <Text style={styles.editLabel}>Fee Amount</Text>
+                      <Text style={styles.feePreviewAmount}>${(parseFloat(item.amount) || 0).toFixed(2)}</Text>
+                    </View>
+                  </View>
+                )}
+              </>
+            )}
+
             <View style={styles.editFormRow}>
               <View style={styles.editFieldFlex}>
                 <Text style={styles.editLabel}>{t('components.expenses.receiptBreakdown.itemName')}</Text>
@@ -205,14 +291,37 @@ const ItemRow = memo(({
                 />
               </View>
 
+              <View style={styles.editFieldQuantity}>
+                <Text style={[styles.editLabel, (itemErrors.quantity || localValidationErrors.quantity) && styles.errorLabel]}>
+                  Qty
+                </Text>
+                <TextInput
+                  style={[styles.editInput, styles.quantityInput, (itemErrors.quantity || localValidationErrors.quantity) && styles.errorInput]}
+                  value={localQtyText}
+                  onChangeText={(value) => {
+                    const sanitized = value.replace(/[^0-9.]/g, '');
+                    setLocalQtyText(sanitized);
+                    const qty = parseFloat(sanitized);
+                    if (qty > 0) {
+                      onUpdate('item', index, 'quantity', qty);
+                      setLocalValidationErrors(prev => ({ ...prev, quantity: false }));
+                    }
+                  }}
+                  keyboardType={Platform.OS === 'ios' ? 'decimal-pad' : 'numeric'}
+                  placeholder="1"
+                />
+              </View>
+
               <View style={styles.editFieldFixed}>
                 <Text style={[styles.editLabel, (itemErrors.amount || localValidationErrors.amount) && styles.errorLabel]}>
                   {t('components.expenses.receiptBreakdown.price')}
                 </Text>
                 <PriceInput
-                  value={item.amount || 0}
+                  value={item.unitAmount ?? item.amount ?? 0}
+                  disabled={isPercentageFee}
                   onChangeText={(value) => {
-                    onUpdate('item', index, 'amount', value);
+                    if (isPercentageFee) return;
+                    onUpdate('item', index, 'unitAmount', value);
                     if (onClearValidationError && parseFloat(value) > 0) {
                       onClearValidationError(item.id, 'amount');
                     }
@@ -253,22 +362,6 @@ const ItemRow = memo(({
                 </Text>
               )}
             </View>
-
-            {/* Extra Fee Toggle */}
-            <TouchableOpacity
-              style={styles.extraFeeToggle}
-              onPress={() => onUpdate('item', index, 'isExtraFee', !item.isExtraFee)}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={item.isExtraFee ? 'checkbox' : 'square-outline'}
-                size={20}
-                color={item.isExtraFee ? Colors.accent : Colors.textSecondary}
-              />
-              <Text style={styles.extraFeeLabel}>
-                {t('components.expenses.receiptBreakdown.extraFee') || 'Mark as extra fee (tip, tax, etc.)'}
-              </Text>
-            </TouchableOpacity>
 
             <View style={styles.editActions}>
               <TouchableOpacity
@@ -379,6 +472,12 @@ const ItemRow = memo(({
             </View>
 
             <View style={styles.amountContainer}>
+              {quantityValue > 1 && (
+                <Text style={styles.quantityBadgeText}>x{Number.isInteger(quantityValue) ? quantityValue : quantityValue.toFixed(2)}</Text>
+              )}
+              {item.isExtraFee && item.feeCalcType === 'percentage' && feePercentageValue > 0 && (
+                <Text style={styles.percentBadgeText}>{feePercentageValue}%</Text>
+              )}
               <Text style={[styles.viewModeAmount, isLocked && styles.viewModeAmountLocked]}>
                 ${(parseFloat(item.amount) || 0).toFixed(2)}
               </Text>
@@ -402,6 +501,11 @@ const ItemRow = memo(({
     prevProps.item.id === nextProps.item.id &&
     prevProps.item.name === nextProps.item.name &&
     prevProps.item.amount === nextProps.item.amount &&
+    prevProps.item.unitAmount === nextProps.item.unitAmount &&
+    prevProps.item.quantity === nextProps.item.quantity &&
+    prevProps.item.feeCalcType === nextProps.item.feeCalcType &&
+    prevProps.item.feePercentage === nextProps.item.feePercentage &&
+    prevProps.item.isExtraFee === nextProps.item.isExtraFee &&
     prevProps.item.selectedConsumers === nextProps.item.selectedConsumers &&
     prevProps.index === nextProps.index &&
     prevProps.isEditing === nextProps.isEditing &&
@@ -690,6 +794,7 @@ const styles = StyleSheet.create({
   amountContainer: {
     alignItems: 'flex-end',
     justifyContent: 'center',
+    gap: 2,
   },
   viewModeAmount: {
     ...Typography.body1,
@@ -807,12 +912,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.md,
     marginBottom: Spacing.lg,
+    alignItems: 'flex-end',
   },
   editFieldFlex: {
     flex: 1,
   },
+  editFieldQuantity: {
+    width: 70,
+  },
   editFieldFixed: {
-    width: 100,
+    width: 120,
   },
   editLabel: {
     ...Typography.caption,
@@ -838,6 +947,13 @@ const styles = StyleSheet.create({
   priceInputStyle: {
     backgroundColor: Colors.surfaceLight,
     height: 48, // Match name input height
+  },
+  quantityInput: {
+    textAlign: 'center',
+  },
+  errorInput: {
+    borderColor: Colors.danger,
+    borderWidth: 1.5,
   },
   participantsSection: {
     marginBottom: Spacing.lg,
@@ -991,6 +1107,75 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     fontFamily: Typography.familyRegular,
+  },
+  feeModeToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: Radius.md,
+    padding: 4,
+    marginBottom: Spacing.md,
+  },
+  feeModeOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.sm,
+  },
+  feeModeOptionSelected: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.accent + '33',
+  },
+  feeModeText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  feeModeTextSelected: {
+    color: Colors.accent,
+  },
+  feePercentageRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  feePercentageInputWrap: {
+    flex: 1,
+  },
+  percentInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  percentInput: {
+    flex: 1,
+  },
+  percentSuffix: {
+    ...Typography.body1,
+    color: Colors.textSecondary,
+    marginLeft: Spacing.sm,
+    fontWeight: '600',
+  },
+  feePreviewWrap: {
+    minWidth: 96,
+    alignItems: 'flex-end',
+  },
+  feePreviewAmount: {
+    ...Typography.body1,
+    color: Colors.textPrimary,
+    fontFamily: Typography.familySemiBold,
+    paddingBottom: Spacing.sm,
+  },
+  quantityBadgeText: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  percentBadgeText: {
+    ...Typography.caption,
+    color: Colors.accent,
+    fontWeight: '600',
   },
 });
 
