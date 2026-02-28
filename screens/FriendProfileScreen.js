@@ -27,7 +27,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
     debtBreakdown: {}
   });
   const [loading, setLoading] = useState(true);
-  
+
   const { expenses } = useExpenseData();
 
   useEffect(() => {
@@ -39,7 +39,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
         // Determine the target friend ID
         const targetFriendId = initialFriend?.friendId || initialFriend?.userId || userId || friendId;
-        
+
         if (!targetFriendId) {
           Alert.alert(t('common.error'), 'No friend information found');
           navigation.goBack();
@@ -64,12 +64,12 @@ const FriendProfileScreen = ({ route, navigation }) => {
               break;
             }
           }
-          
+
           if (foundFriend) {
             setFriendProfile(foundFriend);
           } else {
-             // Basic fallback if we can't find them
-             setFriendProfile({ friendId: targetFriendId, name: 'Friend' });
+            // Basic fallback if we can't find them
+            setFriendProfile({ friendId: targetFriendId, name: 'Friend' });
           }
         }
 
@@ -196,10 +196,10 @@ const FriendProfileScreen = ({ route, navigation }) => {
           styles.expenseAmount,
           { color: expenseData.type === 'owes_you' ? Colors.success : Colors.danger }
         ]}>
-          <Ionicons 
-            name={expenseData.type === 'owes_you' ? 'arrow-down-circle' : 'arrow-up-circle'} 
-            size={16} 
-            color={expenseData.type === 'owes_you' ? Colors.success : Colors.danger} 
+          <Ionicons
+            name={expenseData.type === 'owes_you' ? 'arrow-down-circle' : 'arrow-up-circle'}
+            size={16}
+            color={expenseData.type === 'owes_you' ? Colors.success : Colors.danger}
           />
           <Text style={styles.expenseAmountText}>
             {expenseData.type === 'owes_you' ? t('friendProfile.owesYou') : t('friendProfile.youOwe')} ${Math.abs(expenseData.amount).toFixed(2)}
@@ -309,7 +309,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
             />
             <View style={styles.friendDetails}>
               <Text style={styles.friendName}>
-                {friendProfile.firstName && friendProfile.lastName 
+                {friendProfile.firstName && friendProfile.lastName
                   ? `${friendProfile.firstName} ${friendProfile.lastName}`
                   : friendProfile.name
                 }
@@ -323,7 +323,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('friendProfile.balanceSummary')}</Text>
-          
+
           <View style={styles.netBalanceCard}>
             <Text style={styles.netBalanceLabel}>{t('friendProfile.netBalance')}</Text>
             <Text style={[
@@ -333,8 +333,8 @@ const FriendProfileScreen = ({ route, navigation }) => {
               {friendBalances.netBalance >= 0 ? '+' : '-'}${Math.abs(friendBalances.netBalance).toFixed(2)}
             </Text>
             <Text style={styles.netBalanceSubtext}>
-              {friendBalances.netBalance >= 0 
-                ? t('friendProfile.theyOweYouOverall') 
+              {friendBalances.netBalance >= 0
+                ? t('friendProfile.theyOweYouOverall')
                 : t('friendProfile.youOweThemOverall')
               }
             </Text>
@@ -358,7 +358,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('friendProfile.paymentMethods')}</Text>
-          
+
           <View style={styles.paymentMethods}>
             {friendProfile.username && (
               <TouchableOpacity style={styles.paymentMethod} onPress={handleVenmoPayment}>
@@ -372,7 +372,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
                 <Ionicons name="open-outline" size={20} color={Colors.textSecondary} />
               </TouchableOpacity>
             )}
-            
+
             {!friendProfile.username && (
               <View style={styles.noPaymentMethod}>
                 <Ionicons name="information-circle-outline" size={24} color={Colors.textSecondary} />
@@ -386,16 +386,16 @@ const FriendProfileScreen = ({ route, navigation }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('friendProfile.sharedExpenses')}</Text>
-          
+
           {Object.keys(friendBalances.debtBreakdown).length === 0 ? (
             <View style={styles.noExpensesContainer}>
               <Ionicons name="receipt-outline" size={48} color={Colors.textSecondary} />
               <Text style={styles.noExpensesText}>{t('friendProfile.noSharedExpenses')}</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.addExpenseButton}
-                onPress={() => navigation.navigate('AddExpense', { 
+                onPress={() => navigation.navigate('AddExpense', {
                   selectedFriends: [friendProfile],
-                  fromFriendProfile: true 
+                  fromFriendProfile: true
                 })}
               >
                 <Text style={styles.addExpenseButtonText}>{t('friendProfile.addFirstExpense')}</Text>
@@ -404,7 +404,7 @@ const FriendProfileScreen = ({ route, navigation }) => {
           ) : (
             <View style={styles.expenseList}>
               {Object.entries(friendBalances.debtBreakdown)
-                .sort(([,a], [,b]) => (b.date || 0) - (a.date || 0))
+                .sort(([, a], [, b]) => (b.date || 0) - (a.date || 0))
                 .map(([expenseId, expenseData]) => renderExpenseItem(expenseId, expenseData))
               }
             </View>
@@ -458,7 +458,6 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
-    ...Shadows.card,
   },
   sectionTitle: {
     ...Typography.h3,
@@ -491,7 +490,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     alignItems: 'center',
     marginBottom: Spacing.md,
-    ...Shadows.card,
   },
   netBalanceLabel: {
     ...Typography.label,
@@ -518,7 +516,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: Spacing.md,
     borderLeftWidth: 4,
-    ...Shadows.card,
   },
   balanceHeader: {
     flexDirection: 'row',

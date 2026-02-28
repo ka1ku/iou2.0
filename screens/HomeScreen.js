@@ -34,30 +34,30 @@ const HomeScreen = ({ navigation }) => {
     if (!currentUser) {
       return { youOwe: 0, youPaid: 0 };
     }
-    
+
     const balance = calculateUserBalanceForExpense(expense, currentUser.uid);
-    
+
     // Calculate pending confirmation amounts to subtract from the balance
     let pendingAmount = 0;
     if (expense.settlements && expense.settlements.length > 0) {
       const currentUserParticipant = expense.participants?.find(p => p.userId === currentUser.uid);
       const currentUserName = currentUserParticipant?.name;
-      
+
       const SETTLED_STATUSES = ['paymentRequested', 'paymentMade', 'markedAsPaid', 'complete', 'confirmed', 'partial'];
-      
+
       expense.settlements.forEach(settlement => {
         // Check if settlement is in any "handled" status (pending or settled)
         if (SETTLED_STATUSES.includes(settlement.status)) {
           const isDebtor = settlement.debtor === currentUserName || settlement.from === currentUserName;
           const isCreditor = settlement.creditor === currentUserName || settlement.to === currentUserName;
-          
+
           let amountToSubtract = 0;
           if (settlement.status === 'partial') {
             amountToSubtract = parseFloat(settlement.settledAmount) || 0;
           } else {
             amountToSubtract = parseFloat(settlement.amount) || 0;
           }
-          
+
           if (isDebtor) {
             // User owes this amount, but it's pending confirmation or already settled
             pendingAmount += amountToSubtract;
@@ -68,10 +68,10 @@ const HomeScreen = ({ navigation }) => {
         }
       });
     }
-    
+
     // Subtract pending amounts from the balance
     const adjustedBalance = balance.netBalance - pendingAmount;
-    
+
     return { youOwe: adjustedBalance, youPaid: balance.youPaid };
   };
 
@@ -100,14 +100,14 @@ const HomeScreen = ({ navigation }) => {
     // User is awaiting confirmation if:
     // 1) paymentRequested status AND user is creditor (user requested payment)
     // 2) paymentMade status AND user is debtor (user made payment)
-    
+
     let needsConfirmation = false;
     let awaitingConfirmation = false;
 
     expense.settlements.forEach(settlement => {
       const isDebtor = settlement.debtor === currentUserName || settlement.from === currentUserName;
       const isCreditor = settlement.creditor === currentUserName || settlement.to === currentUserName;
-      
+
       if (settlement.status === 'paymentRequested') {
         if (isDebtor) {
           // Creditor requested payment, debtor needs to confirm
@@ -189,12 +189,12 @@ const HomeScreen = ({ navigation }) => {
     const totalItems = item.items?.length || 0;
     const totalParticipants = item.participants?.length || 0;
     const expenseBalance = calculateExpenseBalance(item);
-    
-    const isReceipt = item.expenseType === 'receipt' || 
-                     item.fromReceiptScan || 
-                     (item.title && item.title.toLowerCase().includes('receipt'));
-    const isExpense = item.expenseType === 'expense' || !isReceipt;
-    
+
+    const isReceipt = item.type === 'receipt' || item.expenseType === 'receipt' ||
+      item.fromReceiptScan ||
+      (item.title && item.title.toLowerCase().includes('receipt'));
+    const isExpense = item.type === 'expense' || item.expenseType === 'expense' || !isReceipt;
+
     const paymentSummary = {};
 
     const paidByIndices = Array.isArray(item.selectedPayers)
@@ -204,7 +204,7 @@ const HomeScreen = ({ navigation }) => {
         : [];
 
     const totalAmount = calculateExpenseTotal(item);
-    
+
     const splitAmount = paidByIndices.length > 0 ? totalAmount / paidByIndices.length : 0;
 
     paidByIndices.forEach(idx => {
@@ -232,7 +232,7 @@ const HomeScreen = ({ navigation }) => {
         onPress={handleItemPress}
         activeOpacity={0.92}
       >
-        
+
         <View style={styles.expenseHeader}>
           <View style={styles.titleContainer}>
             <Text style={styles.expenseTitle}>{item.title}</Text>
@@ -247,7 +247,7 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.expenseBalance}>
               {(() => {
                 const settlementStatus = getSettlementStatus(item);
-                
+
                 // Priority 1: Show settled status
                 if (settlementStatus === 'settled') {
                   return (
@@ -257,7 +257,7 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                   );
                 }
-                
+
                 // Priority 2: Show owe/owed amounts (takes precedence over confirmation badges)
                 if (expenseBalance.youOwe > 0) {
                   return (
@@ -274,7 +274,7 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                   );
                 }
-                
+
                 // Priority 3: Show confirmation badges only if balance is zero
                 if (settlementStatus === 'confirmPayment') {
                   return (
@@ -291,7 +291,7 @@ const HomeScreen = ({ navigation }) => {
                     </View>
                   );
                 }
-                
+
                 // Priority 4: Needs settlement (fallback)
                 return (
                   <View style={styles.needsSettlementContainer}>
@@ -307,9 +307,9 @@ const HomeScreen = ({ navigation }) => {
         {(() => {
           const currentUserId = getCurrentUser()?.uid;
           const otherMembers = item.participants?.filter(p => p.userId !== currentUserId) || [];
-          
+
           if (otherMembers.length === 0) return null;
-          
+
           return (
             <View style={styles.participantsContainer}>
               <View style={styles.participantsHeader}>
@@ -322,11 +322,11 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.participantsAvatars}>
                 {otherMembers.slice(0, 6).map((participant, displayIndex) => {
                   const originalIndex = item.participants?.findIndex(p => p === participant) ?? -1;
-                  
-                  const paidForItems = originalIndex >= 0 && (item.items?.some(item => 
+
+                  const paidForItems = originalIndex >= 0 && (item.items?.some(item =>
                     item.selectedPayers?.includes(originalIndex)
                   ) || false);
-                  
+
                   const isOverflowIndicator = displayIndex === 5 && otherMembers.length > 6;
                   const remainingCount = otherMembers.length - 5;
                   const getAvatarColor = (name) => {
@@ -334,9 +334,9 @@ const HomeScreen = ({ navigation }) => {
                     const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
                     return colors[index % colors.length];
                   };
-                  
+
                   const avatarColor = getAvatarColor(participant.name);
-                  
+
                   return (
                     <View key={displayIndex} style={styles.participantAvatarContainer}>
                       <View style={styles.avatarWrapper}>
@@ -346,11 +346,11 @@ const HomeScreen = ({ navigation }) => {
                           </View>
                         ) : participant.profilePhoto ? (
                           <View style={styles.avatarImageContainer}>
-                            <Image 
-                              source={{ uri: participant.profilePhoto }} 
+                            <Image
+                              source={{ uri: participant.profilePhoto }}
                               style={styles.participantAvatar}
                               contentFit="cover"
-                              transition={200} 
+                              transition={200}
                             />
                           </View>
                         ) : (
@@ -385,16 +385,16 @@ const HomeScreen = ({ navigation }) => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons 
-        name={searchQuery.trim() ? "search-outline" : "receipt-outline"} 
-        size={64} 
-        color="#ccc" 
+      <Ionicons
+        name={searchQuery.trim() ? "search-outline" : "receipt-outline"}
+        size={64}
+        color="#ccc"
       />
       <Text style={styles.emptyStateText}>
         {searchQuery.trim() ? t('home.noSearchResultsTitle') : t('home.noExpensesTitle')}
       </Text>
       <Text style={styles.emptyStateSubtext}>
-        {searchQuery.trim() 
+        {searchQuery.trim()
           ? t('home.noSearchResultsDesc')
           : t('home.noExpensesDesc')
         }
@@ -404,7 +404,7 @@ const HomeScreen = ({ navigation }) => {
 
   const renderFooter = () => {
     if (!loadingMore) return null;
-    
+
     return (
       <View style={styles.footerLoader}>
         <LoadingSpinner size="small" />
@@ -519,27 +519,28 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   expenseCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    ...Shadows.card,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   receiptCard: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1.5,
-    borderColor: Colors.blue + '40',
+    backgroundColor: '#FFFFFF',
     borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    // Cyberpunk blue glow effect - subtle circular glow
-    shadowColor: '#00D4FF', // Bright cyan-blue for cyberpunk feel
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25, // Faint glow
-    shadowRadius: 16, // Larger radius for more circular glow
-    elevation: 6, // Android elevation with glow
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   expenseHeader: {
     flexDirection: 'row',
@@ -565,7 +566,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderWidth: 1,
     minWidth: 70,
     justifyContent: 'center',
   },
@@ -576,14 +576,12 @@ const styles = StyleSheet.create({
   },
   receiptBadge: {
     backgroundColor: Colors.blue + '10',
-    borderColor: Colors.blue + '30',
   },
   receiptTypeText: {
     color: Colors.blue,
   },
   expenseBadge: {
     backgroundColor: Colors.accent + '10',
-    borderColor: Colors.accent + '30',
   },
   expenseTypeText: {
     color: Colors.accent,
@@ -594,12 +592,10 @@ const styles = StyleSheet.create({
   oweContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.danger + '15',
+    backgroundColor: Colors.danger + '12',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.danger + '30',
   },
   oweText: {
     ...Typography.label,
@@ -610,12 +606,10 @@ const styles = StyleSheet.create({
   owedContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.success + '15',
+    backgroundColor: Colors.success + '12',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.success + '30',
   },
   owedText: {
     ...Typography.label,
@@ -626,12 +620,10 @@ const styles = StyleSheet.create({
   awaitingConfirmationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.warning + '15',
+    backgroundColor: Colors.warning + '12',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.warning + '30',
   },
   awaitingConfirmationText: {
     ...Typography.label,
@@ -642,12 +634,10 @@ const styles = StyleSheet.create({
   confirmPaymentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.accent + '15',
+    backgroundColor: Colors.accent + '12',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.accent + '30',
   },
   confirmPaymentText: {
     ...Typography.label,
@@ -658,12 +648,10 @@ const styles = StyleSheet.create({
   evenContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.success + '15',
+    backgroundColor: Colors.success + '12',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.success + '30',
   },
   evenText: {
     ...Typography.label,
@@ -674,12 +662,10 @@ const styles = StyleSheet.create({
   needsSettlementContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.warning + '15',
+    backgroundColor: Colors.warning + '12',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Colors.warning + '30',
   },
   needsSettlementText: {
     ...Typography.label,
@@ -709,7 +695,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Colors.divider,
+    borderTopColor: '#F0EDE6',
   },
   participantsHeader: {
     flexDirection: 'row',
@@ -825,19 +811,14 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    borderWidth: 2.5,
-    borderColor: Colors.surface,
     backgroundColor: Colors.background,
   },
   participantAvatarPlaceholder: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    borderWidth: 2.5,
-    borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.avatar,
   },
   participantAvatarInitials: {
     color: Colors.surface,
@@ -854,11 +835,10 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     backgroundColor: Colors.success,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.button,
   },
   participantName: {
     ...Typography.caption,
@@ -875,11 +855,10 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: Colors.textSecondary + '90',
-    borderWidth: 2.5,
-    borderColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.avatar,
   },
   overflowText: {
     color: Colors.surface,

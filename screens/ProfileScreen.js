@@ -19,7 +19,7 @@ import { useTranslation } from '../contexts/LanguageContext';
 const ProfileScreen = ({ navigation }) => {
   const { t } = useTranslation();
   const [displayedExpensesCount, setDisplayedExpensesCount] = useState(3);
-  
+
   // Use shared expense data
   const { expenses, balances, userProfile, loading } = useExpenseData();
 
@@ -67,8 +67,8 @@ const ProfileScreen = ({ navigation }) => {
             </Text>
           </View>
         </View>
-        <TouchableOpacity 
-          onPress={() => navigation.navigate('Settings')} 
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Settings')}
           style={styles.settingsButton}
         >
           <Ionicons name="menu-outline" size={26} color={Colors.textPrimary} />
@@ -79,7 +79,7 @@ const ProfileScreen = ({ navigation }) => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        <BalanceSummary 
+        <BalanceSummary
           balances={balances}
           loading={loading}
         />
@@ -143,7 +143,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    ...Shadows.avatar,
   },
   profileInfo: {
     marginLeft: Spacing.md,

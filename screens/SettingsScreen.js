@@ -17,6 +17,7 @@ import ChangeVenmoBottomSheet from '../components/ChangeVenmoBottomSheet';
 import { useTranslation } from '../contexts/LanguageContext';
 import { useSettingsStore } from '../stores/useSettingsStore';
 import { presentPaywall, restorePurchases } from '../services/revenueCatService';
+import UserCard from '../components/UserCard';
 
 const SectionHeader = ({ title }) => (
   <View style={styles.sectionHeader}>
@@ -24,16 +25,16 @@ const SectionHeader = ({ title }) => (
   </View>
 );
 
-const SettingItem = ({ 
-  icon, 
-  title, 
-  onPress, 
-  showChevron = true, 
+const SettingItem = ({
+  icon,
+  title,
+  onPress,
+  showChevron = true,
   textColor = Colors.textPrimary,
   rightElement,
   danger = false
 }) => (
-  <TouchableOpacity 
+  <TouchableOpacity
     style={styles.settingItem}
     onPress={onPress}
     activeOpacity={0.7}
@@ -133,8 +134,8 @@ const SettingsScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()} 
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
@@ -142,7 +143,7 @@ const SettingsScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={styles.placeholder} />
       </View>
-      
+
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
         <SectionHeader title={t('settings.account')} />
@@ -219,6 +220,31 @@ const SettingsScreen = ({ navigation }) => {
           />
         </View>
 
+        <View style={styles.sectionSpacing} />
+
+        <SectionHeader title="[TEST] User Card Variations" />
+        <View style={{ marginBottom: Spacing.xl }}>
+          <Text style={{ ...Typography.label, color: Colors.textSecondary, marginBottom: Spacing.xs }}>Variant 1 (Soft Tint)</Text>
+          <UserCard
+            user={{ fullName: 'Kailee Reed', username: 'kailee-r' }}
+            designVariant="v1"
+          />
+          <Text style={{ ...Typography.label, color: Colors.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.xs }}>Variant 2 (Brutalist Tech)</Text>
+          <UserCard
+            user={{ fullName: 'Kailee Reed', username: 'kailee-r' }}
+            designVariant="v2"
+          />
+          <Text style={{ ...Typography.label, color: Colors.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.xs }}>Variant 3 (Corporate Accent)</Text>
+          <UserCard
+            user={{ fullName: 'Kailee Reed', username: 'kailee-r' }}
+            designVariant="v3"
+          />
+          <Text style={{ ...Typography.label, color: Colors.textSecondary, marginTop: Spacing.sm, marginBottom: Spacing.xs }}>Deleted User State (V1 Default)</Text>
+          <UserCard
+            variant="deleted"
+          />
+        </View>
+
         <Text style={styles.versionText}>Version 1.0.0</Text>
 
       </ScrollView>
@@ -274,7 +300,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     overflow: 'hidden',
     ...Shadows.card,
-    elevation: 2, 
+    elevation: 2,
     shadowOpacity: 0.05,
     borderWidth: 1,
     borderColor: Colors.surface, // Or transparent if using shadow

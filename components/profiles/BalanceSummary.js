@@ -50,7 +50,7 @@ const BalanceSummary = ({ balances, loading }) => {
         netBalanceValue.value = withTiming(netBalance, { duration: 800 });
       });
 
-      return () => {};
+      return () => { };
     }, [balances])
   );
 
@@ -133,7 +133,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
-    ...Shadows.card,
   },
   chartContainer: {
     height: 240, // Increased to accommodate larger chart
@@ -142,7 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   balanceCardsContainer: {
-    flexDirection: 'row', 
+    flexDirection: 'row',
     justifyContent: 'space-between',
     gap: Spacing.lg,
   },
@@ -153,7 +152,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderLeftWidth: 4,
     alignItems: 'center',
-    ...Shadows.card,
   },
   balanceHeader: {
     alignItems: 'center',
@@ -176,7 +174,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: Spacing.md,
-    ...Shadows.card,
   },
 });
 
